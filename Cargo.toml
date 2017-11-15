@@ -1,0 +1,8 @@
+[package]
+name = "rustytea"
+version = "0.1.0"
+authors = ["transistor <trans@jabberwocky.ca>"]
+
+[dependencies]
+#nom = "^3.2"
+nom = { version = "^3.2", features = ["verbose-errors"] }
