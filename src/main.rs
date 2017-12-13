@@ -1,118 +1,71 @@
 
+use std::fs::File;
+use std::io::prelude::*;
+
 #[macro_use]
 extern crate nom;
+extern crate clap;
+use clap::{ App, Arg };
 
 mod parser;
-use parser::*;
+use parser::AST;
+
+mod scope;
+use scope::ScopeRef;
+
+mod types;
+mod debug;
+mod interpreter;
+mod compiler_c;
 
 fn main() {
+    let matches = App::new("rustytea")
+                    .version("0.1")
+                    .about("A toy ML compiler")
+                    .arg(Arg::with_name("INPUT")
+                        .help("Sets the input file to use")
+                        .required(true)
+                        .index(1))
+                    .get_matches();
 
-    println!("Hello, world!");
-
-    let a = parse("
-
-        2 * (10 + -3) + 5
-        2 + 4 * 7 - 1 / 20  * 10 - 50 * 12
-        (2 * 3) + (4 - 5)
-        2 + 4 * 7 - 1 / 20  == 10 - 50 * 12
-
-        let a = 123.24 * 3
-        123 + ~124 * 25
-        123 + (124 * 25)
-
-        thing.stuff() * ~foo().bar
-
-
-        let recfoo = fn x -> do
-            if x < 1 then
-                1
-            else
-                x * recfoo(x - 1)
-        end
-        recfoo(3)
-
-        class Thing {
-            fn thing -> {
-                things * 4
-            }
-        }
-
-        for x in list
-            x * 100
-
-        []
-        [1, 2, 3 * 10 + 3]
-
-        let fac = fn x : int, y = 5 * 3, z: string = \"hey\" -> if not x then 1 else x - -123
-
-        type newint = {
-            things: int,
-            stuff: int
-        }
-
-        // TODO this at the end causes a parse error, but works everywhere else
-        //type newfloat = float
-
-
-    ".as_bytes());
-    println!("{:?}", a);
-
-    /*
-        import thing.stuff
-
-        dothings
-
-        let a : int = 123.24
-
-        while x
-            noop
-        while x > 0
-            stuff(5)
-
-        thing(5)
-        // TODO this probably shouldn't parse without a ; or \n
-        stuff \"things\"
-
-        0123
-        0x234
-        Inf
-        Info
-        -Inf
-        NaN
-        true false
-        thing.stuff() * ~foo().bar
-
-        let a = 123.24
-        // comments
-        123 + 124 * 25
-        let fac = fn x, y -> if not x then 1 else x - -123
-        fac(3)
-
-        do
-            stuff
-        end
-
-        {
-            stuff
-            { things }
-        }
-
-        match x == true with
-            1 -> x
-            2 -> x * 4
-            _ -> x * 16
-
-
-
-        let a = 123.24 * 3
-        123 + 124 * 25
-        123 + (124 * 25)
-        do 123 * 342 end
-    */
-
-    traverse(a.unwrap().1);
+    let filename = matches.value_of("INPUT").unwrap();
+    execute_file(filename);
 }
 
+fn execute_file(filename: &str) {
+    let mut f = File::open(filename).expect("Error: file not found");
+
+    let mut contents = String::new();
+    f.read_to_string(&mut contents).expect("Error reading file contents");
+    execute_string(contents.as_bytes())
+}
+
+fn process_input(text: &[u8]) -> (ScopeRef, Vec<AST>) {
+    let result = parser::parse(text);
+    println!("{:?}", result);
+    let mut code = result.unwrap().1;
+    let global = scope::bind_names(&mut code);
+    let gtype = types::check_types(global.clone(), &mut code);
+
+    //println!("\n{:?}\n\n{:?}", &code, global.clone());
+    debug::print_types(global.clone(), &code);
+    debug::print_types_scope(global.clone());
+    (global, code)
+}
+
+fn execute_string(text: &[u8]) {
+    let (global, code) = process_input(text);
+
+    let fin = interpreter::execute(global.clone(), &code);
+    println!("{:?}", fin);
+}
+
+fn compile_string(text: &[u8]) {
+    let (global, code) = process_input(text);
+
+    let fin = compiler_c::compile(global.clone(), &code);
+    println!("{}", fin);
+}
 
 fn traverse(tree: Vec<AST>) {
     for node in tree {
@@ -123,4 +76,5 @@ fn traverse(tree: Vec<AST>) {
         }
     }
 }
+
 
