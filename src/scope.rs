@@ -6,18 +6,21 @@ use std::collections::hash_map::Entry;
 
 use parser::{ AST, parse_type };
 use types::Type;
-use interpreter::Value;
+use interpreter;
+use compiler_llvm;
 
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Symbol {
     pub ttype: Type,
-    pub value: Option<Value>,
+    pub value: Option<interpreter::Value>,
+    pub address: Option<compiler_llvm::Value>,
 }
 
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Scope {
+    pub is_global: bool,
     pub names: HashMap<String, Rc<Symbol>>,
     pub types: HashMap<String, Type>,
     pub parent: Option<ScopeRef>,
@@ -29,6 +32,7 @@ pub type ScopeRef = Rc<RefCell<Scope>>;
 impl Scope {
     pub fn new(parent: Option<ScopeRef>) -> Scope {
         Scope {
+            is_global: false,
             names: HashMap::new(),
             types: HashMap::new(),
             parent: parent,
@@ -55,16 +59,23 @@ impl Scope {
         match self.names.contains_key(&name) {
             true => panic!("NameError: variable is already defined; {:?}", name),
             false => {
-                let sym = Rc::new(Symbol { ttype: ttype.unwrap_or_else(|| self.new_typevar()), value: None });
+                let sym = Rc::new(Symbol { ttype: ttype.unwrap_or_else(|| self.new_typevar()), value: None, address: None });
                 self.names.insert(name, sym)
             },
         };
     }
 
-    pub fn assign(&mut self, name: &String, value: Value) {
+    pub fn assign(&mut self, name: &String, value: interpreter::Value) {
         match self.names.entry(name.clone()) {
             Entry::Vacant(_) => panic!("NameError: variable is undefined; {:?}", name),
             Entry::Occupied(mut entry) => Rc::get_mut(entry.get_mut()).unwrap().value = Some(value),
+        }
+    }
+
+    pub fn assign_addr(&mut self, name: &String, value: compiler_llvm::Value) {
+        match self.names.entry(name.clone()) {
+            Entry::Vacant(_) => panic!("NameError: variable is undefined; {:?}", name),
+            Entry::Occupied(mut entry) => Rc::get_mut(entry.get_mut()).unwrap().address = Some(value),
         }
     }
 
@@ -163,39 +174,41 @@ impl Scope {
 
 
 pub fn make_global() -> ScopeRef {
-    let scope = Scope::new_ref(None);
+    let primatives = Scope::new_ref(None);
 
-    scope.borrow_mut().define_type(String::from("Int"), Type::Concrete(String::from("Int")));
-    scope.borrow_mut().define_type(String::from("Real"), Type::Concrete(String::from("Real")));
-    scope.borrow_mut().define_type(String::from("String"), Type::Concrete(String::from("String")));
-    scope.borrow_mut().define_type(String::from("Bool"), Type::Concrete(String::from("Bool")));
-    scope.borrow_mut().define_type(String::from("Class"), Type::Concrete(String::from("Class")));
+    primatives.borrow_mut().define_type(String::from("Int"), Type::Concrete(String::from("Int")));
+    primatives.borrow_mut().define_type(String::from("Real"), Type::Concrete(String::from("Real")));
+    primatives.borrow_mut().define_type(String::from("String"), Type::Concrete(String::from("String")));
+    primatives.borrow_mut().define_type(String::from("Bool"), Type::Concrete(String::from("Bool")));
+    primatives.borrow_mut().define_type(String::from("Class"), Type::Concrete(String::from("Class")));
 
     let bintype = parse_type("('a, 'a) -> 'a");
     let booltype = parse_type("('a, 'a) -> Bool");
-    scope.borrow_mut().define(String::from("*"), bintype.clone());
-    scope.borrow_mut().define(String::from("/"), bintype.clone());
-    scope.borrow_mut().define(String::from("^"), bintype.clone());
-    scope.borrow_mut().define(String::from("%"), bintype.clone());
-    scope.borrow_mut().define(String::from("+"), bintype.clone());
-    scope.borrow_mut().define(String::from("-"), bintype.clone());
-    scope.borrow_mut().define(String::from("<<"), bintype.clone());
-    scope.borrow_mut().define(String::from(">>"), bintype.clone());
-    scope.borrow_mut().define(String::from("<"), booltype.clone());
-    scope.borrow_mut().define(String::from(">"), booltype.clone());
-    scope.borrow_mut().define(String::from("<="), booltype.clone());
-    scope.borrow_mut().define(String::from(">="), booltype.clone());
-    scope.borrow_mut().define(String::from("=="), booltype.clone());
-    scope.borrow_mut().define(String::from("!="), booltype.clone());
-    scope.borrow_mut().define(String::from("&"), bintype.clone());
-    scope.borrow_mut().define(String::from("|"), bintype.clone());
-    scope.borrow_mut().define(String::from("and"), booltype.clone());
-    scope.borrow_mut().define(String::from("or"), booltype.clone());
-    scope.borrow_mut().define(String::from("~"), parse_type("(Int) -> Int"));
-    scope.borrow_mut().define(String::from("not"), parse_type("(Int) -> Bool"));
+    primatives.borrow_mut().define(String::from("*"), bintype.clone());
+    primatives.borrow_mut().define(String::from("/"), bintype.clone());
+    primatives.borrow_mut().define(String::from("^"), bintype.clone());
+    primatives.borrow_mut().define(String::from("%"), bintype.clone());
+    primatives.borrow_mut().define(String::from("+"), bintype.clone());
+    primatives.borrow_mut().define(String::from("-"), bintype.clone());
+    primatives.borrow_mut().define(String::from("<<"), bintype.clone());
+    primatives.borrow_mut().define(String::from(">>"), bintype.clone());
+    primatives.borrow_mut().define(String::from("<"), booltype.clone());
+    primatives.borrow_mut().define(String::from(">"), booltype.clone());
+    primatives.borrow_mut().define(String::from("<="), booltype.clone());
+    primatives.borrow_mut().define(String::from(">="), booltype.clone());
+    primatives.borrow_mut().define(String::from("=="), booltype.clone());
+    primatives.borrow_mut().define(String::from("!="), booltype.clone());
+    primatives.borrow_mut().define(String::from("&"), bintype.clone());
+    primatives.borrow_mut().define(String::from("|"), bintype.clone());
+    primatives.borrow_mut().define(String::from("and"), booltype.clone());
+    primatives.borrow_mut().define(String::from("or"), booltype.clone());
+    primatives.borrow_mut().define(String::from("~"), parse_type("(Int) -> Int"));
+    primatives.borrow_mut().define(String::from("not"), parse_type("(Int) -> Bool"));
 
+    primatives.borrow_mut().define(String::from("puts"), parse_type("(String) -> Bool"));
 
-    let global = Scope::new_ref(Some(scope));
+    let global = Scope::new_ref(Some(primatives));
+    global.borrow_mut().is_global = true;
     return global;
 }
 
@@ -219,7 +232,7 @@ fn bind_names_node(scope: ScopeRef, node: &mut AST) {
             bind_names_node(scope.clone(), code);
         },
 
-        AST::Function(ref args, ref mut body, ref mut fscope) => {
+        AST::Function(ref args, ref mut body, ref mut fscope, _, _) => {
             fscope.borrow_mut().set_parent(scope.clone());
 
             for arg in args {

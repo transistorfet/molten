@@ -5,7 +5,7 @@ use types::Type;
 
 pub fn compile(scope: ScopeRef, code: &Vec<AST>) -> String {
     let mut data = CompilerData::new();
-    let main = data.compile_vec(scope, code);
+    let main = data.compile_vec(scope, code, true);
 
     let mut compiled = String::new();
     for func in data.funcs {
@@ -31,11 +31,11 @@ impl CompilerData {
         }
     }
 
-    pub fn compile_vec(&mut self, scope: ScopeRef, code: &Vec<AST>) -> String {
+    pub fn compile_vec(&mut self, scope: ScopeRef, code: &Vec<AST>, is_last: bool) -> String {
         let mut compiled = String::new();
 
         for i in 0 .. code.len() - 1 {
-            compiled = compiled + &self.indent + &self.compile_node(scope.clone(), &code[i]);
+            compiled = compiled + &self.indent + &self.compile_node(scope.clone(), &code[i], if is_last && i == code.len() { true } else { false });
             if i != code.len() {
                 compiled = compiled + &";\n";
             }
@@ -43,8 +43,8 @@ impl CompilerData {
         compiled
     }
 
-    pub fn compile_node(&mut self, scope: ScopeRef, node: &AST) -> String {
-        match *node {
+    pub fn compile_node(&mut self, scope: ScopeRef, node: &AST, is_last: bool) -> String {
+        let text = match *node {
             AST::Nil => String::from("NULL"),
             AST::Boolean(ref boolean) => match *boolean { true => String::from("1"), false => String::from("0") },
             AST::Integer(ref num) => num.to_string(),
@@ -81,7 +81,7 @@ impl CompilerData {
 
                 let mut compiled = vec!();
                 for code in args {
-                    compiled.push(self.compile_node(scope.clone(), code));
+                    compiled.push(self.compile_node(scope.clone(), code, false));
                 }
 
                 if let Some(result) = CompilerData::compile_builtin(name, &compiled) {
@@ -92,12 +92,12 @@ impl CompilerData {
                 }
             },
 
-            AST::Function(ref args, ref body, ref fscope) => {
+            AST::Function(ref args, ref body, ref fscope, ref ftype, _) => {
                 let mut compiled_args = vec!();
                 for &(ref name, ref ttype, ref value) in args {
-                    compiled_args.push(self.compile_type(fscope.clone(), ttype.clone().unwrap()) + &" " + &name.clone());
+                    compiled_args.push(self.compile_variable_def(fscope.clone(), ttype.clone().unwrap(), name));
                 }
-                let compiled = self.compile_node(fscope.clone(), body);
+                let compiled = self.compile_node(fscope.clone(), body, true);
 
                 let name = self.next;
                 self.next += 1;
@@ -106,15 +106,20 @@ impl CompilerData {
             },
 
             AST::Definition((ref name, ref ttype), ref body) => {
-                self.compile_type(scope.clone(), ttype.clone().unwrap()) + &" " + &name.clone() + &" = " + &self.compile_node(scope.clone(), body)
+                self.compile_variable_def(scope.clone(), ttype.clone().unwrap(), name) + &" = " + &self.compile_node(scope.clone(), body, false)
             },
 
-            AST::Block(ref body) => { self.compile_vec(scope.clone(), body) },
+            AST::Block(ref body) => { self.compile_vec(scope.clone(), body, is_last) },
 
             AST::If(ref cond, ref texpr, ref fexpr) => {
                 let old = self.indent.clone();
                 self.indent = old.clone() + &"    ";
-                let compiled = format!("{space}if ({}) {{\n{indent}{}\n{space}}} else {{\n{indent}{}\n{space}}}", self.compile_node(scope.clone(), cond), self.compile_node(scope.clone(), texpr), self.compile_node(scope.clone(), fexpr), space=old, indent=self.indent);
+
+                let compiled_cond = self.compile_node(scope.clone(), cond, false);
+                let compiled_texpr = self.compile_node(scope.clone(), texpr, is_last);
+                let compiled_fexpr = self.compile_node(scope.clone(), fexpr, is_last);
+                let compiled = format!("{space}if ({}) {{\n{indent}{}\n{space}}} else {{\n{indent}{}\n{space}}}", compiled_cond, compiled_texpr, compiled_fexpr, space=old, indent=self.indent);
+
                 self.indent = old;
                 compiled
             },
@@ -140,9 +145,9 @@ impl CompilerData {
                 // TODO should you implement this as an if statement instead?
                 let mut compiled_cases = vec!();
                 for &(ref case, ref expr) in cases {
-                    compiled_cases.push(format!("{space}  case {}:\n{indent}{}\n{indent}break;", self.compile_node(scope.clone(), case), self.compile_node(scope.clone(), expr), space=old, indent=self.indent));
+                    compiled_cases.push(format!("{space}  case {}:\n{indent}{}\n{indent}break;", self.compile_node(scope.clone(), case, false), self.compile_node(scope.clone(), expr, is_last), space=old, indent=self.indent));
                 }
-                let compiled = format!("select ({}) {{\n{}\n{space}}}", self.compile_node(scope.clone(), cond), compiled_cases.join("\n"), space=old);
+                let compiled = format!("switch ({}) {{\n{}\n{space}}}", self.compile_node(scope.clone(), cond, false), compiled_cases.join("\n"), space=old);
 
                 self.indent = old;
                 compiled
@@ -151,7 +156,7 @@ impl CompilerData {
             AST::While(ref cond, ref body) => {
                 let old = self.indent.clone();
                 self.indent = old.clone() + &"    ";
-                let compiled = format!("while ({}) {{\n{indent}{}\n{space}}}", self.compile_node(scope.clone(), cond), add_terminator(self.compile_node(scope.clone(), body)), space=old, indent=self.indent);
+                let compiled = format!("while ({}) {{\n{indent}{}\n{space}}}", self.compile_node(scope.clone(), cond, false), add_terminator(self.compile_node(scope.clone(), body, false)), space=old, indent=self.indent);
                 self.indent = old;
                 compiled
             },
@@ -175,30 +180,35 @@ impl CompilerData {
     */
 
             _ => { String::new() },
+        };
+
+        match is_last {
+            true => format!("return {};", text),
+            false => text
         }
     }
 
-    fn compile_type(&mut self, scope: ScopeRef, ttype: Type) -> String {
+    fn compile_variable_def(&mut self, scope: ScopeRef, ttype: Type, name: &String) -> String {
         // TODO finish this
         match ttype {
-            Type::Concrete(ref name) => match name.as_str() {
+            Type::Concrete(ref tname) => format!("{} {}", match tname.as_str() {
                 "Bool" => String::from("int"),
                 "Int" => String::from("int"),
                 "Real" => String::from("double"),
                 "String" => String::from("char *"),
                 _ => String::from("UNKNOWN"),
-            },
+            }, name),
             Type::Function(ref args, ref ret) => {
                 let mut compiled_args = vec!();
                 for ttype in args {
-                    compiled_args.push(self.compile_type(scope.clone(), ttype.clone()));
+                    compiled_args.push(self.compile_variable_def(scope.clone(), ttype.clone(), &String::from("")));
                 }
-                let compiled_ret = self.compile_type(scope.clone(), *ret.clone());
-                format!("{} (*)({})", compiled_ret, compiled_args.join(", "))
+                let compiled_ret = self.compile_variable_def(scope.clone(), *ret.clone(), &String::from(""));
+                format!("{} (*{})({})", compiled_ret, name, compiled_args.join(", "))
             },
             // TODO this is temporary
-            Type::Variable(ref name) => String::from("int"),
-            _ => String::from("UNKNOWN"),
+            Type::Variable(ref tname) => String::from("int ") + name,
+            _ => String::from("UNKNOWN ") + name,
         }
     }
 
@@ -213,7 +223,7 @@ impl CompilerData {
         else {
             match name.as_str() {
                 "and" => Some(format!("({} {} {})", args[0], "&&", args[1])),
-                "and" => Some(format!("({} {} {})", args[0], "||", args[1])),
+                "or" => Some(format!("({} {} {})", args[0], "||", args[1])),
                 "not" => Some(format!("{}({})", "!", args[0])),
                 _ => None
             }

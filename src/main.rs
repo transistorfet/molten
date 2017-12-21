@@ -17,6 +17,7 @@ mod types;
 mod debug;
 mod interpreter;
 mod compiler_c;
+mod compiler_llvm;
 
 fn main() {
     let matches = App::new("rustytea")
@@ -26,10 +27,17 @@ fn main() {
                         .help("Sets the input file to use")
                         .required(true)
                         .index(1))
+                    .arg(Arg::with_name("compile")
+                        .short("c")
+                        .help("Compiles to C rather than executing"))
                     .get_matches();
 
     let filename = matches.value_of("INPUT").unwrap();
-    execute_file(filename);
+    match matches.occurrences_of("compile") {
+        0 => execute_file(filename),
+        1 => compile_file(filename),
+        _ => println!("Invalid argument: -c"),
+    }
 }
 
 fn execute_file(filename: &str) {
@@ -38,6 +46,28 @@ fn execute_file(filename: &str) {
     let mut contents = String::new();
     f.read_to_string(&mut contents).expect("Error reading file contents");
     execute_string(contents.as_bytes())
+}
+
+fn execute_string(text: &[u8]) {
+    let (global, code) = process_input(text);
+
+    let fin = interpreter::execute(global.clone(), &code);
+    println!("{:?}", fin);
+}
+
+fn compile_file(filename: &str) {
+    let mut f = File::open(filename).expect("Error: file not found");
+
+    let mut contents = String::new();
+    f.read_to_string(&mut contents).expect("Error reading file contents");
+    compile_string(contents.as_bytes())
+}
+
+fn compile_string(text: &[u8]) {
+    let (global, code) = process_input(text);
+
+    let fin = compiler_llvm::compile(global.clone(), &code);
+    println!("{}", fin);
 }
 
 fn process_input(text: &[u8]) -> (ScopeRef, Vec<AST>) {
@@ -51,20 +81,6 @@ fn process_input(text: &[u8]) -> (ScopeRef, Vec<AST>) {
     debug::print_types(global.clone(), &code);
     debug::print_types_scope(global.clone());
     (global, code)
-}
-
-fn execute_string(text: &[u8]) {
-    let (global, code) = process_input(text);
-
-    let fin = interpreter::execute(global.clone(), &code);
-    println!("{:?}", fin);
-}
-
-fn compile_string(text: &[u8]) {
-    let (global, code) = process_input(text);
-
-    let fin = compiler_c::compile(global.clone(), &code);
-    println!("{}", fin);
 }
 
 fn traverse(tree: Vec<AST>) {

@@ -1,0 +1,23 @@
+
+* ensure typevars in invoke are unique to the scope before adding
+
+* make a temporary function to go through all variables and resolve their types, and report if they resolve further, which might be an issue...
+
+* there is currently no way to specify a functions return type...
+* remove unused typechecking vars somehow...
+* clean up typechecking code
+* implement type definition in namebinding and typechecking
+* should you allow keyword arguments in invoke; foo(a=10, b=20)
+* should you allow arguments with a default value to be omitted from a function call?, that would require a bunch of changes to typechecking
+
+
+* add dicts syntax
+
+* issue with separator/lf not working when two expressions are on the same line (it should produce a parse error)
+* add line and column numbers to error reporting
+* add error returning so multiple errors can be caught at once
+* make nestable comments
+
+* add macros and expandable forms (like lisp)
+* add an LLVM backend
+

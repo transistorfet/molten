@@ -11,7 +11,7 @@ pub fn print_types(scope: ScopeRef, code: &Vec<AST>) {
 pub fn print_types_node(scope: ScopeRef, node: &AST) {
     match *node {
         AST::Block(ref body) => print_types(scope.clone(), body),
-        AST::Function(ref args, ref body, ref fscope) => {
+        AST::Function(ref args, ref body, ref fscope, ref ftype, _) => {
             print_types_scope(fscope.clone());
             print_types_node(fscope.clone(), body);
         },

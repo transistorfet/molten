@@ -1,8 +1,13 @@
 
+use std::fmt;
+use std::rc::Rc;
+use std::cell::RefCell;
+use std::collections::HashMap;
 
 use parser::AST;
-use scope::ScopeRef;
+use scope::{ Scope, ScopeRef };
 use types::Type;
+
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Value {
@@ -12,19 +17,79 @@ pub enum Value {
     Real(f64),
     String(String),
     List(Vec<Value>),
-    Function(ScopeRef, AST),
-    AST(AST),
+    Function(ScopeRef, Vec<(String, Option<Type>, Option<AST>)>, AST),
     Builtin(fn(ScopeRef, Vec<Value>) -> Value),
+    AST(AST),
 }
 
 impl Value {
     fn is_true(&self) -> bool {
-        match self == &Value::Nil || self == &Value::Boolean(false) {
-            true => true,
-            false => false
+        self != &Value::Nil && self != &Value::Boolean(false)
+    }
+}
+
+impl fmt::Display for Value {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            &Value::Function(ref fscope, ref args, ref body) => write!(f, "Function({:?})", body),
+            _ => write!(f, "{:?}", self)
         }
     }
 }
+
+
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct Env {
+    pub names: HashMap<String, Value>,
+    pub parent: Option<EnvRef>,
+}
+
+pub type EnvRef = Rc<RefCell<Env>>;
+
+
+impl Env {
+    pub fn new(parent: Option<EnvRef>) -> Env {
+        Env {
+            names: HashMap::new(),
+            parent: parent,
+        }
+    }
+
+    pub fn new_ref(parent: Option<EnvRef>) -> EnvRef {
+        Rc::new(RefCell::new(Env::new(parent)))
+    }
+
+    pub fn set_parent(&mut self, parent: EnvRef) {
+        self.parent = Some(parent);
+    }
+
+    pub fn assign(&mut self, name: String, value: Value) {
+        //match self.names.entry(name.clone()) {
+        //    Entry::Vacant(_) => panic!("NameError: variable is undefined; {:?}", name),
+        //    Entry::Occupied(mut entry) => Rc::get_mut(entry.get_mut()).unwrap().value = Some(value),
+        //}
+        match self.names.contains_key(&name) {
+            true => panic!("NameError: variable is already defined; {:?}", name),
+            false => self.names.insert(name, value)
+        };
+    }
+
+    pub fn find(&self, name: &String) -> Option<Value> {
+        if let Some(x) = self.names.get(name) {
+            return Some(x.clone());
+        }
+        else if let Some(ref parent) = self.parent {
+            return parent.borrow().find(name).map(|x| x.clone());
+        }
+        else {
+            return None;
+        }
+    }
+}
+
+
+
 
 
 pub fn execute(scope: ScopeRef, code: &Vec<AST>) {
@@ -50,7 +115,7 @@ impl Interpreter {
 
         for node in code {
             last = self.execute_node(scope.clone(), node);
-            println!("PARTIAL: {:?}", last);
+            println!("PARTIAL: {}", last);
         }
         last
     }
@@ -71,7 +136,12 @@ impl Interpreter {
                 Value::List(list)
             },
 
-            AST::Identifier(ref name) => { scope.borrow().find(name).unwrap().value.clone().unwrap() },
+            AST::Identifier(ref name) => {
+                match scope.borrow().find(name).unwrap().value.clone() {
+                    None => panic!("UnsetError: use before assignment {:?}", name),
+                    Some(x) => x
+                }
+            },
 
             AST::Invoke(ref name, ref args) => {
                 let func = &scope.borrow().find(name).unwrap().value;
@@ -81,8 +151,14 @@ impl Interpreter {
                     values.push(self.execute_node(scope.clone(), arg));
                 }
 
-                if let &Some(Value::Function(ref fscope, ref body)) = func {
-                    self.execute_node(fscope.clone(), body)
+                if let &Some(Value::Function(ref fscope, ref argdefs, ref body)) = func {
+                    let lscope = Scope::new_ref(fscope.borrow().get_parent());
+                    for (ref def, value) in argdefs.iter().zip(values.iter()) {
+                        lscope.borrow_mut().define(def.0.clone(), def.1.clone());
+                        lscope.borrow_mut().assign(&def.0, value.clone());
+                    }
+
+                    self.execute_node(lscope.clone(), body)
                 }
                 else if let &Some(Value::Builtin(ref funcptr)) = func {
                     funcptr(scope.clone(), values)
@@ -92,9 +168,8 @@ impl Interpreter {
                 }
             },
 
-            AST::Function(ref args, ref body, ref fscope) => {
-                println!("FUC: {:?}", fscope);
-                Value::Function(fscope.clone(), *body.clone())
+            AST::Function(ref args, ref body, ref fscope, _, _) => {
+                Value::Function(fscope.clone(), args.clone(), *body.clone())
             },
 
             AST::Definition((ref name, ref ttype), ref body) => {

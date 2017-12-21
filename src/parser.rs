@@ -99,7 +99,7 @@ pub enum AST {
     Try(Box<AST>, Vec<(AST, AST)>),
     Match(Box<AST>, Vec<(AST, AST)>),
     For(String, Box<AST>, Box<AST>, ScopeRef),
-    Function(Vec<(String, Option<Type>, Option<AST>)>, Box<AST>, ScopeRef),
+    Function(Vec<(String, Option<Type>, Option<AST>)>, Box<AST>, ScopeRef, Option<Type>, String),
     Class(String, Vec<AST>, ScopeRef),
 
     Import(String),
@@ -281,7 +281,7 @@ named!(function<AST>,
         l: identifier_list_defaults >>
         wscom!(tag!("->")) >>
         e: expression >>
-        (AST::Function(l, Box::new(e), Scope::new_ref(None)))
+        (AST::Function(l, Box::new(e), Scope::new_ref(None), None, next_id()))
     )
 );
 
@@ -684,7 +684,7 @@ named!(line_comment,
 );
 
 named!(block_comment,
-    delimited!(tag!("/*"), is_not!("*/"), tag!("*/"))              //, |s| AST::Comment(String::from(str::from_utf8(s).unwrap())))
+    delimited!(tag!("/*"), take_until!("*/"), tag!("*/"))              //, |s| AST::Comment(String::from(str::from_utf8(s).unwrap())))
 );
 
 
@@ -710,6 +710,14 @@ pub fn count_lines(text: &[u8]) {
             //*lines.get_mut() += 1;
             unsafe { lines += 1; }
         }
+    }
+}
+
+static mut function_id: usize = 0;
+pub fn next_id() -> String {
+    unsafe {
+        function_id += 1;
+        format!("anon{}", function_id)
     }
 }
  

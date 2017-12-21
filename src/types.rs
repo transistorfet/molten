@@ -92,7 +92,7 @@ pub fn check_types_node(scope: ScopeRef, node: &mut AST) -> Type {
             }
         },
 
-        AST::Function(ref mut args, ref mut body, ref fscope) => {
+        AST::Function(ref mut args, ref mut body, ref fscope, ref mut ftype, _) => {
             let mut argtypes: Vec<Type> = vec!();
             for &(ref name, ref ttype, ref value) in &*args {
                 let vtype = match value.clone() {
@@ -121,7 +121,9 @@ pub fn check_types_node(scope: ScopeRef, node: &mut AST) -> Type {
             update_scope_variable_types(fscope.clone());
 
             println!("FUNC: {:?} {:?}", argtypes, rettype);
-            return Type::Function(argtypes, Box::new(rettype));
+            let nftype = Type::Function(argtypes, Box::new(rettype));
+            *ftype = Some(nftype.clone());
+            nftype
         },
 
 
