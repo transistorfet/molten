@@ -180,10 +180,16 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, scope: ScopeRef, node: &
         },
 
         AST::Identifier(ref name) => {
-            let mut pointer = llvm::core::LLVMGetNamedGlobal(data.module, CString::new(name.as_bytes()).unwrap().as_ptr());
-            if pointer.is_null() {
-                pointer = scope.borrow().find(name).unwrap().address.clone().expect(format!("UnsetError: use before assignment {:?}", name).as_str());
-            }
+            let pointer = match scope.borrow().find(name).unwrap().address.clone() {
+                Some(x) => x,
+                None => {
+                    let pointer = llvm::core::LLVMGetNamedGlobal(data.module, CString::new(name.as_bytes()).unwrap().as_ptr());
+                    if pointer.is_null() {
+                        panic!("UnsetError: use before assignment {:?}", name);
+                    }
+                    pointer
+                }
+            };
             println!("IDENT: {:?} {:?}", llvm::core::LLVMGetValueKind(pointer), llvm::core::LLVMGetTypeKind(llvm::core::LLVMTypeOf(pointer)));
             //if llvm::core::LLVMGetTypeKind(llvm::core::LLVMTypeOf(pointer)) == llvm::LLVMTypeKind::LLVMPointerTypeKind {
             if llvm::core::LLVMGetValueKind(pointer) == llvm::LLVMValueKind::LLVMArgumentValueKind {

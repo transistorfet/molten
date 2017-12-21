@@ -17,11 +17,17 @@ pub struct Symbol {
     pub address: Option<compiler_llvm::Value>,
 }
 
+#[derive(Clone, Debug, PartialEq)]
+pub struct TypeInfo {
+    pub ttype: Type,
+    pub members: ScopeRef,
+}
+
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Scope {
     pub is_global: bool,
-    pub names: HashMap<String, Rc<Symbol>>,
+    pub names: HashMap<String, Symbol>,
     pub types: HashMap<String, Type>,
     pub parent: Option<ScopeRef>,
 }
@@ -59,58 +65,80 @@ impl Scope {
         match self.names.contains_key(&name) {
             true => panic!("NameError: variable is already defined; {:?}", name),
             false => {
-                let sym = Rc::new(Symbol { ttype: ttype.unwrap_or_else(|| self.new_typevar()), value: None, address: None });
+                let sym = Symbol { ttype: ttype.unwrap_or_else(|| self.new_typevar()), value: None, address: None };
                 self.names.insert(name, sym)
             },
         };
     }
 
-    pub fn assign(&mut self, name: &String, value: interpreter::Value) {
+    pub fn modify<F>(&mut self, name: &String, mut f: F) -> () where F: FnMut(&mut Symbol) -> () {
         match self.names.entry(name.clone()) {
             Entry::Vacant(_) => panic!("NameError: variable is undefined; {:?}", name),
-            Entry::Occupied(mut entry) => Rc::get_mut(entry.get_mut()).unwrap().value = Some(value),
+            Entry::Occupied(mut entry) => f(entry.get_mut()),
         }
+    } 
+
+    pub fn assign(&mut self, name: &String, value: interpreter::Value) {
+        //match self.names.entry(name.clone()) {
+        //    Entry::Vacant(_) => panic!("NameError: variable is undefined; {:?}", name),
+        //    Entry::Occupied(mut entry) => entry.get_mut().value = Some(value),
+        //}
+        self.modify(name, move |sym| sym.value = Some(value.clone()))
     }
 
     pub fn assign_addr(&mut self, name: &String, value: compiler_llvm::Value) {
-        match self.names.entry(name.clone()) {
-            Entry::Vacant(_) => panic!("NameError: variable is undefined; {:?}", name),
-            Entry::Occupied(mut entry) => Rc::get_mut(entry.get_mut()).unwrap().address = Some(value),
-        }
+        //match self.names.entry(name.clone()) {
+        //    Entry::Vacant(_) => panic!("NameError: variable is undefined; {:?}", name),
+        //    Entry::Occupied(mut entry) => entry.get_mut().address = Some(value),
+        //}
+        self.modify(name, move |sym| sym.address = Some(value))
     }
 
     pub fn update_variable_type(&mut self, name: &String, ttype: Type) {
-        match self.names.entry(name.clone()) {
-            Entry::Vacant(_) => panic!("NameError: variable is undefined; {:?}", name),
-            Entry::Occupied(mut entry) => Rc::get_mut(entry.get_mut()).unwrap().ttype = ttype,
-        };
+        //match self.names.entry(name.clone()) {
+        //    Entry::Vacant(_) => panic!("NameError: variable is undefined; {:?}", name),
+        //    Entry::Occupied(mut entry) => entry.get_mut().ttype = ttype,
+        //};
+        self.modify(name, move |sym| sym.ttype = ttype.clone())
     }
 
     pub fn swap_variable_type(&mut self, name: &String, f: &Fn(Type) -> Type) {
         match self.names.entry(name.clone()) {
             Entry::Vacant(_) => panic!("NameError: variable is undefined; {:?}", name),
             Entry::Occupied(mut entry) => {
-                let sym = Rc::get_mut(entry.get_mut()).unwrap();
+                let sym = entry.get_mut();
                 sym.ttype = f(sym.ttype.clone());
             },
         };
     }
 
-    pub fn find(&self, name: &String) -> Option<Rc<Symbol>> {
+    pub fn find(&self, name: &String) -> Option<Symbol> {
         if let Some(x) = self.names.get(name) {
-            return Some(x.clone());
+            Some(x.clone())
         }
         else if let Some(ref parent) = self.parent {
-            return parent.borrow().find(name).map(|x| x.clone());
+            parent.borrow().find(name).map(|x| x.clone())
         }
         else {
-            return None;
+            None
         }
     }
 
     /*
-    pub fn foreach(&mut self, f: &mut FnMut(&mut Symbol) -> ()) {
-        for (ref name, ref mut sym) in &self.names {
+    pub fn find_and<F, R>(&mut self, name: &String, mut f: F) -> Option<R> where F: FnMut(&mut Symbol) -> Option<R> {
+        if let Some(ref mut sym) = self.names.get(name) {
+            f(sym)
+        }
+        else if let Some(ref parent) = self.parent {
+            parent.borrow_mut().find_and(name, f)
+        }
+        else {
+            None
+        }
+    }
+
+    pub fn foreach<F>(&mut self, mut f: F) where F: FnMut(&mut Symbol) -> () {
+        for (ref name, ref mut sym) in &mut self.names {
             f(sym)
         }
     }
@@ -120,6 +148,7 @@ impl Scope {
         match self.types.contains_key(&name) {
             true => panic!("NameError: type is already defined; {:?}", name),
             false => self.types.insert(name, ttype),
+            //false => self.types.insert(name, TypeInfo { ttype: ttype, members: Scope::new_ref() }),
         };
     }
 
@@ -129,13 +158,13 @@ impl Scope {
 
     pub fn find_type(&self, name: &String) -> Option<Type> {
         if let Some(x) = self.types.get(name) {
-            return Some(x.clone());
+            Some(x.clone())
         }
         else if let Some(ref parent) = self.parent {
-            return parent.borrow().find_type(name).map(|x| x.clone());
+            parent.borrow().find_type(name).map(|x| x.clone())
         }
         else {
-            return None;
+            None
         }
     }
 

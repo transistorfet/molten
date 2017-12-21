@@ -3,7 +3,6 @@
 
 * make a temporary function to go through all variables and resolve their types, and report if they resolve further, which might be an issue...
 
-* there is currently no way to specify a functions return type...
 * remove unused typechecking vars somehow...
 * clean up typechecking code
 * implement type definition in namebinding and typechecking
@@ -19,5 +18,4 @@
 * make nestable comments
 
 * add macros and expandable forms (like lisp)
-* add an LLVM backend
 

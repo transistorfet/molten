@@ -3,7 +3,6 @@
         let stringstuff = fn x: String -> msg
         puts(msg)
 
-    /*
         2 + 5
 
         let e = 3
@@ -36,8 +35,7 @@
         recfoo(3)
 
 
-        let msg = "Hey"
-        printf(msg)
+    /*
 
         while a > 0     //things
             recfoo(5)

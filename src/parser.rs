@@ -135,13 +135,11 @@ named!(statement<AST>,
 );
 
 named!(import<AST>,
-dbg_dmp!(
     do_parse!(
         wscom!(tag_word!("import")) >>
         e: map_str!(recognize!(separated_list!(tag!("."), identifier))) >>
         (AST::Import(e))
     )
-)
 );
 
 named!(definition<AST>,
@@ -250,7 +248,6 @@ named!(matchcase<AST>,
 );
 
 named!(caselist<Vec<(AST, AST)>>,
-dbg_dmp!(
     //separated_list!(wscom!(tag!(",")), do_parse!(
     many1!(do_parse!(
         //wscom!(tag!("|")) >>
@@ -260,7 +257,6 @@ dbg_dmp!(
         //wscom!(tag!(",")) >>
         (c, e)
     ))
-)
 );
 
 named!(forloop<AST>,
@@ -656,14 +652,12 @@ named!(list<AST>,
 
 
 named!(separator,
-dbg_dmp!(
     recognize!(many0!(
         //alt!(take_while1!(is_ws) | comment)
         //alt!(take_while1!(is_ws) | delimited!(tag!("//"), not_line_ending, line_ending))
         //terminated!(sp!(alt!(line_comment | block_comment)), line_ending)
         delimited!(space_comment, alt!(line_ending | tag!(";")), multispace_comment)
     ))
-)
 );
 
 
@@ -683,6 +677,7 @@ named!(line_comment,
     delimited!(tag!("//"), not_line_ending, peek!(line_ending))    //, |s| AST::Comment(String::from(str::from_utf8(s).unwrap())))
 );
 
+// TODO allow for nested comments
 named!(block_comment,
     delimited!(tag!("/*"), take_until!("*/"), tag!("*/"))              //, |s| AST::Comment(String::from(str::from_utf8(s).unwrap())))
 );
