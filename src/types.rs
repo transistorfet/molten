@@ -1,30 +1,33 @@
 
 
+use std::fmt::Debug;
+
 use parser::AST;
-use scope::{ Scope, ScopeRef };
+use scope::{ Scope, ScopeRef, ScopeMapRef };
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Type {
     Concrete(String),
     Variable(String),
+    Class(String),
     List(Box<Type>),
     Function(Vec<Type>, Box<Type>)
 }
 
-pub fn check_types(scope: ScopeRef, code: &mut Vec<AST>) -> Type {
+pub fn check_types<V>(map: ScopeMapRef<V>, scope: ScopeRef<V>, code: &mut Vec<AST>) -> Type where V: Clone + Debug {
     //let types = vec!();
     let mut last: Type = Type::Concrete(String::from("Nil"));
 
     for node in code {
-        //types.push(check_types_node(scope.clone(), node));
-        last = check_types_node(scope.clone(), node);
+        //types.push(check_types_node(map.clone(), scope.clone(), node));
+        last = check_types_node(map.clone(), scope.clone(), node);
         println!("TYPE: {:?}", last);
     }
 
     return last;
 }
 
-pub fn check_types_node(scope: ScopeRef, node: &mut AST) -> Type {
+pub fn check_types_node<V>(map: ScopeMapRef<V>, scope: ScopeRef<V>, node: &mut AST) -> Type where V: Clone + Debug {
     let x = match *node {
         AST::Nil => Type::Concrete(String::from("Nil")),
         AST::Boolean(_) => Type::Concrete(String::from("Bool")),
@@ -35,68 +38,73 @@ pub fn check_types_node(scope: ScopeRef, node: &mut AST) -> Type {
         AST::List(ref mut items) => {
             let mut ltype = None;
             for ref mut expr in items {
-                ltype = Some(expect_type(scope.clone(), ltype, Some(check_types_node(scope.clone(), expr))));
+                ltype = Some(expect_type(scope.clone(), ltype, Some(check_types_node(map.clone(), scope.clone(), expr))));
             }
             Type::List(Box::new(ltype.unwrap()))
         },
 
         AST::Identifier(ref name) => scope.borrow().find(name).unwrap().ttype.clone(),
 
-        AST::Invoke(ref name, ref mut args) => {
+        AST::Invoke(ref name, ref mut args, ref mut stype) => {
             let mut ftype = match scope.borrow().find(name) {
                 None => panic!("Function not found: {:?}", name),
                 Some(sym) => sym.ttype.clone(),
             };
 
             let tscope = Scope::new_ref(Some(scope.clone()));
-            if let Type::Function(ref mut types, ref ret) = ftype {
-                // TODO I think this needs to reallocate the type variables so they don't conflict with types in the parent context?  Or maybe this is somehow why i didn't give the scope a parent in the other one
-                for ttype in types.clone() {
-                    if let Type::Variable(ref name) = ttype {
-                        if !tscope.borrow_mut().contains_type(name) {
-                            tscope.borrow_mut().define_type(name.clone(), ttype.clone());
+            match ftype {
+                Type::Function(ref mut types, ref ret) => {
+                    // TODO I think this needs to reallocate the type variables so they don't conflict with types in the parent context?  Or maybe this is somehow why i didn't give the scope a parent in the other one
+                    for ttype in types.clone() {
+                        if let Type::Variable(ref name) = ttype {
+                            if !tscope.borrow_mut().contains_type(name) {
+                                tscope.borrow_mut().define_type(name.clone(), ttype.clone());
+                            }
                         }
                     }
-                }
 
-                //let mut argtypes = vec!();
-                for (ttype, ref mut value) in types.iter().zip(args.iter()) {
-                    //argtypes.push(check_types_node(tscope.clone(), &mut value.clone()));
-                    // TODO do you have to do these in separate steps
-                    let atype = check_types_node(tscope.clone(), &mut value.clone());
-                    // NOTE atype should take priority over ttype because ttype is locally defined, whereas atype variable are defined in the parent scope
-                    //      actually i don't have a clue why this works, but it does, could still be broken
-                    expect_type(tscope.clone(), Some(atype), Some(ttype.clone()));
-                }
+                    let mut stypes = vec!();
+                    for (ttype, ref mut value) in types.iter().zip(args.iter_mut()) {
+                        //argtypes.push(check_types_node(map.clone(), tscope.clone(), value));
+                        // TODO do you have to do these in separate steps
+                        let atype = check_types_node(map.clone(), tscope.clone(), value);
+                        // NOTE atype should take priority over ttype because ttype is locally defined, whereas atype variable are defined in the parent scope
+                        //      actually i don't have a clue why this works, but it does, could still be broken
+                        stypes.push(expect_type(tscope.clone(), Some(atype), Some(ttype.clone())));
+                    }
 
-                //for (ttype, atype) in types.iter().zip(argtypes.iter()) {
-                //    expect_type(tscope.clone(), Some(ttype.clone()), Some(atype.clone()));
-                //}
+                    //for (ttype, atype) in types.iter().zip(argtypes.iter()) {
+                    //    expect_type(tscope.clone(), Some(ttype.clone()), Some(atype.clone()));
+                    //}
 
-                println!("FUNCTION SCOPE: {:?}", tscope);
-                resolve_type(tscope.clone(), *ret.clone())
-            }
-            else if let Type::Variable(ref name) = ftype {
-                let mut atypes = vec!();
-                for ref mut value in args {
-                    atypes.push(check_types_node(scope.clone(), value));
+                    //println!("FUNCTION SCOPE: {:?}", tscope);
+                    let rtype = resolve_type(tscope.clone(), *ret.clone());
+                    *stype = Some(Type::Function(stypes.iter().map(|ttype| resolve_type(tscope.clone(), ttype.clone())).collect(), Box::new(rtype.clone())));
+                    rtype
+                },
+                Type::Variable(ref name) => {
+                    let mut atypes = vec!();
+                    for ref mut value in args {
+                        atypes.push(check_types_node(map.clone(), scope.clone(), value));
+                    }
+                    let rettype = scope.borrow_mut().new_typevar();
+                    let ftype = Type::Function(atypes, Box::new(rettype.clone()));
+                    // TODO This is suspect... we might be updating type without checking for a conflict
+                    //scope.borrow_mut().update_type(name, Type::Function(atypes, Box::new(rettype.clone())));
+                    *stype = Some(ftype.clone());
+                    update_type(scope.clone(), name, ftype);
+                    rettype
                 }
-                let rettype = scope.borrow_mut().new_typevar();
-                // TODO This is suspect... we might be updating type without checking for a conflict
-                //scope.borrow_mut().update_type(name, Type::Function(atypes, Box::new(rettype.clone())));
-                update_type(scope.clone(), name, Type::Function(atypes, Box::new(rettype.clone())));
-                rettype
-            }
-            else {
-                panic!("Not a function: {:?}", name);
+                _ => panic!("Not a function: {:?}", name),
             }
         },
 
-        AST::Function(ref mut args, ref mut body, ref fscope, ref mut ftype, _) => {
+        AST::Function(ref mut args, ref mut body, ref id, ref mut ftype) => {
+            let fscope = map.get(id);
             let mut argtypes: Vec<Type> = vec!();
             for &(ref name, ref ttype, ref value) in &*args {
                 let vtype = match value.clone() {
-                    Some(ref mut vexpr) => Some(check_types_node(scope.clone(), vexpr)),
+                    Some(ref mut vexpr) => Some(check_types_node(map.clone(), scope.clone(), vexpr)),
                     None => None
                 };
                 let atype = expect_type(fscope.clone(), ttype.clone(), vtype);
@@ -104,7 +112,7 @@ pub fn check_types_node(scope: ScopeRef, node: &mut AST) -> Type {
                 argtypes.push(atype);
             }
 
-            let rettype = resolve_type(fscope.clone(), check_types_node(fscope.clone(), body));
+            let rettype = resolve_type(fscope.clone(), check_types_node(map.clone(), fscope.clone(), body));
 
             // Resolve type variables that can be
             for i in 0 .. argtypes.len() {
@@ -115,9 +123,9 @@ pub fn check_types_node(scope: ScopeRef, node: &mut AST) -> Type {
                 //update_type(fscope.clone(), &args[i].0, argtypes[i].clone());
                 args[i].1 = Some(argtypes[i].clone());
             }
-            use debug;
+            //use debug;
             //debug::print_types_scope(scope.clone());
-            println!("{:?}", fscope);
+            //println!("{:?}", fscope);
             update_scope_variable_types(fscope.clone());
 
             println!("FUNC: {:?} {:?}", argtypes, rettype);
@@ -128,61 +136,63 @@ pub fn check_types_node(scope: ScopeRef, node: &mut AST) -> Type {
 
 
         AST::Definition((ref name, ref mut ttype), ref mut body) => {
-            let btype = expect_type(scope.clone(), ttype.clone(), Some(check_types_node(scope.clone(), body)));
+            let btype = expect_type(scope.clone(), ttype.clone(), Some(check_types_node(map.clone(), scope.clone(), body)));
             scope.borrow_mut().update_variable_type(name, btype.clone());
             *ttype = Some(btype.clone());
             btype
         },
 
-        AST::Block(ref mut body) => check_types(scope, body),
+        AST::Block(ref mut body) => check_types(map, scope, body),
 
         AST::If(ref mut cond, ref mut texpr, ref mut fexpr) => {
-            check_types_node(scope.clone(), cond);
-            let ttype = check_types_node(scope.clone(), texpr);
-            let ftype = check_types_node(scope.clone(), fexpr);
+            check_types_node(map.clone(), scope.clone(), cond);
+            let ttype = check_types_node(map.clone(), scope.clone(), texpr);
+            let ftype = check_types_node(map.clone(), scope.clone(), fexpr);
             expect_type(scope.clone(), Some(ttype), Some(ftype))
         },
 
         AST::Raise(ref mut expr) => {
             // TODO should you check for a special error/exception type?
-            check_types_node(scope.clone(), expr)
+            check_types_node(map.clone(), scope.clone(), expr)
         },
 
         AST::Try(ref mut cond, ref mut cases) |
         AST::Match(ref mut cond, ref mut cases) => {
-            let ctype = check_types_node(scope.clone(), cond);
+            let ctype = check_types_node(map.clone(), scope.clone(), cond);
             let mut rtype = None;
             for &mut (ref mut case, ref mut expr) in cases {
-                expect_type(scope.clone(), Some(ctype.clone()), Some(check_types_node(scope.clone(), case)));
-                rtype = Some(expect_type(scope.clone(), rtype, Some(check_types_node(scope.clone(), expr))));
+                expect_type(scope.clone(), Some(ctype.clone()), Some(check_types_node(map.clone(), scope.clone(), case)));
+                rtype = Some(expect_type(scope.clone(), rtype, Some(check_types_node(map.clone(), scope.clone(), expr))));
             }
             rtype.unwrap()
         },
 
-        AST::For(ref name, ref mut cond, ref mut body, ref mut lscope) => {
+        AST::For(ref name, ref mut cond, ref mut body, ref id) => {
+            let lscope = map.get(id);
             let ctype = match lscope.borrow().find(name) {
                 None => panic!("Variable not found: {:?}", name),
                 Some(sym) => sym.ttype.clone(),
             };
 
-            expect_type(lscope.clone(), Some(Type::List(Box::new(ctype))), Some(check_types_node(lscope.clone(), cond)));
-            check_types_node(lscope.clone(), body)
+            expect_type(lscope.clone(), Some(Type::List(Box::new(ctype))), Some(check_types_node(map.clone(), lscope.clone(), cond)));
+            check_types_node(map.clone(), lscope.clone(), body)
         },
 
         AST::While(ref mut cond, ref mut body) => {
-            check_types_node(scope.clone(), cond);
-            check_types_node(scope.clone(), body)
+            check_types_node(map.clone(), scope.clone(), cond);
+            check_types_node(map.clone(), scope.clone(), body)
         },
 
-        AST::Class(ref name, ref mut body, ref mut cscope) => {
-            check_types(cscope.clone(), body);
-            Type::Concrete(String::from("Class"))
+        AST::Class(ref name, ref mut body, ref id) => {
+            let cscope = map.get(id);
+            check_types(map.clone(), cscope.clone(), body);
+            Type::Class(name.clone())
         },
 
         AST::Index(ref mut base, ref mut index) => {
             let ttype = Type::List(Box::new(scope.borrow_mut().new_typevar()));
-            let ltype = expect_type(scope.clone(), Some(ttype), Some(check_types_node(scope.clone(), base)));
-            let itype = expect_type(scope.clone(), Some(Type::Concrete(String::from("Int"))), Some(check_types_node(scope.clone(), index)));
+            let ltype = expect_type(scope.clone(), Some(ttype), Some(check_types_node(map.clone(), scope.clone(), base)));
+            let itype = expect_type(scope.clone(), Some(Type::Concrete(String::from("Int"))), Some(check_types_node(map.clone(), scope.clone(), index)));
             if let Type::List(ref ttype) = ltype {
                 *ttype.clone()
             }
@@ -192,7 +202,7 @@ pub fn check_types_node(scope: ScopeRef, node: &mut AST) -> Type {
         },
 
         AST::Accessor(ref mut left, ref mut right) => {
-            let ltype = expect_type(scope.clone(), None, Some(check_types_node(scope.clone(), left)));
+            let ltype = expect_type(scope.clone(), None, Some(check_types_node(map.clone(), scope.clone(), left)));
             // TODO how do you finish this?  I guess only a class or a typedef type can be accessed
             //match ltype {
             //}
@@ -212,7 +222,7 @@ pub fn check_types_node(scope: ScopeRef, node: &mut AST) -> Type {
 }
 
 // ottype must be equal to, or a superset of obtype; if obtype is less specific, it will be forced to match
-pub fn expect_type(scope: ScopeRef, ottype: Option<Type>, obtype: Option<Type>) -> Type {
+pub fn expect_type<V>(scope: ScopeRef<V>, ottype: Option<Type>, obtype: Option<Type>) -> Type where V: Clone {
     if ottype.is_none() {
         // TODO should the else case just be Nil... 
         obtype.unwrap_or_else(|| scope.borrow_mut().new_typevar())
@@ -271,8 +281,9 @@ fn resolve_typevar(scope: ScopeRef, ttype: &mut Type) {
 }
 */
 
-fn resolve_type(scope: ScopeRef, ttype: Type) -> Type {
+fn resolve_type<V>(scope: ScopeRef<V>, ttype: Type) -> Type where V: Clone {
     match ttype {
+        Type::Class(ref name) |
         Type::Concrete(ref name) => {
             match scope.borrow().find_type(name) {
                 // TODO we are purposely returning the original type here so as not to over-resolve types... but we should probably still fully resolve for checking purposes
@@ -306,7 +317,7 @@ fn resolve_type(scope: ScopeRef, ttype: Type) -> Type {
     }
 }
 
-fn update_scope_variable_types(scope: ScopeRef) {
+fn update_scope_variable_types<V>(scope: ScopeRef<V>) where V: Clone {
     //use std::rc::Rc;
 
     //for (ref name, ref mut sym) in &mut scope.borrow_mut().names {
@@ -327,7 +338,7 @@ fn update_scope_variable_types(scope: ScopeRef) {
 /*
 */
 
-fn update_type(scope: ScopeRef, name: &String, ttype: Type) {
+fn update_type<V>(scope: ScopeRef<V>, name: &String, ttype: Type) where V: Clone {
     // TODO you would do the typecheck here rather than in the Scope update_type function
     //let otype = scope.borrow().find_type(name).unwrap().clone();
     //scope.borrow_mut().update_type(name, expect_type(scope.clone(), Some(otype), Some(ttype)));
@@ -382,8 +393,8 @@ mod tests {
     fn typecheck(text: &[u8]) -> Type {
         let result = parse(text);
         let mut code = result.unwrap().1;
-        let global = bind_names(&mut code);
-        check_types(global.clone(), &mut code)
+        let map = bind_names(&mut code);
+        check_types(map.clone(), map.get_global(), &mut code)
     }
 }
 

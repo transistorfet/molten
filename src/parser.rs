@@ -8,8 +8,8 @@ use std::f64;
 use std::str;
 use std::str::FromStr;
 
-use scope::{ Scope, ScopeRef };
 use types::Type;
+use utils::{ UniqueID };
 
 
 named!(sp, eat_separator!(&b" \t"[..]));
@@ -90,7 +90,7 @@ pub enum AST {
     Identifier(String),
     Index(Box<AST>, Box<AST>),
     Accessor(Box<AST>, Box<AST>),
-    Invoke(String, Vec<AST>),
+    Invoke(String, Vec<AST>, Option<Type>),
     //Prefix(String, Box<AST>),
     //Infix(String, Box<AST>, Box<AST>),
     Block(Vec<AST>),
@@ -98,9 +98,9 @@ pub enum AST {
     Raise(Box<AST>),
     Try(Box<AST>, Vec<(AST, AST)>),
     Match(Box<AST>, Vec<(AST, AST)>),
-    For(String, Box<AST>, Box<AST>, ScopeRef),
-    Function(Vec<(String, Option<Type>, Option<AST>)>, Box<AST>, ScopeRef, Option<Type>, String),
-    Class(String, Vec<AST>, ScopeRef),
+    For(String, Box<AST>, Box<AST>, UniqueID),
+    Function(Vec<(String, Option<Type>, Option<AST>)>, Box<AST>, UniqueID, Option<Type>),
+    Class(String, Vec<AST>, UniqueID),
 
     Import(String),
     Definition((String, Option<Type>), Box<AST>),
@@ -267,7 +267,7 @@ named!(forloop<AST>,
         l: expression >>
         opt!(multispace_comment) >>
         e: expression >>
-        (AST::For(i, Box::new(l), Box::new(e), Scope::new_ref(None)))
+        (AST::For(i, Box::new(l), Box::new(e), UniqueID::generate()))
     )
 );
 
@@ -277,7 +277,7 @@ named!(function<AST>,
         l: identifier_list_defaults >>
         wscom!(tag!("->")) >>
         e: expression >>
-        (AST::Function(l, Box::new(e), Scope::new_ref(None), None, next_id()))
+        (AST::Function(l, Box::new(e), UniqueID::generate(), None))
     )
 );
 
@@ -302,7 +302,7 @@ named!(class<AST>,
         wscom!(tag!("{")) >>
         s: many0!(statement) >>
         wscom!(tag!("}")) >>
-        (AST::Class(i, s, Scope::new_ref(None)))
+        (AST::Class(i, s, UniqueID::generate()))
     )
 );
 
@@ -354,7 +354,7 @@ impl AST {
     fn fold_op_old(left: AST, operations: Vec<(String, AST)>) -> Self {
         operations.into_iter().fold(left, |acc, pair| {
             //AST::Infix(pair.0, Box::new(acc), Box::new(pair.1))
-            AST::Invoke(pair.0, vec!(acc, pair.1))
+            AST::Invoke(pair.0, vec!(acc, pair.1), None)
         })
     }
     */
@@ -372,7 +372,7 @@ impl AST {
                 let r2 = operands.pop().unwrap();
                 let r1 = operands.pop().unwrap();
                 //operands.push(AST::Infix(op, Box::new(r1), Box::new(r2)));
-                operands.push(AST::Invoke(op, vec!(r1, r2)));
+                operands.push(AST::Invoke(op, vec!(r1, r2), None));
             }
 
             operators.push((next_op, p));
@@ -384,7 +384,7 @@ impl AST {
             let r2 = operands.pop().unwrap();
             let r1 = operands.pop().unwrap();
             //operands.push(AST::Infix(op, Box::new(r1), Box::new(r2)));
-            operands.push(AST::Invoke(op, vec!(r1, r2)));
+            operands.push(AST::Invoke(op, vec!(r1, r2), None));
         }
 
         assert_eq!(operands.len(), 1);
@@ -444,7 +444,7 @@ named!(prefix<AST>,
         op: prefix_op >>
         a: atomic >>
         //(AST::Prefix(op, Box::new(a)))
-        (AST::Invoke(op, vec!(a)))
+        (AST::Invoke(op, vec!(a), None))
     )
 );
 
@@ -485,7 +485,7 @@ named!(invoke<AST>,
         tag!("(") >>
         l: expression_list >>
         tag!(")") >>
-        (AST::Invoke(s, l))
+        (AST::Invoke(s, l, None))
     )
 );
 
@@ -708,13 +708,17 @@ pub fn count_lines(text: &[u8]) {
     }
 }
 
-static mut function_id: usize = 0;
-pub fn next_id() -> String {
+/*
+pub type UniqueID = usize;
+static mut _next_id: UniqueID = 10;
+pub fn generate_id() -> UniqueID {
     unsafe {
-        function_id += 1;
-        format!("anon{}", function_id)
+        _next_id += 1;
+        //format!("anon{}", _next_id)
+        _next_id
     }
 }
+*/
  
 #[cfg(test)]
 mod tests {
@@ -728,9 +732,9 @@ mod tests {
             ".as_bytes()),
             IResult::Done(&b""[..], vec!(
                 AST::Invoke(String::from("+"), vec!(
-                    AST::Invoke(String::from("*"), vec!(AST::Integer(5), AST::Integer(3))),
-                    AST::Invoke(String::from("/"), vec!(AST::Integer(8), AST::Integer(100)))
-                ))
+                    AST::Invoke(String::from("*"), vec!(AST::Integer(5), AST::Integer(3)), None),
+                    AST::Invoke(String::from("/"), vec!(AST::Integer(8), AST::Integer(100)), None)
+                ), None)
             ))
         );
     }

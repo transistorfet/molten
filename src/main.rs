@@ -1,4 +1,5 @@
 
+use std::fmt::Debug;
 use std::fs::File;
 use std::io::prelude::*;
 
@@ -7,30 +8,34 @@ extern crate nom;
 extern crate clap;
 use clap::{ App, Arg };
 
+mod utils;
+use utils::UniqueID;
+
 mod parser;
 use parser::AST;
 
 mod scope;
-use scope::ScopeRef;
+use scope::ScopeMapRef;
 
 mod types;
 mod debug;
 mod interpreter;
-mod compiler_c;
+//mod compiler_c;
 mod compiler_llvm;
 
 fn main() {
-    let matches = App::new("rustytea")
-                    .version("0.1")
-                    .about("A toy ML compiler")
-                    .arg(Arg::with_name("INPUT")
-                        .help("Sets the input file to use")
-                        .required(true)
-                        .index(1))
-                    .arg(Arg::with_name("compile")
-                        .short("c")
-                        .help("Compiles to C rather than executing"))
-                    .get_matches();
+    let matches =
+        App::new("rustytea")
+            .version("0.1")
+            .about("A toy ML compiler")
+            .arg(Arg::with_name("INPUT")
+                .help("Sets the input file to use")
+                .required(true)
+                .index(1))
+            .arg(Arg::with_name("compile")
+                .short("c")
+                .help("Compiles to C rather than executing"))
+            .get_matches();
 
     let filename = matches.value_of("INPUT").unwrap();
     match matches.occurrences_of("compile") {
@@ -49,9 +54,9 @@ fn execute_file(filename: &str) {
 }
 
 fn execute_string(text: &[u8]) {
-    let (global, code) = process_input(text);
+    let (map, code) = process_input(text);
 
-    let fin = interpreter::execute(global.clone(), &code);
+    let fin = interpreter::execute(map.clone(), &code);
     println!("{:?}", fin);
 }
 
@@ -64,23 +69,24 @@ fn compile_file(filename: &str) {
 }
 
 fn compile_string(text: &[u8]) {
-    let (global, code) = process_input(text);
+    let (map, code) = process_input(text);
 
-    let fin = compiler_llvm::compile(global.clone(), &code);
+    let fin = compiler_llvm::compile(map.clone(), &code);
     println!("{}", fin);
 }
 
-fn process_input(text: &[u8]) -> (ScopeRef, Vec<AST>) {
+fn process_input<V>(text: &[u8]) -> (ScopeMapRef<V>, Vec<AST>) where V: Clone + Debug {
     let result = parser::parse(text);
     println!("{:?}", result);
     let mut code = result.unwrap().1;
-    let global = scope::bind_names(&mut code);
-    let gtype = types::check_types(global.clone(), &mut code);
+    let map = scope::bind_names(&mut code);
+    let gtype = types::check_types(map.clone(), map.get_global(), &mut code);
+    println!("\n{:?}\n", code);
 
     //println!("\n{:?}\n\n{:?}", &code, global.clone());
-    debug::print_types(global.clone(), &code);
-    debug::print_types_scope(global.clone());
-    (global, code)
+    debug::print_types(map.clone(), map.get_global(), &code);
+    debug::print_types_scope(map.clone(), map.get_global());
+    (map, code)
 }
 
 fn traverse(tree: Vec<AST>) {

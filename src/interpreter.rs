@@ -5,7 +5,7 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 
 use parser::AST;
-use scope::{ Scope, ScopeRef };
+use scope::{ Scope, ScopeRef, ScopeMapRef };
 use types::Type;
 
 
@@ -17,8 +17,8 @@ pub enum Value {
     Real(f64),
     String(String),
     List(Vec<Value>),
-    Function(ScopeRef, Vec<(String, Option<Type>, Option<AST>)>, AST),
-    Builtin(fn(ScopeRef, Vec<Value>) -> Value),
+    Function(ScopeRef<Value>, Vec<(String, Option<Type>, Option<AST>)>, AST),
+    Builtin(fn(ScopeRef<Value>, Vec<Value>) -> Value),
     AST(AST),
 }
 
@@ -92,10 +92,11 @@ impl Env {
 
 
 
-pub fn execute(scope: ScopeRef, code: &Vec<AST>) {
+pub fn execute(map: ScopeMapRef<Value>, code: &Vec<AST>) {
+    let scope = map.get_global();
     let mut machine = Interpreter::new();
     builtins::assign_builtins(scope.borrow().get_parent().unwrap().clone());
-    let result = machine.execute_vec(scope, code);
+    let result = machine.execute_vec(map, scope, code);
 
 }
 
@@ -110,17 +111,17 @@ impl Interpreter {
         }
     }
 
-    pub fn execute_vec(&mut self, scope: ScopeRef, code: &Vec<AST>) -> Value {
+    pub fn execute_vec(&mut self, map: ScopeMapRef<Value>, scope: ScopeRef<Value>, code: &Vec<AST>) -> Value {
         let mut last: Value = Value::Nil;
 
         for node in code {
-            last = self.execute_node(scope.clone(), node);
+            last = self.execute_node(map.clone(), scope.clone(), node);
             println!("PARTIAL: {}", last);
         }
         last
     }
 
-    pub fn execute_node(&mut self, scope: ScopeRef, node: &AST) -> Value {
+    pub fn execute_node(&mut self, map: ScopeMapRef<Value>, scope: ScopeRef<Value>, node: &AST) -> Value {
         match *node {
             AST::Nil => Value::Nil,
             AST::Boolean(boolean) => Value::Boolean(boolean),
@@ -131,7 +132,7 @@ impl Interpreter {
             AST::List(ref items) => {
                 let mut list = vec!();
                 for item in items {
-                    list.push(self.execute_node(scope.clone(), item));
+                    list.push(self.execute_node(map.clone(), scope.clone(), item));
                 }
                 Value::List(list)
             },
@@ -143,12 +144,12 @@ impl Interpreter {
                 }
             },
 
-            AST::Invoke(ref name, ref args) => {
+            AST::Invoke(ref name, ref args, _) => {
                 let func = &scope.borrow().find(name).unwrap().value;
 
                 let mut values = vec!();
                 for arg in args {
-                    values.push(self.execute_node(scope.clone(), arg));
+                    values.push(self.execute_node(map.clone(), scope.clone(), arg));
                 }
 
                 if let &Some(Value::Function(ref fscope, ref argdefs, ref body)) = func {
@@ -158,7 +159,7 @@ impl Interpreter {
                         lscope.borrow_mut().assign(&def.0, value.clone());
                     }
 
-                    self.execute_node(lscope.clone(), body)
+                    self.execute_node(map.clone(), lscope.clone(), body)
                 }
                 else if let &Some(Value::Builtin(ref funcptr)) = func {
                     funcptr(scope.clone(), values)
@@ -168,25 +169,26 @@ impl Interpreter {
                 }
             },
 
-            AST::Function(ref args, ref body, ref fscope, _, _) => {
+            AST::Function(ref args, ref body, ref id, _) => {
+                let fscope = map.get(id);
                 Value::Function(fscope.clone(), args.clone(), *body.clone())
             },
 
             AST::Definition((ref name, ref ttype), ref body) => {
-                let value = self.execute_node(scope.clone(), body);
+                let value = self.execute_node(map.clone(), scope.clone(), body);
                 scope.borrow_mut().assign(name, value.clone());
                 value
             },
 
-            AST::Block(ref body) => { self.execute_vec(scope.clone(), body) },
+            AST::Block(ref body) => { self.execute_vec(map.clone(), scope.clone(), body) },
 
             AST::If(ref cond, ref texpr, ref fexpr) => {
-                let result = self.execute_node(scope.clone(), cond);
+                let result = self.execute_node(map.clone(), scope.clone(), cond);
                 if result.is_true() {
-                    self.execute_node(scope.clone(), texpr)
+                    self.execute_node(map.clone(), scope.clone(), texpr)
                 }
                 else {
-                    self.execute_node(scope.clone(), fexpr)
+                    self.execute_node(map.clone(), scope.clone(), fexpr)
                 }
             },
 
@@ -199,7 +201,8 @@ impl Interpreter {
 
             },
 
-            AST::For(ref name, ref cond, ref body, ref lscope) => {
+            AST::For(ref name, ref cond, ref body, ref id) => {
+                let lscope = map.get(id);
 
             },
     */
@@ -212,9 +215,9 @@ impl Interpreter {
                 // TODO should you implement this as an if statement instead?
                 let mut compiled_cases = vec!();
                 for &(ref case, ref expr) in cases {
-                    compiled_cases.push(format!("{space}  case {}:\n{indent}{}\n{indent}break;", self.execute_node(scope.clone(), case), self.execute_node(scope.clone(), expr), space=old, indent=self.indent));
+                    compiled_cases.push(format!("{space}  case {}:\n{indent}{}\n{indent}break;", self.execute_node(map.clone(), scope.clone(), case), self.execute_node(map.clone(), scope.clone(), expr), space=old, indent=self.indent));
                 }
-                let compiled = format!("select ({}) {{\n{}\n{space}}}", self.execute_node(scope.clone(), cond), compiled_cases.join("\n"), space=old);
+                let compiled = format!("select ({}) {{\n{}\n{space}}}", self.execute_node(map.clone(), scope.clone(), cond), compiled_cases.join("\n"), space=old);
 
                 self.indent = old;
                 compiled
@@ -223,12 +226,13 @@ impl Interpreter {
             AST::While(ref cond, ref body) => {
                 let old = self.indent.clone();
                 self.indent = old.clone() + &"    ";
-                let compiled = format!("while ({}) {{\n{indent}{}\n{space}}}", self.execute_node(scope.clone(), cond), add_terminator(self.execute_node(scope.clone(), body)), space=old, indent=self.indent);
+                let compiled = format!("while ({}) {{\n{indent}{}\n{space}}}", self.execute_node(map.clone(), scope.clone(), cond), add_terminator(self.execute_node(map.clone(), scope.clone(), body)), space=old, indent=self.indent);
                 self.indent = old;
                 compiled
             },
 
-            AST::Class(ref name, ref body, ref cscope) => {
+            AST::Class(ref name, ref body, ref id) => {
+                let cscope = map.get(id);
 
             },
 
@@ -256,7 +260,7 @@ mod builtins {
     use scope::ScopeRef;
     use interpreter::Value;
 
-    pub fn assign_builtins(scope: ScopeRef) {
+    pub fn assign_builtins(scope: ScopeRef<Value>) {
         let mut scope = scope.borrow_mut();
         scope.assign(&String::from("*"), Value::Builtin(multiply));
         scope.assign(&String::from("/"), Value::Builtin(divide));
@@ -290,35 +294,35 @@ mod builtins {
         }
     }
 
-    fn multiply(scope: ScopeRef, args: Vec<Value>) -> Value {
+    fn multiply(scope: ScopeRef<Value>, args: Vec<Value>) -> Value {
         for_numbers!(args, a, b, a * b)
     }
 
-    fn divide(scope: ScopeRef, args: Vec<Value>) -> Value {
+    fn divide(scope: ScopeRef<Value>, args: Vec<Value>) -> Value {
         for_numbers!(args, a, b, a / b)
     }
 
-    fn add(scope: ScopeRef, args: Vec<Value>) -> Value {
+    fn add(scope: ScopeRef<Value>, args: Vec<Value>) -> Value {
         for_numbers!(args, a, b, a + b)
     }
 
-    fn subtract(scope: ScopeRef, args: Vec<Value>) -> Value {
+    fn subtract(scope: ScopeRef<Value>, args: Vec<Value>) -> Value {
         for_numbers!(args, a, b, a - b)
     }
 
-    fn equals(scope: ScopeRef, args: Vec<Value>) -> Value {
+    fn equals(scope: ScopeRef<Value>, args: Vec<Value>) -> Value {
         for_numbers!(args, a, b, a == b, Value::Boolean)
     }
 
-    fn not_equals(scope: ScopeRef, args: Vec<Value>) -> Value {
+    fn not_equals(scope: ScopeRef<Value>, args: Vec<Value>) -> Value {
         for_numbers!(args, a, b, a != b, Value::Boolean)
     }
 
-    fn greater_than(scope: ScopeRef, args: Vec<Value>) -> Value {
+    fn greater_than(scope: ScopeRef<Value>, args: Vec<Value>) -> Value {
         for_numbers!(args, a, b, a > b, Value::Boolean)
     }
 
-    fn less_than(scope: ScopeRef, args: Vec<Value>) -> Value {
+    fn less_than(scope: ScopeRef<Value>, args: Vec<Value>) -> Value {
         for_numbers!(args, a, b, a < b, Value::Boolean)
     }
 }

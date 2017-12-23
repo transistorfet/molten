@@ -1,11 +1,16 @@
 
 use parser::AST;
-use scope::ScopeRef;
+use scope::{ ScopeRef, ScopeMapRef };
 use types::Type;
 
-pub fn compile(scope: ScopeRef, code: &Vec<AST>) -> String {
+#[derive(Clone, Debug, PartialEq)]
+pub struct Value {
+
+}
+
+pub fn compile(map: ScopeMapRef<Value>, code: &Vec<AST>) -> String {
     let mut data = CompilerData::new();
-    let main = data.compile_vec(scope, code, true);
+    let main = data.compile_vec(map.clone(), map.get_global(), code, true);
 
     let mut compiled = String::new();
     for func in data.funcs {
@@ -31,11 +36,11 @@ impl CompilerData {
         }
     }
 
-    pub fn compile_vec(&mut self, scope: ScopeRef, code: &Vec<AST>, is_last: bool) -> String {
+    pub fn compile_vec(&mut self, map: ScopeMapRef<Value>, scope: ScopeRef<Value>, code: &Vec<AST>, is_last: bool) -> String {
         let mut compiled = String::new();
 
         for i in 0 .. code.len() - 1 {
-            compiled = compiled + &self.indent + &self.compile_node(scope.clone(), &code[i], if is_last && i == code.len() { true } else { false });
+            compiled = compiled + &self.indent + &self.compile_node(map.clone(), scope.clone(), &code[i], if is_last && i == code.len() { true } else { false });
             if i != code.len() {
                 compiled = compiled + &";\n";
             }
@@ -43,7 +48,7 @@ impl CompilerData {
         compiled
     }
 
-    pub fn compile_node(&mut self, scope: ScopeRef, node: &AST, is_last: bool) -> String {
+    pub fn compile_node(&mut self, map: ScopeMapRef<Value>, scope: ScopeRef<Value>, node: &AST, is_last: bool) -> String {
         let text = match *node {
             AST::Nil => String::from("NULL"),
             AST::Boolean(ref boolean) => match *boolean { true => String::from("1"), false => String::from("0") },
@@ -57,7 +62,7 @@ impl CompilerData {
 
             AST::Identifier(ref name) => { name.clone() },
 
-            AST::Invoke(ref name, ref args) => {
+            AST::Invoke(ref name, ref args, _) => {
                 //let mut ftype = match scope.borrow().find(name) {
                 //    None => panic!("Function not found: {:?}", name),
                 //    Some(sym) => sym.ttype.clone(),
@@ -81,7 +86,7 @@ impl CompilerData {
 
                 let mut compiled = vec!();
                 for code in args {
-                    compiled.push(self.compile_node(scope.clone(), code, false));
+                    compiled.push(self.compile_node(map.clone(), scope.clone(), code, false));
                 }
 
                 if let Some(result) = CompilerData::compile_builtin(name, &compiled) {
@@ -92,12 +97,13 @@ impl CompilerData {
                 }
             },
 
-            AST::Function(ref args, ref body, ref fscope, ref ftype, _) => {
+            AST::Function(ref args, ref body, ref id, ref ftype) => {
+                let fscope = map.get(id);
                 let mut compiled_args = vec!();
                 for &(ref name, ref ttype, ref value) in args {
                     compiled_args.push(self.compile_variable_def(fscope.clone(), ttype.clone().unwrap(), name));
                 }
-                let compiled = self.compile_node(fscope.clone(), body, true);
+                let compiled = self.compile_node(map.clone(), fscope.clone(), body, true);
 
                 let name = self.next;
                 self.next += 1;
@@ -106,18 +112,18 @@ impl CompilerData {
             },
 
             AST::Definition((ref name, ref ttype), ref body) => {
-                self.compile_variable_def(scope.clone(), ttype.clone().unwrap(), name) + &" = " + &self.compile_node(scope.clone(), body, false)
+                self.compile_variable_def(scope.clone(), ttype.clone().unwrap(), name) + &" = " + &self.compile_node(map.clone(), scope.clone(), body, false)
             },
 
-            AST::Block(ref body) => { self.compile_vec(scope.clone(), body, is_last) },
+            AST::Block(ref body) => { self.compile_vec(map.clone(), scope.clone(), body, is_last) },
 
             AST::If(ref cond, ref texpr, ref fexpr) => {
                 let old = self.indent.clone();
                 self.indent = old.clone() + &"    ";
 
-                let compiled_cond = self.compile_node(scope.clone(), cond, false);
-                let compiled_texpr = self.compile_node(scope.clone(), texpr, is_last);
-                let compiled_fexpr = self.compile_node(scope.clone(), fexpr, is_last);
+                let compiled_cond = self.compile_node(map.clone(), scope.clone(), cond, false);
+                let compiled_texpr = self.compile_node(map.clone(), scope.clone(), texpr, is_last);
+                let compiled_fexpr = self.compile_node(map.clone(), scope.clone(), fexpr, is_last);
                 let compiled = format!("{space}if ({}) {{\n{indent}{}\n{space}}} else {{\n{indent}{}\n{space}}}", compiled_cond, compiled_texpr, compiled_fexpr, space=old, indent=self.indent);
 
                 self.indent = old;
@@ -133,7 +139,8 @@ impl CompilerData {
 
             },
 
-            AST::For(ref name, ref cond, ref body, ref lscope) => {
+            AST::For(ref name, ref cond, ref body, ref id) => {
+                let lscope = map.get(id);
 
             },
     */
@@ -145,9 +152,9 @@ impl CompilerData {
                 // TODO should you implement this as an if statement instead?
                 let mut compiled_cases = vec!();
                 for &(ref case, ref expr) in cases {
-                    compiled_cases.push(format!("{space}  case {}:\n{indent}{}\n{indent}break;", self.compile_node(scope.clone(), case, false), self.compile_node(scope.clone(), expr, is_last), space=old, indent=self.indent));
+                    compiled_cases.push(format!("{space}  case {}:\n{indent}{}\n{indent}break;", self.compile_node(map.clone(), scope.clone(), case, false), self.compile_node(map.clone(), scope.clone(), expr, is_last), space=old, indent=self.indent));
                 }
-                let compiled = format!("switch ({}) {{\n{}\n{space}}}", self.compile_node(scope.clone(), cond, false), compiled_cases.join("\n"), space=old);
+                let compiled = format!("switch ({}) {{\n{}\n{space}}}", self.compile_node(map.clone(), scope.clone(), cond, false), compiled_cases.join("\n"), space=old);
 
                 self.indent = old;
                 compiled
@@ -156,13 +163,14 @@ impl CompilerData {
             AST::While(ref cond, ref body) => {
                 let old = self.indent.clone();
                 self.indent = old.clone() + &"    ";
-                let compiled = format!("while ({}) {{\n{indent}{}\n{space}}}", self.compile_node(scope.clone(), cond, false), add_terminator(self.compile_node(scope.clone(), body, false)), space=old, indent=self.indent);
+                let compiled = format!("while ({}) {{\n{indent}{}\n{space}}}", self.compile_node(map.clone(), scope.clone(), cond, false), add_terminator(self.compile_node(map.clone(), scope.clone(), body, false)), space=old, indent=self.indent);
                 self.indent = old;
                 compiled
             },
 
     /*
-            AST::Class(ref name, ref body, ref cscope) => {
+            AST::Class(ref name, ref body, ref id) => {
+                let cscope = map.get(id);
 
             },
 
@@ -188,7 +196,7 @@ impl CompilerData {
         }
     }
 
-    fn compile_variable_def(&mut self, scope: ScopeRef, ttype: Type, name: &String) -> String {
+    fn compile_variable_def(&mut self, scope: ScopeRef<Value>, ttype: Type, name: &String) -> String {
         // TODO finish this
         match ttype {
             Type::Concrete(ref tname) => format!("{} {}", match tname.as_str() {

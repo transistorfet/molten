@@ -21,10 +21,9 @@
         let fac2 = fn x, y, z -> if not x then 1 else x - -123
         testy(3)
 
-        // TODO this causes a segfault
-	//let test = fn x -> x()
+	let test = fn x -> x()
         // TODO this causes a typeerror
-	//let test = fn x -> x() + 1
+	//let test2 = fn x -> x() + 1
 
         let recfoo = fn x -> begin  //comment
             if x < 1 then           //comment
@@ -34,6 +33,11 @@
         end                         //comment
         recfoo(3)
 
+        class Thing {
+            let foo = fn a -> {
+                a * 4
+            }
+        }
 
     /*
 

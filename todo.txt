@@ -1,4 +1,6 @@
 
+* change the debug prints to overwrite Debug formatting for scopes
+
 * ensure typevars in invoke are unique to the scope before adding
 
 * make a temporary function to go through all variables and resolve their types, and report if they resolve further, which might be an issue...
