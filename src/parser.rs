@@ -89,8 +89,9 @@ pub enum AST {
 
     Identifier(String),
     Index(Box<AST>, Box<AST>),
-    Accessor(Box<AST>, Box<AST>),
-    Invoke(String, Vec<AST>, Option<Type>),
+    Resolver(Box<AST>, String),
+    Accessor(Box<AST>, String, Option<Type>),
+    Invoke(Box<AST>, Vec<AST>, Option<Type>),
     //Prefix(String, Box<AST>),
     //Infix(String, Box<AST>, Box<AST>),
     Block(Vec<AST>),
@@ -100,7 +101,7 @@ pub enum AST {
     Match(Box<AST>, Vec<(AST, AST)>),
     For(String, Box<AST>, Box<AST>, UniqueID),
     Function(Vec<(String, Option<Type>, Option<AST>)>, Box<AST>, UniqueID, Option<Type>),
-    Class(String, Vec<AST>, UniqueID),
+    Class(String, Option<String>, Vec<AST>, UniqueID),
 
     Import(String),
     Definition((String, Option<Type>), Box<AST>),
@@ -299,10 +300,12 @@ named!(class<AST>,
     do_parse!(
         wscom!(tag_word!("class")) >>
         i: identifier >>
+        p: opt!(preceded!(wscom!(tag_word!("extends")),
+            identifier)) >>
         wscom!(tag!("{")) >>
         s: many0!(statement) >>
         wscom!(tag!("}")) >>
-        (AST::Class(i, s, UniqueID::generate()))
+        (AST::Class(i, p, s, UniqueID::generate()))
     )
 );
 
@@ -354,7 +357,7 @@ impl AST {
     fn fold_op_old(left: AST, operations: Vec<(String, AST)>) -> Self {
         operations.into_iter().fold(left, |acc, pair| {
             //AST::Infix(pair.0, Box::new(acc), Box::new(pair.1))
-            AST::Invoke(pair.0, vec!(acc, pair.1), None)
+            AST::Invoke(Box::new(AST::Identifier(pair.0)), vec!(acc, pair.1), None)
         })
     }
     */
@@ -372,7 +375,7 @@ impl AST {
                 let r2 = operands.pop().unwrap();
                 let r1 = operands.pop().unwrap();
                 //operands.push(AST::Infix(op, Box::new(r1), Box::new(r2)));
-                operands.push(AST::Invoke(op, vec!(r1, r2), None));
+                operands.push(AST::Invoke(Box::new(AST::Identifier(op)), vec!(r1, r2), None));
             }
 
             operators.push((next_op, p));
@@ -384,7 +387,7 @@ impl AST {
             let r2 = operands.pop().unwrap();
             let r1 = operands.pop().unwrap();
             //operands.push(AST::Infix(op, Box::new(r1), Box::new(r2)));
-            operands.push(AST::Invoke(op, vec!(r1, r2), None));
+            operands.push(AST::Invoke(Box::new(AST::Identifier(op)), vec!(r1, r2), None));
         }
 
         assert_eq!(operands.len(), 1);
@@ -426,9 +429,13 @@ named!(infix<AST>,
 named!(atomic<AST>,
     wscom!(alt_complete!(
         prefix |
-        index |
-        accessor |
-        subatomic
+        subatomic_operation
+        //index |
+        //accessor |
+        // TODO (expr), identifier, invoke(), literal
+        //literal |
+        //invoke |
+        //subatomic
     ))
 );
 
@@ -444,13 +451,52 @@ named!(prefix<AST>,
         op: prefix_op >>
         a: atomic >>
         //(AST::Prefix(op, Box::new(a)))
-        (AST::Invoke(op, vec!(a), None))
+        (AST::Invoke(Box::new(AST::Identifier(op)), vec!(a), None))
     )
 );
 
+named!(subatomic_operation<AST>,
+    do_parse!(
+        left: subatomic >>
+        operations: many0!(alt!(
+            map!(delimited!(tag!("["), expression, tag!("]")), |e| SubOP::Index(e)) |
+            map!(delimited!(tag!("("), expression_list, tag!(")")), |e| SubOP::Invoke(e)) |
+            map!(preceded!(tag!("."), identifier), |s| SubOP::Accessor(s)) |
+            map!(preceded!(tag!("::"), identifier), |s| SubOP::Resolver(s))
+        )) >>
+        (AST::fold_access(left, operations))
+    )
+);
+
+enum SubOP {
+    Index(AST),
+    Invoke(Vec<AST>),
+    Accessor(String),
+    Resolver(String),
+}
+
+impl AST {
+    fn fold_access(left: AST, operations: Vec<SubOP>) -> Self {
+        let mut ret = left;
+        for op in operations {
+            match op {
+                SubOP::Index(e) => ret = AST::Index(Box::new(ret), Box::new(e)),
+                SubOP::Invoke(e) => ret = AST::Invoke(Box::new(ret), e, None),
+                SubOP::Accessor(name) => ret = AST::Accessor(Box::new(ret), name.clone(), None),
+                SubOP::Resolver(name) => ret = AST::Resolver(Box::new(ret), name.clone()),
+            }
+        }
+        ret
+    }
+}
+
+/*
 named!(index<AST>,
     do_parse!(
-        base: subatomic >>
+        // TODO could be (expr), identifier, invoke(), accessor, literal(ie. list)?
+        base: alt!(accessor | literal | invoke | subatomic) >>
+        //base: subatomic >>
+
         tag!("[") >>
         ind: expression >>
         tag!("]") >>
@@ -460,32 +506,42 @@ named!(index<AST>,
 
 named!(accessor<AST>,
     do_parse!(
-        left: subatomic >>
+        // TODO could be (expr), identifier, invoke(), index
+        //left: alt!(invoke | index | subatomic) >>
+        left: alt!(invoke | subatomic) >>
+        //left: subatomic >>
+
         //operations: many0!(tuple!(map_str!(tag!(".")), subatomic)) >>
         //(AST::fold_op(left, operations))
         tag!(".") >>
-        right: atomic >>
-        (AST::Accessor(Box::new(left), Box::new(right)))
-    )
-);
-
-named!(subatomic<AST>,
-    alt_complete!(
-        literal |
-        invoke |
-        map!(identifier, |s| AST::Identifier(s)) |
-        delimited!(tag!("("), wscom!(expression), tag!(")"))
+        // TODO can only be identifier... invokes should match before accessor
+        //right: atomic >>
+        //right: map!(identifier, |s| AST::Identifier(s)) >>
+        right: identifier >>
+        (AST::Accessor(Box::new(left), right, None))
     )
 );
 
 named!(invoke<AST>,
     do_parse!(
-        s: identifier >>
+        // TODO could be (expr), identifier, index, accessor
+        s: alt!(accessor | subatomic) >>
+        //s: map!(identifier, |s| AST::Identifier(s)) >>
         opt!(space) >>
         tag!("(") >>
         l: expression_list >>
         tag!(")") >>
-        (AST::Invoke(s, l, None))
+        (AST::Invoke(Box::new(s), l, None))
+    )
+);
+*/
+
+named!(subatomic<AST>,
+    alt_complete!(
+        literal |
+        //invoke |
+        map!(identifier, |s| AST::Identifier(s)) |
+        delimited!(tag!("("), wscom!(expression), tag!(")"))
     )
 );
 
@@ -731,9 +787,9 @@ mod tests {
                 5 * 3 + 8 / 100
             ".as_bytes()),
             IResult::Done(&b""[..], vec!(
-                AST::Invoke(String::from("+"), vec!(
-                    AST::Invoke(String::from("*"), vec!(AST::Integer(5), AST::Integer(3)), None),
-                    AST::Invoke(String::from("/"), vec!(AST::Integer(8), AST::Integer(100)), None)
+                AST::Invoke(Box::new(AST::Identifier(String::from("+"))), vec!(
+                    AST::Invoke(Box::new(AST::Identifier(String::from("*"))), vec!(AST::Integer(5), AST::Integer(3)), None),
+                    AST::Invoke(Box::new(AST::Identifier(String::from("/"))), vec!(AST::Integer(8), AST::Integer(100)), None)
                 ), None)
             ))
         );

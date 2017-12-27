@@ -45,15 +45,13 @@ pub fn check_types_node<V>(map: ScopeMapRef<V>, scope: ScopeRef<V>, node: &mut A
 
         AST::Identifier(ref name) => scope.borrow().find(name).unwrap().ttype.clone(),
 
-        AST::Invoke(ref name, ref mut args, ref mut stype) => {
-            let mut ftype = match scope.borrow().find(name) {
-                None => panic!("Function not found: {:?}", name),
-                Some(sym) => sym.ttype.clone(),
-            };
+        AST::Invoke(ref mut fexpr, ref mut args, ref mut stype) => {
+            let etype = check_types_node(map.clone(), scope.clone(), fexpr);
+            //let otype = if let AST::Accessor(ref mut expr, _, _) = **fexpr { Some(check_types_node(map.clone(), scope.clone(), expr)) } else { None };
 
             let tscope = Scope::new_ref(Some(scope.clone()));
-            match ftype {
-                Type::Function(ref mut types, ref ret) => {
+            match etype {
+                Type::Function(ref types, ref ret) => {
                     // TODO I think this needs to reallocate the type variables so they don't conflict with types in the parent context?  Or maybe this is somehow why i didn't give the scope a parent in the other one
                     for ttype in types.clone() {
                         if let Type::Variable(ref name) = ttype {
@@ -84,6 +82,7 @@ pub fn check_types_node<V>(map: ScopeMapRef<V>, scope: ScopeRef<V>, node: &mut A
                 },
                 Type::Variable(ref name) => {
                     let mut atypes = vec!();
+                    //if otype.is_some() { atypes.push(otype); }
                     for ref mut value in args {
                         atypes.push(check_types_node(map.clone(), scope.clone(), value));
                     }
@@ -92,10 +91,12 @@ pub fn check_types_node<V>(map: ScopeMapRef<V>, scope: ScopeRef<V>, node: &mut A
                     // TODO This is suspect... we might be updating type without checking for a conflict
                     //scope.borrow_mut().update_type(name, Type::Function(atypes, Box::new(rettype.clone())));
                     *stype = Some(ftype.clone());
-                    update_type(scope.clone(), name, ftype);
+                    if let AST::Identifier(ref fname) = **fexpr {
+                        update_type(scope.clone(), fname, ftype);
+                    }
                     rettype
                 }
-                _ => panic!("Not a function: {:?}", name),
+                _ => panic!("Not a function: {:?}", fexpr),
             }
         },
 
@@ -107,7 +108,11 @@ pub fn check_types_node<V>(map: ScopeMapRef<V>, scope: ScopeRef<V>, node: &mut A
                     Some(ref mut vexpr) => Some(check_types_node(map.clone(), scope.clone(), vexpr)),
                     None => None
                 };
-                let atype = expect_type(fscope.clone(), ttype.clone(), vtype);
+                let mut atype = expect_type(fscope.clone(), ttype.clone(), vtype);
+                if &name[..] == "self" {
+                    let ctype = fscope.borrow().find_type(&String::from("Self"));
+                    atype = expect_type(fscope.clone(), Some(atype), ctype);
+                }
                 fscope.borrow_mut().update_variable_type(name, atype.clone());
                 argtypes.push(atype);
             }
@@ -183,17 +188,38 @@ pub fn check_types_node<V>(map: ScopeMapRef<V>, scope: ScopeRef<V>, node: &mut A
             check_types_node(map.clone(), scope.clone(), body)
         },
 
-        AST::Class(ref name, ref mut body, ref id) => {
-            let cscope = map.get(id);
-            check_types(map.clone(), cscope.clone(), body);
-            Type::Class(name.clone())
+        AST::Class(ref name, ref parent, ref mut body, ref id) => {
+            let tscope = map.get(id);
+            check_types(map.clone(), tscope.clone(), body);
+
+            let mut structdef = if let Some(ref name) = *parent {
+                scope.borrow().find_struct_def(name).unwrap()
+            } else {
+                vec!()
+            };
+
+            for node in body {
+                match *node {
+                    AST::Definition((ref name, ref mut ttype), ref mut body) => {
+                        match **body {
+                            AST::Function(_, _, _, _) => { },
+                            _ => structdef.push((name.clone(), ttype.clone().unwrap())),
+                        }
+                    },
+                    _ => { }
+                }
+            }
+            scope.borrow_mut().set_struct_def(name, structdef);
+
+            //Type::Class(name.clone())
+            Type::Concrete(String::from("Class"))     // NOTE: the class expression returns a class, and not an object of that class
         },
 
         AST::Index(ref mut base, ref mut index) => {
             let ttype = Type::List(Box::new(scope.borrow_mut().new_typevar()));
             let ltype = expect_type(scope.clone(), Some(ttype), Some(check_types_node(map.clone(), scope.clone(), base)));
             let itype = expect_type(scope.clone(), Some(Type::Concrete(String::from("Int"))), Some(check_types_node(map.clone(), scope.clone(), index)));
-            if let Type::List(ref ttype) = ltype {
+            if let Type::List(ref ttype) = itype {
                 *ttype.clone()
             }
             else {
@@ -201,12 +227,41 @@ pub fn check_types_node<V>(map: ScopeMapRef<V>, scope: ScopeRef<V>, node: &mut A
             }
         },
 
-        AST::Accessor(ref mut left, ref mut right) => {
+        AST::Resolver(ref mut left, ref mut field) => {
+            let ltype = match **left {
+                AST::Identifier(ref name) => expect_type(scope.clone(), None, Some(scope.borrow().find_type(name).unwrap().clone())),
+                _ => panic!("SyntaxError: left-hand side of scope resolver must be identifier")
+            };
+
+            match ltype {
+                Type::Class(ref name) |
+                Type::Concrete(ref name) => {
+                    let classdef = scope.borrow().find_class_def(name).unwrap();
+                    let rtype = match classdef.borrow().find(field) {
+                        Some(info) => info.ttype.clone(),
+                        None => panic!("NameError: type {:?} doesn't contain field name {:?}", ltype, field)
+                    };
+                    rtype
+                },
+                _ => panic!("TypeError: accessor expected Class and Concrete type, but found {:?}", ltype)
+            }
+        },
+
+        AST::Accessor(ref mut left, ref mut field, ref mut stype) => {
             let ltype = expect_type(scope.clone(), None, Some(check_types_node(map.clone(), scope.clone(), left)));
-            // TODO how do you finish this?  I guess only a class or a typedef type can be accessed
-            //match ltype {
-            //}
-            ltype
+            *stype = Some(ltype.clone());
+            match ltype {
+                Type::Class(ref name) |
+                Type::Concrete(ref name) => {
+                    let classdef = scope.borrow().find_class_def(name).unwrap();
+                    let rtype = match classdef.borrow().find(field) {
+                        Some(info) => info.ttype.clone(),
+                        None => panic!("NameError: type {:?} doesn't contain field name {:?}", ltype, field)
+                    };
+                    rtype
+                },
+                _ => panic!("TypeError: accessor expected Class and Concrete type, but found {:?}", ltype)
+            }
         },
 
         AST::Noop |
@@ -256,6 +311,7 @@ pub fn expect_type<V>(scope: ScopeRef<V>, ottype: Option<Type>, obtype: Option<T
                     }
                     Type::Function(argtypes, Box::new(expect_type(scope.clone(), Some(*aret.clone()), Some(*bret.clone()))))
                 },
+                // TODO you have to add a special case here for classes, which could match if one is a direct decendent of the other
                 _ => {
                     if ttype == btype {
                         ttype
@@ -345,8 +401,8 @@ fn update_type<V>(scope: ScopeRef<V>, name: &String, ttype: Type) where V: Clone
     //scope.borrow_mut().swap_variable_type(name, &|otype| expect_type(scope.clone(), Some(otype), Some(ttype.clone())));
     //scope.borrow_mut().swap_type(name, &|otype| expect_type(scope.clone(), Some(otype), Some(ttype.clone())));
 
-    let otype = scope.borrow().find_type(name).unwrap().clone();
-    let ntype = expect_type(scope.clone(), Some(otype), Some(ttype));
+    let otype = scope.borrow().find_type(name).clone();
+    let ntype = expect_type(scope.clone(), otype, Some(ttype));
     scope.borrow_mut().update_type(name, ntype);
 }
 
@@ -393,7 +449,7 @@ mod tests {
     fn typecheck(text: &[u8]) -> Type {
         let result = parse(text);
         let mut code = result.unwrap().1;
-        let map = bind_names(&mut code);
+        let map: ScopeMapRef<()> = bind_names(&mut code);
         check_types(map.clone(), map.get_global(), &mut code)
     }
 }

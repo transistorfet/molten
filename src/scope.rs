@@ -23,6 +23,8 @@ pub struct Symbol<V> {
 #[derive(Clone, Debug, PartialEq)]
 pub struct TypeInfo<V> {
     pub ttype: Type,
+    pub structdef: Vec<(String, Type)>,
+    pub parent: Option<String>,
     pub classdef: Option<ScopeRef<V>>,
 }
 
@@ -31,6 +33,7 @@ pub struct TypeInfo<V> {
 pub struct Scope<V> {
     //pub id: UniqueID,
     pub is_global: bool,
+    pub no_lookup: bool,
     pub names: HashMap<String, Symbol<V>>,
     pub types: HashMap<String, TypeInfo<V>>,
     pub parent: Option<ScopeRef<V>>,
@@ -46,6 +49,7 @@ impl<V> Scope<V> where V: Clone {
     pub fn new(parent: Option<ScopeRef<V>>) -> Scope<V> {
         Scope {
             is_global: false,
+            no_lookup: false,
             names: HashMap::new(),
             types: HashMap::new(),
             parent: parent,
@@ -63,6 +67,10 @@ impl<V> Scope<V> where V: Clone {
 
     pub fn set_global(&mut self, value: bool) {
         self.is_global = value;
+    }
+
+    pub fn set_no_lookup(&mut self, value: bool) {
+        self.no_lookup = value;
     }
 
     pub fn set_parent(&mut self, parent: ScopeRef<V>) {
@@ -131,8 +139,9 @@ impl<V> Scope<V> where V: Clone {
     }
 
     pub fn find(&self, name: &String) -> Option<Symbol<V>> {
-        if let Some(x) = self.names.get(name) {
-            Some(x.clone())
+        let sym = self.names.get(name);
+        if sym.is_some() && !self.no_lookup {
+            Some(sym.unwrap().clone())
         }
         else if let Some(ref parent) = self.parent {
             parent.borrow().find(name).map(|x| x.clone())
@@ -166,7 +175,7 @@ impl<V> Scope<V> where V: Clone {
         match self.types.contains_key(&name) {
             true => panic!("NameError: type is already defined; {:?}", name),
             //false => self.types.insert(name, ttype),
-            false => self.types.insert(name, TypeInfo { ttype: ttype, classdef: None }),
+            false => self.types.insert(name, TypeInfo { ttype: ttype, structdef: vec!(), parent: None, classdef: None }),
         };
     }
 
@@ -174,7 +183,21 @@ impl<V> Scope<V> where V: Clone {
         self.types.contains_key(name)
     }
 
+    pub fn search_type<F, U>(&self, name: &String, f: F) -> Option<U> where F: Fn(&TypeInfo<V>) -> Option<U> {
+        if let Some(ref info) = self.types.get(name) {
+            f(info)
+        }
+        else if let Some(ref parent) = self.parent {
+            parent.borrow().search_type(name, f)
+        }
+        else {
+            None
+        }
+    }
+
     pub fn find_type(&self, name: &String) -> Option<Type> {
+        self.search_type(name, |info| Some(info.ttype.clone()))
+/*
         if let Some(info) = self.types.get(name) {
             Some(info.ttype.clone())
         }
@@ -184,6 +207,7 @@ impl<V> Scope<V> where V: Clone {
         else {
             None
         }
+*/
     }
 
     pub fn update_type(&mut self, name: &String, ttype: Type) {
@@ -197,16 +221,29 @@ impl<V> Scope<V> where V: Clone {
         }
     }
 
-    pub fn set_class_def(&mut self, name: &String, classdef: ScopeRef<V>) {
+    pub fn swap_type<F>(&mut self, name: &String, f: F) where F: Fn(Type) -> Type {
+        match self.types.entry(name.clone()) {
+            Entry::Vacant(_) => panic!("NameError: type is undefined; {:?}", name),
+            Entry::Occupied(mut entry) => {
+                (*entry.get_mut()).ttype = f(entry.get().ttype.clone());
+            },
+        };
+    }
+
+
+    pub fn set_class_def(&mut self, name: &String, parentclass: Option<String>, classdef: ScopeRef<V>) {
         if let Entry::Occupied(mut entry) = self.types.entry(name.clone()) {
+            (*entry.get_mut()).parent = parentclass;
             (*entry.get_mut()).classdef = Some(classdef);
         }
         else if let Some(ref parent) = self.parent {
-            parent.borrow_mut().set_class_def(name, classdef);
+            parent.borrow_mut().set_class_def(name, parentclass, classdef);
         }
     }
 
     pub fn find_class_def(&self, name: &String) -> Option<ScopeRef<V>> {
+        self.search_type(name, |info| info.classdef.clone())
+/*
         if let Some(info) = self.types.get(name) {
             info.classdef.clone()
         }
@@ -216,16 +253,32 @@ impl<V> Scope<V> where V: Clone {
         else {
             None
         }
+*/
     }
 
-    pub fn swap_type(&mut self, name: &String, f: &Fn(Type) -> Type) {
-        match self.types.entry(name.clone()) {
-            Entry::Vacant(_) => panic!("NameError: type is undefined; {:?}", name),
-            Entry::Occupied(mut entry) => {
-                (*entry.get_mut()).ttype = f(entry.get().ttype.clone());
-            },
-        };
+    pub fn get_parent_class_def(&self, name: &String) -> Option<ScopeRef<V>> {
+        self.search_type(name, |info| {
+            match info.parent {
+                Some(ref name) => self.search_type(name, |info| info.classdef.clone()),
+                None => None,
+            }
+        })
     }
+
+    pub fn set_struct_def(&mut self, name: &String, structdef: Vec<(String, Type)>) {
+        if let Entry::Occupied(mut entry) = self.types.entry(name.clone()) {
+            (*entry.get_mut()).structdef = structdef;
+        }
+        else if let Some(ref parent) = self.parent {
+            parent.borrow_mut().set_struct_def(name, structdef);
+        }
+    }
+
+    pub fn find_struct_def(&self, name: &String) -> Option<Vec<(String, Type)>> {
+        self.search_type(name, |info| Some(info.structdef.clone()))
+    }
+
+
 
     pub fn new_typevar(&mut self) -> Type {
         for ch in b'a' .. b'z' + 1 {
@@ -271,6 +324,7 @@ pub fn make_global<V>(map: ScopeMapRef<V>) -> ScopeRef<V> where V: Clone {
     //let primatives = Scope::new_ref(None);
     let primatives = map.add(UniqueID(0), None);
 
+    primatives.borrow_mut().define_type(String::from("Nil"), Type::Concrete(String::from("Nil")));
     primatives.borrow_mut().define_type(String::from("Int"), Type::Concrete(String::from("Int")));
     primatives.borrow_mut().define_type(String::from("Real"), Type::Concrete(String::from("Real")));
     primatives.borrow_mut().define_type(String::from("String"), Type::Concrete(String::from("String")));
@@ -301,6 +355,11 @@ pub fn make_global<V>(map: ScopeMapRef<V>) -> ScopeRef<V> where V: Clone {
     primatives.borrow_mut().define(String::from("not"), parse_type("(Int) -> Bool"));
 
     primatives.borrow_mut().define(String::from("puts"), parse_type("(String) -> Bool"));
+    primatives.borrow_mut().define(String::from("malloc"), parse_type("(Int) -> 'a"));
+    primatives.borrow_mut().define(String::from("realloc"), parse_type("('a, Int) -> 'a"));
+    primatives.borrow_mut().define(String::from("free"), parse_type("('a) -> Nil"));
+
+    primatives.borrow_mut().define(String::from("str"), parse_type("(Int) -> String"));
 
     //let global = Scope::new_ref(Some(primatives));
     let global = map.add(UniqueID(1), Some(primatives));
@@ -342,7 +401,7 @@ fn bind_names_node<V>(map: ScopeMapRef<V>, scope: ScopeRef<V>, node: &mut AST) w
 
         AST::Identifier(ref name) => {
             if scope.borrow().find(name).is_none() {
-                panic!("Undefined identifier: {:?}", name);
+                panic!("NameError: undefined identifier {:?}", name);
             }
         }
 
@@ -355,16 +414,26 @@ fn bind_names_node<V>(map: ScopeMapRef<V>, scope: ScopeRef<V>, node: &mut AST) w
             bind_names_node(map.clone(), scope.clone(), index);
         },
 
-        AST::Accessor(ref mut left, ref mut right) => {
-            bind_names_node(map.clone(), scope, left);
-            // NOTE we don't search right, because it will depend on the return type of left, which we don't know yet
+        AST::Resolver(ref mut left, ref mut right) => {
+            // TODO should this always work on a type reference, or should classes be added as values as well as types?
+            //bind_names_node(map.clone(), scope, left);
+            match **left {
+                AST::Identifier(ref name) => {
+                    if scope.borrow().find_type(name).is_none() {
+                        panic!("NameError: undefined type {:?}", name);
+                    }
+                },
+                _ => panic!("SyntaxError: left-hand side of scope resolver must be identifier")
+            }
         },
 
-        AST::Invoke(ref name, ref mut args, ref ttype) => {
-            if scope.borrow().find(name).is_none() {
-                panic!("Undefined identifier: {:?}", name);
-            }
-            bind_names_vec(map.clone(), scope, args);
+        AST::Accessor(ref mut left, ref mut right, _) => {
+            bind_names_node(map.clone(), scope, left);
+        },
+
+        AST::Invoke(ref mut fexpr, ref mut args, ref ttype) => {
+            bind_names_node(map.clone(), scope.clone(), fexpr);
+            bind_names_vec(map.clone(), scope.clone(), args);
         },
 
         AST::If(ref mut cond, ref mut texpr, ref mut fexpr) => {
@@ -400,15 +469,40 @@ fn bind_names_node<V>(map: ScopeMapRef<V>, scope: ScopeRef<V>, node: &mut AST) w
             bind_names_node(map.clone(), scope.clone(), body);
         },
 
-        AST::Class(ref name, ref mut body, ref id) => {
-            let cscope = map.add(id.clone(), None);
-            //let cscope = map.get(id);
+        AST::Class(ref name, ref parent, ref mut body, ref id) => {
+            // Create class name bindings for checking ast::accessors
+            let cscope = Scope::new_ref(None);
+
+            // Find the parent class definitions, which the new class will inherit from
+            match *parent {
+                 Some(ref parent) => match scope.borrow().find_class_def(&parent) {
+                    Some(ref parentdef) => cscope.borrow_mut().set_parent(parentdef.clone()),
+                    None => panic!("NameError: undefined parent class {:?} for {:?}", parent, name),
+                },
+                None => { }
+            };
+
+            // Add all the name definitions to the class, so we can later name and type check ast::accessors
+            cscope.borrow_mut().define(String::from("new"), Some(Type::Function(vec!(), Box::new(Type::Class(name.clone())))));
+            for ref node in body.iter() {
+                match **node {
+                    AST::Definition((ref name, ref ttype), ref code) => { cscope.borrow_mut().define(name.clone(), ttype.clone()) },
+                    _ => { }
+                }
+            }
+
+            // Define the class in the local scope
+            scope.borrow_mut().define_type(name.clone(), Type::Class(name.clone()));
+            scope.borrow_mut().set_class_def(name, parent.clone(), cscope.clone());
             // TODO i don't like this type == Class thing, but i don't know how i'll do struct types yet either
             //scope.borrow_mut().define(name.clone(), Some(Type::Class(name.clone())));
-            scope.borrow_mut().define_type(name.clone(), Type::Class(name.clone()));
-            cscope.borrow_mut().set_parent(scope.clone());
-            scope.borrow_mut().set_class_def(name, cscope.clone());
-            bind_names_vec(map.clone(), cscope.clone(), body);
+
+            let tscope = map.add(id.clone(), Some(scope.clone()));
+            // Create a temporary invisible scope to name check the class body
+            tscope.borrow_mut().define_type(String::from("Self"), Type::Class(name.clone()));
+            tscope.borrow_mut().set_no_lookup(true);
+            bind_names_vec(map.clone(), tscope.clone(), body);
+            tscope.borrow_mut().set_no_lookup(false);
         },
 
         // TODO AST::Type

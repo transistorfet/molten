@@ -2,6 +2,7 @@
         let msg = "Hey"
         let stringstuff = fn x: String -> msg
         puts(msg)
+        puts(str(10))
 
         2 + 5
 
@@ -21,7 +22,8 @@
         let fac2 = fn x, y, z -> if not x then 1 else x - -123
         testy(3)
 
-	let test = fn x -> x()
+        // TODO this causes a segfault
+	//let test = fn x -> x()
         // TODO this causes a typeerror
 	//let test2 = fn x -> x() + 1
 
@@ -31,13 +33,60 @@
             else                    //comment
                 x * recfoo(x - 1)   //comment
         end                         //comment
-        recfoo(3)
+        puts(str(recfoo(5)))
 
-        class Thing {
+        let stuff = class Stuff {
             let foo = fn a -> {
                 a * 4
             }
+
+            let a = 1
+            let b: String = "aoeu"
+
         }
+
+        class TestClass extends Stuff {
+            let bar = fn self, x -> {
+                // TODO currently causes a segfault
+                //self.foo(x)
+            }
+        }
+
+        //let thing = TestClass::new()
+
+        //malloc(10)
+
+        /*
+        let thing = class Thing {
+            let foo = fn a -> {
+                a * 4
+            }
+
+            let bar = fn a -> [ a, a, a ]
+            let arr = [ 1, 2, 3, 4 ]
+            let foobar = [ fn x -> x * 16, fn x -> x * 100 ]
+
+            let baz = fn self: Thing, a -> {
+
+            }
+        }
+
+        let get_thing = fn -> thing
+
+        [ 0, 1, 2, 3 ][0]
+        let arr = [ 1, 2, 3, 4 ]
+        arr[2]
+        thing.arr[1]
+        get_thing().arr[2]
+        thing.bar()[1]
+        (thing.bar())[1]
+        get_thing().bar()[1]
+        thing.foobar[2](123)
+        get_thing().foobar[2](123)
+        thing.foo(521)
+        get_thing().foo(985)
+        Thing::foo(a)
+        */
 
     /*
 

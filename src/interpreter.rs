@@ -144,15 +144,15 @@ impl Interpreter {
                 }
             },
 
-            AST::Invoke(ref name, ref args, _) => {
-                let func = &scope.borrow().find(name).unwrap().value;
+            AST::Invoke(ref fexpr, ref args, _) => {
+                let func = self.execute_node(map.clone(), scope.clone(), fexpr);
 
                 let mut values = vec!();
                 for arg in args {
                     values.push(self.execute_node(map.clone(), scope.clone(), arg));
                 }
 
-                if let &Some(Value::Function(ref fscope, ref argdefs, ref body)) = func {
+                if let Value::Function(ref fscope, ref argdefs, ref body) = func {
                     let lscope = Scope::new_ref(fscope.borrow().get_parent());
                     for (ref def, value) in argdefs.iter().zip(values.iter()) {
                         lscope.borrow_mut().define(def.0.clone(), def.1.clone());
@@ -161,11 +161,11 @@ impl Interpreter {
 
                     self.execute_node(map.clone(), lscope.clone(), body)
                 }
-                else if let &Some(Value::Builtin(ref funcptr)) = func {
+                else if let Value::Builtin(ref funcptr) = func {
                     funcptr(scope.clone(), values)
                 }
                 else {
-                    panic!("Function not found: {:?}", name);
+                    panic!("Function not found: {:?}", fexpr);
                 }
             },
 
@@ -231,8 +231,8 @@ impl Interpreter {
                 compiled
             },
 
-            AST::Class(ref name, ref body, ref id) => {
-                let cscope = map.get(id);
+            AST::Class(ref name, ref parent, ref body, ref id) => {
+                let tscope = map.get(id);
 
             },
 
@@ -240,7 +240,11 @@ impl Interpreter {
 
             },
 
-            AST::Accessor(ref left, ref right) => {
+            AST::Resolver(ref left, ref right) => {
+
+            },
+
+            AST::Accessor(ref left, ref right, _) => {
 
             },
 

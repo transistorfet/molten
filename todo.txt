@@ -1,23 +1,49 @@
 
+* you might have to eventually unify class and concrete, because parse_type() can not distinguish between the two
+
+* add a 'tag' field to Function, along with a base name arg to bind_names and use look-ahead to change the names of functions, taking
+  into account classes and maybe nested functions...
+* fix scope resolution to also work on objects, so that you can have static methods...
+* maybe eventually support a 'super' variable or function for class methods
+
+* make structdef Rc<Vec<(String, Type)>> so you can make multiple references to the same one without cloning
+* add a case to expect_type which compares classes with their parents, superclasses
+
+* implement garbage collection
+* how are you going to do strings, with allocation?
+* there needs to be a constructor function that is automatically added? or at least required during name binding
+* error when type checking calls to methods; and with passing/type checking the first argument (the object itself)
+* general issues with the type checker and the proliferation of type variables
+
+* should classes be values, added to the name space, or should they only be defined as types; should types be first class or not?
+
+* get llvm closures working
 * change the debug prints to overwrite Debug formatting for scopes
 
+
+TYPE CHECKING:
+
 * ensure typevars in invoke are unique to the scope before adding
-
-* make a temporary function to go through all variables and resolve their types, and report if they resolve further, which might be an issue...
-
 * remove unused typechecking vars somehow...
 * clean up typechecking code
 * implement type definition in namebinding and typechecking
 * should you allow keyword arguments in invoke; foo(a=10, b=20)
 * should you allow arguments with a default value to be omitted from a function call?, that would require a bunch of changes to typechecking
 
+* handling of class methods "self" type is kind of a hack
+* make a temporary function to go through all variables and resolve their types, and report if they resolve further, which might be an issue...
 
-* add dicts syntax
+
+PARSER:
 
 * issue with separator/lf not working when two expressions are on the same line (it should produce a parse error)
 * add line and column numbers to error reporting
 * add error returning so multiple errors can be caught at once
 * make nestable comments
 
+FEATURES:
+
+* add dicts syntax
 * add macros and expandable forms (like lisp)
+* what about type functions to build/cast to specific C/LLVM types, like i32, i8, etc
 

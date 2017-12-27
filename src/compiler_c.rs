@@ -169,8 +169,8 @@ impl CompilerData {
             },
 
     /*
-            AST::Class(ref name, ref body, ref id) => {
-                let cscope = map.get(id);
+            AST::Class(ref name, ref parent, ref body, ref id) => {
+                let tscope = map.get(id);
 
             },
 
@@ -178,7 +178,10 @@ impl CompilerData {
 
             },
 
-            AST::Accessor(ref left, ref right) => {
+            AST::Resolver(ref left, ref right) => {
+            },
+
+            AST::Accessor(ref left, ref right, _) => {
 
             },
 

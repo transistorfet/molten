@@ -8,9 +8,6 @@ extern crate nom;
 extern crate clap;
 use clap::{ App, Arg };
 
-mod utils;
-use utils::UniqueID;
-
 mod parser;
 use parser::AST;
 
@@ -19,6 +16,7 @@ use scope::ScopeMapRef;
 
 mod types;
 mod debug;
+mod utils;
 mod interpreter;
 //mod compiler_c;
 mod compiler_llvm;
@@ -77,8 +75,9 @@ fn compile_string(text: &[u8]) {
 
 fn process_input<V>(text: &[u8]) -> (ScopeMapRef<V>, Vec<AST>) where V: Clone + Debug {
     let result = parser::parse(text);
-    println!("{:?}", result);
+    println!("{:?}\n\n", result);
     let mut code = result.unwrap().1;
+    traverse(&code);
     let map = scope::bind_names(&mut code);
     let gtype = types::check_types(map.clone(), map.get_global(), &mut code);
     println!("\n{:?}\n", code);
@@ -89,11 +88,11 @@ fn process_input<V>(text: &[u8]) -> (ScopeMapRef<V>, Vec<AST>) where V: Clone + 
     (map, code)
 }
 
-fn traverse(tree: Vec<AST>) {
+fn traverse(tree: &Vec<AST>) {
     for node in tree {
         println!("{:?}", node);
-        match node {
-            AST::Block(x) => traverse(x),
+        match *node {
+            AST::Block(ref x) => traverse(x),
             _ => ()
         }
     }
