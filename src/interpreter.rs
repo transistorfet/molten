@@ -8,6 +8,10 @@ use parser::AST;
 use scope::{ Scope, ScopeRef, ScopeMapRef };
 use types::Type;
 
+#[derive(Clone, Debug, PartialEq)]
+pub enum TypeValue {
+
+}
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Value {
@@ -17,8 +21,8 @@ pub enum Value {
     Real(f64),
     String(String),
     List(Vec<Value>),
-    Function(ScopeRef<Value>, Vec<(String, Option<Type>, Option<AST>)>, AST),
-    Builtin(fn(ScopeRef<Value>, Vec<Value>) -> Value),
+    Function(ScopeRef<Value, TypeValue>, Vec<(String, Option<Type>, Option<AST>)>, AST),
+    Builtin(fn(ScopeRef<Value, TypeValue>, Vec<Value>) -> Value),
     AST(AST),
 }
 
@@ -36,6 +40,7 @@ impl fmt::Display for Value {
         }
     }
 }
+
 
 
 
@@ -92,7 +97,7 @@ impl Env {
 
 
 
-pub fn execute(map: ScopeMapRef<Value>, code: &Vec<AST>) {
+pub fn execute(map: ScopeMapRef<Value, TypeValue>, code: &Vec<AST>) {
     let scope = map.get_global();
     let mut machine = Interpreter::new();
     builtins::assign_builtins(scope.borrow().get_parent().unwrap().clone());
@@ -111,7 +116,7 @@ impl Interpreter {
         }
     }
 
-    pub fn execute_vec(&mut self, map: ScopeMapRef<Value>, scope: ScopeRef<Value>, code: &Vec<AST>) -> Value {
+    pub fn execute_vec(&mut self, map: ScopeMapRef<Value, TypeValue>, scope: ScopeRef<Value, TypeValue>, code: &Vec<AST>) -> Value {
         let mut last: Value = Value::Nil;
 
         for node in code {
@@ -121,7 +126,7 @@ impl Interpreter {
         last
     }
 
-    pub fn execute_node(&mut self, map: ScopeMapRef<Value>, scope: ScopeRef<Value>, node: &AST) -> Value {
+    pub fn execute_node(&mut self, map: ScopeMapRef<Value, TypeValue>, scope: ScopeRef<Value, TypeValue>, node: &AST) -> Value {
         match *node {
             AST::Nil => Value::Nil,
             AST::Boolean(boolean) => Value::Boolean(boolean),
@@ -169,7 +174,7 @@ impl Interpreter {
                 }
             },
 
-            AST::Function(ref args, ref body, ref id, _) => {
+            AST::Function(ref name, ref args, ref rtype, ref body, ref id) => {
                 let fscope = map.get(id);
                 Value::Function(fscope.clone(), args.clone(), *body.clone())
             },
@@ -263,8 +268,9 @@ impl Interpreter {
 mod builtins {
     use scope::ScopeRef;
     use interpreter::Value;
+    use interpreter::TypeValue;
 
-    pub fn assign_builtins(scope: ScopeRef<Value>) {
+    pub fn assign_builtins(scope: ScopeRef<Value, TypeValue>) {
         let mut scope = scope.borrow_mut();
         scope.assign(&String::from("*"), Value::Builtin(multiply));
         scope.assign(&String::from("/"), Value::Builtin(divide));
@@ -298,35 +304,35 @@ mod builtins {
         }
     }
 
-    fn multiply(scope: ScopeRef<Value>, args: Vec<Value>) -> Value {
+    fn multiply(scope: ScopeRef<Value, TypeValue>, args: Vec<Value>) -> Value {
         for_numbers!(args, a, b, a * b)
     }
 
-    fn divide(scope: ScopeRef<Value>, args: Vec<Value>) -> Value {
+    fn divide(scope: ScopeRef<Value, TypeValue>, args: Vec<Value>) -> Value {
         for_numbers!(args, a, b, a / b)
     }
 
-    fn add(scope: ScopeRef<Value>, args: Vec<Value>) -> Value {
+    fn add(scope: ScopeRef<Value, TypeValue>, args: Vec<Value>) -> Value {
         for_numbers!(args, a, b, a + b)
     }
 
-    fn subtract(scope: ScopeRef<Value>, args: Vec<Value>) -> Value {
+    fn subtract(scope: ScopeRef<Value, TypeValue>, args: Vec<Value>) -> Value {
         for_numbers!(args, a, b, a - b)
     }
 
-    fn equals(scope: ScopeRef<Value>, args: Vec<Value>) -> Value {
+    fn equals(scope: ScopeRef<Value, TypeValue>, args: Vec<Value>) -> Value {
         for_numbers!(args, a, b, a == b, Value::Boolean)
     }
 
-    fn not_equals(scope: ScopeRef<Value>, args: Vec<Value>) -> Value {
+    fn not_equals(scope: ScopeRef<Value, TypeValue>, args: Vec<Value>) -> Value {
         for_numbers!(args, a, b, a != b, Value::Boolean)
     }
 
-    fn greater_than(scope: ScopeRef<Value>, args: Vec<Value>) -> Value {
+    fn greater_than(scope: ScopeRef<Value, TypeValue>, args: Vec<Value>) -> Value {
         for_numbers!(args, a, b, a > b, Value::Boolean)
     }
 
-    fn less_than(scope: ScopeRef<Value>, args: Vec<Value>) -> Value {
+    fn less_than(scope: ScopeRef<Value, TypeValue>, args: Vec<Value>) -> Value {
         for_numbers!(args, a, b, a < b, Value::Boolean)
     }
 }

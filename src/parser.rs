@@ -100,11 +100,12 @@ pub enum AST {
     Try(Box<AST>, Vec<(AST, AST)>),
     Match(Box<AST>, Vec<(AST, AST)>),
     For(String, Box<AST>, Box<AST>, UniqueID),
-    Function(Vec<(String, Option<Type>, Option<AST>)>, Box<AST>, UniqueID, Option<Type>),
+    Function(Option<String>, Vec<(String, Option<Type>, Option<AST>)>, Option<Type>, Box<AST>, UniqueID),
     Class(String, Option<String>, Vec<AST>, UniqueID),
 
     Import(String),
     Definition((String, Option<Type>), Box<AST>),
+    Assignment(Box<AST>, Box<AST>),
     While(Box<AST>, Box<AST>),
     Type(String, Vec<(String, Option<Type>)>),
 }
@@ -124,8 +125,10 @@ named!(statement<AST>,
         s: wscom!(alt!(
             import |
             definition |
+            assignment |
             whileloop |
             typedef |
+            // TODO should class be here too?
             expression
             //value!(AST::Noop, multispace_comment)
         )) >>
@@ -150,6 +153,15 @@ named!(definition<AST>,
         wscom!(tag!("=")) >>
         e: expression >>
         (AST::Definition(i, Box::new(e)))
+    )
+);
+
+named!(assignment<AST>,
+    do_parse!(
+        o: subatomic_operation >>
+        wscom!(tag!("=")) >>
+        e: expression >>
+        (AST::Assignment(Box::new(o), Box::new(e)))
     )
 );
 
@@ -253,7 +265,7 @@ named!(caselist<Vec<(AST, AST)>>,
     many1!(do_parse!(
         //wscom!(tag!("|")) >>
         c: alt_complete!(value!(AST::Underscore, tag!("_")) | literal) >>
-        wscom!(tag!("->")) >>
+        wscom!(tag!("=>")) >>
         e: expression >>
         //wscom!(tag!(",")) >>
         (c, e)
@@ -275,13 +287,31 @@ named!(forloop<AST>,
 named!(function<AST>,
     do_parse!(
         wscom!(tag_word!("fn")) >>
+        //n: opt!(identifier) >>
+        l: alt!(
+            do_parse!(
+                n: opt!(identifier) >>
+                l: delimited!(tag!("("), identifier_list_defaults, tag!(")")) >>
+                ((n, l))
+            ) |
+            map!(identifier_list_defaults, |l| (None, l))
+        ) >>
+        r: opt!(preceded!(wscom!(tag!("->")), type_description)) >>
+        e: alt!(block | preceded!(wscom!(tag!("=>")), expression)) >>
+        (AST::Function(l.0, l.1, r, Box::new(e), UniqueID::generate()))
+    )
+);
+/*
+named!(function<AST>,
+    do_parse!(
+        wscom!(tag_word!("fn")) >>
         l: identifier_list_defaults >>
-        wscom!(tag!("->")) >>
+        wscom!(tag!("=>")) >>
         e: expression >>
         (AST::Function(l, Box::new(e), UniqueID::generate(), None))
     )
 );
-
+*/
 named!(identifier_list<Vec<(String, Option<Type>)>>,
     separated_list!(tag!(","), identifier_typed)
 );
@@ -352,15 +382,6 @@ impl AST {
             _                       => 20,
         }
     }
-
-    /*
-    fn fold_op_old(left: AST, operations: Vec<(String, AST)>) -> Self {
-        operations.into_iter().fold(left, |acc, pair| {
-            //AST::Infix(pair.0, Box::new(acc), Box::new(pair.1))
-            AST::Invoke(Box::new(AST::Identifier(pair.0)), vec!(acc, pair.1), None)
-        })
-    }
-    */
 
     fn fold_op(left: AST, operations: Vec<(String, AST)>) -> Self {
         let mut operands: Vec<AST> = vec!();
@@ -490,56 +511,9 @@ impl AST {
     }
 }
 
-/*
-named!(index<AST>,
-    do_parse!(
-        // TODO could be (expr), identifier, invoke(), accessor, literal(ie. list)?
-        base: alt!(accessor | literal | invoke | subatomic) >>
-        //base: subatomic >>
-
-        tag!("[") >>
-        ind: expression >>
-        tag!("]") >>
-        (AST::Index(Box::new(base), Box::new(ind)))
-    )
-);
-
-named!(accessor<AST>,
-    do_parse!(
-        // TODO could be (expr), identifier, invoke(), index
-        //left: alt!(invoke | index | subatomic) >>
-        left: alt!(invoke | subatomic) >>
-        //left: subatomic >>
-
-        //operations: many0!(tuple!(map_str!(tag!(".")), subatomic)) >>
-        //(AST::fold_op(left, operations))
-        tag!(".") >>
-        // TODO can only be identifier... invokes should match before accessor
-        //right: atomic >>
-        //right: map!(identifier, |s| AST::Identifier(s)) >>
-        right: identifier >>
-        (AST::Accessor(Box::new(left), right, None))
-    )
-);
-
-named!(invoke<AST>,
-    do_parse!(
-        // TODO could be (expr), identifier, index, accessor
-        s: alt!(accessor | subatomic) >>
-        //s: map!(identifier, |s| AST::Identifier(s)) >>
-        opt!(space) >>
-        tag!("(") >>
-        l: expression_list >>
-        tag!(")") >>
-        (AST::Invoke(Box::new(s), l, None))
-    )
-);
-*/
-
 named!(subatomic<AST>,
     alt_complete!(
         literal |
-        //invoke |
         map!(identifier, |s| AST::Identifier(s)) |
         delimited!(tag!("("), wscom!(expression), tag!(")"))
     )

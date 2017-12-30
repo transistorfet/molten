@@ -1,6 +1,6 @@
 
         let msg = "Hey"
-        let stringstuff = fn x: String -> msg
+        let stringstuff = fn x: String => msg
         puts(msg)
         puts(str(10))
 
@@ -17,17 +17,17 @@
 
         let x = 2 + 4 * 7 - 1 / 20  == 10 - 50 * 12
 
-        let testy = fn x -> x + 1
-        let fac = fn x : Int, y = 5 * 3, z: String = "hey" -> if not x then 1 else x - -123
-        let fac2 = fn x, y, z -> if not x then 1 else x - -123
+        let testy = fn x => x + 1
+        let fac = fn (x : Int, y = 5 * 3, z: String = "hey") => if not x then 1 else x - -123
+        let fac2 = fn x, y, z => if not x then 1 else x - -123
         testy(3)
 
         // TODO this causes a segfault
-	//let test = fn x -> x()
+	//let test = fn x => x()
         // TODO this causes a typeerror
-	//let test2 = fn x -> x() + 1
+	//let test2 = fn x => x() + 1
 
-        let recfoo = fn x -> begin  //comment
+        let recfoo = fn x => begin  //comment
             if x < 1 then           //comment
                 1                   //comment
             else                    //comment
@@ -36,7 +36,11 @@
         puts(str(recfoo(5)))
 
         let stuff = class Stuff {
-            let foo = fn a -> {
+            let foo = fn self, a => {
+                a * 4
+            }
+
+            fn foo2(self, a) {
                 a * 4
             }
 
@@ -46,32 +50,43 @@
         }
 
         class TestClass extends Stuff {
-            let bar = fn self, x -> {
-                // TODO currently causes a segfault
-                //self.foo(x)
+            let bar = fn self, x => {
+                self.foo2(x)
+            }
+
+            let add = fn self, x => {
+                self.a = self.a + x
             }
         }
 
-        //let thing = TestClass::new()
+        let thing = TestClass::new()
+        thing.a = 1337
+        thing.add(124)
+        puts(str(thing.a))
+
+        while thing.a > 0 {
+            puts("Hey again")
+            thing.a = -123
+        }
 
         //malloc(10)
 
         /*
         let thing = class Thing {
-            let foo = fn a -> {
+            let foo = fn a => {
                 a * 4
             }
 
-            let bar = fn a -> [ a, a, a ]
+            let bar = fn a => [ a, a, a ]
             let arr = [ 1, 2, 3, 4 ]
-            let foobar = [ fn x -> x * 16, fn x -> x * 100 ]
+            let foobar = [ fn x => x * 16, fn x => x * 100 ]
 
-            let baz = fn self: Thing, a -> {
+            let baz = fn self: Thing, a => {
 
             }
         }
 
-        let get_thing = fn -> thing
+        let get_thing = fn => thing
 
         [ 0, 1, 2, 3 ][0]
         let arr = [ 1, 2, 3, 4 ]
@@ -94,7 +109,7 @@
             recfoo(5)
 
         class Thing {
-            fn thing -> {
+            fn thing => {
                 a * 4
             }
         }
@@ -106,14 +121,14 @@
             x * 100
 
         match a with
-            1 -> a
-            2 -> a * 4
-            _ -> a * 16
+            1 => a
+            2 => a * 4
+            _ => a * 16
 
         try raise a with
-            1 -> a
-            2 -> a * 4
-            _ -> a * 16
+            1 => a
+            2 => a * 4
+            _ => a * 16
 
         [ 0, 1, 2, 3 ][0]
  
@@ -141,7 +156,7 @@
 
         thing.stuff() * ~foo().bar
 
-        let recfoo = fn x -> begin  //comment
+        let recfoo = fn x => begin  //comment
             if x < 1 then           //comment
                 1                   //comment
             else                    //comment
@@ -149,7 +164,7 @@
         end                         //comment
         recfoo(3)
 
-        let fac = fn x : int, y = 5 * 3, z: string = "hey" -> if not x then 1 else x - -123
+        let fac = fn x : int, y = 5 * 3, z: string = "hey" => if not x then 1 else x - -123
 
         thing(5)
         // TODO this probably shouldn't parse without a ; or \n
@@ -167,7 +182,7 @@
         let a = 123.24
         // comments
         123 + 124 * 25
-        let fac = fn x, y -> if not x then 1 else x - -123
+        let fac = fn x, y => if not x then 1 else x - -123
         fac(3)
 
         begin
@@ -180,14 +195,14 @@
         }
 
         match x == true with
-            1 -> x
-            2 -> x * 4
-            _ -> x * 16
+            1 => x
+            2 => x * 4
+            _ => x * 16
 
         match a with
-            1 -> a
-            2 -> a * 4
-            _ -> a * 16
+            1 => a
+            2 => a * 4
+            _ => a * 16
 
 
         let a = 123.24 * 3
@@ -197,7 +212,7 @@
 
 
         class Thing {
-            fn thing -> {
+            fn thing => {
                 things * 4
             }
         }

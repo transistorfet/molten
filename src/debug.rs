@@ -20,16 +20,16 @@ print_code_node(node: &AST) {
 */
 
 
-pub fn print_types<V>(map: ScopeMapRef<V>, scope: ScopeRef<V>, code: &Vec<AST>) where V: Clone {
+pub fn print_types<V, T>(map: ScopeMapRef<V, T>, scope: ScopeRef<V, T>, code: &Vec<AST>) where V: Clone, T: Clone {
     for node in code {
         print_types_node(map.clone(), scope.clone(), node);
     }
 }
 
-pub fn print_types_node<V>(map: ScopeMapRef<V>, scope: ScopeRef<V>, node: &AST) where V: Clone {
+pub fn print_types_node<V, T>(map: ScopeMapRef<V, T>, scope: ScopeRef<V, T>, node: &AST) where V: Clone, T: Clone {
     match *node {
         AST::Block(ref body) => print_types(map.clone(), scope, body),
-        AST::Function(ref args, ref body, ref id, ref ftype) => {
+        AST::Function(ref name, ref args, ref rtype, ref body, ref id) => {
             let fscope = map.get(id);
             print_types_scope(map.clone(), fscope.clone());
             print_types_node(map.clone(), fscope.clone(), body);
@@ -42,7 +42,7 @@ pub fn print_types_node<V>(map: ScopeMapRef<V>, scope: ScopeRef<V>, node: &AST) 
     }
 }
 
-pub fn print_types_scope<V>(map: ScopeMapRef<V>, scope: ScopeRef<V>) where V: Clone {
+pub fn print_types_scope<V, T>(map: ScopeMapRef<V, T>, scope: ScopeRef<V, T>) where V: Clone, T: Clone {
     println!("\nNames:");
     for (ref name, ref sym) in &scope.borrow_mut().names {
         println!("{:?} {:?}", name, sym.ttype);

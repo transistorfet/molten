@@ -73,7 +73,7 @@ fn compile_string(text: &[u8]) {
     println!("{}", fin);
 }
 
-fn process_input<V>(text: &[u8]) -> (ScopeMapRef<V>, Vec<AST>) where V: Clone + Debug {
+fn process_input<V, T>(text: &[u8]) -> (ScopeMapRef<V, T>, Vec<AST>) where V: Clone + Debug, T: Clone {
     let result = parser::parse(text);
     println!("{:?}\n\n", result);
     let mut code = result.unwrap().1;
