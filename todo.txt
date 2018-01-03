@@ -1,30 +1,30 @@
 
-* you might have to eventually unify class and concrete, because parse_type() can not distinguish between the two
-* there needs to be a way to cast pointers down when calling parent class methods
-* llvm doesn't optimize method calls, such that the object is resolved twice...
-
-* add function and method overloading
+* fix scope resolution to also work on objects, so that you can have static methods...
 * add a 'tag' field to Function, along with a base name arg to bind_names and use look-ahead to change the names of functions, taking
   into account classes and maybe nested functions...
-
-* should class bodies have different rules; i've already had to make it treat definitions specially, but i could just have the parser
-  create a different ast element for class body definitions... maybe the same form even, using let, or maybe with a different keyword, like def
 * there needs to be a constructor function that is automatically added? or at least required during name binding
 
-* fix scope resolution to also work on objects, so that you can have static methods...
+* add function and method overloading
+* add operator overloading
+* llvm doesn't optimize method calls, such that the object is resolved twice...
+* should class bodies have different rules; i've already had to make it treat definitions specially, but i could just have the parser
+  create a different ast element for class body definitions... maybe the same form even, using let, or maybe with a different keyword, like def
+
 * make structdef Rc<Vec<(String, Type)>> so you can make multiple references to the same one without cloning
 
 * how are you going to do strings, with allocation? (have I got this, other than GC?)
+* implement lists in compiled code
+* how are you going to do exceptions?
+* how will modules and importing work?
 
 
 
 * implement garbage collection
-* error when type checking calls to methods; and with passing/type checking the first argument (the object itself)
-* general issues with the type checker and the proliferation of type variables
+* handling of class methods "self" type is kind of a hack
 
 * should classes be values, added to the name space, or should they only be defined as types; should types be first class or not?
-
-* how will modules and importing work?
+* should you allow keyword arguments in invoke; foo(a=10, b=20)
+* should you allow arguments with a default value to be omitted from a function call?, that would require a bunch of changes to typechecking
 
 * add error returns instead of panics
 * get llvm closures working
@@ -33,14 +33,10 @@
 
 TYPE CHECKING:
 
-* ensure typevars in invoke are unique to the scope before adding
 * remove unused typechecking vars somehow...
 * clean up typechecking code
-* implement type definition in namebinding and typechecking
-* should you allow keyword arguments in invoke; foo(a=10, b=20)
-* should you allow arguments with a default value to be omitted from a function call?, that would require a bunch of changes to typechecking
+* implement type definition ast element
 
-* handling of class methods "self" type is kind of a hack
 * make a temporary function to go through all variables and resolve their types, and report if they resolve further, which might be an issue...
 
 

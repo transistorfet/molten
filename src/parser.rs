@@ -290,6 +290,7 @@ named!(function<AST>,
         //n: opt!(identifier) >>
         l: alt!(
             do_parse!(
+                //n: opt!(alt!(identifier | infix_op)) >>
                 n: opt!(identifier) >>
                 l: delimited!(tag!("("), identifier_list_defaults, tag!(")")) >>
                 ((n, l))
@@ -560,7 +561,7 @@ named!(type_description<Type>,
 );
 
 named!(type_concrete<Type>,
-    map!(identifier, |s| Type::Concrete(s))
+    map!(identifier, |s| Type::Object(s))
 );
 
 named!(type_variable<Type>,

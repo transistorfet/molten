@@ -66,10 +66,31 @@
 
         while thing.a > 0 {
             puts("Hey again")
-            thing.a = -123
+            thing.a = thing.a - 1000
         }
 
         //malloc(10)
+
+        let r = match a with
+            1 => a
+            2 => a * 4
+            _ => a * 16
+
+        puts(str(r))
+
+        fn strnum(num: Int) -> String {
+            let buffer: String = malloc(22)
+            sprintf(buffer, "%d", num)
+            buffer
+        }
+
+        fn stringcat(s1: String, s2: String) -> String {
+            let s1len = strlen(s1)
+            let s2len = strlen(s2)
+            let buffer: String = malloc(s1len + s2len)
+            sprintf(buffer, "%s%s", s1, s2)
+            buffer
+        }
 
         /*
         let thing = class Thing {
