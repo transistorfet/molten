@@ -84,11 +84,9 @@ impl Env {
     pub fn find(&self, name: &String) -> Option<Value> {
         if let Some(x) = self.names.get(name) {
             return Some(x.clone());
-        }
-        else if let Some(ref parent) = self.parent {
+        } else if let Some(ref parent) = self.parent {
             return parent.borrow().find(name).map(|x| x.clone());
-        }
-        else {
+        } else {
             return None;
         }
     }
@@ -166,11 +164,9 @@ impl Interpreter {
                     }
 
                     self.execute_node(map.clone(), lscope.clone(), body)
-                }
-                else if let Value::Builtin(ref funcptr) = func {
+                } else if let Value::Builtin(ref funcptr) = func {
                     funcptr(scope.clone(), values)
-                }
-                else {
+                } else {
                     panic!("Function not found: {:?}", fexpr);
                 }
             },
@@ -192,8 +188,7 @@ impl Interpreter {
                 let result = self.execute_node(map.clone(), scope.clone(), cond);
                 if result.is_true() {
                     self.execute_node(map.clone(), scope.clone(), texpr)
-                }
-                else {
+                } else {
                     self.execute_node(map.clone(), scope.clone(), fexpr)
                 }
             },

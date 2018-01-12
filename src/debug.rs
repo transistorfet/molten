@@ -45,7 +45,7 @@ pub fn print_types_node<V, T>(map: ScopeMapRef<V, T>, scope: ScopeRef<V, T>, nod
 pub fn print_types_scope<V, T>(map: ScopeMapRef<V, T>, scope: ScopeRef<V, T>) where V: Clone, T: Clone {
     println!("\nNames:");
     for (ref name, ref sym) in &scope.borrow_mut().names {
-        println!("{:?} {:?}", name, sym.ttype);
+        println!("{:?} {:?} {:?}", name, sym.ttype, sym.funcdefs);
     }
 
     println!("\nTypes:");

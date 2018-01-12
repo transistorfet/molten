@@ -1,25 +1,43 @@
 
+use std::ptr;
+use std::fs::File;
+use std::io::prelude::*;
+use std::ffi::CString;
+
 extern crate llvm_sys as llvm;
 use self::llvm::prelude::*;
 use self::llvm::core::*;
 
-use std::ptr;
-use std::ffi::CString;
-
+use import;
 use parser::AST;
-use scope::{ ScopeRef, ScopeMapRef };
+use scope::{ ScopeRef, ScopeMapRef, mangle_name };
 use types::Type;
+use utils::UniqueID;
+//use lib_llvm::{ TypeFunctionMap, initialize_builtins };
 
 
-pub fn compile(map: ScopeMapRef<Value, TypeValue>, code: &Vec<AST>) -> String {
+pub fn compile(map: ScopeMapRef<Value, TypeValue>, module_name: &str, code: &Vec<AST>) {
     unsafe {
-        compile_module(map.clone(), map.get_global(), code)
+        compile_module(map.clone(), map.get_global(), module_name, code)
     }
 }
 
 
 pub type Value = LLVMValueRef;
-pub type TypeValue = LLVMTypeRef;
+//pub type TypeValue = LLVMTypeRef;
+
+//#[derive(Clone, Debug, PartialEq)]
+//pub enum Value {
+//    LLVM(LLVMValueRef),
+//    Builtin(UniqueID),
+//}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct TypeValue {
+    structdef: Vec<(String, Type)>,
+    value: LLVMTypeRef,
+}
+
 
 pub struct LLVM<'a> {
     map: ScopeMapRef<Value, TypeValue>,
@@ -31,10 +49,13 @@ pub struct LLVM<'a> {
     //funcpass: LLVMPassManagerRef,
 }
 
+type Unwind = Option<(LLVMBasicBlockRef, LLVMBasicBlockRef)>;
 
-unsafe fn compile_module(map: ScopeMapRef<Value, TypeValue>, scope: ScopeRef<Value, TypeValue>, code: &Vec<AST>) -> String {
+
+unsafe fn compile_module(map: ScopeMapRef<Value, TypeValue>, scope: ScopeRef<Value, TypeValue>, module_name: &str, code: &Vec<AST>) {
     let context = LLVMContextCreate();
-    let module = LLVMModuleCreateWithName(b"main_module\0".as_ptr() as *const _);
+    //let module = LLVMModuleCreateWithName(b"main_module\0".as_ptr() as *const _);
+    let module = LLVMModuleCreateWithName(label(module_name).as_ptr());
     let builder = LLVMCreateBuilderInContext(context);
     //let funcpass = LLVMCreateFunctionPassManagerForModule(module);
     //LLVMInitializeFunctionPassManager(funcpass);
@@ -57,20 +78,22 @@ unsafe fn compile_module(map: ScopeMapRef<Value, TypeValue>, scope: ScopeRef<Val
     let bb = LLVMAppendBasicBlockInContext(context, function, entry_name.as_ptr());
     LLVMPositionBuilderAtEnd(builder, bb);
 
-    let ret = compile_vec(data, function, scope, code);
+    let ret = compile_vec(data, function, None, scope, code);
     LLVMBuildRet(builder, ret);
 
     // Output to a file, and also a string for debugging
     //LLVMFinalizeFunctionPassManager(funcpass);
-    let out_file = CString::new("out.ll").unwrap();
-    LLVMPrintModuleToFile(module, out_file.as_ptr(), ptr::null_mut());
+    let file_parts: Vec<&str> = module_name.rsplitn(2, '.').collect();
+    LLVMPrintModuleToFile(module, label(format!("{}.ll", file_parts[1]).as_str()).as_ptr(), ptr::null_mut());
     let compiled = CString::from_raw(LLVMPrintModuleToString(module));
+
+    println!("{}\n", compiled.into_string().unwrap());
+
+    import::store_index(data.map.get_global(), format!("{}.idx", file_parts[1]).as_str(), code);
 
     LLVMDisposeBuilder(builder);
     LLVMDisposeModule(module);
     LLVMContextDispose(context);
-
-    compiled.into_string().unwrap()
 }
 
 unsafe fn declare_functions(data: &LLVM, scope: ScopeRef<Value, TypeValue>) {
@@ -88,90 +111,96 @@ unsafe fn declare_functions(data: &LLVM, scope: ScopeRef<Value, TypeValue>) {
 
     declare_function(data.module, pscope.clone(), "puts", &mut [bytestr_type], cint_type, false);
     declare_function(data.module, pscope.clone(), "sprintf", &mut [bytestr_type, bytestr_type], cint_type, true);
+
+    // TODO this is probably wrong because we're only declaring extern the imported functions in the global scope, but not functions imported into a local scope, which still need to be declared globally as funcs
+    for (name, sym) in &scope.borrow().names {
+        if sym.external && !sym.ttype.as_ref().unwrap().is_overloaded() {
+            LLVMAddFunction(data.module, label(name.as_str()).as_ptr(), get_type(data, scope.clone(), sym.ttype.clone().unwrap(), false));
+        }
+    }
 }
 
 unsafe fn declare_globals(data: &LLVM, scope: ScopeRef<Value, TypeValue>) {
     for (name, sym) in &scope.borrow().names {
-        let ltype = get_type(data, scope.clone(), sym.ttype.clone().unwrap(), true);
-        LLVMAddGlobal(data.module, ltype, label(name.as_str()).as_ptr());
+        if LLVMGetNamedFunction(data.module, label(name.as_str()).as_ptr()).is_null() && !sym.ttype.as_ref().unwrap().is_overloaded() {
+            let ltype = get_type(data, scope.clone(), sym.ttype.clone().unwrap(), true);
+            LLVMAddGlobal(data.module, ltype, label(name.as_str()).as_ptr());
+        }
     }
 }
 
-unsafe fn compile_vec(data: &LLVM, func: LLVMValueRef, scope: ScopeRef<Value, TypeValue>, code: &Vec<AST>) -> LLVMValueRef {
+unsafe fn compile_vec(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: ScopeRef<Value, TypeValue>, code: &Vec<AST>) -> LLVMValueRef {
     let mut last = zero_int(data);
     for node in code {
-        last = compile_node(data, func, scope.clone(), node);
+        last = compile_node(data, func, unwind, scope.clone(), node);
     }
     last
 }
 
-unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, scope: ScopeRef<Value, TypeValue>, node: &AST) -> LLVMValueRef {
+unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: ScopeRef<Value, TypeValue>, node: &AST) -> LLVMValueRef {
     println!("COMPILE: {:?}", node);
     match *node {
-        //AST::Nil => String::from("NULL"),
+        AST::Noop |
+        AST::Nil => zero_int(data), // null_value() but what type should it be?let invoke 
         AST::Boolean(ref num) => LLVMConstInt(bool_type(data), *num as u64, 0),
         AST::Integer(ref num) => LLVMConstInt(int_type(data), *num as u64, 0),
         AST::Real(ref num) => LLVMConstReal(real_type(data), *num),
         AST::String(ref string) => LLVMBuildGlobalStringPtr(data.builder, label(string.as_str()).as_ptr(), label("strc").as_ptr()),
 
+        AST::Block(ref body) => { compile_vec(data, func, unwind, scope, body) },
+
         AST::Invoke(ref fexpr, ref args, ref stype) => {
-            let name = match **fexpr {
-                AST::Identifier(ref name) => name.clone(),
-                _ => String::from("something-invalid")
+            let atypes = match stype.clone().unwrap() {
+                Type::Function(atypes, _) => atypes,
+                stype @ _ => panic!("TypeError: expected function type: {:?}", stype),
             };
 
-            // TODO this shouldn't be necessary, but it is when we use reduced type vars; also we still don't erase resolved type vars
-            //println!("{:?} {:?} {:?}", name, scope, stype);
-            //use types::resolve_type;
-            //let stype = resolve_type(scope.clone(), stype.clone().unwrap());
-            let stype = stype.clone().unwrap();
+            let mut largs = vec!();
+            for (ttype, arg) in atypes.iter().zip(args.iter()) {
+                let mut larg = compile_node(data, func, unwind, scope.clone(), arg);
+                let ltype = get_type(data, scope.clone(), ttype.clone(), true);
+                if ltype != LLVMTypeOf(larg) {
+                    larg = LLVMBuildPointerCast(data.builder, larg, ltype, label("ptr").as_ptr());
+                }
+                largs.push(larg);
+            }
 
-            if let Some(result) = compile_builtin(data, func, scope.clone(), &name, args, stype.clone()) {
+            let name = match **fexpr {
+                AST::Identifier(ref name) => name.clone(),
+                _ => String::from("")
+            };
+
+            if let Some(result) = compile_builtin(data, func, scope.clone(), &name, &largs, stype.clone().unwrap()) {
                 println!("BUILTIN: {:?}", result);
                 result
-            }
-            else {
-                let atypes = match stype {
-                    Type::Function(atypes, _) => atypes,
-                    _ => panic!("TypeError: expected function type: {:?}", stype),
-                };
-
-                let mut largs = vec!();
-                for (ttype, arg) in atypes.iter().zip(args.iter()) {
-                    let mut larg = compile_node(data, func, scope.clone(), arg);
-                    let ltype = get_type(data, scope.clone(), ttype.clone(), true);
-                    if ltype != LLVMTypeOf(larg) {
-                        larg = LLVMBuildPointerCast(data.builder, larg, ltype, label("ptr").as_ptr());
-                    }
-                    largs.push(larg);
-                }
-
-                //let mut function = LLVMGetNamedFunction(data.module, label(name.as_str()).as_ptr());
-                //let mut function = scope.borrow().find(name).unwrap().address.clone().expect(format!("UnsetError: use before assignment {:?}", name).as_str());
-                /*
-                let mut function = LLVMGetNamedGlobal(data.module, label(name.as_str()).as_ptr());
-                if function.is_null() {
-                    function = scope.borrow().find(name).unwrap().value.clone().expect(format!("UnsetError: use before assignment {:?}", name).as_str());
-                }
-                if LLVMGetTypeKind(LLVMTypeOf(function)) == llvm::LLVMTypeKind::LLVMPointerTypeKind {
-                    function = LLVMBuildLoad(data.builder, function, label("tmp").as_ptr())
-                }
-                */
+            } else {
                 let mut function = LLVMGetNamedFunction(data.module, label(name.as_str()).as_ptr());
                 if function.is_null() {
-                    function = compile_node(data, func, scope.clone(), fexpr);
+                    //function = compile_node(data, func, unwind, scope.clone(), fexpr);
+                    function = match **fexpr {
+                        AST::Accessor(_, ref name, ref stype) => compile_node(data, func, unwind, scope.clone(), &AST::Resolver(Box::new(AST::Identifier(stype.clone().unwrap().get_name().unwrap())), name.clone())),
+                        _ => compile_node(data, func, unwind, scope.clone(), fexpr)
+                    };
                 }
                 LLVMDumpValue(function);
-                LLVMBuildCall(data.builder, function, largs.as_mut_ptr(), largs.len() as u32, label("tmp").as_ptr())
+                //LLVMBuildCall(data.builder, function, largs.as_mut_ptr(), largs.len() as u32, label("tmp").as_ptr())
+                match unwind {
+                    None => LLVMBuildCall(data.builder, function, largs.as_mut_ptr(), largs.len() as u32, label("tmp").as_ptr()),
+                    Some((then, catch)) => {
+                        LLVMBuildInvoke(data.builder, function, largs.as_mut_ptr(), largs.len() as u32, then, catch, label("tmp").as_ptr())
+                        //LLVMSetUnwindDest(invoke, unwind.unwrap());
+                    }
+                }
             }
         },
 
         AST::Function(ref name, ref args, ref rtype, ref body, ref id) => {
-            LLVMGetNamedFunction(data.module, label(format!("anon{}", id).as_str()).as_ptr())
+            let fname = scope.borrow().get_full_name(name, id.clone());
+            LLVMGetNamedFunction(data.module, label(fname.as_str()).as_ptr())
         },
 
         AST::Identifier(ref name) => {
-            let pointer = match scope.borrow().find(name).unwrap().value.clone() {
+            let pointer = match scope.borrow().get_variable_value(name) {
                 Some(x) => x,
                 None => {
                     let pointer = LLVMGetNamedGlobal(data.module, label(name.as_str()).as_ptr());
@@ -183,11 +212,10 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, scope: ScopeRef<Value, T
             };
             println!("IDENT: {:?} {:?}", LLVMGetValueKind(pointer), LLVMGetTypeKind(LLVMTypeOf(pointer)));
             //if LLVMGetTypeKind(LLVMTypeOf(pointer)) == llvm::LLVMTypeKind::LLVMPointerTypeKind {
-            if LLVMGetValueKind(pointer) == llvm::LLVMValueKind::LLVMArgumentValueKind {
-                pointer
-            }
-            else {
-                LLVMBuildLoad(data.builder, pointer, label("tmp").as_ptr())
+            match LLVMGetValueKind(pointer) {
+                llvm::LLVMValueKind::LLVMArgumentValueKind |
+                llvm::LLVMValueKind::LLVMFunctionValueKind => pointer,
+                _ => LLVMBuildLoad(data.builder, pointer, label("tmp").as_ptr())
             }
         },
 
@@ -198,20 +226,83 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, scope: ScopeRef<Value, T
                 let global = LLVMGetNamedGlobal(data.module, label(name.as_str()).as_ptr());
                 LLVMSetInitializer(global, null_value(ltype));
                 global
-            }
-            else {
+            } else {
                 LLVMBuildAlloca(data.builder, ltype, label(name.as_str()).as_ptr())
             };
             scope.borrow_mut().assign(name, pointer);
-            let value = compile_node(data, func, scope, body);
+            let value = compile_node(data, func, unwind, scope, body);
             LLVMBuildStore(data.builder, value, pointer);
             value
         },
 
-        AST::Block(ref body) => { compile_vec(data, func, scope, body) },
+        /*
+        // TODO you might need to create a new function to hold the body, so that it can be resumed from, and there also
+        // might be an issue when you call a function one level down, and pass it the same unwind locations... it might effect all
+        // functions, all the way down
+        AST::Try(ref body, ref cases) => {
+            // TODO need to add multiple cases, and also it doesn't work
+            let try_block = LLVMAppendBasicBlockInContext(data.context, func, label("try").as_ptr());
+            let catch_block = LLVMAppendBasicBlockInContext(data.context, func, label("catch").as_ptr());
+            let finally_block = LLVMAppendBasicBlockInContext(data.context, func, label("finally").as_ptr());
+
+            LLVMBuildBr(data.builder, try_block);
+            LLVMPositionBuilderAtEnd(data.builder, try_block);
+            let body_value = compile_node(data, func, Some((finally_block, catch_block)), scope.clone(), body);
+            LLVMBuildBr(data.builder, finally_block);
+
+            LLVMPositionBuilderAtEnd(data.builder, catch_block);
+            let pad = LLVMBuildLandingPad(data.builder, LLVMTypeOf(body_value), ptr::null_mut(), 0, label("pad").as_ptr());
+            LLVMBuildBr(data.builder, finally_block);
+
+            LLVMPositionBuilderAtEnd(data.builder, finally_block);
+            //let phi = LLVMBuildPhi(data.builder, LLVMTypeOf(body_value), label("matchphi").as_ptr());
+
+            //LLVMAddIncoming(phi, values.as_mut_ptr(), do_blocks.as_mut_ptr(), values.len() as u32);
+            //phi
+            zero_int(data)
+        },
+        */
+
+/*
+        AST::Raise(ref expr) => {
+
+        },
+*/
+
+        AST::SideEffect(ref op, ref args) => {
+            // TODO This only handles two arguments, which is all that will be parsed, but you can do better... 
+            let lexpr_block = LLVMAppendBasicBlockInContext(data.context, func, label(op).as_ptr());
+            let rexpr_block = LLVMAppendBasicBlockInContext(data.context, func, label(op).as_ptr());
+            let merge_block = LLVMAppendBasicBlockInContext(data.context, func, label(op).as_ptr());
+
+            LLVMBuildBr(data.builder, lexpr_block);
+
+            LLVMPositionBuilderAtEnd(data.builder, lexpr_block);
+            let lexpr_value = compile_node(data, func, unwind, scope.clone(), &args[0]);
+            let test_type = match op.as_str() {
+                "or" => llvm::LLVMIntPredicate::LLVMIntNE,
+                "and" => llvm::LLVMIntPredicate::LLVMIntEQ,
+                _ => panic!("NotImplementedError: attempted to compile invalid side effect operation: {}", op)
+            };
+            let is_enough = LLVMBuildICmp(data.builder, test_type, lexpr_value, null_value(LLVMTypeOf(lexpr_value)), label("is_enough").as_ptr());
+            LLVMBuildCondBr(data.builder, is_enough, merge_block, rexpr_block);
+
+            LLVMPositionBuilderAtEnd(data.builder, rexpr_block);
+            let rexpr_value = compile_node(data, func, unwind, scope.clone(), &args[1]);
+            LLVMBuildBr(data.builder, merge_block);
+
+            LLVMPositionBuilderAtEnd(data.builder, merge_block);
+            let phi = LLVMBuildPhi(data.builder, LLVMTypeOf(lexpr_value), label(op).as_ptr());
+
+            let mut values = vec![lexpr_value, rexpr_value];
+            let mut blocks = vec![lexpr_block, rexpr_block];
+
+            LLVMAddIncoming(phi, values.as_mut_ptr(), blocks.as_mut_ptr(), 2);
+            phi
+        },
 
         AST::If(ref cond, ref texpr, ref fexpr) => {
-            let cond_value = compile_node(data, func, scope.clone(), cond);
+            let cond_value = compile_node(data, func, unwind, scope.clone(), cond);
             let cond_zero = LLVMConstInt(LLVMTypeOf(cond_value), 0, 0);
             let is_nonzero = LLVMBuildICmp(data.builder, llvm::LLVMIntPredicate::LLVMIntNE, cond_value, cond_zero, label("is_nonzero").as_ptr());
 
@@ -224,12 +315,12 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, scope: ScopeRef<Value, T
 
 
             LLVMPositionBuilderAtEnd(data.builder, texpr_block);
-            let texpr_value = compile_node(data, func, scope.clone(), texpr);
+            let texpr_value = compile_node(data, func, unwind, scope.clone(), texpr);
             LLVMBuildBr(data.builder, merge_block);
             //let texpr_block = LLVMGetInsertBlock(data.builder);
 
             LLVMPositionBuilderAtEnd(data.builder, fexpr_block);
-            let fexpr_value = compile_node(data, func, scope.clone(), fexpr);
+            let fexpr_value = compile_node(data, func, unwind, scope.clone(), fexpr);
             LLVMBuildBr(data.builder, merge_block);
             //let fexpr_block = LLVMGetInsertBlock(data.builder);
 
@@ -243,21 +334,6 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, scope: ScopeRef<Value, T
             phi
         },
 
-/*
-        AST::Try(ref cond, ref cases) => {
-
-        },
-
-        AST::Raise(ref expr) => {
-
-        },
-
-        AST::For(ref name, ref cond, ref body, ref id) => {
-            let lscope = map.get(id);
-
-        },
-*/
-
         AST::Match(ref cond, ref cases) => {
             let mut cond_blocks = vec!();
             let mut do_blocks = vec!();
@@ -268,7 +344,7 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, scope: ScopeRef<Value, T
             let merge_block = LLVMAppendBasicBlockInContext(data.context, func, label("matchend").as_ptr());
             cond_blocks.push(merge_block);
 
-            let cond_value = compile_node(data, func, scope.clone(), cond);
+            let cond_value = compile_node(data, func, unwind, scope.clone(), cond);
             LLVMBuildBr(data.builder, cond_blocks[0]);
 
             let mut values = vec!();
@@ -277,14 +353,14 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, scope: ScopeRef<Value, T
                 match *case {
                     AST::Underscore => { LLVMBuildBr(data.builder, do_blocks[i]); },
                     _ => {
-                        let case_value = compile_node(data, func, scope.clone(), case);
+                        let case_value = compile_node(data, func, unwind, scope.clone(), case);
                         let is_true = LLVMBuildICmp(data.builder, llvm::LLVMIntPredicate::LLVMIntEQ, cond_value, case_value, label("is_true").as_ptr());
                         LLVMBuildCondBr(data.builder, is_true, do_blocks[i], cond_blocks[i + 1]);
                     }
                 }
 
                 LLVMPositionBuilderAtEnd(data.builder, do_blocks[i]);
-                values.push(compile_node(data, func, scope.clone(), expr));
+                values.push(compile_node(data, func, unwind, scope.clone(), expr));
                 LLVMBuildBr(data.builder, merge_block);
             }
 
@@ -302,13 +378,13 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, scope: ScopeRef<Value, T
 
             LLVMBuildBr(data.builder, before_block);
             LLVMPositionBuilderAtEnd(data.builder, before_block);
-            let cond_value = compile_node(data, func, scope.clone(), cond);
+            let cond_value = compile_node(data, func, unwind, scope.clone(), cond);
             let cond_zero = LLVMConstInt(LLVMTypeOf(cond_value), 0, 0);
             let is_nonzero = LLVMBuildICmp(data.builder, llvm::LLVMIntPredicate::LLVMIntNE, cond_value, cond_zero, label("is_nonzero").as_ptr());
             LLVMBuildCondBr(data.builder, is_nonzero, body_block, after_block);
 
             LLVMPositionBuilderAtEnd(data.builder, body_block);
-            let body_value = compile_node(data, func, scope.clone(), body);
+            let body_value = compile_node(data, func, unwind, scope.clone(), body);
             LLVMBuildBr(data.builder, before_block);
 
             LLVMPositionBuilderAtEnd(data.builder, after_block);
@@ -322,17 +398,12 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, scope: ScopeRef<Value, T
             body_value
         },
 
-        AST::Class(ref name, ref parent, ref body, ref id) => {
-            let tscope = data.map.get(id);
-            let classdef = scope.borrow().find_class_def(name).unwrap();
+/*
+        AST::For(ref name, ref cond, ref body, ref id) => {
+            let lscope = map.get(id);
 
-            // TODO you still need to compile the body of the func, if you're going to allow that... like an init function
-            //compile_vec(data, func, tscope.clone(), body);
-
-            zero_int(data)
         },
 
-/*
         AST::List(ref items) => {
 
         },
@@ -342,32 +413,42 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, scope: ScopeRef<Value, T
         },
 */
 
+        AST::Class(ref name, ref parent, ref body, ref id) => {
+            let tscope = data.map.get(id);
+            let classdef = scope.borrow().get_class_def(name).unwrap();
+
+            // TODO you still need to compile the body of the func, if you're going to allow that... like an init function
+            //compile_vec(data, func, unwind, tscope.clone(), body);
+
+            zero_int(data)
+        },
+
         AST::Resolver(ref left, ref right) => {
             match **left {
                 AST::Identifier(ref name) => {
-                    let classdef = scope.borrow().find_class_def(name).unwrap();
-                    let sym = classdef.borrow().find(right).unwrap();
-                    sym.value.unwrap()
+                    let classdef = scope.borrow().get_class_def(name).unwrap();
+                    let value = classdef.borrow().get_variable_value(right);
+                    value.unwrap()
                 },
                 _ => panic!("SyntaxError: left-hand side of scope resolver must be identifier")
             }
         },
 
         AST::Accessor(ref left, ref right, ref ltype) => {
-            let object = compile_node(data, func, scope.clone(), left);
+            let object = compile_node(data, func, unwind, scope.clone(), left);
 
             let name = ltype.clone().unwrap().get_name().unwrap();
-            let classdef = scope.borrow().find_class_def(&name).unwrap();
+            let classdef = scope.borrow().get_class_def(&name).unwrap();
             let sym = classdef.borrow().find(right).unwrap();
             println!("*ACCESS: {:?} {:?}", right, classdef);
 
             if let Type::Function(_, _) = sym.ttype.unwrap() {
                 sym.value.unwrap()
-            }
-            else {
+            } else {
                 let cint_type = i32_type(data);
 
-                let structdef = scope.borrow().find_struct_def(&name).unwrap();
+                //let structdef = scope.borrow().get_struct_def(&name).unwrap();
+                let structdef = scope.borrow().get_type_value(&name).unwrap().structdef;
                 let index = structdef.iter().position(|ref r| r.0 == *right).unwrap();
                 let mut indices = vec!(LLVMConstInt(cint_type, 0, 0), LLVMConstInt(cint_type, index as u64, 0));
                 let pointer = LLVMBuildGEP(data.builder, object, indices.as_mut_ptr(), indices.len() as u32, label("tmp").as_ptr());
@@ -376,14 +457,14 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, scope: ScopeRef<Value, T
         },
 
         AST::Assignment(ref left, ref right) => {
-            let value = compile_node(data, func, scope.clone(), right);
+            let value = compile_node(data, func, unwind, scope.clone(), right);
             match **left {
                 AST::Accessor(ref left, ref right, ref ltype) => {
                     let name = ltype.clone().unwrap().get_name().unwrap();
-                    let object = compile_node(data, func, scope.clone(), left);
+                    let object = compile_node(data, func, unwind, scope.clone(), left);
                     let cint_type = i32_type(data);
 
-                    let structdef = scope.borrow().find_struct_def(&name).unwrap();
+                    let structdef = scope.borrow().get_type_value(&name).unwrap().structdef;
                     let index = structdef.iter().position(|ref r| r.0 == *right).unwrap();
                     let mut indices = vec!(LLVMConstInt(cint_type, 0, 0), LLVMConstInt(cint_type, index as u64, 0));
                     let pointer = LLVMBuildGEP(data.builder, object, indices.as_mut_ptr(), indices.len() as u32, label("tmp").as_ptr());
@@ -394,9 +475,9 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, scope: ScopeRef<Value, T
             value
         },
 
-        //AST::Import(_) => { },
+        AST::Import(_) => { ptr::null_mut() },  //// Nothing to do
 
-        //AST::Type(_) => { },
+        AST::Type(_, _) => panic!("NotImplementedError: not yet supported, {:?}", node),
 
         _ => {
             let int_type = LLVMInt64TypeInContext(data.context);
@@ -413,11 +494,14 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, scope: ScopeRef<Value, T
 unsafe fn build_function_body(data: &LLVM, node: &AST) {
     if let AST::Function(ref name, ref args, ref rtype, ref body, ref id) = *node {
         let fscope = data.map.get(id);
-        let function = LLVMGetNamedFunction(data.module, label(format!("anon{}", id).as_str()).as_ptr());
+        //let fname = if name.is_some() { name.clone().unwrap() } else { format!("anon{}", id) };
+        let scope = fscope.borrow().parent.clone().unwrap();
+        let fname = scope.borrow().get_full_name(name, id.clone());
+        let function = LLVMGetNamedFunction(data.module, label(fname.as_str()).as_ptr());
 
         let bb = LLVMAppendBasicBlockInContext(data.context, function, label("entry").as_ptr());
         LLVMPositionBuilderAtEnd(data.builder, bb);
-        let ret = compile_node(data, function, fscope.clone(), body);
+        let ret = compile_node(data, function, None, fscope.clone(), body);
         LLVMBuildRet(data.builder, ret);
 
         //if llvm::analysis::LLVMVerifyFunction(function, llvm::analysis::LLVMVerifierFailureAction::LLVMPrintMessageAction) != 0 {
@@ -439,11 +523,15 @@ unsafe fn collect_functions_node<'a>(data: &mut LLVM<'a>, scope: ScopeRef<Value,
     match *node {
 
         AST::Function(ref name, ref args, ref rtype, ref body, ref id) => {
-            data.functions.push(node);
-
             let fscope = data.map.get(id);
-            let ftype = get_type(data, fscope.clone(), Type::Function(args.iter().map(|t| t.1.clone().unwrap()).collect(), Box::new(rtype.clone().unwrap())), false);
-            let function = LLVMAddFunction(data.module, label(format!("anon{}", id).as_str()).as_ptr(), ftype);
+            let ftype = get_type(data, scope.clone(), Type::Function(args.iter().map(|t| t.1.clone().unwrap()).collect(), Box::new(rtype.clone().unwrap())), false);
+            let fname = scope.borrow().get_full_name(name, id.clone());
+            let function = LLVMAddFunction(data.module, label(fname.as_str()).as_ptr(), ftype);
+            //LLVMSetGC(function, label("shadow-stack").as_ptr());
+            match *name {
+                Some(ref name) => scope.borrow_mut().assign(name, function),
+                _ => { },
+            }
 
             let nargs = LLVMCountParams(function) as usize;
             if nargs != 0 && nargs != args.len() {
@@ -455,12 +543,17 @@ unsafe fn collect_functions_node<'a>(data: &mut LLVM<'a>, scope: ScopeRef<Value,
                 LLVMSetValueName(llarg, label(name.as_str()).into_raw());
                 fscope.borrow_mut().assign(name, llarg);
             }
+
+            collect_functions_node(data, fscope, body);
+            data.functions.push(node);
             return Some(function);
         },
 
         AST::List(ref items) => { collect_functions_vec(data, scope, items); },
 
         AST::Invoke(ref name, ref args, _) => { collect_functions_vec(data, scope, args); },
+
+        AST::SideEffect(_, ref args) => { collect_functions_vec(data, scope, args); },
 
         AST::Definition((ref name, ref ttype), ref body) => {
             collect_functions_node(data, scope, body);
@@ -500,7 +593,7 @@ unsafe fn collect_functions_node<'a>(data: &mut LLVM<'a>, scope: ScopeRef<Value,
             let tscope = data.map.get(id);
 
             let mut structdef = if let Some(ref name) = *parent {
-                scope.borrow().find_struct_def(name).unwrap()
+                scope.borrow().get_type_value(name).unwrap().structdef
             } else {
                 vec!()
             };
@@ -515,20 +608,18 @@ unsafe fn collect_functions_node<'a>(data: &mut LLVM<'a>, scope: ScopeRef<Value,
                     _ => { }
                 }
             }
-            scope.borrow_mut().set_struct_def(name, structdef);
 
-            let structdef = scope.borrow().find_struct_def(name).unwrap();
             let mut types = vec!();
-            for (_, ttype) in structdef {
+            for &(_, ref ttype) in &structdef {
                 types.push(get_type(data, tscope.clone(), ttype.clone(), true))
             }
             let lltype = LLVMStructCreateNamed(data.context, label(name).as_ptr());
             LLVMStructSetBody(lltype, types.as_mut_ptr(), types.len() as u32, false as i32);
-            scope.borrow_mut().set_type_value(name, lltype);
+            scope.borrow_mut().set_type_value(name, TypeValue { structdef: structdef, value: lltype });
 
 
             // TODO you need to add the 'new' function definition here, but the value should be stored in cscope, not tscope...
-            let classdef = scope.borrow().find_class_def(name).unwrap();
+            let classdef = scope.borrow().get_class_def(name).unwrap();
             classdef.borrow_mut().assign(&String::from("new"), build_constructor(data, format!("{}_new", name).as_str(), lltype));
             for node in body {
                 match *node {
@@ -573,11 +664,15 @@ unsafe fn collect_functions_node<'a>(data: &mut LLVM<'a>, scope: ScopeRef<Value,
             collect_functions_node(data, scope.clone(), right);
         },
 
-        AST::Type(_, _) => { },
-        AST::Underscore |
-        AST::Import(_) => { },
+        AST::Import(_) => {
+            // TODO what do you do here?  you need to declare imported functions, but that requires the index, which has already been loaded and discarded by this point
+        },
 
-        _ => { },
+        AST::Type(_, _) => panic!("NotImplementedError: not yet supported, {:?}", node),
+
+        AST::Identifier(_) |
+        AST::Noop | AST::Underscore | AST::Nil |
+        AST::Boolean(_) | AST::Integer(_) | AST::Real(_) | AST::String(_) => { }
     };
     None
 }
@@ -694,7 +789,7 @@ unsafe fn get_type(data: &LLVM, scope: ScopeRef<Value, TypeValue>, ttype: Type, 
             "String" => LLVMPointerType(LLVMInt8Type(), 0),
 
             _ => match scope.borrow().get_type_value(tname) {
-                Some(value) => LLVMPointerType(value, 0),
+                Some(typedata) => LLVMPointerType(typedata.value, 0),
                 // TODO this should panic...
                 None => LLVMInt64TypeInContext(data.context),
             }
@@ -708,8 +803,7 @@ unsafe fn get_type(data: &LLVM, scope: ScopeRef<Value, TypeValue>, ttype: Type, 
             let ftype = LLVMFunctionType(rtype, atypes.as_mut_ptr(), atypes.len() as u32, false as i32);
             if use_fptrs {
                 LLVMPointerType(ftype, 0)
-            }
-            else {
+            } else {
                 ftype
             }
         },
@@ -720,48 +814,37 @@ unsafe fn get_type(data: &LLVM, scope: ScopeRef<Value, TypeValue>, ttype: Type, 
 }
 
 
-unsafe fn compile_builtin(data: &LLVM, func: LLVMValueRef, scope: ScopeRef<Value, TypeValue>, name: &String, args: &Vec<AST>, stype: Type) -> Option<LLVMValueRef> {
-    if args.len() <= 0 {
+unsafe fn compile_builtin(data: &LLVM, func: LLVMValueRef, scope: ScopeRef<Value, TypeValue>, name: &String, largs: &Vec<LLVMValueRef>, stype: Type) -> Option<LLVMValueRef> {
+    if largs.len() <= 0 {
         return None
     }
 
-    if vec!("and", "or").contains(&name.as_str()) {
-        // TODO fill this in
-        Some(zero_int(data))
-    }
-    else {
-
-        println!("**BUILTINS: {:?}", stype);
-        match stype {
-            Type::Function(ref sargs, _) => {
-                match sargs[0] {
-                    Type::Object(ref tname) => {
-                        match data.builtins.get(tname) {
-                            Some(ref map) => match map.get(name) {
-                                Some(builtin) => {
-                                    let mut largs = vec!();
-                                    for arg in args {
-                                        largs.push(compile_node(data, func, scope.clone(), arg));
-                                    }
-                                    Some(builtin(data, largs))
-                                },
-                                None => None
+    println!("**BUILTINS: {:?}", stype);
+    match stype {
+        Type::Function(ref sargs, _) => {
+            match sargs[0] {
+                Type::Object(ref tname) => {
+                    match data.builtins.get(tname) {
+                        Some(ref map) => match map.get(name) {
+                            Some(builtin) => {
+                                Some(builtin(data, largs.clone()))
                             },
                             None => None
-                        }
-                    },
-                    _ => None
-                }
-            },
-            _ => None
-        }
+                        },
+                        None => None
+                    }
+                },
+                _ => None
+            }
+        },
+        _ => None
     }
 }
 
 
 use std::collections::HashMap;
 
-pub type Function = fn(&LLVM, Vec<Value>) -> Value;
+pub type Function = fn(&LLVM, Vec<LLVMValueRef>) -> LLVMValueRef;
 pub type FunctionMap = HashMap<String, Function>;
 pub type TypeFunctionMap = HashMap<String, FunctionMap>;
 
@@ -774,17 +857,26 @@ unsafe fn initialize_builtins(data: &mut LLVM) {
 unsafe fn initialize_type_int(data: &mut LLVM) {
     let mut builtins: FunctionMap = HashMap::new();
 
-    fn add(data: &LLVM, args: Vec<Value>) -> Value { unsafe { LLVMBuildAdd(data.builder, args[0], args[1], label("tmp").as_ptr()) } }
-    fn sub(data: &LLVM, args: Vec<Value>) -> Value { unsafe { LLVMBuildSub(data.builder, args[0], args[1], label("tmp").as_ptr()) } }
-    fn mul(data: &LLVM, args: Vec<Value>) -> Value { unsafe { LLVMBuildMul(data.builder, args[0], args[1], label("tmp").as_ptr()) } }
-    fn div(data: &LLVM, args: Vec<Value>) -> Value { unsafe { LLVMBuildSDiv(data.builder, args[0], args[1], label("tmp").as_ptr()) } }
-    fn eq(data: &LLVM, args: Vec<Value>) -> Value { unsafe { LLVMBuildICmp(data.builder, llvm::LLVMIntPredicate::LLVMIntEQ, args[0], args[1], label("tmp").as_ptr()) } }
-    fn ne(data: &LLVM, args: Vec<Value>) -> Value { unsafe { LLVMBuildICmp(data.builder, llvm::LLVMIntPredicate::LLVMIntNE, args[0], args[1], label("tmp").as_ptr()) } }
-    fn lt(data: &LLVM, args: Vec<Value>) -> Value { unsafe { LLVMBuildICmp(data.builder, llvm::LLVMIntPredicate::LLVMIntSLT, args[0], args[1], label("tmp").as_ptr()) } }
-    fn gt(data: &LLVM, args: Vec<Value>) -> Value { unsafe { LLVMBuildICmp(data.builder, llvm::LLVMIntPredicate::LLVMIntSGT, args[0], args[1], label("tmp").as_ptr()) } }
-    fn lte(data: &LLVM, args: Vec<Value>) -> Value { unsafe { LLVMBuildICmp(data.builder, llvm::LLVMIntPredicate::LLVMIntSLE, args[0], args[1], label("tmp").as_ptr()) } }
-    fn gte(data: &LLVM, args: Vec<Value>) -> Value { unsafe { LLVMBuildICmp(data.builder, llvm::LLVMIntPredicate::LLVMIntSGE, args[0], args[1], label("tmp").as_ptr()) } }
-    fn not(data: &LLVM, args: Vec<Value>) -> Value { unsafe { LLVMBuildNot(data.builder, args[0], label("tmp").as_ptr()) } }
+    build_lib_add(data);
+    let global = data.map.get_global();
+    let intdef = global.borrow().get_class_def(&String::from("Int")).unwrap();
+    intdef.borrow_mut().assign(&String::from("add"), LLVMGetNamedFunction(data.module, label("builtin.add").as_ptr()));
+
+    let ftype = Type::Function(vec!(Type::Object(String::from("Int")), Type::Object(String::from("Int"))), Box::new(Type::Object(String::from("Int"))));
+    global.borrow_mut().define_assign(mangle_name(&String::from("+"), &vec!(Type::Object(String::from("Int")), Type::Object(String::from("Int")))), Some(ftype), LLVMGetNamedFunction(data.module, label("builtin.add").as_ptr()));
+
+
+    fn add(data: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildAdd(data.builder, args[0], args[1], label("tmp").as_ptr()) } }
+    fn sub(data: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildSub(data.builder, args[0], args[1], label("tmp").as_ptr()) } }
+    fn mul(data: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildMul(data.builder, args[0], args[1], label("tmp").as_ptr()) } }
+    fn div(data: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildSDiv(data.builder, args[0], args[1], label("tmp").as_ptr()) } }
+    fn eq(data: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildICmp(data.builder, llvm::LLVMIntPredicate::LLVMIntEQ, args[0], args[1], label("tmp").as_ptr()) } }
+    fn ne(data: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildICmp(data.builder, llvm::LLVMIntPredicate::LLVMIntNE, args[0], args[1], label("tmp").as_ptr()) } }
+    fn lt(data: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildICmp(data.builder, llvm::LLVMIntPredicate::LLVMIntSLT, args[0], args[1], label("tmp").as_ptr()) } }
+    fn gt(data: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildICmp(data.builder, llvm::LLVMIntPredicate::LLVMIntSGT, args[0], args[1], label("tmp").as_ptr()) } }
+    fn lte(data: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildICmp(data.builder, llvm::LLVMIntPredicate::LLVMIntSLE, args[0], args[1], label("tmp").as_ptr()) } }
+    fn gte(data: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildICmp(data.builder, llvm::LLVMIntPredicate::LLVMIntSGE, args[0], args[1], label("tmp").as_ptr()) } }
+    fn not(data: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildNot(data.builder, args[0], label("tmp").as_ptr()) } }
 
     builtins.insert(String::from("+"), add);
     builtins.insert(String::from("-"), sub);
@@ -806,17 +898,17 @@ unsafe fn initialize_type_int(data: &mut LLVM) {
 unsafe fn initialize_type_real(data: &mut LLVM) {
     let mut builtins: FunctionMap = HashMap::new();
 
-    fn add(data: &LLVM, args: Vec<Value>) -> Value { unsafe { LLVMBuildFAdd(data.builder, args[0], args[1], label("tmp").as_ptr()) } }
-    fn sub(data: &LLVM, args: Vec<Value>) -> Value { unsafe { LLVMBuildFSub(data.builder, args[0], args[1], label("tmp").as_ptr()) } }
-    fn mul(data: &LLVM, args: Vec<Value>) -> Value { unsafe { LLVMBuildFMul(data.builder, args[0], args[1], label("tmp").as_ptr()) } }
-    fn div(data: &LLVM, args: Vec<Value>) -> Value { unsafe { LLVMBuildFDiv(data.builder, args[0], args[1], label("tmp").as_ptr()) } }
-    fn eq(data: &LLVM, args: Vec<Value>) -> Value { unsafe { LLVMBuildFCmp(data.builder, llvm::LLVMRealPredicate::LLVMRealOEQ, args[0], args[1], label("tmp").as_ptr()) } }
-    fn ne(data: &LLVM, args: Vec<Value>) -> Value { unsafe { LLVMBuildFCmp(data.builder, llvm::LLVMRealPredicate::LLVMRealONE, args[0], args[1], label("tmp").as_ptr()) } }
-    fn lt(data: &LLVM, args: Vec<Value>) -> Value { unsafe { LLVMBuildFCmp(data.builder, llvm::LLVMRealPredicate::LLVMRealOLT, args[0], args[1], label("tmp").as_ptr()) } }
-    fn gt(data: &LLVM, args: Vec<Value>) -> Value { unsafe { LLVMBuildFCmp(data.builder, llvm::LLVMRealPredicate::LLVMRealOGT, args[0], args[1], label("tmp").as_ptr()) } }
-    fn lte(data: &LLVM, args: Vec<Value>) -> Value { unsafe { LLVMBuildFCmp(data.builder, llvm::LLVMRealPredicate::LLVMRealOLE, args[0], args[1], label("tmp").as_ptr()) } }
-    fn gte(data: &LLVM, args: Vec<Value>) -> Value { unsafe { LLVMBuildFCmp(data.builder, llvm::LLVMRealPredicate::LLVMRealOGE, args[0], args[1], label("tmp").as_ptr()) } }
-    fn not(data: &LLVM, args: Vec<Value>) -> Value { unsafe { LLVMBuildNot(data.builder, args[0], label("tmp").as_ptr()) } }
+    fn add(data: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildFAdd(data.builder, args[0], args[1], label("tmp").as_ptr()) } }
+    fn sub(data: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildFSub(data.builder, args[0], args[1], label("tmp").as_ptr()) } }
+    fn mul(data: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildFMul(data.builder, args[0], args[1], label("tmp").as_ptr()) } }
+    fn div(data: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildFDiv(data.builder, args[0], args[1], label("tmp").as_ptr()) } }
+    fn eq(data: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildFCmp(data.builder, llvm::LLVMRealPredicate::LLVMRealOEQ, args[0], args[1], label("tmp").as_ptr()) } }
+    fn ne(data: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildFCmp(data.builder, llvm::LLVMRealPredicate::LLVMRealONE, args[0], args[1], label("tmp").as_ptr()) } }
+    fn lt(data: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildFCmp(data.builder, llvm::LLVMRealPredicate::LLVMRealOLT, args[0], args[1], label("tmp").as_ptr()) } }
+    fn gt(data: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildFCmp(data.builder, llvm::LLVMRealPredicate::LLVMRealOGT, args[0], args[1], label("tmp").as_ptr()) } }
+    fn lte(data: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildFCmp(data.builder, llvm::LLVMRealPredicate::LLVMRealOLE, args[0], args[1], label("tmp").as_ptr()) } }
+    fn gte(data: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildFCmp(data.builder, llvm::LLVMRealPredicate::LLVMRealOGE, args[0], args[1], label("tmp").as_ptr()) } }
+    fn not(data: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildNot(data.builder, args[0], label("tmp").as_ptr()) } }
 
     builtins.insert(String::from("+"), add);
     builtins.insert(String::from("-"), sub);
@@ -837,20 +929,20 @@ unsafe fn initialize_type_real(data: &mut LLVM) {
 unsafe fn initialize_type_string(data: &mut LLVM) {
     let mut builtins: FunctionMap = HashMap::new();
 
-    build_lib_str(data);
+    //build_lib_str(data);
     build_lib_strcat(data);
 
-    fn add(data: &LLVM, args: Vec<Value>) -> Value { unsafe { LLVMBuildFAdd(data.builder, args[0], args[1], label("tmp").as_ptr()) } }
-    //fn sub(data: &LLVM, args: Vec<Value>) -> Value { unsafe { LLVMBuildFSub(data.builder, args[0], args[1], label("tmp").as_ptr()) } }
-    //fn mul(data: &LLVM, args: Vec<Value>) -> Value { unsafe { LLVMBuildFMul(data.builder, args[0], args[1], label("tmp").as_ptr()) } }
-    //fn div(data: &LLVM, args: Vec<Value>) -> Value { unsafe { LLVMBuildFDiv(data.builder, args[0], args[1], label("tmp").as_ptr()) } }
-    fn eq(data: &LLVM, args: Vec<Value>) -> Value { unsafe { LLVMBuildFCmp(data.builder, llvm::LLVMRealPredicate::LLVMRealOEQ, args[0], args[1], label("tmp").as_ptr()) } }
-    fn ne(data: &LLVM, args: Vec<Value>) -> Value { unsafe { LLVMBuildFCmp(data.builder, llvm::LLVMRealPredicate::LLVMRealONE, args[0], args[1], label("tmp").as_ptr()) } }
-    //fn lt(data: &LLVM, args: Vec<Value>) -> Value { unsafe { LLVMBuildFCmp(data.builder, llvm::LLVMRealPredicate::LLVMRealOLT, args[0], args[1], label("tmp").as_ptr()) } }
-    //fn gt(data: &LLVM, args: Vec<Value>) -> Value { unsafe { LLVMBuildFCmp(data.builder, llvm::LLVMRealPredicate::LLVMRealOGT, args[0], args[1], label("tmp").as_ptr()) } }
-    //fn lte(data: &LLVM, args: Vec<Value>) -> Value { unsafe { LLVMBuildFCmp(data.builder, llvm::LLVMRealPredicate::LLVMRealOLE, args[0], args[1], label("tmp").as_ptr()) } }
-    //fn gte(data: &LLVM, args: Vec<Value>) -> Value { unsafe { LLVMBuildFCmp(data.builder, llvm::LLVMRealPredicate::LLVMRealOGE, args[0], args[1], label("tmp").as_ptr()) } }
-    //fn not(data: &LLVM, args: Vec<Value>) -> Value { unsafe { LLVMBuildNot(data.builder, args[0], label("tmp").as_ptr()) } }
+    fn add(data: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildFAdd(data.builder, args[0], args[1], label("tmp").as_ptr()) } }
+    //fn sub(data: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildFSub(data.builder, args[0], args[1], label("tmp").as_ptr()) } }
+    //fn mul(data: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildFMul(data.builder, args[0], args[1], label("tmp").as_ptr()) } }
+    //fn div(data: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildFDiv(data.builder, args[0], args[1], label("tmp").as_ptr()) } }
+    fn eq(data: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildFCmp(data.builder, llvm::LLVMRealPredicate::LLVMRealOEQ, args[0], args[1], label("tmp").as_ptr()) } }
+    fn ne(data: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildFCmp(data.builder, llvm::LLVMRealPredicate::LLVMRealONE, args[0], args[1], label("tmp").as_ptr()) } }
+    //fn lt(data: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildFCmp(data.builder, llvm::LLVMRealPredicate::LLVMRealOLT, args[0], args[1], label("tmp").as_ptr()) } }
+    //fn gt(data: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildFCmp(data.builder, llvm::LLVMRealPredicate::LLVMRealOGT, args[0], args[1], label("tmp").as_ptr()) } }
+    //fn lte(data: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildFCmp(data.builder, llvm::LLVMRealPredicate::LLVMRealOLE, args[0], args[1], label("tmp").as_ptr()) } }
+    //fn gte(data: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildFCmp(data.builder, llvm::LLVMRealPredicate::LLVMRealOGE, args[0], args[1], label("tmp").as_ptr()) } }
+    //fn not(data: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildNot(data.builder, args[0], label("tmp").as_ptr()) } }
 
     builtins.insert(String::from("+"), add);
     //builtins.insert(String::from("-"), sub);
@@ -871,6 +963,7 @@ unsafe fn initialize_type_string(data: &mut LLVM) {
 unsafe fn build_lib_str(data: &LLVM) {
     let args = vec!((String::from("num"), int_type(data)));
     let function = build_function_start(data, "str", args, str_type(data));
+    LLVMSetLinkage(function, llvm::LLVMLinkage::LLVMLinkOnceAnyLinkage);
 
     let pointer = LLVMBuildAlloca(data.builder, str_type(data), label("buffer").as_ptr());
     LLVMBuildStore(data.builder, build_malloc_const(data, 22), pointer);
@@ -885,6 +978,7 @@ unsafe fn build_lib_str(data: &LLVM) {
 unsafe fn build_lib_strcat(data: &LLVM) {
     let args = vec!((String::from("str1"), str_type(data)), (String::from("str2"), str_type(data)));
     let function = build_function_start(data, "strcat", args, str_type(data));
+    LLVMSetLinkage(function, llvm::LLVMLinkage::LLVMLinkOnceAnyLinkage);
 
     let str1 = LLVMGetParam(function, 0);
     let str2 = LLVMGetParam(function, 1);
@@ -899,4 +993,20 @@ unsafe fn build_lib_strcat(data: &LLVM) {
 
     LLVMBuildRet(data.builder, buffer);
 }
+
+unsafe fn build_lib_add(data: &LLVM) {
+    let dtype = int_type(data);
+    let mut atypes = vec!(dtype, dtype);
+    let function = LLVMAddFunction(data.module, label("builtin.add").as_ptr(), LLVMFunctionType(dtype, atypes.as_mut_ptr(), atypes.len() as u32, false as i32));
+    LLVMSetLinkage(function, llvm::LLVMLinkage::LLVMLinkOnceAnyLinkage);
+    //LLVMAddAttributeAtIndex(function, 0, "inlinealways"
+    LLVMPositionBuilderAtEnd(data.builder, LLVMAppendBasicBlockInContext(data.context, function, label("entry").as_ptr()));
+    let value = LLVMBuildAdd(data.builder, LLVMGetParam(function, 0), LLVMGetParam(function, 1), label("tmp").as_ptr());
+    LLVMBuildRet(data.builder, value);
+}
+
+//    let mut types = vec!(cint_type, bool_type(data));
+//    let rtype = LLVMStructTypeInContext(data.context, types.as_mut_ptr(), types.len() as u32, false as i32);
+
+//    declare_function(data.module, pscope.clone(), "llvm.sadd.with.overflow.i64", &mut [cint_type, cint_type], rtype, false);
 

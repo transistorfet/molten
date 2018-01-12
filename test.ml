@@ -1,4 +1,6 @@
 
+        import libcore
+
         let msg = "Hey"
         let stringstuff = fn x: String => msg
         puts(msg)
@@ -7,10 +9,14 @@
         2 + 5
 
         let e = 3
-        if e < 1 then
+        if e < 1 and e > 4 then
             1
         else
             e
+
+        (12).add(3)
+        e.add(3)
+        fn test(x: Int) => x.add(2)
 
         let a = 5 * 5
         let b : Real = 123.24
@@ -19,13 +25,13 @@
 
         let testy = fn x => x + 1
         let fac = fn (x : Int, y = 5 * 3, z: String = "hey") => if not x then 1 else x - -123
-        let fac2 = fn x, y, z => if not x then 1 else x - -123
+        // TODO this causes an error because the type used in not() cannot be determined
+        //let fac2 = fn x, y, z => if not x then 1 else x - -123
         testy(3)
 
-        // TODO this causes a segfault
-	//let test = fn x => x()
-        // TODO this causes a typeerror
-	//let test2 = fn x => x() + 1
+	let test2 = fn x => x()
+	let test3 = fn x => x() + 1
+        puts(str(test3(fn => 3)))
 
         let recfoo = fn x => begin  //comment
             if x < 1 then           //comment
@@ -44,6 +50,10 @@
                 a * 4
             }
 
+            fn foo2(self, a) {
+                a * 4.0
+            }
+
             let a = 1
             let b: String = "aoeu"
 
@@ -54,22 +64,25 @@
                 self.foo2(x)
             }
 
+            // TODO causing issues
+            //fn foo2(self, a, b) {
+            //    a * 4.0 * b
+            //}
+
             let add = fn self, x => {
                 self.a = self.a + x
             }
         }
 
-        let thing = TestClass::new()
-        thing.a = 1337
-        thing.add(124)
-        puts(str(thing.a))
+        let thingy = TestClass::new()
+        thingy.a = 1337
+        thingy.add(124)
+        puts(str(thingy.a))
 
-        while thing.a > 0 {
+        while thingy.a > 0 {
             puts("Hey again")
-            thing.a = thing.a - 1000
+            thingy.a = thingy.a - 1000
         }
-
-        //malloc(10)
 
         let r = match a with
             1 => a
@@ -84,6 +97,29 @@
             buffer
         }
 
+        fn strnum(num: Real) -> String {
+            let buffer: String = malloc(22)
+            sprintf(buffer, "%f", num)
+            buffer
+        }
+
+        fn overload() {
+            fn strnum(num: Int, suffix: String) -> String {
+                // TODO this doesn't work because no type is a set for strnum, and we don't try to get the parent definition
+                //      but even iff we did, we wouldn't be able to make recursive overloaded functions
+                //strnum(num)
+                "poop"
+            }
+
+            strnum(1, "px")
+            strnum(1.0)
+        }
+
+
+        puts(strnum(12))
+        puts(strnum(1.214))
+
+        /*
         fn stringcat(s1: String, s2: String) -> String {
             let s1len = strlen(s1)
             let s2len = strlen(s2)
@@ -91,9 +127,14 @@
             sprintf(buffer, "%s%s", s1, s2)
             buffer
         }
+        */
+
+        //try str(123) with
+        //    _ => a * 16
+
 
         /*
-        let thing = class Thing {
+        class Thing {
             let foo = fn a => {
                 a * 4
             }
@@ -107,6 +148,7 @@
             }
         }
 
+        let thing = Thing::new()
         let get_thing = fn => thing
 
         [ 0, 1, 2, 3 ][0]
@@ -119,8 +161,8 @@
         get_thing().bar()[1]
         thing.foobar[2](123)
         get_thing().foobar[2](123)
-        thing.foo(521)
-        get_thing().foo(985)
+        thing.baz(521)
+        get_thing().baz(985)
         Thing::foo(a)
         */
 
@@ -257,5 +299,5 @@
 
         // things
         /* stuff */
-        4 * /* things */ 5
+        4 + /* things */ 5
 

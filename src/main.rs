@@ -1,15 +1,19 @@
 
-use std::fmt::Debug;
+use std::str;
 use std::fs::File;
+use std::fmt::Debug;
 use std::io::prelude::*;
 
-#[macro_use]
-extern crate nom;
 extern crate clap;
 use clap::{ App, Arg };
 
+#[macro_use]
+extern crate nom;
+
 mod parser;
 use parser::AST;
+
+//mod validator;
 
 mod scope;
 use scope::ScopeMapRef;
@@ -17,6 +21,7 @@ use scope::ScopeMapRef;
 mod types;
 mod debug;
 mod utils;
+mod import;
 mod interpreter;
 //mod compiler_c;
 mod compiler_llvm;
@@ -38,49 +43,42 @@ fn main() {
 
     let filename = matches.value_of("INPUT").unwrap();
     match matches.occurrences_of("compile") {
-        0 => execute_file(filename),
-        1 => compile_file(filename),
+        0 => with_file(filename, |name, text| execute_string(name, text)),
+        1 => with_file(filename, |name, text| compile_string(name, text)),
         _ => println!("Invalid argument: -c"),
     }
 }
 
-fn execute_file(filename: &str) {
+fn with_file<F>(filename: &str, with: F) where F: Fn(&str, &[u8]) -> () {
     let mut f = File::open(filename).expect("Error: file not found");
 
     let mut contents = String::new();
     f.read_to_string(&mut contents).expect("Error reading file contents");
-    execute_string(contents.as_bytes())
+    with(filename, contents.as_bytes())
 }
 
-fn execute_string(text: &[u8]) {
+
+fn execute_string(name: &str, text: &[u8]) {
     let map = interpreter::make_global();
-    let code = process_input(map.clone(), text);
+    let code = process_input(map.clone(), name, text);
 
     let fin = interpreter::execute(map.clone(), &code);
     println!("{:?}", fin);
 }
 
-fn compile_file(filename: &str) {
-    let mut f = File::open(filename).expect("Error: file not found");
-
-    let mut contents = String::new();
-    f.read_to_string(&mut contents).expect("Error reading file contents");
-    compile_string(contents.as_bytes())
-}
-
-fn compile_string(text: &[u8]) {
+fn compile_string(name: &str, text: &[u8]) {
     let map = lib_llvm::make_global();
-    let code = process_input(map.clone(), text);
+    let mut code = process_input(map.clone(), name, text);
 
-    let fin = compiler_llvm::compile(map.clone(), &code);
-    println!("{}", fin);
+    compiler_llvm::compile(map.clone(), name, &mut code);
 }
 
-fn process_input<V, T>(map: ScopeMapRef<V, T>, text: &[u8]) -> Vec<AST> where V: Clone + Debug, T: Clone + Debug {
-    let result = parser::parse(text);
-    println!("{:?}\n\n", result);
-    let mut code = result.unwrap().1;
+
+fn process_input<V, T>(map: ScopeMapRef<V, T>, name: &str, text: &[u8]) -> Vec<AST> where V: Clone + Debug, T: Clone + Debug {
+    let mut code = parser::parse_or_error(name, text);
+    //validator::validate(&mut code);
     traverse(&code);
+    //import::load_index(map.get_global(), "libcore.idx");
     scope::bind_names(map.clone(), &mut code);
     let gtype = types::check_types(map.clone(), map.get_global(), &mut code);
     println!("\n{:?}\n", code);

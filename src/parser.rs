@@ -12,6 +12,26 @@ use types::Type;
 use utils::{ UniqueID };
 
 
+pub fn parse_or_error(name: &str, text: &[u8]) -> Vec<AST> {
+    match parse(text) {
+        IResult::Done(rem, _) if rem != [] => panic!("InternalError: unparsed input remaining: {:?}", rem),
+        IResult::Done(rem, code) => code,
+        res @ IResult::Error(_) => { print_error(name, text, nom::prepare_errors(text, res).unwrap()); panic!(""); },
+        res @ _ => panic!("UnknownError: the parser returned an unknown result; {:?}", res),
+    }
+}
+
+pub fn parse_index_or_error(name: &str, text: &[u8]) -> Vec<Decl> {
+    match parse_index(text) {
+        IResult::Done(rem, _) if rem != [] => panic!("InternalError: unparsed input remaining: {:?}", rem),
+        IResult::Done(rem, decls) => decls,
+        res @ IResult::Error(_) => { println!("OETNUHU: {:?}", res); print_error(name, text, nom::prepare_errors(text, res).unwrap()); panic!(""); },
+        res @ _ => panic!("UnknownError: the parser returned an unknown result; {:?}", res),
+    }
+}
+
+///// Parser /////
+
 named!(sp, eat_separator!(&b" \t"[..]));
 
 #[macro_export]
@@ -92,6 +112,9 @@ pub enum AST {
     Resolver(Box<AST>, String),
     Accessor(Box<AST>, String, Option<Type>),
     Invoke(Box<AST>, Vec<AST>, Option<Type>),
+    SideEffect(String, Vec<AST>),
+    //MethodIdentifier(String),
+    //InvokeMethod(String, Vec<AST>, Option<Type>),
     //Prefix(String, Box<AST>),
     //Infix(String, Box<AST>, Box<AST>),
     Block(Vec<AST>),
@@ -290,8 +313,8 @@ named!(function<AST>,
         //n: opt!(identifier) >>
         l: alt!(
             do_parse!(
-                //n: opt!(alt!(identifier | infix_op)) >>
-                n: opt!(identifier) >>
+                n: opt!(alt!(identifier | any_op)) >>
+                //n: opt!(identifier) >>
                 l: delimited!(tag!("("), identifier_list_defaults, tag!(")")) >>
                 ((n, l))
             ) |
@@ -396,8 +419,8 @@ impl AST {
                 let op = operators.pop().unwrap().0;
                 let r2 = operands.pop().unwrap();
                 let r1 = operands.pop().unwrap();
-                //operands.push(AST::Infix(op, Box::new(r1), Box::new(r2)));
-                operands.push(AST::Invoke(Box::new(AST::Identifier(op)), vec!(r1, r2), None));
+
+                operands.push(AST::make_op(op, r1, r2))
             }
 
             operators.push((next_op, p));
@@ -408,12 +431,21 @@ impl AST {
             let op = operators.pop().unwrap().0;
             let r2 = operands.pop().unwrap();
             let r1 = operands.pop().unwrap();
-            //operands.push(AST::Infix(op, Box::new(r1), Box::new(r2)));
-            operands.push(AST::Invoke(Box::new(AST::Identifier(op)), vec!(r1, r2), None));
+            operands.push(AST::make_op(op, r1, r2))
         }
 
         assert_eq!(operands.len(), 1);
         operands.pop().unwrap()
+    }
+
+    fn make_op(op: String, r1: AST, r2: AST) -> AST {
+        match op.as_str() {
+            "and" | "or" => AST::SideEffect(op, vec!(r1, r2)),
+            _ => 
+            //AST::Infix(op, Box::new(r1), Box::new(r2))
+            AST::Invoke(Box::new(AST::Identifier(op)), vec!(r1, r2), None)
+            //AST::Invoke(Box::new(AST::Accessor(Box::new(r1), op, None)), vec!(r2), None)
+        }
     }
 }
 
@@ -474,6 +506,7 @@ named!(prefix<AST>,
         a: atomic >>
         //(AST::Prefix(op, Box::new(a)))
         (AST::Invoke(Box::new(AST::Identifier(op)), vec!(a), None))
+        //(AST::Invoke(Box::new(AST::Accessor(Box::new(a), op, None)), vec!(), None))
     )
 );
 
@@ -545,6 +578,10 @@ named!(identifier_typed<(String, Option<Type>)>,
     ))
 );
 
+named!(any_op<String>,
+    alt!(infix_op | prefix_op | map_str!(alt!(tag!("[]") | tag!("::"))))
+);
+
 pub fn parse_type(s: &str) -> Option<Type> {
     match type_description(s.as_bytes()) {
         IResult::Done(_, t) => Some(t),
@@ -555,6 +592,7 @@ pub fn parse_type(s: &str) -> Option<Type> {
 named!(type_description<Type>,
     alt!(
         type_function |
+        type_list |
         type_variable |
         type_concrete
     )
@@ -568,6 +606,13 @@ named!(type_variable<Type>,
     map!(preceded!(tag!("'"), identifier), |s| Type::Variable(s))
 );
 
+named!(type_list<Type>,
+    map!(
+        delimited!(tag!("List["), wscom!(type_description), tag!("]")),
+        |t| Type::List(Box::new(t))
+    )
+);
+
 named!(type_function<Type>,
     wscom!(do_parse!(
         args: delimited!(tag!("("), separated_list!(wscom!(tag!(",")), type_description), tag!(")")) >>
@@ -575,6 +620,13 @@ named!(type_function<Type>,
         ret: type_description >>
         (Type::Function(args, Box::new(ret)))
     ))
+);
+
+named!(type_overload<Type>,
+    map!(
+        delimited!(tag!("Overload["), wscom!(separated_list!(wscom!(tag!(",")), type_description)), tag!("]")),
+        |t| Type::Overload(t)
+    )
 );
 
 named!(reserved,
@@ -661,8 +713,7 @@ impl AST {
         let n = str::from_utf8(s).unwrap();
         if let Ok(i) = isize::from_str_radix(n, 10) {
             AST::Integer(i)
-        }
-        else {
+        } else {
             AST::Real(f64::from_str(n).unwrap())
         }
     }
@@ -728,29 +779,96 @@ pub fn is_alphanumeric_underscore(ch: u8) -> bool {
 }
 
 
-static mut lines: usize = 0;
+static mut _lines: usize = 0;
 
 pub fn count_lines(text: &[u8]) {
     for ch in text {
         if *ch == '\n' as u8 {
             //*lines.get_mut() += 1;
-            unsafe { lines += 1; }
+            unsafe { _lines += 1; }
         }
     }
 }
 
-/*
-pub type UniqueID = usize;
-static mut _next_id: UniqueID = 10;
-pub fn generate_id() -> UniqueID {
-    unsafe {
-        _next_id += 1;
-        //format!("anon{}", _next_id)
-        _next_id
+
+
+pub fn print_error(name: &str, text: &[u8], errors: Vec<(nom::ErrorKind, usize, usize)>) {
+    for error in errors {
+        print_error_info(name, text, error);
     }
 }
-*/
- 
+
+pub fn print_error_info(name: &str, text: &[u8], err: (nom::ErrorKind, usize, usize)) {
+    let mut lines = 0;
+    let mut start = 0;
+    for i in 0 .. err.1 {
+        if text[i] == b'\n' {
+            lines += 1;
+            start = i + 1;
+        }
+    }
+
+    let mut end = err.2 - 1;
+    for i in err.1 .. err.2 {
+        if text[i] == b'\n' {
+            end = i;
+            break;
+        }
+    }
+
+    println!("{}:{}:{}: ParseError: {:?} near {:?}", name, lines, err.1 - start, err.0, String::from(str::from_utf8(&text[start .. end]).unwrap()));
+}
+
+
+///// Index Summaries /////
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum Decl {
+    Symbol(String, Type),
+    Class(String, Option<String>, Vec<Decl>),
+}
+
+named!(pub parse_index<Vec<Decl>>,
+    complete!(do_parse!(
+        e: many0!(declarations) >>
+        eof!() >>
+        (e)
+    ))
+);
+
+named!(declarations<Decl>,
+    do_parse!(
+        s: wscom!(alt!(
+            symbol_decl |
+            class_decl
+        )) >>
+        separator >>
+        (s)
+    )
+);
+
+named!(symbol_decl<Decl>,
+    do_parse!(
+        wscom!(tag_word!("decl")) >>
+        n: identifier >>
+        wscom!(tag!(":")) >>
+        t: alt!(type_overload | type_description) >>
+        (Decl::Symbol(n, t))
+    )
+);
+
+named!(class_decl<Decl>,
+    do_parse!(
+        wscom!(tag_word!("class")) >>
+        i: identifier >>
+        p: opt!(preceded!(wscom!(tag_word!("extends")), identifier)) >>
+        wscom!(tag!("{")) >>
+        s: many0!(symbol_decl) >>
+        wscom!(tag!("}")) >>
+        (Decl::Class(i, p, s))
+    )
+); 
+
 #[cfg(test)]
 mod tests {
     use super::*;
