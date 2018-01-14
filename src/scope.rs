@@ -1,16 +1,27 @@
 
 use std::mem;
+use std::str;
 use std::rc::Rc;
 use std::fmt::Debug;
+use std::str::FromStr;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::collections::hash_map::Entry;
 
+extern crate nom;
+use nom::{ digit };
 
 use import;
 use parser::AST;
 use types::Type;
 use utils::UniqueID;
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum Context {
+    Local,
+    Global,
+    Class,
+}
 
 
 #[derive(Clone, Debug, PartialEq)]
@@ -34,7 +45,7 @@ pub struct TypeInfo<V, T> {
 pub struct Scope<V, T> {
     //pub id: UniqueID,
     pub basename: String,
-    pub is_global: bool,
+    pub context: Context,
     pub no_lookup: bool,
     pub names: HashMap<String, Symbol<V>>,
     pub types: HashMap<String, TypeInfo<V, T>>,
@@ -50,7 +61,7 @@ impl<V, T> Scope<V, T> where V: Clone, T: Clone {
     pub fn new(parent: Option<ScopeRef<V, T>>) -> Scope<V, T> {
         Scope {
             basename: String::from(""),
-            is_global: false,
+            context: Context::Local,
             no_lookup: false,
             names: HashMap::new(),
             types: HashMap::new(),
@@ -67,11 +78,15 @@ impl<V, T> Scope<V, T> where V: Clone, T: Clone {
     }
 
     pub fn is_global(&self) -> bool {
-        self.is_global
+        self.context == Context::Global
     }
 
     pub fn set_global(&mut self, value: bool) {
-        self.is_global = value;
+        self.context = if value { Context::Global } else { Context::Local };
+    }
+
+    pub fn set_class(&mut self, value: bool) {
+        self.context = if value { Context::Class } else { Context::Local };
     }
 
     pub fn set_no_lookup(&mut self, value: bool) {
@@ -95,21 +110,15 @@ impl<V, T> Scope<V, T> where V: Clone, T: Clone {
         };
     }
 
-    pub fn define_func(&mut self, name: String, ttype: Option<Type>) {
+    pub fn define_func(&mut self, name: String, ttype: Option<Type>, external: bool) {
+        // TODO we don't really do the right this with type here
         let funcs = self.search(&name, true, |sym| Some(sym.funcdefs)).unwrap_or(0);
         match self.names.entry(name.clone()) {
             Entry::Occupied(mut entry) => match entry.get().funcdefs {
                 0 => panic!("NameError: variable is already defined as a non-function; {:?}", name),
                 _ => entry.get_mut().funcdefs += 1,
             },
-            Entry::Vacant(entry) => { entry.insert(Symbol { ttype: ttype, value: None, funcdefs: funcs + 1, external: false }); },
-        };
-    }
-
-    pub fn define_extern(&mut self, name: String, ttype: Option<Type>) {
-        match self.names.contains_key(&name) {
-            true => panic!("NameError: variable is already defined; {:?}", name),
-            false => self.names.insert(name, Symbol { ttype: ttype, value: None, funcdefs: 0, external: true }),
+            Entry::Vacant(entry) => { entry.insert(Symbol { ttype: ttype, value: None, funcdefs: funcs + 1, external: external }); },
         };
     }
 
@@ -174,7 +183,7 @@ impl<V, T> Scope<V, T> where V: Clone, T: Clone {
     pub fn get_variable_value(&self, name: &String) -> Option<V> {
         match self.search(name, false, |sym| Some(sym.value.clone())) {
             Some(value) => value,
-            None => panic!("NameError: variable is undefined; {}", name),
+            None => panic!("NameError: variable is undefined; {:?}", name),
         }
     }
 
@@ -183,9 +192,16 @@ impl<V, T> Scope<V, T> where V: Clone, T: Clone {
     }
 
     pub fn get_variable_type(&self, name: &String) -> Option<Type> {
-        match self.search(name, false, |sym| Some(sym.ttype.clone())) {
+        let otype = self.search(name, false, |sym| {
+            if sym.funcdefs > 1 {
+                Some(Some(Type::Overload(self.get_all_variants(name))))
+            } else {
+                Some(sym.ttype.clone())
+            }
+        });
+        match otype {
             Some(ttype) => ttype,
-            None => panic!("NameError: variable is undefined; {}", name),
+            None => panic!("NameError: variable is undefined; {:?}", name),
         }
     }
 
@@ -193,6 +209,17 @@ impl<V, T> Scope<V, T> where V: Clone, T: Clone {
         self.modify_local(name, move |sym| sym.ttype = Some(ttype.clone()))
     }
 
+    //pub fn add_function_type(&mut self, name: &String, ttype: Type) {
+    //    let mut otype = self.get_variable_type(name);
+    //
+    //    self.update_variable_type(name, nftype.clone());
+    //}
+
+    pub fn get_all_variants(&self, name: &String) -> Vec<Type> {
+        let mut variants = self.parent.as_ref().map(|parent| parent.borrow().get_all_variants(name)).unwrap_or(vec!());
+        variants.extend(self.names.get(name).as_ref().map(|sym| sym.ttype.as_ref().map(|ttype| ttype.get_variants()).unwrap_or(vec!())).unwrap_or(vec!()));
+        variants
+    }
 
 
     ///// Type Functions /////
@@ -272,6 +299,18 @@ impl<V, T> Scope<V, T> where V: Clone, T: Clone {
                 None => None,
             }
         })
+    }
+
+    pub fn get_self_class_def(&self) -> Option<ScopeRef<V, T>> {
+        self.search_type(&self.basename, |info| info.classdef.clone())
+    }
+
+    pub fn target(scope: ScopeRef<V, T>) -> ScopeRef<V, T> {
+        if scope.borrow().context == Context::Class {
+            scope.borrow().get_self_class_def().unwrap()
+        } else {
+            scope
+        }
     }
 
     pub fn set_type_value(&mut self, name: &String, value: T) {
@@ -406,6 +445,20 @@ pub fn mangle_name(name: &String, argtypes: &Vec<Type>) -> String {
     format!("_Z{}{}{}", name.len(), name, args)
 }
 
+pub fn unmangle_name(name: &String) -> Option<String> {
+    named!(unmangle<String>,
+        preceded!(tag!("_Z"),
+            map!(
+                length_bytes!(map!(digit, |s| usize::from_str_radix(str::from_utf8(s).unwrap(), 10).unwrap())),
+                |s| String::from(str::from_utf8(s).unwrap())
+            )
+        )
+    );
+    match unmangle(name.as_bytes()) {
+        nom::IResult::Done(_, value) => Some(value),
+        _ => None,
+    }
+}
 
 
 pub fn bind_names<V, T>(map: ScopeMapRef<V, T>, code: &mut Vec<AST>) where V: Clone + Debug, T: Clone + Debug {
@@ -425,20 +478,8 @@ fn bind_names_node<V, T>(map: ScopeMapRef<V, T>, scope: ScopeRef<V, T>, node: &m
             fscope.borrow_mut().set_basename(name.as_ref().map_or(format!("anon{}", id), |name| name.clone()));
 
             if let Some(ref name) = *name {
-                scope.borrow_mut().define_func(name.clone(), None);
-                //if !scope.borrow().contains_local(name) {
-                //    scope.borrow_mut().define(name.clone(), None);
-                //}
-                //if scope.borrow().search(name, true, |sym| Some(sym.clone())).is_none() {
-                //    scope.borrow_mut().define(name.clone(), None);
-                //} else {
-                //    // TODO this is maybe going to change when I fix overloading??
-                //    scope.borrow_mut().set_overloaded(name);
-                //    if !scope.borrow().contains_local(name) {
-                //        scope.borrow_mut().define(name.clone(), None);
-                //        scope.borrow_mut().set_overloaded(name);
-                //    }
-                //}
+                let dscope = Scope::target(scope.clone());
+                dscope.borrow_mut().define_func(name.clone(), None, false);
             }
 
             for arg in args {
@@ -463,7 +504,8 @@ fn bind_names_node<V, T>(map: ScopeMapRef<V, T>, scope: ScopeRef<V, T>, node: &m
 
         AST::Definition((ref name, ref ttype), ref mut code) => {
             check_for_typevars(scope.clone(), ttype);
-            scope.borrow_mut().define(name.clone(), ttype.clone());
+            let dscope = Scope::target(scope.clone());
+            dscope.borrow_mut().define(name.clone(), ttype.clone());
             bind_names_node(map.clone(), scope.clone(), code);
         },
 
@@ -519,17 +561,6 @@ fn bind_names_node<V, T>(map: ScopeMapRef<V, T>, scope: ScopeRef<V, T>, node: &m
 
 
         AST::Class(ref name, ref parent, ref mut body, ref id) => {
-            // Create a temporary invisible scope to name check the class body
-            let tscope = map.add(id.clone(), Some(scope.clone()));
-            tscope.borrow_mut().set_basename(name.clone());
-            tscope.borrow_mut().define_type(String::from("Self"), Type::Object(name.clone()));
-            if parent.is_some() {
-                tscope.borrow_mut().define_type(String::from("Super"), Type::Object(parent.clone().unwrap()));
-            }
-            tscope.borrow_mut().set_no_lookup(true);
-            bind_names_vec(map.clone(), tscope.clone(), body);
-            tscope.borrow_mut().set_no_lookup(false);
-
             // Create class name bindings for checking ast::accessors
             let classdef = Scope::new_ref(None);
             classdef.borrow_mut().set_basename(name.clone());
@@ -545,15 +576,27 @@ fn bind_names_node<V, T>(map: ScopeMapRef<V, T>, scope: ScopeRef<V, T>, node: &m
 
             // Add all the name definitions to the class, so we can later name and type check ast::accessors
             classdef.borrow_mut().define(String::from("new"), Some(Type::Function(vec!(), Box::new(Type::Object(name.clone())))));
-            for (name, sym) in &tscope.borrow().names {
-                classdef.borrow_mut().clone_symbol(name, sym);
-            }
+            //for (name, sym) in &tscope.borrow().names {
+            //    classdef.borrow_mut().clone_symbol(name, sym);
+            //}
 
             // Define the class in the local scope
             scope.borrow_mut().define_type(name.clone(), Type::Object(name.clone()));
             scope.borrow_mut().set_class_def(name, parent.clone(), classdef.clone());
             // TODO i don't like this type == Class thing, but i don't know how i'll do struct types yet either
             //scope.borrow_mut().define(name.clone(), Some(Type::Object(name.clone())));
+
+            // Create a temporary invisible scope to name check the class body
+            let tscope = map.add(id.clone(), Some(scope.clone()));
+            tscope.borrow_mut().set_basename(name.clone());
+            tscope.borrow_mut().define_type(String::from("Self"), Type::Object(name.clone()));
+            if parent.is_some() {
+                tscope.borrow_mut().define_type(String::from("Super"), Type::Object(parent.clone().unwrap()));
+            }
+            tscope.borrow_mut().set_class(true);
+            //tscope.borrow_mut().set_no_lookup(true);
+            bind_names_vec(map.clone(), tscope.clone(), body);
+            //tscope.borrow_mut().set_no_lookup(false);
         },
 
         AST::Resolver(ref mut left, ref mut right) => {

@@ -10,7 +10,7 @@ use self::llvm::core::*;
 
 use import;
 use parser::AST;
-use scope::{ ScopeRef, ScopeMapRef, mangle_name };
+use scope::{ Scope, ScopeRef, ScopeMapRef, mangle_name };
 use types::Type;
 use utils::UniqueID;
 //use lib_llvm::{ TypeFunctionMap, initialize_builtins };
@@ -528,8 +528,10 @@ unsafe fn collect_functions_node<'a>(data: &mut LLVM<'a>, scope: ScopeRef<Value,
             let fname = scope.borrow().get_full_name(name, id.clone());
             let function = LLVMAddFunction(data.module, label(fname.as_str()).as_ptr(), ftype);
             //LLVMSetGC(function, label("shadow-stack").as_ptr());
+
+            let dscope = Scope::target(scope.clone());
             match *name {
-                Some(ref name) => scope.borrow_mut().assign(name, function),
+                Some(ref name) => dscope.borrow_mut().assign(name, function),
                 _ => { },
             }
 
@@ -556,7 +558,11 @@ unsafe fn collect_functions_node<'a>(data: &mut LLVM<'a>, scope: ScopeRef<Value,
         AST::SideEffect(_, ref args) => { collect_functions_vec(data, scope, args); },
 
         AST::Definition((ref name, ref ttype), ref body) => {
-            collect_functions_node(data, scope, body);
+            //collect_functions_node(data, scope, body);
+            if let Some(function) = collect_functions_node(data, scope.clone(), body) {
+                let dscope = Scope::target(scope.clone());
+                dscope.borrow_mut().assign(name, function);
+            }
         },
 
         AST::Block(ref body) => { collect_functions_vec(data, scope, body); },
@@ -621,6 +627,7 @@ unsafe fn collect_functions_node<'a>(data: &mut LLVM<'a>, scope: ScopeRef<Value,
             // TODO you need to add the 'new' function definition here, but the value should be stored in cscope, not tscope...
             let classdef = scope.borrow().get_class_def(name).unwrap();
             classdef.borrow_mut().assign(&String::from("new"), build_constructor(data, format!("{}_new", name).as_str(), lltype));
+            /*
             for node in body {
                 match *node {
                     AST::Definition((ref name, ref ttype), ref expr) => {
@@ -638,8 +645,9 @@ unsafe fn collect_functions_node<'a>(data: &mut LLVM<'a>, scope: ScopeRef<Value,
                     _ => { collect_functions_node(data, tscope.clone(), node); },
                 }
             }
+            */
 
-            //collect_functions_vec(data, tscope.clone(), body);
+            collect_functions_vec(data, tscope.clone(), body);
             //for (name, sym) in &tscope.borrow().names {
             //    if let Some(value) = sym.value {
             //        classdef.borrow_mut().assign(name, value);

@@ -65,9 +65,9 @@
             }
 
             // TODO causing issues
-            //fn foo2(self, a, b) {
-            //    a * 4.0 * b
-            //}
+            fn foo2(self, a, b) {
+                a * 4.0 * b
+            }
 
             let add = fn self, x => {
                 self.a = self.a + x
@@ -84,10 +84,11 @@
             thingy.a = thingy.a - 1000
         }
 
-        let r = match a with
+        let r = match a {
             1 => a
             2 => a * 4
             _ => a * 16
+	}
 
         puts(str(r))
 
@@ -104,10 +105,9 @@
         }
 
         fn overload() {
+            // TODO we don't allow recursion in overloaded functions, although I don't know that that can be fixed without constricted types
             fn strnum(num: Int, suffix: String) -> String {
-                // TODO this doesn't work because no type is a set for strnum, and we don't try to get the parent definition
-                //      but even iff we did, we wouldn't be able to make recursive overloaded functions
-                //strnum(num)
+                strnum(num)
                 "poop"
             }
 
@@ -293,7 +293,6 @@
 
         // TODO this at the end causes a parse error, but works everywhere else
         //type newfloat = float
-
 
     */
 

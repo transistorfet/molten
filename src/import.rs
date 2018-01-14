@@ -4,7 +4,7 @@ use std::fmt::Debug;
 use std::io::prelude::*;
 
 use types::Type;
-use scope::ScopeRef;
+use scope::{ ScopeRef, unmangle_name };
 use parser::{ AST, Decl, parse_index_or_error };
 
 
@@ -27,7 +27,18 @@ pub fn load_index_vec<V, T>(scope: ScopeRef<V, T>, code: &Vec<Decl>) where V: Cl
 fn load_index_node<V, T>(scope: ScopeRef<V, T>, node: &Decl) where V: Clone, T: Clone {
     match *node {
         Decl::Symbol(ref name, ref ttype) => {
-            scope.borrow_mut().define_extern(name.clone(), Some(ttype.clone()));
+            scope.borrow_mut().define_func(name.clone(), Some(ttype.clone()), true);
+            // TODO if the name is mangled, unmangle and define_func again
+            match unmangle_name(name) {
+                Some(ref name) => {
+                    println!("OVERLOAD: {:?}", name);
+                    scope.borrow_mut().define_func(name.clone(), None, true);
+                    let mut stype = scope.borrow().get_variable_type(name).unwrap_or(Type::Overload(vec!()));
+                    stype = stype.add_variant(scope.clone(), ttype.clone());
+                    scope.borrow_mut().update_variable_type(name, stype);
+                },
+                None => { },
+            };
         },
         Decl::Class(ref name, ref parent, ref body) => {
             println!("Oh No");
@@ -47,11 +58,11 @@ pub fn build_index<V, T>(scope: ScopeRef<V, T>, code: &Vec<AST>) -> String where
     for node in code {
         build_index_node(&mut index, scope.clone(), node);
     }
-    for (name, sym) in &scope.borrow().names {
-        if sym.ttype.as_ref().unwrap().is_overloaded() {
-            index.push_str(format!("decl {} : {}\n", name, unparse_type(sym.ttype.clone().unwrap())).as_str());
-        }
-    }
+    //for (name, sym) in &scope.borrow().names {
+    //    if sym.ttype.as_ref().unwrap().is_overloaded() {
+    //        index.push_str(format!("decl {} : {}\n", name, unparse_type(sym.ttype.clone().unwrap())).as_str());
+    //    }
+    //}
     index
 }
 
@@ -89,11 +100,11 @@ fn build_index_node<V, T>(index: &mut String, scope: ScopeRef<V, T>, node: &AST)
                     _ => {  },
                 }
             }
-            for (name, sym) in &classdef.borrow().names {
-                if sym.ttype.as_ref().unwrap().is_overloaded() {
-                    index.push_str(format!("    decl {} : {}\n", name, unparse_type(sym.ttype.clone().unwrap())).as_str());
-                }
-            }
+            //for (name, sym) in &classdef.borrow().names {
+            //    if sym.ttype.as_ref().unwrap().is_overloaded() {
+            //        index.push_str(format!("    decl {} : {}\n", name, unparse_type(sym.ttype.clone().unwrap())).as_str());
+            //    }
+            //}
             index.push_str(format!("}}\n").as_str());
         },
 

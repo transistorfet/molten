@@ -5,27 +5,16 @@
 * could change AST::Accessor into AST::Resolver during typecheck, but this would have be done after type checking... because the type might be a variable until then
 
 
+* change the debug prints to overwrite Debug formatting for scopes
 * fix scope resolution to also work on objects, so that you can have static methods...
 * fix constructors, perhaps by making all methods called new() allocate before the method is called?
-
-* issue with overloaded operators in import declarations; they can't be parsed because we are only parsing identifiers
-* issue with overloaded methods in subclasses
-
-
-* is it even possible to add a special "constrained" type, which has &AST that must type check correctly in order to match (checks done in check_type)
-* if you make ops methods, then everything has to be type annotated, with the type system as it is; you'd need constrained types, or multiple paths, or bidirectional or something
-* you might need to integrate type restrictions which have to get resolved later; like 'a where 'a is object with add(Int) method; not sure how you could be so specific without complexity
 * make typed functions for all math operations, with the inlinealways attribute, if you decide to make operators methods
 
-* what if you generalize overloaded types, such that they're checked in check_type, and options are eliminated, or resolved to one type over the course of checking
-* if you were to support the generation of functions with more than one type/variable types, you'd need to collect all invokation types for each function during collect
-
-* if you had a tuple type, you could use a typevar to represent a tuple of the arguments to a function: Type::Function(Type::Variable(..), Type::Variable(..)) or 'a -> 'b where 'a = ('c, 'd, 'e)
 
 * refactor heavily
 * add error returns instead of panics
 * add operator overloading; issue with type system as a result of making operators methods
-* how will modules and importing work?
+* add module initialization functions and sort out issue with duplicate main() functions
 * implement lists in compiled code
 * add or expand string support
 * implement exceptions
@@ -34,22 +23,27 @@
 
 
 
-* handling of class methods "self" type is kind of a hack
-* change the debug prints to overwrite Debug formatting for scopes
+* is it even possible to add a special "constrained" type, which has &AST that must type check correctly in order to match (checks done in check_type)
+* if you make ops methods, then everything has to be type annotated, with the type system as it is; you'd need constrained types, or multiple paths, or bidirectional or something
+* you might need to integrate type restrictions which have to get resolved later; like 'a where 'a is object with add(Int) method; not sure how you could be so specific without complexity
+* what if you generalize overloaded types, such that they're checked in check_type, and options are eliminated, or resolved to one type over the course of checking
+* if you were to support the generation of functions with more than one type/variable types, you'd need to collect all invokation types for each function during collect
+* if you had a tuple type, you could use a typevar to represent a tuple of the arguments to a function: Type::Function(Type::Variable(..), Type::Variable(..)) or 'a -> 'b where 'a = ('c, 'd, 'e)
+
+
+
+* should import indexes also list all the modules that the file imports, so that class definitions in other imports can be found, if needed for arguments
 
 * should class bodies use different rules than blocks, with different definition statements, like "def foo: Int", such that a value isn't required for members
 * should classes be values, added to the name space, or should they only be defined as types; should types be first class or not?
 * should you allow keyword arguments in invoke; foo(a=10, b=20)
 * should you allow arguments with a default value to be omitted from a function call?, that would require a bunch of changes to typechecking
-* should there be a way to declare functions/classes; should import indexes parse to AST?
-* should import indexes also list all the modules that the file imports, so that class definitions in other imports can be found, if needed for arguments
 
 
 
 TYPE CHECKING:
 
 * remove unused typechecking vars somehow...
-* clean up typechecking code
 * implement type definition ast element
 
 

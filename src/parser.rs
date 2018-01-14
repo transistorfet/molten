@@ -1,7 +1,7 @@
 
 
 extern crate nom;
-use nom::{ digit, hex_digit, oct_digit, line_ending, not_line_ending, space, multispace, is_alphanumeric, is_alphabetic, IResult };
+use nom::{ digit, hex_digit, oct_digit, line_ending, not_line_ending, space, multispace, is_alphanumeric, is_alphabetic, is_space, IResult };
 
 extern crate std;
 use std::f64;
@@ -277,8 +277,9 @@ named!(matchcase<AST>,
     do_parse!(
         wscom!(tag_word!("match")) >>
         c: expression >>
-        wscom!(tag_word!("with")) >>
-        l: caselist >>
+        //wscom!(tag_word!("with")) >>
+        //l: caselist >>
+        l: delimited!(wscom!(tag!("{")), caselist, wscom!(tag!("}"))) >>
         (AST::Match(Box::new(c), l))
     )
 );
@@ -778,6 +779,10 @@ pub fn is_alphanumeric_underscore(ch: u8) -> bool {
     ch == b'_' || is_alphanumeric(ch)
 }
 
+pub fn is_not_colon(ch: u8) -> bool {
+    ch != b':' && !is_space(ch)
+}
+
 
 static mut _lines: usize = 0;
 
@@ -847,10 +852,14 @@ named!(declarations<Decl>,
     )
 );
 
+named!(symbol_name<String>,
+    map_str!(recognize!(take_while!(is_not_colon)))
+);
+
 named!(symbol_decl<Decl>,
     do_parse!(
         wscom!(tag_word!("decl")) >>
-        n: identifier >>
+        n: symbol_name >>
         wscom!(tag!(":")) >>
         t: alt!(type_overload | type_description) >>
         (Decl::Symbol(n, t))

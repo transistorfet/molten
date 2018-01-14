@@ -37,8 +37,12 @@ pub fn make_global<V, T>() -> ScopeMapRef<V, T> where V: Clone, T: Clone {
     primatives.borrow_mut().define(String::from("/"), bintype.clone());
     primatives.borrow_mut().define(String::from("^"), bintype.clone());
     primatives.borrow_mut().define(String::from("%"), bintype.clone());
+
     //primatives.borrow_mut().define(String::from("+"), bintype.clone());
     primatives.borrow_mut().define(String::from("+"), Some(Type::Overload(vec!(parse_type("(Real, Real) -> Real").unwrap(), parse_type("(Int, Int) -> Int").unwrap()))));
+    //primatives.borrow_mut().define_func(String::from("+"), parse_type("(Int, Int) -> Int"), false);
+    //primatives.borrow_mut().define_func(String::from("+"), parse_type("(Real, Real) -> Real"), false);
+
     primatives.borrow_mut().define(String::from("-"), bintype.clone());
     primatives.borrow_mut().define(String::from("<<"), bintype.clone());
     primatives.borrow_mut().define(String::from(">>"), bintype.clone());
