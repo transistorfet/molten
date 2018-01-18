@@ -127,7 +127,7 @@ impl Interpreter {
 
     pub fn execute_node(&mut self, map: ScopeMapRef<Value, TypeValue>, scope: ScopeRef<Value, TypeValue>, node: &AST) -> Value {
         match *node {
-            AST::Nil => Value::Nil,
+            AST::Nil(_) => Value::Nil,
             AST::Boolean(boolean) => Value::Boolean(boolean),
             AST::Integer(num) => Value::Integer(num),
             AST::Real(num) => Value::Real(num),

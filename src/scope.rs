@@ -1,9 +1,7 @@
 
-use std::mem;
 use std::str;
 use std::rc::Rc;
 use std::fmt::Debug;
-use std::str::FromStr;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::collections::hash_map::Entry;
@@ -122,6 +120,11 @@ impl<V, T> Scope<V, T> where V: Clone, T: Clone {
         };
     }
 
+    pub fn define_func_variant(dscope: ScopeRef<V, T>, name: &String, tscope: ScopeRef<V, T>, ftype: Type) {
+        dscope.borrow_mut().define_func(name.clone(), None, false);
+        Scope::add_func_variant(dscope, name, tscope, ftype);
+    }
+
     pub fn define_assign(&mut self, name: String, ttype: Option<Type>, value: V) {
         self.define(name.clone(), ttype);
         self.assign(&name, value)
@@ -221,6 +224,13 @@ impl<V, T> Scope<V, T> where V: Clone, T: Clone {
         variants
     }
 
+    pub fn add_func_variant(dscope: ScopeRef<V, T>, name: &String, tscope: ScopeRef<V, T>, ftype: Type) {
+        let otype = dscope.borrow().get_variable_type(name);
+        let mut ftype = ftype.clone();
+        ftype = otype.map(|ttype| ttype.add_variant(tscope.clone(), ftype.clone())).unwrap_or(ftype);
+        dscope.borrow_mut().update_variable_type(name, ftype.clone());
+    }
+
 
     ///// Type Functions /////
 
@@ -276,6 +286,30 @@ impl<V, T> Scope<V, T> where V: Clone, T: Clone {
     //    self.modify_type(name, |info| info.ttype = f(info.ttype.clone()))
     //}
 
+    pub fn create_class_def(&mut self, name: &String, parent: &Option<String>) -> ScopeRef<V, T> {
+        // Create class name bindings for checking ast::accessors
+        let classdef = Scope::new_ref(None);
+        classdef.borrow_mut().set_basename(name.clone());
+
+        // Find the parent class definitions, which the new class will inherit from
+        match *parent {
+             Some(ref parent) => match self.get_class_def(&parent) {
+                Some(ref parentdef) => classdef.borrow_mut().set_parent(parentdef.clone()),
+                None => panic!("NameError: undefined parent class {:?} for {:?}", parent, name),
+            },
+            None => { }
+        };
+
+        // Add constructor method
+        classdef.borrow_mut().define(String::from("new"), Some(Type::Function(vec!(), Box::new(Type::Object(name.clone())))));
+
+        // Define the class in the local scope
+        self.define_type(name.clone(), Type::Object(name.clone()));
+        self.set_class_def(name, parent.clone(), classdef.clone());
+        // TODO i don't like this type == Class thing, but i don't know how i'll do struct types yet either
+        //self.define(name.clone(), Some(Type::Object(name.clone())));
+        classdef
+    }
 
     pub fn set_class_def(&mut self, name: &String, parentclass: Option<String>, classdef: ScopeRef<V, T>) {
         self.modify_type(name, |info| {
@@ -431,6 +465,12 @@ impl<V, T> ScopeMapRef<V, T> where V: Clone, T: Clone {
     pub fn get_global(&self) -> ScopeRef<V, T> {
         self.get(&UniqueID(1))
     }
+
+    pub fn foreach<F>(&self, f: F) where F: Fn(ScopeRef<V, T>) -> () {
+        for (i, scope) in self.0.borrow().iter() {
+            f(scope.clone());
+        }
+    }
 }
 
 pub fn mangle_name(name: &String, argtypes: &Vec<Type>) -> String {
@@ -561,30 +601,7 @@ fn bind_names_node<V, T>(map: ScopeMapRef<V, T>, scope: ScopeRef<V, T>, node: &m
 
 
         AST::Class(ref name, ref parent, ref mut body, ref id) => {
-            // Create class name bindings for checking ast::accessors
-            let classdef = Scope::new_ref(None);
-            classdef.borrow_mut().set_basename(name.clone());
-
-            // Find the parent class definitions, which the new class will inherit from
-            match *parent {
-                 Some(ref parent) => match scope.borrow().get_class_def(&parent) {
-                    Some(ref parentdef) => classdef.borrow_mut().set_parent(parentdef.clone()),
-                    None => panic!("NameError: undefined parent class {:?} for {:?}", parent, name),
-                },
-                None => { }
-            };
-
-            // Add all the name definitions to the class, so we can later name and type check ast::accessors
-            classdef.borrow_mut().define(String::from("new"), Some(Type::Function(vec!(), Box::new(Type::Object(name.clone())))));
-            //for (name, sym) in &tscope.borrow().names {
-            //    classdef.borrow_mut().clone_symbol(name, sym);
-            //}
-
-            // Define the class in the local scope
-            scope.borrow_mut().define_type(name.clone(), Type::Object(name.clone()));
-            scope.borrow_mut().set_class_def(name, parent.clone(), classdef.clone());
-            // TODO i don't like this type == Class thing, but i don't know how i'll do struct types yet either
-            //scope.borrow_mut().define(name.clone(), Some(Type::Object(name.clone())));
+            let classdef = scope.borrow_mut().create_class_def(name, parent);
 
             // Create a temporary invisible scope to name check the class body
             let tscope = map.add(id.clone(), Some(scope.clone()));
@@ -625,14 +642,14 @@ fn bind_names_node<V, T>(map: ScopeMapRef<V, T>, scope: ScopeRef<V, T>, node: &m
             bind_names_node(map.clone(), scope.clone(), right);
         },
 
-        AST::Import(ref name) => {
+        AST::Import(ref name, ref mut decls) => {
             let path = name.replace(".", "/") + ".idx";
-            import::load_index(scope.clone(), path.as_str());
+            *decls = import::load_index(scope.clone(), path.as_str());
         },
 
         AST::Type(_, _) => panic!("NotImplementedError: not yet supported, {:?}", node),
 
-        AST::Noop | AST::Underscore | AST::Nil |
+        AST::Noop | AST::Underscore | AST::Nil(_) |
         AST::Boolean(_) | AST::Integer(_) | AST::Real(_) | AST::String(_) => { }
     }
 }

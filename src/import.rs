@@ -1,6 +1,5 @@
 
 use std::fs::File;
-use std::fmt::Debug;
 use std::io::prelude::*;
 
 use types::Type;
@@ -8,7 +7,7 @@ use scope::{ ScopeRef, unmangle_name };
 use parser::{ AST, Decl, parse_index_or_error };
 
 
-pub fn load_index<V, T>(scope: ScopeRef<V, T>, filename: &str) where V: Clone, T: Clone {
+pub fn load_index<V, T>(scope: ScopeRef<V, T>, filename: &str) -> Vec<Decl> where V: Clone, T: Clone {
     let mut f = File::open(filename).expect("Error: file not found");
     let mut contents = String::new();
     f.read_to_string(&mut contents).expect("Error reading file contents");
@@ -16,6 +15,7 @@ pub fn load_index<V, T>(scope: ScopeRef<V, T>, filename: &str) where V: Clone, T
     let decl = parse_index_or_error(filename, contents.as_bytes());
     println!("DECL: {:?}", decl);
     load_index_vec(scope, &decl);
+    decl
 }
 
 pub fn load_index_vec<V, T>(scope: ScopeRef<V, T>, code: &Vec<Decl>) where V: Clone, T: Clone {
@@ -28,20 +28,18 @@ fn load_index_node<V, T>(scope: ScopeRef<V, T>, node: &Decl) where V: Clone, T: 
     match *node {
         Decl::Symbol(ref name, ref ttype) => {
             scope.borrow_mut().define_func(name.clone(), Some(ttype.clone()), true);
-            // TODO if the name is mangled, unmangle and define_func again
-            match unmangle_name(name) {
-                Some(ref name) => {
-                    println!("OVERLOAD: {:?}", name);
-                    scope.borrow_mut().define_func(name.clone(), None, true);
-                    let mut stype = scope.borrow().get_variable_type(name).unwrap_or(Type::Overload(vec!()));
-                    stype = stype.add_variant(scope.clone(), ttype.clone());
-                    scope.borrow_mut().update_variable_type(name, stype);
-                },
-                None => { },
-            };
+            if let Some(ref name) = unmangle_name(name) {
+                println!("OVERLOAD: {:?}", name);
+                scope.borrow_mut().define_func(name.clone(), None, true);
+                let mut stype = scope.borrow().get_variable_type(name).unwrap_or(Type::Overload(vec!()));
+                stype = stype.add_variant(scope.clone(), ttype.clone());
+                scope.borrow_mut().update_variable_type(name, stype);
+            }
         },
         Decl::Class(ref name, ref parent, ref body) => {
-            println!("Oh No");
+            // TODO how will you import classes?  I guess it's just functions that get imported, but don't you still need the structdef too, to access members?
+            let classdef = scope.borrow_mut().create_class_def(name, parent);
+            load_index_vec(classdef.clone(), body);
         }
     }
 }
@@ -58,24 +56,21 @@ pub fn build_index<V, T>(scope: ScopeRef<V, T>, code: &Vec<AST>) -> String where
     for node in code {
         build_index_node(&mut index, scope.clone(), node);
     }
-    //for (name, sym) in &scope.borrow().names {
-    //    if sym.ttype.as_ref().unwrap().is_overloaded() {
-    //        index.push_str(format!("decl {} : {}\n", name, unparse_type(sym.ttype.clone().unwrap())).as_str());
-    //    }
-    //}
     index
 }
 
 fn build_index_node<V, T>(index: &mut String, scope: ScopeRef<V, T>, node: &AST) where V: Clone, T: Clone {
     match *node {
         AST::Function(ref name, ref args, ref rtype, ref body, ref id) => {
-            match *name {
-                Some(ref name) => {
-                    let ttype = scope.borrow().get_variable_type(name).unwrap();
-                    index.push_str(format!("decl {} : {}\n", name, unparse_type(ttype)).as_str());
-                }
-                _ => { },
+            if let Some(ref name) = *name {
+                let ttype = scope.borrow().get_variable_type(name).unwrap();
+                index.push_str(format!("decl {} : {}\n", name, unparse_type(ttype)).as_str());
             }
+        },
+
+        AST::Definition((_, _), ref body) => match **body {
+            ref node @ AST::Class(_, _, _, _) => build_index_node(index, scope, node),
+            _ => { },
         },
 
         AST::Class(ref name, ref parent, ref body, ref id) => {
@@ -89,30 +84,16 @@ fn build_index_node<V, T>(index: &mut String, scope: ScopeRef<V, T>, node: &AST)
                         index.push_str(format!("    decl {} : {}\n", name, unparse_type(ttype.clone().unwrap())).as_str());
                     },
                     AST::Function(ref name, _, _, _, _) => {
-                        match *name {
-                            Some(ref name) => {
-                                let ttype = classdef.borrow().get_variable_type(name).unwrap();
-                                index.push_str(format!("    decl {} : {}\n", name, unparse_type(ttype)).as_str());
-                            },
-                            _ => { },
+                        if let Some(ref name) = *name {
+                            let ttype = classdef.borrow().get_variable_type(name).unwrap();
+                            index.push_str(format!("    decl {} : {}\n", name, unparse_type(ttype)).as_str());
                         }
                     },
                     _ => {  },
                 }
             }
-            //for (name, sym) in &classdef.borrow().names {
-            //    if sym.ttype.as_ref().unwrap().is_overloaded() {
-            //        index.push_str(format!("    decl {} : {}\n", name, unparse_type(sym.ttype.clone().unwrap())).as_str());
-            //    }
-            //}
             index.push_str(format!("}}\n").as_str());
         },
-
-        AST::Definition((_, _), ref body) => match **body {
-            ref node @ AST::Class(_, _, _, _) => build_index_node(index, scope, node),
-            _ => { },
-        }
-
         _ => { },
     }
 }

@@ -9,9 +9,9 @@ use self::llvm::prelude::*;
 use self::llvm::core::*;
 
 use import;
-use parser::AST;
+use parser::{ AST, Decl };
 use scope::{ Scope, ScopeRef, ScopeMapRef, mangle_name };
-use types::Type;
+use types::{ Type, resolve_type };
 use utils::UniqueID;
 //use lib_llvm::{ TypeFunctionMap, initialize_builtins };
 
@@ -53,6 +53,8 @@ type Unwind = Option<(LLVMBasicBlockRef, LLVMBasicBlockRef)>;
 
 
 unsafe fn compile_module(map: ScopeMapRef<Value, TypeValue>, scope: ScopeRef<Value, TypeValue>, module_name: &str, code: &Vec<AST>) {
+    let file_parts: Vec<&str> = module_name.rsplitn(2, '.').collect();
+
     let context = LLVMContextCreate();
     //let module = LLVMModuleCreateWithName(b"main_module\0".as_ptr() as *const _);
     let module = LLVMModuleCreateWithName(label(module_name).as_ptr());
@@ -70,20 +72,23 @@ unsafe fn compile_module(map: ScopeMapRef<Value, TypeValue>, scope: ScopeRef<Val
         build_function_body(data, func);
     }
 
-    let int_type = LLVMInt64TypeInContext(context);
-    let function_type = LLVMFunctionType(int_type, ptr::null_mut(), 0, 0);
+    let module_init_name = format!("init.{}", file_parts[1].replace("/", "."));
+
+    let function_type = LLVMFunctionType(bool_type(data), ptr::null_mut(), 0, 0);
+    let function = LLVMAddFunction(module, label(module_init_name.as_str()).as_ptr(), function_type);
+    LLVMPositionBuilderAtEnd(builder, LLVMAppendBasicBlockInContext(context, function, label("entry").as_ptr()));
+    compile_vec(data, function, None, scope.clone(), code);
+    LLVMBuildRet(builder, LLVMConstInt(bool_type(data), 1, 0));
+
+
+    let function_type = LLVMFunctionType(int_type(data), ptr::null_mut(), 0, 0);
     let function = LLVMAddFunction(module, b"main\0".as_ptr() as *const _, function_type);
-
-    let entry_name = label("entry");
-    let bb = LLVMAppendBasicBlockInContext(context, function, entry_name.as_ptr());
-    LLVMPositionBuilderAtEnd(builder, bb);
-
-    let ret = compile_vec(data, function, None, scope, code);
-    LLVMBuildRet(builder, ret);
+    LLVMPositionBuilderAtEnd(builder, LLVMAppendBasicBlockInContext(context, function, label("entry").as_ptr()));
+    compile_node(data, function, None, scope.clone(), &AST::Invoke(Box::new(AST::Identifier(String::from(module_init_name))), vec!(), Some(Type::Function(vec!(), Box::new(Type::Object(String::from("Bool")))))));
+    LLVMBuildRet(builder, int_value(data, 0));
 
     // Output to a file, and also a string for debugging
     //LLVMFinalizeFunctionPassManager(funcpass);
-    let file_parts: Vec<&str> = module_name.rsplitn(2, '.').collect();
     LLVMPrintModuleToFile(module, label(format!("{}.ll", file_parts[1]).as_str()).as_ptr(), ptr::null_mut());
     let compiled = CString::from_raw(LLVMPrintModuleToString(module));
 
@@ -112,12 +117,33 @@ unsafe fn declare_functions(data: &LLVM, scope: ScopeRef<Value, TypeValue>) {
     declare_function(data.module, pscope.clone(), "puts", &mut [bytestr_type], cint_type, false);
     declare_function(data.module, pscope.clone(), "sprintf", &mut [bytestr_type, bytestr_type], cint_type, true);
 
+    /*
     // TODO this is probably wrong because we're only declaring extern the imported functions in the global scope, but not functions imported into a local scope, which still need to be declared globally as funcs
-    for (name, sym) in &scope.borrow().names {
-        if sym.external && !sym.ttype.as_ref().unwrap().is_overloaded() {
-            LLVMAddFunction(data.module, label(name.as_str()).as_ptr(), get_type(data, scope.clone(), sym.ttype.clone().unwrap(), false));
+    data.map.foreach(|scope| {
+        for (name, sym) in &scope.borrow().names {
+            if sym.external && !sym.ttype.as_ref().unwrap().is_overloaded() {
+                let fname = scope.borrow().get_full_name(&Some(name.clone()), UniqueID(0));
+                println!("*****DECLARING: {:?}", fname);
+                let function = LLVMAddFunction(data.module, label(fname.as_str()).as_ptr(), get_type(data, scope.clone(), sym.ttype.clone().unwrap(), false));
+                scope.borrow_mut().assign(name, function)
+            }
         }
-    }
+
+        for (name, info) in &scope.borrow().types {
+            if info.classdef.is_some() {
+                let classdef = info.classdef.clone().unwrap();
+                for (name, sym) in &classdef.borrow().names {
+                    if sym.external && !sym.ttype.as_ref().unwrap().is_overloaded() {
+                        let fname = classdef.borrow().get_full_name(&Some(name.clone()), UniqueID(0));
+                        println!("*****DECLARING: {:?}", fname);
+                        let function = LLVMAddFunction(data.module, label(fname.as_str()).as_ptr(), get_type(data, scope.clone(), sym.ttype.clone().unwrap(), false));
+                        classdef.borrow_mut().assign(name, function)
+                    }
+                }
+            }
+        }
+    });
+    */
 }
 
 unsafe fn declare_globals(data: &LLVM, scope: ScopeRef<Value, TypeValue>) {
@@ -140,8 +166,8 @@ unsafe fn compile_vec(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: Sc
 unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: ScopeRef<Value, TypeValue>, node: &AST) -> LLVMValueRef {
     println!("COMPILE: {:?}", node);
     match *node {
-        AST::Noop |
-        AST::Nil => zero_int(data), // null_value() but what type should it be?let invoke 
+        AST::Noop => ptr::null_mut(),
+        AST::Nil(ref ttype) => null_value(get_type(data, scope.clone(), resolve_type(scope.clone(), ttype.clone().unwrap()), true)),
         AST::Boolean(ref num) => LLVMConstInt(bool_type(data), *num as u64, 0),
         AST::Integer(ref num) => LLVMConstInt(int_type(data), *num as u64, 0),
         AST::Real(ref num) => LLVMConstReal(real_type(data), *num),
@@ -373,7 +399,7 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
 
         AST::While(ref cond, ref body) => {
             let before_block = LLVMAppendBasicBlockInContext(data.context, func, label("while").as_ptr());
-            let body_block = LLVMAppendBasicBlockInContext(data.context, func, label("while").as_ptr());
+            let body_block = LLVMAppendBasicBlockInContext(data.context, func, label("whilebody").as_ptr());
             let after_block = LLVMAppendBasicBlockInContext(data.context, func, label("whileend").as_ptr());
 
             LLVMBuildBr(data.builder, before_block);
@@ -402,6 +428,30 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
         AST::For(ref name, ref cond, ref body, ref id) => {
             let lscope = map.get(id);
 
+            let before_block = LLVMAppendBasicBlockInContext(data.context, func, label("for").as_ptr());
+            let body_block = LLVMAppendBasicBlockInContext(data.context, func, label("forbody").as_ptr());
+            let after_block = LLVMAppendBasicBlockInContext(data.context, func, label("forend").as_ptr());
+
+            LLVMBuildBr(data.builder, before_block);
+            LLVMPositionBuilderAtEnd(data.builder, before_block);
+            let cond_value = compile_node(data, func, unwind, scope.clone(), cond);
+            let cond_zero = LLVMConstInt(LLVMTypeOf(cond_value), 0, 0);
+            let is_nonzero = LLVMBuildICmp(data.builder, llvm::LLVMIntPredicate::LLVMIntNE, cond_value, cond_zero, label("is_nonzero").as_ptr());
+            LLVMBuildCondBr(data.builder, is_nonzero, body_block, after_block);
+
+            LLVMPositionBuilderAtEnd(data.builder, body_block);
+            let body_value = compile_node(data, func, unwind, lscope.clone(), body);
+            LLVMBuildBr(data.builder, before_block);
+
+            LLVMPositionBuilderAtEnd(data.builder, after_block);
+            //let phi = LLVMBuildPhi(data.builder, LLVMInt64TypeInContext(data.context), label("forend").as_ptr());
+
+            //let mut values = vec![texpr_value, fexpr_value];
+            //let mut blocks = vec![texpr_block, fexpr_block];
+
+            //LLVMAddIncoming(phi, values.as_mut_ptr(), blocks.as_mut_ptr(), 2);
+            //phi
+            body_value
         },
 
         AST::List(ref items) => {
@@ -475,7 +525,14 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
             value
         },
 
-        AST::Import(_) => { ptr::null_mut() },  //// Nothing to do
+        AST::Import(ref name, _) => {
+            let module_init_name = format!("init.{}", name);
+            if LLVMGetNamedFunction(data.module, label(module_init_name.as_str()).as_ptr()).is_null() {
+                declare_function(data.module, scope.clone(), module_init_name.as_str(), &mut [], bool_type(data), false);
+            }
+            compile_node(data, func, None, scope.clone(), &AST::Invoke(Box::new(AST::Identifier(String::from(module_init_name))), vec!(), Some(Type::Function(vec!(), Box::new(Type::Object(String::from("Bool")))))));
+            ptr::null_mut()
+        },
 
         AST::Type(_, _) => panic!("NotImplementedError: not yet supported, {:?}", node),
 
@@ -486,10 +543,6 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
         },
     }
 }
-
-//unsafe fn compile_assignable(data: &LLVM, scope: ScopeRef<Value, TypeValue>, items: &AST) -> LLVMValueRef {
-
-//}
 
 unsafe fn build_function_body(data: &LLVM, node: &AST) {
     if let AST::Function(ref name, ref args, ref rtype, ref body, ref id) = *node {
@@ -615,44 +668,13 @@ unsafe fn collect_functions_node<'a>(data: &mut LLVM<'a>, scope: ScopeRef<Value,
                 }
             }
 
-            let mut types = vec!();
-            for &(_, ref ttype) in &structdef {
-                types.push(get_type(data, tscope.clone(), ttype.clone(), true))
-            }
-            let lltype = LLVMStructCreateNamed(data.context, label(name).as_ptr());
-            LLVMStructSetBody(lltype, types.as_mut_ptr(), types.len() as u32, false as i32);
-            scope.borrow_mut().set_type_value(name, TypeValue { structdef: structdef, value: lltype });
+            let lltype = build_class_type(data, scope.clone(), name, structdef);
 
 
             // TODO you need to add the 'new' function definition here, but the value should be stored in cscope, not tscope...
             let classdef = scope.borrow().get_class_def(name).unwrap();
             classdef.borrow_mut().assign(&String::from("new"), build_constructor(data, format!("{}_new", name).as_str(), lltype));
-            /*
-            for node in body {
-                match *node {
-                    AST::Definition((ref name, ref ttype), ref expr) => {
-                        if let Some(function) = collect_functions_node(data, tscope.clone(), expr) {
-                            classdef.borrow_mut().assign(name, function);
-                        }
-                    },
-                    AST::Function(ref name, _, _, _, _) => {
-                        if let Some(ref name) = *name {
-                            if let Some(function) = collect_functions_node(data, tscope.clone(), node) {
-                                classdef.borrow_mut().assign(name, function);
-                            }
-                        }
-                    },
-                    _ => { collect_functions_node(data, tscope.clone(), node); },
-                }
-            }
-            */
-
             collect_functions_vec(data, tscope.clone(), body);
-            //for (name, sym) in &tscope.borrow().names {
-            //    if let Some(value) = sym.value {
-            //        classdef.borrow_mut().assign(name, value);
-            //    }
-            //}
         },
 
         AST::Index(ref left, ref right) => {
@@ -672,17 +694,65 @@ unsafe fn collect_functions_node<'a>(data: &mut LLVM<'a>, scope: ScopeRef<Value,
             collect_functions_node(data, scope.clone(), right);
         },
 
-        AST::Import(_) => {
-            // TODO what do you do here?  you need to declare imported functions, but that requires the index, which has already been loaded and discarded by this point
+        AST::Import(_, ref decls) => {
+            for decl in decls {
+                collect_functions_decl(data, scope.clone(), decl);
+            }
         },
 
         AST::Type(_, _) => panic!("NotImplementedError: not yet supported, {:?}", node),
 
         AST::Identifier(_) |
-        AST::Noop | AST::Underscore | AST::Nil |
+        AST::Noop | AST::Underscore | AST::Nil(_) |
         AST::Boolean(_) | AST::Integer(_) | AST::Real(_) | AST::String(_) => { }
     };
     None
+}
+
+unsafe fn collect_functions_decl(data: &mut LLVM, scope: ScopeRef<Value, TypeValue>, decl: &Decl) {
+    match *decl {
+        Decl::Symbol(ref name, ref ttype) => {
+            let fname = scope.borrow().get_full_name(&Some(name.clone()), UniqueID(0));
+            println!("*****DECLARING: {:?}", fname);
+            let function = LLVMAddFunction(data.module, label(fname.as_str()).as_ptr(), get_type(data, scope.clone(), ttype.clone(), false));
+            scope.borrow_mut().assign(name, function);
+        },
+        Decl::Class(ref name, ref parent, ref decls) => {
+            let mut structdef = if let Some(ref name) = *parent {
+                scope.borrow().get_type_value(name).unwrap().structdef
+            } else {
+                vec!()
+            };
+            for ref decl in decls {
+                match **decl {
+                    Decl::Symbol(ref name, ref ttype) => {
+                        match *ttype {
+                            Type::Function(_, _) => { },
+                            _ => structdef.push((name.clone(), ttype.clone())),
+                        }
+                    },
+                    _ => { }
+                }
+            }
+            let lltype = build_class_type(data, scope.clone(), name, structdef);
+
+            let classdef = scope.borrow().get_class_def(name).unwrap();
+            for decl in decls {
+                collect_functions_decl(data, classdef.clone(), decl);
+            }
+        }
+    }
+}
+
+unsafe fn build_class_type(data: &mut LLVM, scope: ScopeRef<Value, TypeValue>, name: &String, structdef: Vec<(String, Type)>) -> LLVMTypeRef {
+    let mut types = vec!();
+    for &(_, ref ttype) in &structdef {
+        types.push(get_type(data, scope.clone(), ttype.clone(), true))
+    }
+    let lltype = LLVMStructCreateNamed(data.context, label(name).as_ptr());
+    LLVMStructSetBody(lltype, types.as_mut_ptr(), types.len() as u32, false as i32);
+    scope.borrow_mut().set_type_value(name, TypeValue { structdef: structdef, value: lltype });
+    lltype
 }
 
 

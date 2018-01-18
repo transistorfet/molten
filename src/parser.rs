@@ -3,13 +3,13 @@
 extern crate nom;
 use nom::{ digit, hex_digit, oct_digit, line_ending, not_line_ending, space, multispace, is_alphanumeric, is_alphabetic, is_space, IResult };
 
-extern crate std;
+use std;
 use std::f64;
 use std::str;
 use std::str::FromStr;
 
 use types::Type;
-use utils::{ UniqueID };
+use utils::UniqueID;
 
 
 pub fn parse_or_error(name: &str, text: &[u8]) -> Vec<AST> {
@@ -25,7 +25,7 @@ pub fn parse_index_or_error(name: &str, text: &[u8]) -> Vec<Decl> {
     match parse_index(text) {
         IResult::Done(rem, _) if rem != [] => panic!("InternalError: unparsed input remaining: {:?}", rem),
         IResult::Done(rem, decls) => decls,
-        res @ IResult::Error(_) => { println!("OETNUHU: {:?}", res); print_error(name, text, nom::prepare_errors(text, res).unwrap()); panic!(""); },
+        res @ IResult::Error(_) => { print_error(name, text, nom::prepare_errors(text, res).unwrap()); panic!(""); },
         res @ _ => panic!("UnknownError: the parser returned an unknown result; {:?}", res),
     }
 }
@@ -58,7 +58,7 @@ macro_rules! wscom {
 }
 
 #[macro_export]
-macro_rules! wscomp {
+macro_rules! wscoml {
     ($i:expr, $submac:ident!( $($args:tt)* )) => ({
         use parser::multispace_comment;
         //terminated!($i, $submac!($($args)*), multispace_comment)
@@ -99,12 +99,12 @@ pub enum AST {
     Noop,
     //Comment(String),
 
-    Nil,
     Underscore,
     Boolean(bool),
     Integer(isize),
     Real(f64),
     String(String),
+    Nil(Option<Type>),
     List(Vec<AST>),
 
     Identifier(String),
@@ -126,7 +126,7 @@ pub enum AST {
     Function(Option<String>, Vec<(String, Option<Type>, Option<AST>)>, Option<Type>, Box<AST>, UniqueID),
     Class(String, Option<String>, Vec<AST>, UniqueID),
 
-    Import(String),
+    Import(String, Vec<Decl>),
     Definition((String, Option<Type>), Box<AST>),
     Assignment(Box<AST>, Box<AST>),
     While(Box<AST>, Box<AST>),
@@ -165,7 +165,7 @@ named!(import<AST>,
     do_parse!(
         wscom!(tag_word!("import")) >>
         e: map_str!(recognize!(separated_list!(tag!("."), identifier))) >>
-        (AST::Import(e))
+        (AST::Import(e, vec!()))
     )
 );
 
@@ -649,7 +649,7 @@ named!(literal<AST>,
 );
 
 named!(nil<AST>,
-    value!(AST::Nil, tag_word!("nil"))
+    value!(AST::Nil(None), tag_word!("nil"))
 );
 
 named!(boolean<AST>,
@@ -821,7 +821,7 @@ pub fn print_error_info(name: &str, text: &[u8], err: (nom::ErrorKind, usize, us
         }
     }
 
-    println!("{}:{}:{}: ParseError: {:?} near {:?}", name, lines, err.1 - start, err.0, String::from(str::from_utf8(&text[start .. end]).unwrap()));
+    println!("{}:{}:{}: ParseError: error with \"{:?}\" near {:?}", name, lines, err.1 - start, err.0, String::from(str::from_utf8(&text[start .. end]).unwrap()));
 }
 
 

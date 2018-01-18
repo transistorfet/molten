@@ -115,19 +115,13 @@
             strnum(1.0)
         }
 
-
+	puts("thing" + "stuff")
+        puts("FUCK".push(" shit"))
         puts(strnum(12))
         puts(strnum(1.214))
 
-        /*
-        fn stringcat(s1: String, s2: String) -> String {
-            let s1len = strlen(s1)
-            let s2len = strlen(s2)
-            let buffer: String = malloc(s1len + s2len)
-            sprintf(buffer, "%s%s", s1, s2)
-            buffer
-        }
-        */
+        // TODO this causes a stack overflow during resolve_type()
+        //let buffer = malloc(30)
 
         //try str(123) with
         //    _ => a * 16

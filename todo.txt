@@ -1,25 +1,23 @@
 
-* could make new element for method invoke: AST::InvokeMethod(name, args, ...)
-* could add an object to invoke: AST::Invoke(object, fexpr, args, ...)
-* could use a special element for indirection: AST::FirstArg;  AST::Invoke(AST::Accessor(AST::FirstArg, "foo"), vec!(object, arg1, arg2, ...), ...)
-* could change AST::Accessor into AST::Resolver during typecheck, but this would have be done after type checking... because the type might be a variable until then
 
-
+* strings don't interpolate escape characters...
 * change the debug prints to overwrite Debug formatting for scopes
 * fix scope resolution to also work on objects, so that you can have static methods...
 * fix constructors, perhaps by making all methods called new() allocate before the method is called?
 * make typed functions for all math operations, with the inlinealways attribute, if you decide to make operators methods
 
+* add generation of functions with typevars, as if overloaded...
 
-* refactor heavily
+
 * add error returns instead of panics
 * add operator overloading; issue with type system as a result of making operators methods
-* add module initialization functions and sort out issue with duplicate main() functions
+* sort out issue with duplicate main() functions
 * implement lists in compiled code
 * add or expand string support
 * implement exceptions
 * implement garbage collection
 * get llvm closures working
+* implement type definition ast element (enum type?)
 
 
 
@@ -29,6 +27,9 @@
 * what if you generalize overloaded types, such that they're checked in check_type, and options are eliminated, or resolved to one type over the course of checking
 * if you were to support the generation of functions with more than one type/variable types, you'd need to collect all invokation types for each function during collect
 * if you had a tuple type, you could use a typevar to represent a tuple of the arguments to a function: Type::Function(Type::Variable(..), Type::Variable(..)) or 'a -> 'b where 'a = ('c, 'd, 'e)
+* if you define a class in a deeper scope than its previous definition, it will mask it; which applies to fundamental types as well.  This is actually helpful atm for making libcore, but
+  it might not be desirable.  Perhaps you could use a keyword like 'override' to silence an error or warning when masking
+* if you added decls as AST elements, then you could possibly declare external functions in localized scopes so they aren't accessible to other code
 
 
 
@@ -44,7 +45,6 @@
 TYPE CHECKING:
 
 * remove unused typechecking vars somehow...
-* implement type definition ast element
 
 
 PARSER:
