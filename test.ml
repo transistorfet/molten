@@ -115,7 +115,7 @@
             strnum(1.0)
         }
 
-	puts("thing" + "stuff")
+	puts("thing" + "stuff\n")
         puts("FUCK".push(" shit"))
         puts(strnum(12))
         puts(strnum(1.214))

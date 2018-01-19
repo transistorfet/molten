@@ -1,12 +1,12 @@
 
+* fix constructors, perhaps by making all methods called new() allocate before the method is called?
 
-* strings don't interpolate escape characters...
 * change the debug prints to overwrite Debug formatting for scopes
 * fix scope resolution to also work on objects, so that you can have static methods...
-* fix constructors, perhaps by making all methods called new() allocate before the method is called?
 * make typed functions for all math operations, with the inlinealways attribute, if you decide to make operators methods
 
 * add generation of functions with typevars, as if overloaded...
+* you kind of need a macro/compile-time function to call a list generic function and cast the element to a void pointer, to be stored in the list...
 
 
 * add error returns instead of panics
@@ -59,5 +59,4 @@ FEATURES:
 
 * add dicts syntax
 * add macros and expandable forms (like lisp)
-* what about type functions to build/cast to specific C/LLVM types, like i32, i8, etc
 

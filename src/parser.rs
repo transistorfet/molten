@@ -145,14 +145,14 @@ named!(pub parse<Vec<AST>>,
 named!(statement<AST>,
     //separated_list!(ws!(tag!(",")), do_parse!(
     do_parse!(
-        s: wscom!(alt!(
+        s: wscom!(alt_complete!(
             import |
             definition |
             assignment |
             whileloop |
             typedef |
-            // TODO should class be here too?
             expression
+            // TODO should class be here too?
             //value!(AST::Noop, multispace_comment)
         )) >>
         //eat_separator!("\n") >>
@@ -312,9 +312,9 @@ named!(function<AST>,
     do_parse!(
         wscom!(tag_word!("fn")) >>
         //n: opt!(identifier) >>
-        l: alt!(
+        l: alt_complete!(
             do_parse!(
-                n: opt!(alt!(identifier | any_op)) >>
+                n: opt!(alt_complete!(identifier | any_op)) >>
                 //n: opt!(identifier) >>
                 l: delimited!(tag!("("), identifier_list_defaults, tag!(")")) >>
                 ((n, l))
@@ -322,7 +322,7 @@ named!(function<AST>,
             map!(identifier_list_defaults, |l| (None, l))
         ) >>
         r: opt!(preceded!(wscom!(tag!("->")), type_description)) >>
-        e: alt!(block | preceded!(wscom!(tag!("=>")), expression)) >>
+        e: alt_complete!(block | preceded!(wscom!(tag!("=>")), expression)) >>
         (AST::Function(l.0, l.1, r, Box::new(e), UniqueID::generate()))
     )
 );
@@ -514,7 +514,7 @@ named!(prefix<AST>,
 named!(subatomic_operation<AST>,
     do_parse!(
         left: subatomic >>
-        operations: many0!(alt!(
+        operations: many0!(alt_complete!(
             map!(delimited!(tag!("["), expression, tag!("]")), |e| SubOP::Index(e)) |
             map!(delimited!(tag!("("), expression_list, tag!(")")), |e| SubOP::Invoke(e)) |
             map!(preceded!(tag!("."), identifier), |s| SubOP::Accessor(s)) |
@@ -591,7 +591,7 @@ pub fn parse_type(s: &str) -> Option<Type> {
 }
 
 named!(type_description<Type>,
-    alt!(
+    alt_complete!(
         type_function |
         type_list |
         type_variable |
@@ -663,10 +663,18 @@ named!(string<AST>,
     map!(
         delimited!(
             tag!("\""),
-            is_not!("\""),
+            escaped_transform!(is_not!("\"\\"), '\\',
+                alt!(
+                    tag!("\\") => { |_| &b"\\"[..] } |
+                    tag!("\"") => { |_| &b"\""[..] } |
+                    tag!("n")  => { |_| &b"\n"[..] } |
+                    tag!("r")  => { |_| &b"\r"[..] } |
+                    tag!("t")  => { |_| &b"\t"[..] }
+                )
+            ),
             tag!("\"")
         ),
-        |s| AST::String(String::from(str::from_utf8(s).unwrap()))
+        |s| AST::String(String::from_utf8_lossy(&s).into_owned())
     )
 );
 
@@ -843,7 +851,7 @@ named!(pub parse_index<Vec<Decl>>,
 
 named!(declarations<Decl>,
     do_parse!(
-        s: wscom!(alt!(
+        s: wscom!(alt_complete!(
             symbol_decl |
             class_decl
         )) >>
@@ -861,7 +869,7 @@ named!(symbol_decl<Decl>,
         wscom!(tag_word!("decl")) >>
         n: symbol_name >>
         wscom!(tag!(":")) >>
-        t: alt!(type_overload | type_description) >>
+        t: alt_complete!(type_overload | type_description) >>
         (Decl::Symbol(n, t))
     )
 );

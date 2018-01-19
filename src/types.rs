@@ -9,6 +9,7 @@ use scope::{ Scope, ScopeRef, ScopeMapRef, mangle_name };
 pub enum Type {
     Object(String),
     Variable(String),
+    //Generic(String, Vec<Type>),
     List(Box<Type>),
     Function(Vec<Type>, Box<Type>),
     Overload(Vec<Type>),
