@@ -421,6 +421,7 @@ pub fn check_type<V, T>(scope: ScopeRef<V, T>, ottype: Option<Type>, obtype: Opt
 
 fn is_subclass_of<V, T>(scope: ScopeRef<V, T>, aname: (&String, &Vec<Type>), bname: (&String, &Vec<Type>), update: bool) -> bool where V: Clone, T: Clone {
     let mut aname = (aname.0.clone(), aname.1.clone());
+    //let mut aclass = scope.borrow().get_class_def(&aname.0).unwrap();
     loop {
         if *bname.0 == aname.0 {
             if bname.1.len() == aname.1.len() {
@@ -443,6 +444,14 @@ fn is_subclass_of<V, T>(scope: ScopeRef<V, T>, aname: (&String, &Vec<Type>), bna
             Some((name, types)) => aname = (name, types),
             None => return false,
         }
+        /*
+        let parent = aclass.borrow().get_parent();
+        match parent {
+            Some(newclass) => aclass = newclass,
+            None => return false,
+        }
+        aname = (aclass.borrow().get_basename(), aname.1);
+        */
     }
 }
 

@@ -1,4 +1,9 @@
 
+* resolve the inheritence thing...???
+* there is an issue with strings, such that the libcore class overrides the builtin class... one way is to have libcore string inherit, with a special provision to search for the class in the parent
+  scope if the name matches the definition... or somehow implement it all in libcore, perhaps with a builtin function for indexing
+
+
 * fix constructors, perhaps by making all methods called new() allocate before the method is called?
 
 * add a const expression

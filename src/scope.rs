@@ -71,10 +71,6 @@ impl<V, T> Scope<V, T> where V: Clone, T: Clone {
         Rc::new(RefCell::new(Scope::new(parent)))
     }
 
-    pub fn set_basename(&mut self, name: String) {
-        self.basename = name;
-    }
-
     pub fn is_global(&self) -> bool {
         self.context == Context::Global
     }
@@ -326,6 +322,7 @@ impl<V, T> Scope<V, T> where V: Clone, T: Clone {
         self.search_type(name, |info| info.parent.clone())
     }
 
+    /*
     pub fn get_parent_class_def(&self, name: &String) -> Option<ScopeRef<V, T>> {
         self.search_type(name, |info| {
             match info.parent {
@@ -334,6 +331,7 @@ impl<V, T> Scope<V, T> where V: Clone, T: Clone {
             }
         })
     }
+    */
 
     pub fn get_self_class_def(&self) -> Option<ScopeRef<V, T>> {
         self.search_type(&self.basename, |info| info.classdef.clone())
@@ -422,6 +420,10 @@ impl<V, T> Scope<V, T> where V: Clone, T: Clone {
 
 
     ///// Name Functions /////
+
+    pub fn set_basename(&mut self, name: String) {
+        self.basename = name;
+    }
 
     pub fn get_full_name(&self, name: &Option<String>, id: UniqueID) -> String {
         let mut base = self.get_basename();

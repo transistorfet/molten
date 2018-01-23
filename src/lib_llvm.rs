@@ -1,6 +1,9 @@
 
 use std::ptr;
 use std::fmt::Debug;
+use std::collections::HashMap;
+use std::collections::hash_map::Entry;
+
 
 extern crate llvm_sys as llvm;
 use self::llvm::prelude::*;
@@ -13,7 +16,7 @@ use scope::{ Scope, ScopeRef, ScopeMapRef, check_for_typevars, mangle_name, unma
 use compiler_llvm::*;
 
 
-pub type RuntimeFunction = unsafe fn(&LLVM, LLVMTypeRef) -> LLVMValueRef;
+pub type RuntimeFunction = unsafe fn(&LLVM, &str, LLVMTypeRef) -> LLVMValueRef;
 pub type ComptimeFunction = unsafe fn(&LLVM, Vec<LLVMValueRef>) -> LLVMValueRef;
 
 #[derive(Clone)]
@@ -31,36 +34,171 @@ pub enum Builtin<'a> {
     Class(&'a str, Vec<(String, Type)>, Vec<Builtin<'a>>),
 }
 
-impl<'a> Builtin<'a> {
-    pub unsafe fn compile_builtin(data: &LLVM, func: LLVMValueRef, scope: ScopeRef<Value, TypeValue>, name: &String, largs: &Vec<LLVMValueRef>, stype: Type) -> Option<LLVMValueRef> {
+#[derive(Clone)]
+pub struct BuiltinMap<'a> (HashMap<&'a str, Vec<(ComptimeFunction, Type)>>);
+
+impl<'a> BuiltinMap<'a> {
+    pub fn new() -> BuiltinMap<'a> {
+        BuiltinMap(HashMap::new())
+    }
+
+    pub fn add(&mut self, name: &'a str, func: ComptimeFunction, ftype: Type) {
+        match self.0.entry(name) {
+            Entry::Vacant(entry) => { entry.insert(vec!((func, ftype))); },
+            Entry::Occupied(mut entry) => { entry.get_mut().push((func, ftype)); },
+        }
+    }
+
+    pub unsafe fn compile_builtin(data: &LLVM, scope: ScopeRef<Value, TypeValue>, name: &String, largs: &Vec<LLVMValueRef>, stype: Type) -> Option<LLVMValueRef> {
         let name = if let Some(uname) = unmangle_name(name) {
             uname
         } else {
             name.clone()
         };
 
-        for entry in data.builtins {
-            if let Builtin::Func(ref fname, ref types, ref func) = *entry {
-                if *fname == name.as_str() {
-                    if let Func::Comptime(fptr) = *func {
-                        match check_type(scope.clone(), parse_type(types), Some(stype.clone()), false) {
-                            Ok(_) => return Some(fptr(data, largs.clone())),
-                            Err(_) => { },
-                        }
-                    }
+        match data.builtins.0.get(name.as_str()) {
+            Some(ref list) => {
+                for ref entry in list.iter() {
+                    match check_type(scope.clone(), Some(entry.1.clone()), Some(stype.clone()), false) {
+                        Ok(_) => return Some(entry.0(data, largs.clone())),
+                        Err(_) => { },
+                    };
                 }
-            }
+                None
+            },
+            None => None,
         }
-        None
     }
 }
+
+pub fn make_global<'a, V, T>(builtins: &Vec<Builtin<'a>>) -> ScopeMapRef<V, T> where V: Clone + Debug, T: Clone + Debug {
+    let map = ScopeMapRef::new();
+    let primatives = map.add(ScopeMapRef::<V, T>::PRIMATIVE, None);
+
+    register_builtins_vec(primatives.clone(), primatives.clone(), builtins);
+
+    let global = map.add(ScopeMapRef::<V, T>::GLOBAL, Some(primatives));
+    global.borrow_mut().set_global(true);
+
+    return map;
+}
+ 
+pub fn register_builtins_vec<'a, V, T>(scope: ScopeRef<V, T>, tscope: ScopeRef<V, T>, entries: &Vec<Builtin<'a>>) where V: Clone + Debug, T: Clone + Debug {
+    for node in entries {
+        register_builtins_node(scope.clone(), tscope.clone(), node);
+    }
+}
+
+pub fn register_builtins_node<'a, V, T>(scope: ScopeRef<V, T>, tscope: ScopeRef<V, T>, node: &Builtin<'a>) where V: Clone + Debug, T: Clone + Debug {
+    match *node {
+        Builtin::Type(ref name, ref ttype) => scope.borrow_mut().define_type(String::from(*name), ttype.clone()),
+        Builtin::Func(ref name, ref ftype, _) => {
+            let ftype = parse_type(ftype);
+            //check_for_typevars(tscope.clone(), &ftype);
+            Scope::define_func_variant(scope.clone(), String::from(*name), tscope.clone(), ftype.clone().unwrap());
+        },
+        Builtin::Class(ref name, _, ref entries) => {
+            let name = String::from(*name);
+            let classdef = Scope::new_ref(None);
+            classdef.borrow_mut().set_basename(name.clone());
+            scope.borrow_mut().set_class_def(&name, None, classdef.clone());
+
+            let tscope = Scope::new_ref(Some(scope.clone()));
+            register_builtins_vec(classdef.clone(), tscope.clone(), entries);
+        },
+    }
+}
+
+pub unsafe fn initialize_builtins<'a>(data: &mut LLVM<'a>, scope: ScopeRef<Value, TypeValue>, entries: &Vec<Builtin<'a>>) {
+    let pscope = scope.borrow().get_parent().unwrap().clone();
+    declare_builtins_vec(data, ptr::null_mut(), pscope.clone(), scope.clone(), entries);
+    declare_irregular_functions(data, pscope.clone());
+}
+
+pub unsafe fn declare_builtins_vec<'a>(data: &mut LLVM<'a>, objtype: LLVMTypeRef, scope: ScopeRef<Value, TypeValue>, tscope: ScopeRef<Value, TypeValue>, entries: &Vec<Builtin<'a>>) {
+    for node in entries {
+        declare_builtins_node(data, objtype, scope.clone(), tscope.clone(), node);
+    }
+}
+
+pub unsafe fn declare_builtins_node<'a>(data: &mut LLVM<'a>, objtype: LLVMTypeRef, scope: ScopeRef<Value, TypeValue>, tscope: ScopeRef<Value, TypeValue>, node: &Builtin<'a>) {
+    match *node {
+        Builtin::Type(ref name, ref ttype) => { },
+        Builtin::Func(ref sname, ref types, ref func) => {
+            let mut name = String::from(*sname);
+            let ftype = parse_type(types).unwrap();
+            match *func {
+                Func::External => {
+                    let func = LLVMAddFunction(data.module, label(name.as_str()), get_type(data, scope.clone(), ftype, false));
+                    if scope.borrow().find(&name).is_some() {
+                        scope.borrow_mut().assign(&name, func);
+                    }
+                },
+                Func::Runtime(func) => {
+                    if scope.borrow().get_variable_type(&name).unwrap().is_overloaded() {
+                        name = mangle_name(&name, ftype.get_argtypes());
+                    }
+                    let fname = scope.borrow().get_full_name(&Some(name.clone()), UniqueID(0));
+                    scope.borrow_mut().assign(&name, func(data, fname.as_str(), objtype));
+                },
+                Func::Comptime(func) => {
+                    data.builtins.add(sname, func, ftype);
+                },
+                _ => { },
+            }
+        },
+        Builtin::Class(ref name, ref structdef, ref entries) => {
+            let name = String::from(*name);
+            let classdef = scope.borrow().get_class_def(&name).unwrap();
+
+            //let tscope = Scope::new_ref(Some(scope.clone()));
+            let lltype = if structdef.len() > 0 {
+                build_class_type(data, scope.clone(), &name, structdef.clone())
+            } else {
+                let lltype = get_type(data, scope.clone(), scope.borrow().find_type(&name).unwrap(), true);
+                scope.borrow_mut().set_type_value(&name, TypeValue { structdef: structdef.clone(), value: lltype });
+                lltype
+            };
+
+            declare_builtins_vec(data, lltype, classdef.clone(), tscope.clone(), entries);
+        },
+    }
+}
+
+
+pub unsafe fn declare_function(module: LLVMModuleRef, scope: ScopeRef<Value, TypeValue>, name: &str, args: &mut [LLVMTypeRef], ret_type: LLVMTypeRef, vargs: bool) {
+    let ftype = LLVMFunctionType(ret_type, args.as_mut_ptr(), args.len() as u32, vargs as i32);
+    let func = LLVMAddFunction(module, label(name), ftype);
+    let name = &String::from(name);
+    if scope.borrow().find(name).is_some() {
+        scope.borrow_mut().assign(name, func);
+    }
+}
+
+unsafe fn declare_irregular_functions(data: &LLVM, scope: ScopeRef<Value, TypeValue>) {
+    let bytestr_type = LLVMPointerType(LLVMInt8Type(), 0);
+    //let cint_type = LLVMInt32TypeInContext(data.context);
+    let cint_type = int_type(data);
+
+    //declare_function(data.module, scope.clone(), "malloc", &mut [cint_type], bytestr_type, false);
+    //declare_function(data.module, scope.clone(), "realloc", &mut [bytestr_type, cint_type], bytestr_type, false);
+    //declare_function(data.module, scope.clone(), "free", &mut [bytestr_type], LLVMVoidType(), false);
+
+    //declare_function(data.module, scope.clone(), "strlen", &mut [bytestr_type], cint_type, false);
+    //declare_function(data.module, scope.clone(), "memcpy", &mut [bytestr_type, bytestr_type, cint_type], bytestr_type, false);
+
+    //declare_function(data.module, scope.clone(), "puts", &mut [bytestr_type], cint_type, false);
+    declare_function(data.module, scope.clone(), "sprintf", &mut [bytestr_type, bytestr_type], cint_type, true);
+
+}
+
 
 pub fn get_builtins<'a>() -> Vec<Builtin<'a>> {
     vec!(
         Builtin::Func("malloc",     "(Int) -> 'a",          Func::External),
         Builtin::Func("realloc",    "('a, Int) -> 'a",      Func::External),
         Builtin::Func("free",       "('a) -> Nil",          Func::External),
-        //Builtin::Func("memcpy",     "('a, 'a, Int) -> 'a",  Func::External),
+        Builtin::Func("memcpy",     "('a, 'a, Int) -> 'a",  Func::External),
         Builtin::Func("puts",       "(String) -> Int",      Func::External),
         Builtin::Func("strlen",     "(String) -> Int",      Func::External),
         Builtin::Func("sprintf",    "'a",                   Func::Undefined),
@@ -81,6 +219,7 @@ pub fn get_builtins<'a>() -> Vec<Builtin<'a>> {
 
         Builtin::Class("String", vec!(), vec!(
             //Builtin::Func("push", "(String, String) -> String", Func::Comptime(add_int)),
+            Builtin::Func("[]",   "(String, Int) -> Int",       Func::Runtime(build_string_get)),
         )),
 
         Builtin::Class("List", vec!(
@@ -163,155 +302,73 @@ fn gte_real(data: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLV
 fn not_real(data: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildNot(data.builder, args[0], label("tmp")) } }
 
 
-pub fn make_global<'a, V, T>(builtins: &Vec<Builtin<'a>>) -> ScopeMapRef<V, T> where V: Clone + Debug, T: Clone + Debug {
-    let map = ScopeMapRef::new();
-    let primatives = map.add(ScopeMapRef::<V, T>::PRIMATIVE, None);
+unsafe fn build_list_constructor(data: &LLVM, name: &str, objtype: LLVMTypeRef) -> LLVMValueRef {
+    let function = build_function_start(data, name, vec!(), objtype);
+    LLVMSetLinkage(function, llvm::LLVMLinkage::LLVMLinkOnceAnyLinkage);
 
-    register_builtins_vec(primatives.clone(), primatives.clone(), builtins);
-
-/*
-    primatives.borrow_mut().define_type(String::from("Nil"), Type::Object(String::from("Nil"), vec!()));
-    primatives.borrow_mut().define_type(String::from("Int"), Type::Object(String::from("Int"), vec!()));
-    primatives.borrow_mut().define_type(String::from("Real"), Type::Object(String::from("Real"), vec!()));
-    primatives.borrow_mut().define_type(String::from("String"), Type::Object(String::from("String"), vec!()));
-    primatives.borrow_mut().define_type(String::from("Bool"), Type::Object(String::from("Bool"), vec!()));
-    primatives.borrow_mut().define_type(String::from("Class"), Type::Object(String::from("Class"), vec!()));
-    primatives.borrow_mut().define_type(String::from("List"), Type::Object(String::from("List"), vec!(Type::Variable(String::from("item")))));
-
-    //register_string_type(primatives.clone(), String::from("String"));
-    register_list_type(primatives.clone(), String::from("List"));
-
-    let intdef = Scope::new_ref(None);
-    intdef.borrow_mut().set_basename(String::from("Int"));
-    let bintype = parse_type("(Int, Int) -> Int");
-    let booltype = parse_type("(Int, Int) -> Bool");
-    intdef.borrow_mut().define(String::from("*"), bintype.clone());
-    //intdef.borrow_mut().define_assign(String::from("*"), bintype.clone(), Value::Builtin(mul));
-    intdef.borrow_mut().define(String::from("+"), bintype.clone());
-    intdef.borrow_mut().define(String::from("add"), bintype.clone());
-    intdef.borrow_mut().define(String::from("-"), bintype.clone());
-    intdef.borrow_mut().define(String::from("<"), booltype.clone());
-    intdef.borrow_mut().define(String::from(">"), booltype.clone());
-    intdef.borrow_mut().define(String::from("/"), bintype.clone());
-    intdef.borrow_mut().define(String::from("=="), booltype.clone());
-    primatives.borrow_mut().set_class_def(&String::from("Int"), None, intdef);
-
-
-    let bintype = parse_type("('a, 'a) -> 'a");
-    let booltype = parse_type("('a, 'a) -> Bool");
-    primatives.borrow_mut().define(String::from("*"), bintype.clone());
-    primatives.borrow_mut().define(String::from("/"), bintype.clone());
-    primatives.borrow_mut().define(String::from("^"), bintype.clone());
-    primatives.borrow_mut().define(String::from("%"), bintype.clone());
-
-    //primatives.borrow_mut().define(String::from("+"), bintype.clone());
-    //primatives.borrow_mut().define(String::from("+"), Some(Type::Overload(vec!(parse_type("(Real, Real) -> Real").unwrap(), parse_type("(Int, Int) -> Int").unwrap()))));
-    Scope::define_func_variant(primatives.clone(), String::from("+"), primatives.clone(), parse_type("(Int, Int) -> Int").unwrap());
-    Scope::define_func_variant(primatives.clone(), String::from("+"), primatives.clone(), parse_type("(Real, Real) -> Real").unwrap());
-
-    primatives.borrow_mut().define(String::from("-"), bintype.clone());
-    primatives.borrow_mut().define(String::from("<<"), bintype.clone());
-    primatives.borrow_mut().define(String::from(">>"), bintype.clone());
-    primatives.borrow_mut().define(String::from("<"), booltype.clone());
-    primatives.borrow_mut().define(String::from(">"), booltype.clone());
-    primatives.borrow_mut().define(String::from("<="), booltype.clone());
-    primatives.borrow_mut().define(String::from(">="), booltype.clone());
-    primatives.borrow_mut().define(String::from("=="), booltype.clone());
-    primatives.borrow_mut().define(String::from("!="), booltype.clone());
-    primatives.borrow_mut().define(String::from("&"), bintype.clone());
-    primatives.borrow_mut().define(String::from("|"), bintype.clone());
-    primatives.borrow_mut().define(String::from("and"), booltype.clone());
-    primatives.borrow_mut().define(String::from("or"), booltype.clone());
-    primatives.borrow_mut().define(String::from("~"), parse_type("('a) -> 'a"));
-    primatives.borrow_mut().define(String::from("not"), parse_type("('a) -> Bool"));
-
-    primatives.borrow_mut().define(String::from("puts"), parse_type("(String) -> Int"));
-    primatives.borrow_mut().define(String::from("malloc"), parse_type("(Int) -> 'a"));
-    primatives.borrow_mut().define(String::from("realloc"), parse_type("('a, Int) -> 'a"));
-    primatives.borrow_mut().define(String::from("free"), parse_type("('a) -> Nil"));
-    primatives.borrow_mut().define(String::from("sprintf"), parse_type("'a"));
-
-    //primatives.borrow_mut().define(String::from("str"), parse_type("(Int) -> String"));
-    primatives.borrow_mut().define(String::from("strlen"), parse_type("(String) -> Int"));
-*/
-
-    let global = map.add(ScopeMapRef::<V, T>::GLOBAL, Some(primatives));
-    global.borrow_mut().set_global(true);
-
-    return map;
-}
- 
-pub fn register_builtins_vec<'a, V, T>(scope: ScopeRef<V, T>, tscope: ScopeRef<V, T>, entries: &Vec<Builtin<'a>>) where V: Clone + Debug, T: Clone + Debug {
-    for node in entries {
-        register_builtins_node(scope.clone(), tscope.clone(), node);
-    }
+    let raw_ptr = build_malloc(data, LLVMSizeOf(LLVMGetElementType(objtype)));
+    let ptr = LLVMBuildPointerCast(data.builder, raw_ptr, objtype, label("ptr"));
+    LLVMBuildRet(data.builder, ptr);
+    function
 }
 
-pub fn register_builtins_node<'a, V, T>(scope: ScopeRef<V, T>, tscope: ScopeRef<V, T>, node: &Builtin<'a>) where V: Clone + Debug, T: Clone + Debug {
-    match *node {
-        Builtin::Type(ref name, ref ttype) => scope.borrow_mut().define_type(String::from(*name), ttype.clone()),
-        Builtin::Func(ref name, ref types, _) => {
-            let types = parse_type(types);
-            //check_for_typevars(tscope.clone(), &types);
-            Scope::define_func_variant(scope.clone(), String::from(*name), tscope.clone(), types.clone().unwrap());
-        },
-        Builtin::Class(ref name, _, ref entries) => {
-            let name = String::from(*name);
-            let classdef = Scope::new_ref(None);
-            classdef.borrow_mut().set_basename(name.clone());
-            scope.borrow_mut().set_class_def(&name, None, classdef.clone());
+unsafe fn build_list_push(data: &LLVM, name: &str, objtype: LLVMTypeRef) -> LLVMValueRef {
+    let function = build_function_start(data, name, vec!(objtype, str_type(data)), int_type(data));
+    LLVMSetLinkage(function, llvm::LLVMLinkage::LLVMLinkOnceAnyLinkage);
 
-            let tscope = Scope::new_ref(Some(scope.clone()));
-            register_builtins_vec(classdef.clone(), tscope.clone(), entries);
-        },
-    }
+    //let raw_ptr = build_malloc(data, LLVMSizeOf(LLVMGetElementType(objtype)));
+    //let ptr = LLVMBuildPointerCast(data.builder, raw_ptr, objtype, label("ptr"));
+    LLVMBuildRet(data.builder, int_value(data, 0));
+    function
 }
 
-pub unsafe fn initialize_builtins(data: &LLVM, scope: ScopeRef<Value, TypeValue>) {
-    let pscope = scope.borrow().get_parent().unwrap().clone();
-    declare_builtins_vec(data, ptr::null_mut(), pscope.clone(), scope.clone(), data.builtins);
-    declare_irregular_functions(data, pscope.clone());
+unsafe fn build_list_get(data: &LLVM, name: &str, objtype: LLVMTypeRef) -> LLVMValueRef {
+    let function = build_function_start(data, name, vec!(objtype, int_type(data)), str_type(data));
+    LLVMSetLinkage(function, llvm::LLVMLinkage::LLVMLinkOnceAnyLinkage);
+
+    //let mut indices = vec!(int_value(data, 0), int_value(data, 0));
+    //let pointer = LLVMBuildGEP(data.builder, object, indices.as_mut_ptr(), indices.len() as u32, label("tmp"));
+    //let value = LLVMBuildLoad(data.builder, pointer, label("tmp"));
+    //let pointer = LLVMBuildAlloca(data.builder, str_type(data), label("buffer"));
+    
+    LLVMBuildRet(data.builder, null_value(str_type(data)));
+    function
 }
 
-pub unsafe fn declare_builtins_vec<'a>(data: &LLVM, objtype: LLVMTypeRef, scope: ScopeRef<Value, TypeValue>, tscope: ScopeRef<Value, TypeValue>, entries: &Vec<Builtin<'a>>) {
-    for node in entries {
-        declare_builtins_node(data, objtype, scope.clone(), tscope.clone(), node);
-    }
+unsafe fn build_string_get(data: &LLVM, name: &str, objtype: LLVMTypeRef) -> LLVMValueRef {
+    let function = build_function_start(data, name, vec!(objtype, int_type(data)), int_type(data));
+    LLVMSetLinkage(function, llvm::LLVMLinkage::LLVMLinkOnceAnyLinkage);
+
+    let string = LLVMGetParam(function, 0);
+    let mut indices = vec!(LLVMGetParam(function, 1));
+    let pointer = LLVMBuildGEP(data.builder, string, indices.as_mut_ptr(), indices.len() as u32, label("tmp"));
+    let value = LLVMBuildLoad(data.builder, pointer, label("tmp"));
+    let value = LLVMBuildCast(data.builder, llvm::LLVMOpcode::LLVMZExt, value, int_type(data), label("tmp"));
+    
+    LLVMBuildRet(data.builder, value);
+    function
 }
 
-pub unsafe fn declare_builtins_node<'a>(data: &LLVM, objtype: LLVMTypeRef, scope: ScopeRef<Value, TypeValue>, tscope: ScopeRef<Value, TypeValue>, node: &Builtin<'a>) {
-    match *node {
-        Builtin::Type(ref name, ref ttype) => { },
-        Builtin::Func(ref name, ref types, ref func) => {
-            let mut name = String::from(*name);
-            match *func {
-                Func::External => {
-                    let func = LLVMAddFunction(data.module, label(name.as_str()), get_type(data, scope.clone(), parse_type(types).unwrap(), false));
-                    if scope.borrow().find(&name).is_some() {
-                        scope.borrow_mut().assign(&name, func);
-                    }
-                },
-                Func::Runtime(func) => {
-                    if scope.borrow().get_variable_type(&name).unwrap().is_overloaded() {
-                        name = mangle_name(&name, parse_type(types).unwrap().get_argtypes());
-                    }
-                    scope.borrow_mut().assign(&name, func(data, objtype));
-                },
-                _ => { },
-            }
-        },
-        Builtin::Class(ref name, ref structdef, ref entries) => {
-            let name = String::from(*name);
-            let classdef = scope.borrow().get_class_def(&name).unwrap();
-
-            //let tscope = Scope::new_ref(Some(scope.clone()));
-            let lltype = build_class_type(data, scope.clone(), &name, structdef.clone());
-            scope.borrow_mut().set_type_value(&name, TypeValue { structdef: structdef.clone(), value: lltype });
-
-            declare_builtins_vec(data, lltype, classdef.clone(), tscope.clone(), entries);
-        },
-    }
+unsafe fn build_lib_add(data: &LLVM, name: &str, objtype: LLVMTypeRef) -> LLVMValueRef {
+    let dtype = int_type(data);
+    let mut atypes = vec!(dtype, dtype);
+    let function = LLVMAddFunction(data.module, label("builtin.add"), LLVMFunctionType(dtype, atypes.as_mut_ptr(), atypes.len() as u32, false as i32));
+    LLVMSetLinkage(function, llvm::LLVMLinkage::LLVMLinkOnceAnyLinkage);
+    //LLVMAddAttributeAtIndex(function, 0, "inlinealways"
+    LLVMPositionBuilderAtEnd(data.builder, LLVMAppendBasicBlockInContext(data.context, function, label("entry")));
+    let value = LLVMBuildAdd(data.builder, LLVMGetParam(function, 0), LLVMGetParam(function, 1), label("tmp"));
+    LLVMBuildRet(data.builder, value);
+    function
 }
+
+
+
+//    let mut types = vec!(cint_type, bool_type(data));
+//    let rtype = LLVMStructTypeInContext(data.context, types.as_mut_ptr(), types.len() as u32, false as i32);
+
+//    declare_function(data.module, pscope.clone(), "llvm.sadd.with.overflow.i64", &mut [cint_type, cint_type], rtype, false);
+
+
 
 
 
@@ -526,46 +583,11 @@ unsafe fn initialize_type_list(data: &mut LLVM, scope: ScopeRef<Value, TypeValue
 }
 */
 
-unsafe fn build_list_constructor(data: &LLVM, objtype: LLVMTypeRef) -> LLVMValueRef {
-    let ptr_type = LLVMPointerType(objtype, 0);
-    let function = build_function_start(data, "List_new", vec!(), ptr_type);
-    LLVMSetLinkage(function, llvm::LLVMLinkage::LLVMLinkOnceAnyLinkage);
 
-    let raw_ptr = build_malloc(data, LLVMSizeOf(objtype));
-    let ptr = LLVMBuildPointerCast(data.builder, raw_ptr, ptr_type, label("ptr"));
-    LLVMBuildRet(data.builder, ptr);
-    function
-}
-
-unsafe fn build_list_push(data: &LLVM, objtype: LLVMTypeRef) -> LLVMValueRef {
-    let ptr_type = LLVMPointerType(objtype, 0);
-    let function = build_function_start(data, "List_push", vec!((String::from("list"), ptr_type), (String::from("item"), str_type(data))), int_type(data));
-    LLVMSetLinkage(function, llvm::LLVMLinkage::LLVMLinkOnceAnyLinkage);
-
-    //let raw_ptr = build_malloc(data, LLVMSizeOf(objtype));
-    //let ptr = LLVMBuildPointerCast(data.builder, raw_ptr, ptr_type, label("ptr"));
-    LLVMBuildRet(data.builder, int_value(data, 0));
-    function
-}
-
-unsafe fn build_list_get(data: &LLVM, objtype: LLVMTypeRef) -> LLVMValueRef {
-    let ptr_type = LLVMPointerType(objtype, 0);
-    let function = build_function_start(data, "List_get", vec!((String::from("list"), ptr_type), (String::from("index"), int_type(data))), str_type(data));
-    LLVMSetLinkage(function, llvm::LLVMLinkage::LLVMLinkOnceAnyLinkage);
-
-    //let mut indices = vec!(int_value(data, 0), int_value(data, 0));
-    //let pointer = LLVMBuildGEP(data.builder, object, indices.as_mut_ptr(), indices.len() as u32, label("tmp"));
-    //let value = LLVMBuildLoad(data.builder, pointer, label("tmp"));
-    //let pointer = LLVMBuildAlloca(data.builder, str_type(data), label("buffer"));
-    
-    LLVMBuildRet(data.builder, null_value(str_type(data)));
-    function
-}
 
 /*
 unsafe fn build_lib_str(data: &LLVM) {
-    let args = vec!((String::from("num"), int_type(data)));
-    let function = build_function_start(data, "str", args, str_type(data));
+    let function = build_function_start(data, "str", vec!(int_type(data)), str_type(data));
     LLVMSetLinkage(function, llvm::LLVMLinkage::LLVMLinkOnceAnyLinkage);
 
     let pointer = LLVMBuildAlloca(data.builder, str_type(data), label("buffer"));
@@ -579,8 +601,7 @@ unsafe fn build_lib_str(data: &LLVM) {
 }
 
 unsafe fn build_lib_strcat(data: &LLVM) {
-    let args = vec!((String::from("str1"), str_type(data)), (String::from("str2"), str_type(data)));
-    let function = build_function_start(data, "strcat", args, str_type(data));
+    let function = build_function_start(data, "strcat", vec!(str_type(data), str_type(data)), str_type(data));
     LLVMSetLinkage(function, llvm::LLVMLinkage::LLVMLinkOnceAnyLinkage);
 
     let str1 = LLVMGetParam(function, 0);
@@ -597,48 +618,5 @@ unsafe fn build_lib_strcat(data: &LLVM) {
     LLVMBuildRet(data.builder, buffer);
 }
 */
-
-unsafe fn build_lib_add(data: &LLVM, objtype: LLVMTypeRef) -> LLVMValueRef {
-    let dtype = int_type(data);
-    let mut atypes = vec!(dtype, dtype);
-    let function = LLVMAddFunction(data.module, label("builtin.add"), LLVMFunctionType(dtype, atypes.as_mut_ptr(), atypes.len() as u32, false as i32));
-    LLVMSetLinkage(function, llvm::LLVMLinkage::LLVMLinkOnceAnyLinkage);
-    //LLVMAddAttributeAtIndex(function, 0, "inlinealways"
-    LLVMPositionBuilderAtEnd(data.builder, LLVMAppendBasicBlockInContext(data.context, function, label("entry")));
-    let value = LLVMBuildAdd(data.builder, LLVMGetParam(function, 0), LLVMGetParam(function, 1), label("tmp"));
-    LLVMBuildRet(data.builder, value);
-    function
-}
-
-//    let mut types = vec!(cint_type, bool_type(data));
-//    let rtype = LLVMStructTypeInContext(data.context, types.as_mut_ptr(), types.len() as u32, false as i32);
-
-//    declare_function(data.module, pscope.clone(), "llvm.sadd.with.overflow.i64", &mut [cint_type, cint_type], rtype, false);
-
-unsafe fn declare_irregular_functions(data: &LLVM, scope: ScopeRef<Value, TypeValue>) {
-    let bytestr_type = LLVMPointerType(LLVMInt8Type(), 0);
-    //let cint_type = LLVMInt32TypeInContext(data.context);
-    let cint_type = int_type(data);
-
-    //declare_function(data.module, scope.clone(), "malloc", &mut [cint_type], bytestr_type, false);
-    //declare_function(data.module, scope.clone(), "realloc", &mut [bytestr_type, cint_type], bytestr_type, false);
-    //declare_function(data.module, scope.clone(), "free", &mut [bytestr_type], LLVMVoidType(), false);
-
-    //declare_function(data.module, scope.clone(), "strlen", &mut [bytestr_type], cint_type, false);
-    //declare_function(data.module, scope.clone(), "memcpy", &mut [bytestr_type, bytestr_type, cint_type], bytestr_type, false);
-
-    //declare_function(data.module, scope.clone(), "puts", &mut [bytestr_type], cint_type, false);
-    declare_function(data.module, scope.clone(), "sprintf", &mut [bytestr_type, bytestr_type], cint_type, true);
-
-}
-
-pub unsafe fn declare_function(module: LLVMModuleRef, scope: ScopeRef<Value, TypeValue>, name: &str, args: &mut [LLVMTypeRef], ret_type: LLVMTypeRef, vargs: bool) {
-    let ftype = LLVMFunctionType(ret_type, args.as_mut_ptr(), args.len() as u32, vargs as i32);
-    let func = LLVMAddFunction(module, label(name), ftype);
-    let name = &String::from(name);
-    if scope.borrow().find(name).is_some() {
-        scope.borrow_mut().assign(name, func);
-    }
-}
 
 
