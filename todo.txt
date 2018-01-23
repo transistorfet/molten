@@ -1,9 +1,19 @@
 
 * fix constructors, perhaps by making all methods called new() allocate before the method is called?
 
+* add a const expression
+* remove instances of List()
+* should you make interpreter harder to activate?  Should no -c do a compile/link/run step instead of interpret?
+* should you add a char type?
+
+* for setitem/getitem, you need to know whether this is assigning to the result, or recalling from the result, so you don't know which to check for.  It shouldn't
+  be required to overload both set and get in order to satisfy a requirement... I suppose another way to do this would be using a trait/interface/protocol/whatever for "Indexable"
+  instead of just checking for the method, which is more duck typing i think... not that I have anything against that, but it's a more dynamically typed sort of thing
+
 * change the debug prints to overwrite Debug formatting for scopes
 * fix scope resolution to also work on objects, so that you can have static methods...
 * make typed functions for all math operations, with the inlinealways attribute, if you decide to make operators methods
+* there is a problem with some type inference, fn x => x() + 1; it might be fixed if the type of x can be resolved(), but that doesn't happen currently.  In some places it makes more trouble
 
 * add generation of functions with typevars, as if overloaded...
 * you kind of need a macro/compile-time function to call a list generic function and cast the element to a void pointer, to be stored in the list...
@@ -21,6 +31,7 @@
 
 
 
+* if you added decls as AST elements, then you could possibly declare external functions in localized scopes so they aren't accessible to other code
 * is it even possible to add a special "constrained" type, which has &AST that must type check correctly in order to match (checks done in check_type)
 * if you make ops methods, then everything has to be type annotated, with the type system as it is; you'd need constrained types, or multiple paths, or bidirectional or something
 * you might need to integrate type restrictions which have to get resolved later; like 'a where 'a is object with add(Int) method; not sure how you could be so specific without complexity
@@ -29,7 +40,6 @@
 * if you had a tuple type, you could use a typevar to represent a tuple of the arguments to a function: Type::Function(Type::Variable(..), Type::Variable(..)) or 'a -> 'b where 'a = ('c, 'd, 'e)
 * if you define a class in a deeper scope than its previous definition, it will mask it; which applies to fundamental types as well.  This is actually helpful atm for making libcore, but
   it might not be desirable.  Perhaps you could use a keyword like 'override' to silence an error or warning when masking
-* if you added decls as AST elements, then you could possibly declare external functions in localized scopes so they aren't accessible to other code
 
 
 

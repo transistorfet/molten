@@ -29,9 +29,10 @@
         //let fac2 = fn x, y, z => if not x then 1 else x - -123
         testy(3)
 
-	let test2 = fn x => x()
-	let test3 = fn x => x() + 1
-        puts(str(test3(fn => 3)))
+        // TODO this once again causes a segfault; the typevar of x is not resolved correctly, I think; it only panicks instead of segfault when creating llvm type if typevars are not silently turned into ints
+	//let test2 = fn x => x()
+	//let test3 = fn x => x() + 1
+        //puts(str(test3(fn => 3)))
 
         let recfoo = fn x => begin  //comment
             if x < 1 then           //comment
@@ -41,7 +42,7 @@
         end                         //comment
         puts(str(recfoo(5)))
 
-        let stuff = class Stuff {
+        class Stuff {
             let foo = fn self, a => {
                 a * 4
             }
@@ -125,6 +126,20 @@
 
         //try str(123) with
         //    _ => a * 16
+
+        let list: List['thing] = [ 1, 2, 3 ]
+        puts(str(list[1]))
+        //list[1] = 5
+        //puts(str("Thing"[2]))
+        let list2 = [ TestClass::new(), Stuff::new(), TestClass::new() ]
+
+        //if a > 1 then
+        //    puts("It's more than 1!")
+
+        class NumList['a] extends List[Int] {
+            let x: 'a = nil
+
+        }
 
 
         /*

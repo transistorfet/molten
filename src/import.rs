@@ -36,9 +36,9 @@ fn load_index_node<V, T>(scope: ScopeRef<V, T>, node: &Decl) where V: Clone, T: 
                 scope.borrow_mut().update_variable_type(name, stype);
             }
         },
-        Decl::Class(ref name, ref parent, ref body) => {
+        Decl::Class((ref name, ref types), ref parent, ref body) => {
             // TODO how will you import classes?  I guess it's just functions that get imported, but don't you still need the structdef too, to access members?
-            let classdef = scope.borrow_mut().create_class_def(name, parent);
+            let classdef = scope.borrow_mut().create_class_def(name, parent.clone());
             load_index_vec(classdef.clone(), body);
         }
     }
@@ -73,9 +73,9 @@ fn build_index_node<V, T>(index: &mut String, scope: ScopeRef<V, T>, node: &AST)
             _ => { },
         },
 
-        AST::Class(ref name, ref parent, ref body, ref id) => {
+        AST::Class((ref name, ref types), ref parent, ref body, ref id) => {
             let classdef = scope.borrow().get_class_def(name).unwrap();
-            index.push_str(format!("class {} {{\n", if parent.is_some() { format!("{} extends {}", name, parent.as_ref().unwrap()) } else { name.clone() }).as_str());
+            index.push_str(format!("class {} {{\n", if parent.is_some() { format!("{} extends {}", name, unparse_type(Type::make_object(parent.clone().unwrap()))) } else { name.clone() }).as_str());
             for node in body {
                 match *node {
                     AST::Definition((ref name, ref ttype), _) => {
@@ -100,7 +100,10 @@ fn build_index_node<V, T>(index: &mut String, scope: ScopeRef<V, T>, node: &AST)
 
 pub fn unparse_type(ttype: Type) -> String {
     match ttype {
-        Type::Object(name) => name.clone(),
+        Type::Object(name, types) => {
+            let params = if types.len() > 0 { format!("[{}]", types.iter().map(|p| unparse_type(p.clone())).collect::<Vec<String>>().join(", ")) } else { String::from("") };
+            name.clone() + &params
+        },
         Type::Variable(name) => format!("'{}", name),
         Type::List(stype) => format!("List[{}]", unparse_type(*stype)),
         Type::Function(args, ret) => {

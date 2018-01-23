@@ -13,7 +13,7 @@ extern crate nom;
 mod parser;
 use parser::AST;
 
-//mod validator;
+mod refinery;
 
 mod scope;
 use scope::ScopeMapRef;
@@ -39,12 +39,18 @@ fn main() {
             .arg(Arg::with_name("compile")
                 .short("c")
                 .help("Compiles to C rather than executing"))
+            //.arg(Arg::with_name("interpret")
+            //    .short("i")
+            //    .help("Directly interprets the code rather than compiling"))
+            .arg(Arg::with_name("library")
+                .short("l")
+                .help("Compiles as a library, without a main function"))
             .get_matches();
 
     let filename = matches.value_of("INPUT").unwrap();
     match matches.occurrences_of("compile") {
         0 => with_file(filename, |name, text| execute_string(name, text)),
-        1 => with_file(filename, |name, text| compile_string(name, text)),
+        1 => with_file(filename, |name, text| compile_string(name, text, matches.occurrences_of("library") > 0)),
         _ => println!("Invalid argument: -c"),
     }
 }
@@ -66,17 +72,18 @@ fn execute_string(name: &str, text: &[u8]) {
     println!("{:?}", fin);
 }
 
-fn compile_string(name: &str, text: &[u8]) {
-    let map = lib_llvm::make_global();
+fn compile_string(name: &str, text: &[u8], is_library: bool) {
+    let builtins = lib_llvm::get_builtins();
+    let map = lib_llvm::make_global(&builtins);
     let mut code = process_input(map.clone(), name, text);
 
-    compiler_llvm::compile(map.clone(), name, &mut code);
+    compiler_llvm::compile(&builtins, map.clone(), name, &mut code, is_library);
 }
 
 
 fn process_input<V, T>(map: ScopeMapRef<V, T>, name: &str, text: &[u8]) -> Vec<AST> where V: Clone + Debug, T: Clone + Debug {
     let mut code = parser::parse_or_error(name, text);
-    //validator::validate(&mut code);
+    code = refinery::refine(code);
     traverse(&code);
     //import::load_index(map.get_global(), "libcore.idx");
     scope::bind_names(map.clone(), &mut code);

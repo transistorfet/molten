@@ -108,7 +108,7 @@ pub enum AST {
     List(Vec<AST>),
 
     Identifier(String),
-    Index(Box<AST>, Box<AST>),
+    Index(Box<AST>, Box<AST>, Option<Type>),
     Resolver(Box<AST>, String),
     Accessor(Box<AST>, String, Option<Type>),
     Invoke(Box<AST>, Vec<AST>, Option<Type>),
@@ -124,7 +124,7 @@ pub enum AST {
     Match(Box<AST>, Vec<(AST, AST)>),
     For(String, Box<AST>, Box<AST>, UniqueID),
     Function(Option<String>, Vec<(String, Option<Type>, Option<AST>)>, Option<Type>, Box<AST>, UniqueID),
-    Class(String, Option<String>, Vec<AST>, UniqueID),
+    Class((String, Vec<Type>), Option<(String, Vec<Type>)>, Vec<AST>, UniqueID),
 
     Import(String, Vec<Decl>),
     Definition((String, Option<Type>), Box<AST>),
@@ -150,6 +150,7 @@ named!(statement<AST>,
             definition |
             assignment |
             whileloop |
+            class |
             typedef |
             expression
             // TODO should class be here too?
@@ -198,6 +199,18 @@ named!(whileloop<AST>,
     )
 );
 
+named!(class<AST>,
+    do_parse!(
+        wscom!(tag_word!("class")) >>
+        i: class_identifier >>
+        p: opt!(preceded!(wscom!(tag_word!("extends")), class_identifier)) >>
+        wscom!(tag!("{")) >>
+        s: many0!(statement) >>
+        wscom!(tag!("}")) >>
+        (AST::Class(i, p, s, UniqueID::generate()))
+    )
+);
+
 named!(typedef<AST>,
     do_parse!(
         wscom!(tag_word!("type")) >>
@@ -223,7 +236,6 @@ named!(expression<AST>,
         matchcase |
         forloop |
         function |
-        class |
         infix
     )
 );
@@ -249,9 +261,11 @@ named!(ifexpr<AST>,
         c: expression >>
         wscom!(tag_word!("then")) >>
         t: expression >>
-        wscom!(tag_word!("else")) >>
-        f: expression >>
-        (AST::If(Box::new(c), Box::new(t), Box::new(f)))
+        f: opt!(preceded!(
+            wscom!(tag_word!("else")),
+            expression
+        )) >>
+        (AST::If(Box::new(c), Box::new(t), Box::new(if f.is_some() { f.unwrap() } else { AST::Noop })))
     )
 );
 
@@ -351,19 +365,6 @@ named!(identifier_list_defaults<Vec<(String, Option<Type>, Option<AST>)>>,
     )
 );
 
-named!(class<AST>,
-    do_parse!(
-        wscom!(tag_word!("class")) >>
-        i: identifier >>
-        p: opt!(preceded!(wscom!(tag_word!("extends")),
-            identifier)) >>
-        wscom!(tag!("{")) >>
-        s: many0!(statement) >>
-        wscom!(tag!("}")) >>
-        (AST::Class(i, p, s, UniqueID::generate()))
-    )
-);
-
 
 named!(infix_op<String>,
     map_str!(
@@ -376,10 +377,10 @@ named!(infix_op<String>,
             tag!("-") |
             tag!("<<") |
             tag!(">>") |
-            tag!("<") |
-            tag!(">") |
             tag!("<=") |
             tag!(">=") |
+            tag!("<") |
+            tag!(">") |
             tag!("==") |
             tag!("!=") |
             tag!("&") |
@@ -536,7 +537,7 @@ impl AST {
         let mut ret = left;
         for op in operations {
             match op {
-                SubOP::Index(e) => ret = AST::Index(Box::new(ret), Box::new(e)),
+                SubOP::Index(e) => ret = AST::Index(Box::new(ret), Box::new(e), None),
                 SubOP::Invoke(e) => ret = AST::Invoke(Box::new(ret), e, None),
                 SubOP::Accessor(name) => ret = AST::Accessor(Box::new(ret), name.clone(), None),
                 SubOP::Resolver(name) => ret = AST::Resolver(Box::new(ret), name.clone()),
@@ -571,6 +572,14 @@ named!(identifier<String>,
     )
 );
 
+named!(class_identifier<(String, Vec<Type>)>,
+    do_parse!(
+        i: identifier >>
+        p: opt!(complete!(delimited!(tag!("["), separated_list!(wscom!(tag!(",")), type_description), tag!("]")))) >>
+        ((i, p.unwrap_or(vec!())))
+    )
+);
+
 named!(identifier_typed<(String, Option<Type>)>,
     wscom!(do_parse!(
         i: identifier >>
@@ -593,14 +602,17 @@ pub fn parse_type(s: &str) -> Option<Type> {
 named!(type_description<Type>,
     alt_complete!(
         type_function |
-        type_list |
+        //type_list |
         type_variable |
-        type_concrete
+        type_object
     )
 );
 
-named!(type_concrete<Type>,
-    map!(identifier, |s| Type::Object(s))
+named!(type_object<Type>,
+    do_parse!(
+        c: class_identifier >>
+        (Type::Object(c.0, c.1))
+    )
 );
 
 named!(type_variable<Type>,
@@ -838,7 +850,7 @@ pub fn print_error_info(name: &str, text: &[u8], err: (nom::ErrorKind, usize, us
 #[derive(Clone, Debug, PartialEq)]
 pub enum Decl {
     Symbol(String, Type),
-    Class(String, Option<String>, Vec<Decl>),
+    Class((String, Vec<Type>), Option<(String, Vec<Type>)>, Vec<Decl>),
 }
 
 named!(pub parse_index<Vec<Decl>>,
@@ -877,8 +889,8 @@ named!(symbol_decl<Decl>,
 named!(class_decl<Decl>,
     do_parse!(
         wscom!(tag_word!("class")) >>
-        i: identifier >>
-        p: opt!(preceded!(wscom!(tag_word!("extends")), identifier)) >>
+        i: class_identifier >>
+        p: opt!(preceded!(wscom!(tag_word!("extends")), class_identifier)) >>
         wscom!(tag!("{")) >>
         s: many0!(symbol_decl) >>
         wscom!(tag!("}")) >>

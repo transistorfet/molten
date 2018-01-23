@@ -237,7 +237,7 @@ impl Interpreter {
 
             },
 
-            AST::Index(ref base, ref index) => {
+            AST::Index(ref base, ref index, ref stype) => {
 
             },
 
@@ -264,12 +264,12 @@ pub fn make_global<V, T>() -> ScopeMapRef<V, T> where V: Clone, T: Clone {
     let map = ScopeMapRef::new();
     let primatives = map.add(UniqueID(0), None);
 
-    primatives.borrow_mut().define_type(String::from("Nil"), Type::Object(String::from("Nil")));
-    primatives.borrow_mut().define_type(String::from("Int"), Type::Object(String::from("Int")));
-    primatives.borrow_mut().define_type(String::from("Real"), Type::Object(String::from("Real")));
-    primatives.borrow_mut().define_type(String::from("String"), Type::Object(String::from("String")));
-    primatives.borrow_mut().define_type(String::from("Bool"), Type::Object(String::from("Bool")));
-    primatives.borrow_mut().define_type(String::from("Class"), Type::Object(String::from("Class")));
+    primatives.borrow_mut().define_type(String::from("Nil"), Type::Object(String::from("Nil"), vec!()));
+    primatives.borrow_mut().define_type(String::from("Int"), Type::Object(String::from("Int"), vec!()));
+    primatives.borrow_mut().define_type(String::from("Real"), Type::Object(String::from("Real"), vec!()));
+    primatives.borrow_mut().define_type(String::from("String"), Type::Object(String::from("String"), vec!()));
+    primatives.borrow_mut().define_type(String::from("Bool"), Type::Object(String::from("Bool"), vec!()));
+    primatives.borrow_mut().define_type(String::from("Class"), Type::Object(String::from("Class"), vec!()));
 
     let bintype = parse_type("('a, 'a) -> 'a");
     let booltype = parse_type("('a, 'a) -> Bool");
