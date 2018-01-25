@@ -1,7 +1,6 @@
 
 use std::ptr;
 use std::fmt;
-use std::fs::File;
 use std::io::prelude::*;
 use std::ffi::CString;
 
@@ -11,7 +10,7 @@ use self::llvm::core::*;
 
 use import;
 use parser::{ AST, Decl };
-use scope::{ Scope, ScopeRef, ScopeMapRef, mangle_name };
+use scope::{ Scope, ScopeRef, ScopeMapRef };
 use types::{ Type, resolve_type };
 use utils::UniqueID;
 use lib_llvm::{ Builtin, BuiltinMap, initialize_builtins };
@@ -155,6 +154,7 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
                 let mut larg = compile_node(data, func, unwind, scope.clone(), arg);
                 let ltype = get_type(data, scope.clone(), ttype.clone(), true);
                 if ltype != LLVMTypeOf(larg) {
+                    // TODO this seems to cast to int as well as pointers, so maybe it's doing too much, at least without checking that it's supposed to
                     larg = LLVMBuildPointerCast(data.builder, larg, ltype, label("ptr"));
                 }
                 largs.push(larg);
@@ -189,7 +189,7 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
             }
         },
 
-        AST::Function(ref name, ref args, ref rtype, ref body, ref id) => {
+        AST::Function(ref name, _, _, _, ref id) => {
             let fname = scope.borrow().get_full_name(name, id.clone());
             LLVMGetNamedFunction(data.module, label(fname.as_str()))
         },
@@ -475,12 +475,10 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
             if let Type::Function(_, _) = sym.ttype.unwrap() {
                 sym.value.unwrap()
             } else {
-                let cint_type = i32_type(data);
-
                 //let structdef = scope.borrow().get_struct_def(&name).unwrap();
                 let structdef = scope.borrow().get_type_value(&name).unwrap().structdef;
                 let index = structdef.iter().position(|ref r| r.0 == *right).unwrap();
-                let mut indices = vec!(LLVMConstInt(cint_type, 0, 0), LLVMConstInt(cint_type, index as u64, 0));
+                let mut indices = vec!(i32_value(data, 0), i32_value(data, index));
                 let pointer = LLVMBuildGEP(data.builder, object, indices.as_mut_ptr(), indices.len() as u32, label("tmp"));
                 LLVMBuildLoad(data.builder, pointer, label("tmp"))
             }
@@ -738,6 +736,10 @@ pub unsafe fn null_value(ttype: LLVMTypeRef) -> LLVMValueRef {
 
 pub unsafe fn zero_int(data: &LLVM) -> LLVMValueRef {
     LLVMConstInt(int_type(data), 0, 0)
+}
+
+pub unsafe fn i32_value(data: &LLVM, num: usize) -> LLVMValueRef {
+    LLVMConstInt(i32_type(data), num as u64, 0)
 }
 
 pub unsafe fn int_value(data: &LLVM, num: usize) -> LLVMValueRef {

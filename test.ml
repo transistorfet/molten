@@ -42,6 +42,26 @@
         end                         //comment
         puts(str(recfoo(5)))
 
+        0123
+        0x234
+        Inf
+        //Info  // checks that Inf parses correctly
+        -Inf
+        NaN
+        true false
+
+        2 * (10 + -3) + 5
+        2 + 4 * 7 - 1 / 20  * 10 - 50 * 12
+        (2 * 3) + (4 - 5)
+        2 + 4 * 7 - 1 / 20  == 10 - 50 * 12
+
+        // NOTE this sorta causes a type error, as it should
+        //let ab = 123.24 * 3
+        // TODO implement ~ complement op
+        //123 + ~124 * 25
+        123 + (124 * 25)
+
+
         class Stuff {
             let foo = fn self, a => {
                 a * 4
@@ -91,6 +111,19 @@
             _ => a * 16
 	}
 
+        match x == true {
+            true => x
+            false => x == true
+            //false => !x   // TODO this causes a parse error
+            _ => false
+        }
+
+        match a {
+            1 => a
+            2 => a * 4
+            _ => a * 16
+        }
+
         puts(str(r))
 
         fn strnum(num: Int) -> String {
@@ -117,19 +150,19 @@
         }
 
 	puts("thing" + "stuff\n")
-        puts("FUCK".push(" shit"))
+        puts("STUFF".push(" things"))
         puts(strnum(12))
         puts(strnum(1.214))
 
-        // TODO this causes a stack overflow during resolve_type()
-        //let buffer = malloc(30)
+        let buffer = malloc(30)
 
         //try str(123) with
         //    _ => a * 16
 
         let list: List['thing] = [ 1, 2, 3 ]
-        puts(str(list[1]))
+        // TODO compiles but can't run because the integer isn't cast to varpointer
         //list[1] = 5
+        puts(str(list[1]))
         //puts(str("Thing"[2]))
         let list2 = [ TestClass::new(), Stuff::new(), TestClass::new() ]
 
@@ -141,8 +174,18 @@
 
         }
 
+        class A['it] extends List['it] {
+            let foo = 1.2
+        }
 
-        /*
+        class B['it, 'jt] extends A['jt] {
+            let bar: 'it = nil
+        }
+
+        let c: B[Real, Int] = B::new()
+        // TODO compiles but can't run because the real isn't cast to varpointer
+        //c.bar = 3.2
+
         class Thing {
             let foo = fn a => {
                 a * 4
@@ -160,95 +203,52 @@
         let thing = Thing::new()
         let get_thing = fn => thing
 
+        []
+        [1, 2, 3 * 10 + 3]
         [ 0, 1, 2, 3 ][0]
         let arr = [ 1, 2, 3, 4 ]
         arr[2]
         thing.arr[1]
         get_thing().arr[2]
-        thing.bar()[1]
-        (thing.bar())[1]
-        get_thing().bar()[1]
-        thing.foobar[2](123)
-        get_thing().foobar[2](123)
-        thing.baz(521)
-        get_thing().baz(985)
+
+        // TODO casting issues
+        //thing.baz(521)
+        //get_thing().baz(985)
+        //thing.bar()[1]
+        //(thing.bar())[1]
+        //get_thing().bar()[1]
+
+        // TODO causes segfault
+        //thing.foobar[2](123)
+        //get_thing().foobar[2](123)
+
         Thing::foo(a)
-        */
+
+
+        // TODO this probably shouldn't parse without a ; or \n
+        thing "things"
+
+
 
     /*
 
         while a > 0     //things
             recfoo(5)
-
-        class Thing {
-            fn thing => {
-                a * 4
-            }
-        }
-
-        Thing.thing()
-
+        while x
+            noop
 
         for x in [ 1, 2, 3 ]
             x * 100
 
-        match a with
-            1 => a
-            2 => a * 4
-            _ => a * 16
 
         try raise a with
             1 => a
             2 => a * 4
             _ => a * 16
 
-        [ 0, 1, 2, 3 ][0]
- 
 
         import thing.stuff
 
-        dothings
-
-        let a : int = 123.24
-
-
-        while x
-            noop
-        while x > 0     //things
-            stuff(5)
-
-        2 * (10 + -3) + 5
-        2 + 4 * 7 - 1 / 20  * 10 - 50 * 12
-        (2 * 3) + (4 - 5)
-        2 + 4 * 7 - 1 / 20  == 10 - 50 * 12
-
-        let a = 123.24 * 3
-        123 + ~124 * 25
-        123 + (124 * 25)
-
-        thing.stuff() * ~foo().bar
-
-        let recfoo = fn x => begin  //comment
-            if x < 1 then           //comment
-                1                   //comment
-            else                    //comment
-                x * recfoo(x - 1)   //comment
-        end                         //comment
-        recfoo(3)
-
-        let fac = fn x : int, y = 5 * 3, z: string = "hey" => if not x then 1 else x - -123
-
-        thing(5)
-        // TODO this probably shouldn't parse without a ; or \n
-        stuff "things"
-
-        0123
-        0x234
-        Inf
-        Info
-        -Inf
-        NaN
-        true false
         thing.stuff() * ~foo().bar
 
         let a = 123.24
@@ -266,17 +266,6 @@
             { things }
         }
 
-        match x == true with
-            1 => x
-            2 => x * 4
-            _ => x * 16
-
-        match a with
-            1 => a
-            2 => a * 4
-            _ => a * 16
-
-
         let a = 123.24 * 3
         123 + 124 * 25
         123 + (124 * 25)
@@ -292,8 +281,6 @@
         for x in list
             x * 100
 
-        []
-        [1, 2, 3 * 10 + 3]
 
         type newint = {
             things: int,

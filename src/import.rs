@@ -36,9 +36,9 @@ fn load_index_node<V, T>(scope: ScopeRef<V, T>, node: &Decl) where V: Clone, T: 
                 scope.borrow_mut().update_variable_type(name, stype);
             }
         },
-        Decl::Class((ref name, ref types), ref parent, ref body) => {
+        Decl::Class(ref pair, ref parent, ref body) => {
             // TODO how will you import classes?  I guess it's just functions that get imported, but don't you still need the structdef too, to access members?
-            let classdef = scope.borrow_mut().create_class_def(name, parent.clone());
+            let classdef = scope.borrow_mut().create_class_def(pair, parent.clone());
             load_index_vec(classdef.clone(), body);
         }
     }
@@ -61,7 +61,7 @@ pub fn build_index<V, T>(scope: ScopeRef<V, T>, code: &Vec<AST>) -> String where
 
 fn build_index_node<V, T>(index: &mut String, scope: ScopeRef<V, T>, node: &AST) where V: Clone, T: Clone {
     match *node {
-        AST::Function(ref name, ref args, ref rtype, ref body, ref id) => {
+        AST::Function(ref name, _, _, _, _) => {
             if let Some(ref name) = *name {
                 let ttype = scope.borrow().get_variable_type(name).unwrap();
                 index.push_str(format!("decl {} : {}\n", name, unparse_type(ttype)).as_str());
@@ -73,9 +73,16 @@ fn build_index_node<V, T>(index: &mut String, scope: ScopeRef<V, T>, node: &AST)
             _ => { },
         },
 
-        AST::Class((ref name, ref types), ref parent, ref body, ref id) => {
+        AST::Class((ref name, ref types), ref parent, ref body, _) => {
             let classdef = scope.borrow().get_class_def(name).unwrap();
-            index.push_str(format!("class {} {{\n", if parent.is_some() { format!("{} extends {}", name, unparse_type(Type::make_object(parent.clone().unwrap()))) } else { name.clone() }).as_str());
+            let namespec = unparse_type(Type::Object(name.clone(), types.clone()));
+            let fullspec = if parent.is_some() {
+                format!("{} extends {}", namespec, unparse_type(Type::make_object(parent.clone().unwrap())))
+            } else {
+                namespec.clone()
+            };
+
+            index.push_str(format!("class {} {{\n", fullspec).as_str());
             for node in body {
                 match *node {
                     AST::Definition((ref name, ref ttype), _) => {
@@ -105,7 +112,7 @@ pub fn unparse_type(ttype: Type) -> String {
             name.clone() + &params
         },
         Type::Variable(name) => format!("'{}", name),
-        Type::List(stype) => format!("List[{}]", unparse_type(*stype)),
+        //Type::List(stype) => format!("List[{}]", unparse_type(*stype)),
         Type::Function(args, ret) => {
             let argstr: Vec<String> = args.iter().map(|t| unparse_type(t.clone())).collect();
             format!("({}) -> {}", argstr.join(", "), unparse_type(*ret))

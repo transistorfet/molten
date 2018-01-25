@@ -100,8 +100,7 @@ pub fn execute(map: ScopeMapRef<Value, TypeValue>, code: &Vec<AST>) {
     let scope = map.get_global();
     let mut machine = Interpreter::new();
     builtins::assign_builtins(scope.borrow().get_parent().unwrap().clone());
-    let result = machine.execute_vec(map, scope, code);
-
+    machine.execute_vec(map, scope, code);
 }
 
 pub struct Interpreter {

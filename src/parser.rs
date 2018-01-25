@@ -15,7 +15,7 @@ use utils::UniqueID;
 pub fn parse_or_error(name: &str, text: &[u8]) -> Vec<AST> {
     match parse(text) {
         IResult::Done(rem, _) if rem != [] => panic!("InternalError: unparsed input remaining: {:?}", rem),
-        IResult::Done(rem, code) => code,
+        IResult::Done(_, code) => code,
         res @ IResult::Error(_) => { print_error(name, text, nom::prepare_errors(text, res).unwrap()); panic!(""); },
         res @ _ => panic!("UnknownError: the parser returned an unknown result; {:?}", res),
     }
@@ -24,7 +24,7 @@ pub fn parse_or_error(name: &str, text: &[u8]) -> Vec<AST> {
 pub fn parse_index_or_error(name: &str, text: &[u8]) -> Vec<Decl> {
     match parse_index(text) {
         IResult::Done(rem, _) if rem != [] => panic!("InternalError: unparsed input remaining: {:?}", rem),
-        IResult::Done(rem, decls) => decls,
+        IResult::Done(_, decls) => decls,
         res @ IResult::Error(_) => { print_error(name, text, nom::prepare_errors(text, res).unwrap()); panic!(""); },
         res @ _ => panic!("UnknownError: the parser returned an unknown result; {:?}", res),
     }
@@ -619,12 +619,12 @@ named!(type_variable<Type>,
     map!(preceded!(tag!("'"), identifier), |s| Type::Variable(s))
 );
 
-named!(type_list<Type>,
-    map!(
-        delimited!(tag!("List["), wscom!(type_description), tag!("]")),
-        |t| Type::List(Box::new(t))
-    )
-);
+//named!(type_list<Type>,
+//    map!(
+//        delimited!(tag!("List["), wscom!(type_description), tag!("]")),
+//        |t| Type::List(Box::new(t))
+//    )
+//);
 
 named!(type_function<Type>,
     wscom!(do_parse!(

@@ -79,7 +79,7 @@ pub fn refine_node(node: AST) -> AST {
             AST::Class(name, parent, refine_vec(body), id)
         },
 
-        AST::Index(base, index, stype) => {
+        AST::Index(base, index, _) => {
             //AST::Index(Box::new(refine_node(*base)), Box::new(refine_node(*index)), stype)
             refine_node(AST::Invoke(Box::new(AST::Accessor(base, String::from("[]"), None)), vec!(*index), None))
         },

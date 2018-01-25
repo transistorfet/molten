@@ -39,19 +39,21 @@ fn main() {
             .arg(Arg::with_name("compile")
                 .short("c")
                 .help("Compiles to C rather than executing"))
-            //.arg(Arg::with_name("interpret")
-            //    .short("i")
-            //    .help("Directly interprets the code rather than compiling"))
+            .arg(Arg::with_name("interpret")
+                .short("i")
+                .help("Directly interprets the code rather than compiling"))
             .arg(Arg::with_name("library")
                 .short("l")
                 .help("Compiles as a library, without a main function"))
             .get_matches();
 
     let filename = matches.value_of("INPUT").unwrap();
-    match matches.occurrences_of("compile") {
-        0 => with_file(filename, |name, text| execute_string(name, text)),
-        1 => with_file(filename, |name, text| compile_string(name, text, matches.occurrences_of("library") > 0)),
-        _ => println!("Invalid argument: -c"),
+    if matches.occurrences_of("compile") > 0 {
+        with_file(filename, |name, text| compile_string(name, text, matches.occurrences_of("library") > 0));
+    } else if matches.occurrences_of("interpret") > 0 {
+        with_file(filename, |name, text| execute_string(name, text));
+    } else {
+        println!("Use the -c flag to compile");
     }
 }
 

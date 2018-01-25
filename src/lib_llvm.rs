@@ -9,9 +9,9 @@ extern crate llvm_sys as llvm;
 use self::llvm::prelude::*;
 use self::llvm::core::*;
 
-use types::{ Type, check_type };
+use types::{ Type, check_type, Check };
 use utils::UniqueID;
-use parser::{ AST, parse_type };
+use parser::{ parse_type };
 use scope::{ Scope, ScopeRef, ScopeMapRef, check_for_typevars, mangle_name, unmangle_name };
 use compiler_llvm::*;
 
@@ -59,7 +59,7 @@ impl<'a> BuiltinMap<'a> {
         match data.builtins.0.get(name.as_str()) {
             Some(ref list) => {
                 for ref entry in list.iter() {
-                    match check_type(scope.clone(), Some(entry.1.clone()), Some(stype.clone()), false) {
+                    match check_type(scope.clone(), Some(entry.1.clone()), Some(stype.clone()), Check::Def, false) {
                         Ok(_) => return Some(entry.0(data, largs.clone())),
                         Err(_) => { },
                     };
@@ -94,7 +94,7 @@ pub fn register_builtins_node<'a, V, T>(scope: ScopeRef<V, T>, tscope: ScopeRef<
         Builtin::Type(ref name, ref ttype) => scope.borrow_mut().define_type(String::from(*name), ttype.clone()),
         Builtin::Func(ref name, ref ftype, _) => {
             let ftype = parse_type(ftype);
-            //check_for_typevars(tscope.clone(), &ftype);
+            check_for_typevars(tscope.clone(), &ftype);
             Scope::define_func_variant(scope.clone(), String::from(*name), tscope.clone(), ftype.clone().unwrap());
         },
         Builtin::Class(ref name, _, ref entries) => {
@@ -137,6 +137,7 @@ pub unsafe fn declare_builtins_node<'a>(data: &mut LLVM<'a>, objtype: LLVMTypeRe
                 Func::Runtime(func) => {
                     if scope.borrow().get_variable_type(&name).unwrap().is_overloaded() {
                         name = mangle_name(&name, ftype.get_argtypes());
+                        scope.borrow_mut().define(name.clone(), Some(ftype));
                     }
                     let fname = scope.borrow().get_full_name(&Some(name.clone()), UniqueID(0));
                     scope.borrow_mut().assign(&name, func(data, fname.as_str(), objtype));
@@ -199,7 +200,7 @@ pub fn get_builtins<'a>() -> Vec<Builtin<'a>> {
         Builtin::Func("realloc",    "('a, Int) -> 'a",      Func::External),
         Builtin::Func("free",       "('a) -> Nil",          Func::External),
         Builtin::Func("memcpy",     "('a, 'a, Int) -> 'a",  Func::External),
-        Builtin::Func("puts",       "(String) -> Int",      Func::External),
+        Builtin::Func("puts",       "(String) -> Nil",      Func::External),
         Builtin::Func("strlen",     "(String) -> Int",      Func::External),
         Builtin::Func("sprintf",    "'a",                   Func::Undefined),
 
@@ -223,14 +224,14 @@ pub fn get_builtins<'a>() -> Vec<Builtin<'a>> {
         )),
 
         Builtin::Class("List", vec!(
+            (String::from("items"), parse_type("'item").unwrap()),
             (String::from("size"), parse_type("Int").unwrap()),
             (String::from("capacity"), parse_type("Int").unwrap()),
-            (String::from("items"), parse_type("'item").unwrap())
         ), vec!(
             Builtin::Func("new",  "() -> List['a]",                     Func::Runtime(build_list_constructor)),
             Builtin::Func("push", "(List['a], 'a) -> Int",              Func::Runtime(build_list_push)),
             Builtin::Func("[]",   "(List['item], Int) -> 'item",        Func::Runtime(build_list_get)),
-            //Builtin::Func("[]",   "(List['item], Int, 'item) -> 'item", Func::Runtime()),
+            Builtin::Func("[]",   "(List['item], Int, 'item) -> 'item", Func::Runtime(build_list_set)),
         )),
 
 
@@ -274,6 +275,9 @@ pub fn get_builtins<'a>() -> Vec<Builtin<'a>> {
         Builtin::Func("not", "(Real) -> Bool",        Func::Comptime(not_real)),
 
 
+        Builtin::Func("==",  "(Bool, Bool) -> Bool",  Func::Comptime(eq_bool)),
+        Builtin::Func("!=",  "(Bool, Bool) -> Bool",  Func::Comptime(ne_bool)),
+        Builtin::Func("not", "(Bool) -> Bool",        Func::Comptime(not_bool)),
     )
 }
 
@@ -301,6 +305,10 @@ fn lte_real(data: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLV
 fn gte_real(data: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildFCmp(data.builder, llvm::LLVMRealPredicate::LLVMRealOGE, args[0], args[1], label("tmp")) } }
 fn not_real(data: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildNot(data.builder, args[0], label("tmp")) } }
 
+fn eq_bool(data: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildICmp(data.builder, llvm::LLVMIntPredicate::LLVMIntEQ, args[0], args[1], label("tmp")) } }
+fn ne_bool(data: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildICmp(data.builder, llvm::LLVMIntPredicate::LLVMIntNE, args[0], args[1], label("tmp")) } }
+fn not_bool(data: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildNot(data.builder, args[0], label("tmp")) } }
+
 
 unsafe fn build_list_constructor(data: &LLVM, name: &str, objtype: LLVMTypeRef) -> LLVMValueRef {
     let function = build_function_start(data, name, vec!(), objtype);
@@ -326,11 +334,28 @@ unsafe fn build_list_get(data: &LLVM, name: &str, objtype: LLVMTypeRef) -> LLVMV
     let function = build_function_start(data, name, vec!(objtype, int_type(data)), str_type(data));
     LLVMSetLinkage(function, llvm::LLVMLinkage::LLVMLinkOnceAnyLinkage);
 
-    //let mut indices = vec!(int_value(data, 0), int_value(data, 0));
-    //let pointer = LLVMBuildGEP(data.builder, object, indices.as_mut_ptr(), indices.len() as u32, label("tmp"));
+    let list = LLVMGetParam(function, 0);
+    let index = LLVMBuildCast(data.builder, llvm::LLVMOpcode::LLVMTrunc, LLVMGetParam(function, 1), i32_type(data), label("tmp"));
+    let mut indices = vec!(i32_value(data, 0), i32_value(data, 0), index);
+    //let pointer = LLVMBuildGEP(data.builder, list, indices.as_mut_ptr(), indices.len() as u32, label("tmp"));
     //let value = LLVMBuildLoad(data.builder, pointer, label("tmp"));
-    //let pointer = LLVMBuildAlloca(data.builder, str_type(data), label("buffer"));
-    
+
+    //LLVMBuildRet(data.builder, value);
+    LLVMBuildRet(data.builder, null_value(str_type(data)));
+    function
+}
+
+unsafe fn build_list_set(data: &LLVM, name: &str, objtype: LLVMTypeRef) -> LLVMValueRef {
+    let function = build_function_start(data, name, vec!(objtype, int_type(data), str_type(data)), str_type(data));
+    LLVMSetLinkage(function, llvm::LLVMLinkage::LLVMLinkOnceAnyLinkage);
+
+    let list = LLVMGetParam(function, 0);
+    let index = LLVMBuildCast(data.builder, llvm::LLVMOpcode::LLVMTrunc, LLVMGetParam(function, 1), i32_type(data), label("tmp"));
+    let mut indices = vec!(i32_value(data, 0), i32_value(data, 0), index);
+    //let pointer = LLVMBuildGEP(data.builder, list, indices.as_mut_ptr(), indices.len() as u32, label("tmp"));
+    //let value = LLVMBuildLoad(data.builder, pointer, label("tmp"));
+
+    //LLVMBuildRet(data.builder, value);
     LLVMBuildRet(data.builder, null_value(str_type(data)));
     function
 }
