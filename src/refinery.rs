@@ -1,6 +1,7 @@
 
 
 use parser::AST;
+use types::Type;
 
 pub fn refine(code: Vec<AST>) -> Vec<AST> {
     refine_vec(code)
@@ -20,6 +21,10 @@ pub fn refine_node(node: AST) -> AST {
 
         AST::Definition((name, ttype), code) => {
             AST::Definition((name, ttype), Box::new(refine_node(*code)))
+        },
+
+        AST::Declare(name, ttype) => {
+            AST::Declare(name, ttype)
         },
 
         AST::Function(name, args, ret, body, id) => {
@@ -73,10 +78,40 @@ pub fn refine_node(node: AST) -> AST {
             AST::For(name, Box::new(refine_node(*cond)), Box::new(refine_node(*body)), id)
         },
 
-        AST::List(code) => { AST::List(refine_vec(code)) }
+        AST::List(code) => { AST::List(refine_vec(code)) },
+        // TODO this almost works, but it needs to reference the list that's created, which it can't because blocks don't create their own scope, and a list variable would collide
+        //AST::List(code) => {
+        //    let mut block = vec!();
+        //    block.push(AST::Invoke(Box::new(AST::Resolver(Box::new(AST::Identifier(format!("List"))), String::from("new"))), vec!(AST::Integer(code.len() as isize)), None));
+        //    for item in code {
+        //        block.push(AST::Invoke(Box::new(AST::Resolver(Box::new(AST::Identifier(format!("List"))), String::from("push"))), vec!(item), None));
+        //    }
+        //    AST::Block(refine_vec(block))
+        //},
 
-        AST::Class(name, parent, body, id) => {
-            AST::Class(name, parent, refine_vec(body), id)
+        AST::Class(pair, parent, body, id) => {
+            // Make sure constructors take "self" as the first argument, and return "self" at the end
+            let mut has_new = false;
+            let body = body.into_iter().map(|node| {
+                match node {
+                    AST::Function(name, mut args, ret, mut body, id) => {
+                        if name == Some(String::from("new")) {
+                            has_new = true;
+                            if args.len() > 0 && args[0].0 == String::from("self") {
+                                body = Box::new(AST::Block(vec!(*body, AST::Identifier(String::from("self")))));
+                            } else {
+                                panic!("SyntaxError: the \"new\" method on a class must have \"self\" as its first parameter");
+                            }
+                        }
+                        AST::Function(name, args, ret, body, id)
+                    },
+                    _ => node
+                }
+            }).collect();
+            //if !has_new {
+            //    panic!("SyntaxError: you must declare a \"new\" method on a class");
+            //}
+            AST::Class(pair, parent, refine_vec(body), id)
         },
 
         AST::Index(base, index, _) => {
@@ -119,6 +154,7 @@ pub fn refine_node(node: AST) -> AST {
         AST::String(_) => { node },
         AST::Nil(_) => { node },
         AST::Identifier(_) => { node },
+        AST::New(_) => { node },
         AST::Import(_, _) => { node },
         AST::Type(_, _) => { node },
 

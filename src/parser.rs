@@ -21,6 +21,7 @@ pub fn parse_or_error(name: &str, text: &[u8]) -> Vec<AST> {
     }
 }
 
+/*
 pub fn parse_index_or_error(name: &str, text: &[u8]) -> Vec<Decl> {
     match parse_index(text) {
         IResult::Done(rem, _) if rem != [] => panic!("InternalError: unparsed input remaining: {:?}", rem),
@@ -29,6 +30,7 @@ pub fn parse_index_or_error(name: &str, text: &[u8]) -> Vec<Decl> {
         res @ _ => panic!("UnknownError: the parser returned an unknown result; {:?}", res),
     }
 }
+*/
 
 ///// Parser /////
 
@@ -123,10 +125,12 @@ pub enum AST {
     Try(Box<AST>, Vec<(AST, AST)>),
     Match(Box<AST>, Vec<(AST, AST)>),
     For(String, Box<AST>, Box<AST>, UniqueID),
+    Declare(String, Type),
     Function(Option<String>, Vec<(String, Option<Type>, Option<AST>)>, Option<Type>, Box<AST>, UniqueID),
+    New((String, Vec<Type>)),
     Class((String, Vec<Type>), Option<(String, Vec<Type>)>, Vec<AST>, UniqueID),
 
-    Import(String, Vec<Decl>),
+    Import(String, Vec<AST>),
     Definition((String, Option<Type>), Box<AST>),
     Assignment(Box<AST>, Box<AST>),
     While(Box<AST>, Box<AST>),
@@ -235,6 +239,8 @@ named!(expression<AST>,
         raise |
         matchcase |
         forloop |
+        newclass |
+        declare |
         function |
         infix
     )
@@ -265,7 +271,7 @@ named!(ifexpr<AST>,
             wscom!(tag_word!("else")),
             expression
         )) >>
-        (AST::If(Box::new(c), Box::new(t), Box::new(if f.is_some() { f.unwrap() } else { AST::Noop })))
+        (AST::If(Box::new(c), Box::new(t), Box::new(if f.is_some() { f.unwrap() } else { AST::Nil(None) })))
     )
 );
 
@@ -319,6 +325,28 @@ named!(forloop<AST>,
         opt!(multispace_comment) >>
         e: expression >>
         (AST::For(i, Box::new(l), Box::new(e), UniqueID::generate()))
+    )
+);
+
+named!(newclass<AST>,
+    do_parse!(
+        wscom!(tag_word!("new")) >>
+        i: class_identifier >>
+        a: map!(
+            delimited!(tag!("("), expression_list, tag!(")")),
+            |mut a| { a.insert(0, AST::New(i.clone())); a }
+        ) >>
+        (AST::Invoke(Box::new(AST::Resolver(Box::new(AST::Identifier(i.0)), String::from("new"))), a, None))
+    )
+);
+
+named!(declare<AST>,
+    do_parse!(
+        wscom!(tag_word!("decl")) >>
+        n: symbol_name >>
+        wscom!(tag!(":")) >>
+        t: type_description >>
+        (AST::Declare(n, t))
     )
 );
 
@@ -588,6 +616,11 @@ named!(identifier_typed<(String, Option<Type>)>,
     ))
 );
 
+named!(symbol_name<String>,
+    map_str!(recognize!(take_while!(is_not_colon)))
+);
+
+
 named!(any_op<String>,
     alt!(infix_op | prefix_op | map_str!(alt!(tag!("[]") | tag!("::"))))
 );
@@ -804,6 +837,11 @@ pub fn is_not_colon(ch: u8) -> bool {
 }
 
 
+#[derive(Clone, Debug, PartialEq)]
+pub struct Position {
+    line: usize,
+}
+
 static mut _lines: usize = 0;
 
 pub fn count_lines(text: &[u8]) {
@@ -812,6 +850,12 @@ pub fn count_lines(text: &[u8]) {
             //*lines.get_mut() += 1;
             unsafe { _lines += 1; }
         }
+    }
+}
+
+pub fn position() -> Position {
+    unsafe {
+        Position { line: _lines }
     }
 }
 
@@ -846,7 +890,7 @@ pub fn print_error_info(name: &str, text: &[u8], err: (nom::ErrorKind, usize, us
 
 
 ///// Index Summaries /////
-
+/*
 #[derive(Clone, Debug, PartialEq)]
 pub enum Decl {
     Symbol(String, Type),
@@ -896,7 +940,8 @@ named!(class_decl<Decl>,
         wscom!(tag!("}")) >>
         (Decl::Class(i, p, s))
     )
-); 
+);
+*/
 
 #[cfg(test)]
 mod tests {

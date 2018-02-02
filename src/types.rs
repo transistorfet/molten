@@ -4,15 +4,16 @@ use std::fmt::Debug;
 
 use parser::AST;
 use scope::{ Scope, ScopeRef, ScopeMapRef, mangle_name };
+use utils::UniqueID;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Type {
     Object(String, Vec<Type>),
     Variable(String),
-    //Generic(String, Vec<Type>),
-    //List(Box<Type>),
     Function(Vec<Type>, Box<Type>),
     Overload(Vec<Type>),
+    //List(Box<Type>),
+    //Generic(String, Vec<Type>),
     //Constrained(Box<&mut AST>),
 }
 
@@ -60,7 +61,6 @@ impl Type {
     }
 
     pub fn add_variant<V, T>(self, scope: ScopeRef<V, T>, ntype: Type) -> Type where V: Clone, T: Clone {
-        println!("BEFORE: {:?}", self);
         let rtype = match self {
             Type::Overload(ref variants) => {
                 for variant in variants {
@@ -74,7 +74,6 @@ impl Type {
             },
             _ => expect_type(scope.clone(), Some(self), Some(ntype.clone()), Check::Def),
         };
-        println!("AFTER: {:?}", rtype);
         rtype
     }
 
@@ -126,8 +125,9 @@ pub fn check_types_node<V, T>(map: ScopeMapRef<V, T>, scope: ScopeRef<V, T>, nod
                 let vtype = value.clone().map(|ref mut vexpr| check_types_node(map.clone(), scope.clone(), vexpr));
                 let mut atype = expect_type(fscope.clone(), ttype.clone(), vtype, Check::Def);
                 if &name[..] == "self" {
-                    let ctype = fscope.borrow().find_type(&String::from("Self"));
-                    atype = expect_type(fscope.clone(), Some(atype), ctype, Check::Def);
+                    let mut stype = fscope.borrow().find_type(&String::from("Self")).unwrap();
+                    stype = fscope.borrow_mut().map_all_typevars(stype);
+                    atype = expect_type(fscope.clone(), Some(atype), Some(stype), Check::Def);
                 }
                 fscope.borrow_mut().update_variable_type(name, atype.clone());
                 //Type::update_variable_type(fscope.clone(), name, atype.clone());
@@ -146,6 +146,8 @@ pub fn check_types_node<V, T>(map: ScopeMapRef<V, T>, scope: ScopeRef<V, T>, nod
                 args[i].1 = Some(argtypes[i].clone());
             }
             update_scope_variable_types(fscope.clone());
+            // TODO this fixes the type error, but makes a ton of stupid typevars
+            //scope.borrow_mut().raise_types(fscope.clone());
 
             println!("FUNC: {:?} {:?} {:?}", name, argtypes, rettype);
             let mut nftype = Type::Function(argtypes.clone(), Box::new(rettype));
@@ -158,10 +160,10 @@ pub fn check_types_node<V, T>(map: ScopeMapRef<V, T>, scope: ScopeRef<V, T>, nod
                     *name = Some(fname);
                 }
 
-                let mut otype = dscope.borrow().get_variable_type(&dname);
-                nftype = otype.map(|ttype| ttype.add_variant(scope.clone(), nftype.clone())).unwrap_or(nftype);
-                dscope.borrow_mut().update_variable_type(&dname, nftype.clone());
-                //Type::update_variable_type(dscope.clone(), &dname, nftype.clone());
+                //let mut otype = dscope.borrow().get_variable_type(&dname);
+                //nftype = otype.map(|ttype| ttype.add_variant(scope.clone(), nftype.clone())).unwrap_or(nftype);
+                //dscope.borrow_mut().update_variable_type(&dname, nftype.clone());
+                Scope::add_func_variant(dscope.clone(), &dname, scope.clone(), nftype.clone());
             }
             nftype
         },
@@ -230,6 +232,12 @@ pub fn check_types_node<V, T>(map: ScopeMapRef<V, T>, scope: ScopeRef<V, T>, nod
             btype
         },
 
+        AST::Declare(ref name, ref ttype) => {
+            //let dscope = Scope::target(scope.clone());
+            //dscope.borrow_mut().update_variable_type(name, ttype.clone());
+            ttype.clone()
+        },
+
         AST::Identifier(ref name) => {
             let mut bscope = scope.borrow_mut();
             bscope.get_variable_type(name).unwrap_or_else(|| bscope.new_typevar())
@@ -267,11 +275,11 @@ pub fn check_types_node<V, T>(map: ScopeMapRef<V, T>, scope: ScopeRef<V, T>, nod
             check_types_node(map.clone(), scope.clone(), body)
         },
 
-        AST::For(ref name, ref mut cond, ref mut body, ref id) => {
+        AST::For(ref name, ref mut list, ref mut body, ref id) => {
             let lscope = map.get(id);
-            let itype = lscope.borrow().get_variable_type(name).unwrap();
-            let ltype = expect_type(lscope.clone(), Some(Type::Object(String::from("List"), vec!(itype))), Some(check_types_node(map.clone(), lscope.clone(), cond)), Check::Def);
-            lscope.borrow_mut().update_variable_type(name, ltype);
+            let itype = lscope.borrow().get_variable_type(name).unwrap_or_else(|| scope.borrow_mut().new_typevar());
+            let ltype = expect_type(lscope.clone(), Some(Type::Object(String::from("List"), vec!(itype))), Some(check_types_node(map.clone(), lscope.clone(), list)), Check::Def);
+            lscope.borrow_mut().update_variable_type(name, ltype.get_params()[0].clone());
             //Type::update_variable_type(lscope.clone(), name, ltype);
             check_types_node(map.clone(), lscope.clone(), body)
         },
@@ -297,7 +305,7 @@ pub fn check_types_node<V, T>(map: ScopeMapRef<V, T>, scope: ScopeRef<V, T>, nod
             let itype = expect_type(scope.clone(), Some(Type::Object(String::from("Int"), vec!())), Some(check_types_node(map.clone(), scope.clone(), index)));
             let etype = match ltype {
                 //Type::Object(ref name, ref types) => {
-                //    let classdef = scope.borrow().get_class_def(name).unwrap();
+                //    let classdef = scope.borrow().get_class_def(name);
                 //    // TODO check for [] method, and return the type of the get variant?
                 //    types[0].clone()
                 //},
@@ -310,6 +318,22 @@ pub fn check_types_node<V, T>(map: ScopeMapRef<V, T>, scope: ScopeRef<V, T>, nod
         },
         */
 
+        AST::New((ref name, ref types)) => {
+            let odtype = scope.borrow().find_type(name);
+            match odtype {
+                Some(dtype) => {
+                    let tscope = Scope::new_ref(Some(scope.clone()));
+                    let mtype = tscope.borrow_mut().map_all_typevars(dtype.clone());
+                    if let Err(msg) = check_type_params(tscope.clone(), &mtype.get_params(), types, Check::Def, false) {
+                        panic!(msg);
+                    }
+                    scope.borrow_mut().raise_types(tscope.clone());
+                },
+                None => panic!("TypeError: undefined type {:?}", name),
+            };
+            Type::Object(name.clone(), types.clone())
+        },
+
         AST::Class((ref name, ref types), ref parent, ref mut body, ref id) => {
             let tscope = map.get(id);
             check_types(map.clone(), tscope.clone(), body);
@@ -318,11 +342,13 @@ pub fn check_types_node<V, T>(map: ScopeMapRef<V, T>, scope: ScopeRef<V, T>, nod
 
         AST::Resolver(ref mut left, ref mut field) => {
             let ltype = match **left {
-                AST::Identifier(ref name) => resolve_type(scope.clone(), scope.borrow().find_type(name).unwrap().clone()),
+                // TODO this caused an issue with types that have typevars that aren't declared (ie. Buffer['item])
+                //AST::Identifier(ref name) => resolve_type(scope.clone(), scope.borrow().find_type(name).unwrap().clone()),
+                AST::Identifier(ref name) => scope.borrow().find_type(name).unwrap().clone(),
                 _ => panic!("SyntaxError: left-hand side of scope resolver must be identifier")
             };
 
-            let classdef = scope.borrow().get_class_def(&ltype.get_name()).unwrap();
+            let classdef = scope.borrow().get_class_def(&ltype.get_name());
             let mut cborrow = classdef.borrow_mut();
             cborrow.get_variable_type(field).unwrap_or_else(|| cborrow.new_typevar())
         },
@@ -331,7 +357,7 @@ pub fn check_types_node<V, T>(map: ScopeMapRef<V, T>, scope: ScopeRef<V, T>, nod
             let ltype = resolve_type(scope.clone(), check_types_node(map.clone(), scope.clone(), left));
             *stype = Some(ltype.clone());
 
-            let classdef = scope.borrow().get_class_def(&ltype.get_name()).unwrap();
+            let classdef = scope.borrow().get_class_def(&ltype.get_name());
             let mut cborrow = classdef.borrow_mut();
             cborrow.get_variable_type(field).unwrap_or_else(|| cborrow.new_typevar())
         },
@@ -342,8 +368,12 @@ pub fn check_types_node<V, T>(map: ScopeMapRef<V, T>, scope: ScopeRef<V, T>, nod
             expect_type(scope.clone(), Some(ltype), Some(rtype), Check::Def)
         },
 
-        AST::Noop |
-        AST::Import(_, _) => Type::Object(String::from("Nil"), vec!()),
+        AST::Import(_, ref mut decls) => {
+            check_types(map.clone(), scope.clone(), decls);
+            Type::Object(String::from("Nil"), vec!())
+        },
+
+        AST::Noop => Type::Object(String::from("Nil"), vec!()),
 
         AST::Type(_, _) => panic!("NotImplementedError: not yet supported, {:?}", node),
 
@@ -382,16 +412,16 @@ pub fn check_type<V, T>(scope: ScopeRef<V, T>, odtype: Option<Type>, octype: Opt
         let dtype = resolve_type(scope.clone(), odtype.unwrap());
         let ctype = resolve_type(scope.clone(), octype.unwrap());
 
-        if let Type::Variable(ref name) = ctype {
-            println!("UPDATING: {:?} {:?}", name, dtype);
-            if update { scope.borrow_mut().update_type(name, dtype.clone()); }
-            //if update { Type::update_type(scope.clone(), name, dtype.clone()); }
-            Ok(dtype)
-        } else if let Type::Variable(ref name) = dtype {
+        if let Type::Variable(ref name) = dtype {
             println!("UPDATING: {:?} {:?}", name, dtype);
             if update { scope.borrow_mut().update_type(name, ctype.clone()); }
             //if update { Type::update_type(scope.clone(), name, ctype.clone()); }
             Ok(ctype)
+        } else if let Type::Variable(ref name) = ctype {
+            println!("UPDATING: {:?} {:?}", name, dtype);
+            if update { scope.borrow_mut().update_type(name, dtype.clone()); }
+            //if update { Type::update_type(scope.clone(), name, dtype.clone()); }
+            Ok(dtype)
         } else {
             match (dtype.clone(), ctype.clone()) {
                 //(Type::List(ref a), Type::List(ref b)) => Ok(Type::List(Box::new(check_type(scope.clone(), Some(*a.clone()), Some(*b.clone()), mode, update)?))),
@@ -407,18 +437,10 @@ pub fn check_type<V, T>(scope: ScopeRef<V, T>, odtype: Option<Type>, octype: Opt
                     }
                 },
                 (Type::Object(ref aname, ref atypes), Type::Object(ref bname, ref btypes)) => {
-                    //if is_subclass_of(scope.clone(), (aname, atypes), (bname, btypes), update) {
-                    //    Ok(ctype)
-                    //} else
-                    //if is_subclass_of(scope.clone(), (bname, btypes), (aname, atypes), update) {
-                    //    Ok(dtype)
-                    //} else {
-                    //    Err(format!("TypeError: type mismatch, expected {:?} but found {:?}", dtype, ctype))
-                    //}
-                    match is_subclass_of(scope.clone(), (bname, btypes), (aname, atypes), mode.clone(), update) {
+                    match is_subclass_of(scope.clone(), (bname, btypes), (aname, atypes), mode.clone(), true) {
                         ok @ Ok(_) => ok,
                         err @ Err(_) => match mode {
-                            Check::List => is_subclass_of(scope.clone(), (aname, atypes), (bname, btypes), mode.clone(), update),
+                            Check::List => is_subclass_of(scope.clone(), (aname, atypes), (bname, btypes), mode.clone(), true),
                             _ => err,
                         }
                     }
@@ -443,9 +465,11 @@ fn is_subclass_of<V, T>(scope: ScopeRef<V, T>, adef: (&String, &Vec<Type>), bdef
     let mut adef = (adef.0.clone(), adef.1.clone());
 
     loop {
-        let (rclass, parent) = scope.borrow().get_class_info(&adef.0).unwrap();
+        let (mut class, parent) = scope.borrow().get_class_info(&adef.0).unwrap();
         let mut names = Scope::<V, T>::map_new();
-        let class = tscope.borrow_mut().map_typevars(&mut names, rclass);
+        if update {
+            class = tscope.borrow_mut().map_typevars(&mut names, class);
+        }
         adef.1 = check_type_params(tscope.clone(), &class.get_params(), &adef.1, mode.clone(), true)?;
 
         if *bdef.0 == adef.0 {
@@ -463,7 +487,11 @@ fn is_subclass_of<V, T>(scope: ScopeRef<V, T>, adef: (&String, &Vec<Type>), bdef
         if parent.is_none() {
             return Err(format!("TypeError: type mismatch, expected {:?} but found {:?}", Type::Object(adef.0.clone(), adef.1), Type::Object(bdef.0.clone(), bdef.1.clone())));
         }
-        let parent = tscope.borrow_mut().map_typevars(&mut names, parent.unwrap());
+        let parent = if update {
+            tscope.borrow_mut().map_typevars(&mut names, parent.unwrap())
+        } else {
+            parent.unwrap()
+        };
         match resolve_type(tscope.clone(), parent) {
             Type::Object(name, params) => adef = (name, params),
             ttype @ _ => return Err(format!("TypeError: expected Object but found {:?}", ttype)),
@@ -498,6 +526,7 @@ pub fn resolve_type<V, T>(scope: ScopeRef<V, T>, ttype: Type) -> Type where V: C
             }
         },
         Type::Variable(ref name) => {
+println!("VARIABLE: {:?} {:?} {:?}", scope.borrow().get_full_name(&Some(String::from("")), UniqueID(0)), name, scope.borrow().find_type(name));
             match scope.borrow().find_type(name) {
                 Some(vtype) => {
                     if Type::Variable(name.clone()) == vtype {
@@ -506,6 +535,8 @@ pub fn resolve_type<V, T>(scope: ScopeRef<V, T>, ttype: Type) -> Type where V: C
                         resolve_type(scope.clone(), vtype)
                     }
                 },
+                // TODO I changed this because I was getting a bunch of errors... maybe i need better rules on typevars?
+                //None => Type::Variable(name.clone()),//panic!("TypeError: undefined type variable {:?}", name),
                 None => panic!("TypeError: undefined type variable {:?}", name),
             }
         },

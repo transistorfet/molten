@@ -29,7 +29,7 @@ mod lib_llvm;
 
 fn main() {
     let matches =
-        App::new("rustytea")
+        App::new("molten")
             .version("0.1")
             .about("A toy ML compiler")
             .arg(Arg::with_name("INPUT")

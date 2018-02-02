@@ -1,32 +1,30 @@
 
-* should you convert class name/types tuples into types
+* what about the value initializations in the class...
 
-* issue with re-extending could be solved by renaming/mangling the type
 * issue with self and super type defs; they don't contain the type info; maybe add an aliasing type?
+* there might be trouble with the argument cast in invoke compiling
+* issue with re-extending classes could be solved by renaming/mangling the type
 
-* find out where the cast on List_get is being generated
-* you kind of need a macro/compile-time function to call a list generic function and cast the element to a void pointer, to be stored in the list...
-* should check_type variable priority be reversed?
+* you might have a potentially big issue with duplicate type variables, specifically with map_typevars; it could mistake an undeclared
+  function's typevar with an already defined typevar if they have the same name
+* could you pass an extra argument to check_types_node() with an expected type, so it can use that if needed, rather than creating a typevar
+* make nil work without using a typevar?  Or just eliminate unnecessary typevars
+* if you had a tuple type, you could use a typevar to represent a tuple of the arguments to a function: Type::Function(Type::Variable(..), Type::Variable(..)) or 'a -> 'b where 'a = ('c, 'd, 'e)
+* add an iterator type that gets used in for loops; might need vtables for that
 
-
-* fix constructors, perhaps by making all methods called new() allocate before the method is called?
-
-* remove instances of List()
-* should you add a char type?
 
 * change the debug prints to overwrite Debug formatting for scopes
-* fix scope resolution to also work on objects, so that you can have static methods...
-* make typed functions for all math operations, with the inlinealways attribute, if you decide to make operators methods
-* there is a problem with some type inference, fn x => x() + 1; it might be fixed if the type of x can be resolved(), but that doesn't happen currently.  In some places it makes more trouble
+* should you convert class name/types tuples into types
+* remove instances of List() type
 
 
-
-* implement lists in compiled code
-* add or expand string support
+* fill in remaining math operators (make functions of them?)
+* fill in string and list type functions
 * add line and column numbers to error reporting
 * add error returning so multiple errors can be caught at once
-* add error returns instead of panics
+* add better support for generics; right now it just forces everything to/from a pointer type
 
+* add vtables for classes
 * add a const expression
 * implement exceptions
 * implement garbage collection
@@ -35,24 +33,22 @@
 
 
 
-* if you define a class in a deeper scope than its previous definition, it will mask it; which applies to fundamental types as well.  This is actually helpful atm for making libcore, but
-  it might not be desirable.  Perhaps you could use a keyword like 'override' to silence an error or warning when masking
-* if you added decls as AST elements, then you could possibly declare external functions in localized scopes so they aren't accessible to other code
-* make operators methods instead of functions?
-* if you make ops methods, then everything has to be type annotated, with the type system as it is; you'd need constrained types, or multiple paths, or bidirectional or something
+* fix scope resolution to also work on objects, so that you can have static methods...
 
+* if you make ops methods, then everything has to be type annotated, with the type system as it is; you'd need constrained types, or multiple paths, or bidirectional or something
+* make typed functions for all math operations, with the inlinealways attribute, if you decide to make operators methods
 * is it even possible to add a special "constrained" type, which has &AST that must type check correctly in order to match (checks done in check_type)
 * you might need to integrate type restrictions which have to get resolved later; like 'a where 'a is object with add(Int) method; not sure how you could be so specific without complexity
 * what if you generalize overloaded types, such that they're checked in check_type, and options are eliminated, or resolved to one type over the course of checking
-* if you were to support the generation of functions with more than one type/variable types, you'd need to collect all invokation types for each function during collect
-* if you had a tuple type, you could use a typevar to represent a tuple of the arguments to a function: Type::Function(Type::Variable(..), Type::Variable(..)) or 'a -> 'b where 'a = ('c, 'd, 'e)
+* there is a problem with some type inference, fn x => x() + 1; it might be fixed if the type of x can be resolve_type'd(), but that doesn't happen currently.  In some places it makes more trouble
 
-
-
-* should import indexes also list all the modules that the file imports, so that class definitions in other imports can be found, if needed for arguments
 
 * should class bodies use different rules than blocks, with different definition statements, like "def foo: Int", such that a value isn't required for members
-* should classes be values, added to the name space, or should they only be defined as types; should types be first class or not?
+* should you change to < > format instead of [ ] for type parameters, in the name of consistency?
+* should you change the return type annotation format to : from ->?  fn foobar(): String { } instead of fn foobar() -> String { }
+* should you add a return statement?  It's not functional, but it's practial
+* should import indexes also list all the modules that the file imports, so that class definitions in other imports can be found, if needed for arguments
+* should you require an override keyword when masking definitions in lower scopes? like class definitions
 * should you allow keyword arguments in invoke; foo(a=10, b=20)
 * should you allow arguments with a default value to be omitted from a function call?, that would require a bunch of changes to typechecking
 
@@ -73,4 +69,11 @@ FEATURES:
 
 * add dicts syntax
 * add macros and expandable forms (like lisp)
+
+
+EXAMPLE PROGRAMS:
+
+* hash table
+* regex matcher
+
 

@@ -63,6 +63,8 @@
 
 
         class Stuff {
+            fn new(self) { }
+
             let foo = fn self, a => {
                 a * 4
             }
@@ -81,6 +83,8 @@
         }
 
         class TestClass extends Stuff {
+            fn new(self) { }
+
             let bar = fn self, x => {
                 self.foo2(x)
             }
@@ -95,7 +99,7 @@
             }
         }
 
-        let thingy = TestClass::new()
+        let thingy = new TestClass()
         thingy.a = 1337
         thingy.add(124)
         puts(str(thingy.a))
@@ -110,6 +114,7 @@
             2 => a * 4
             _ => a * 16
 	}
+        puts(str(r))
 
         match x == true {
             true => x
@@ -124,7 +129,10 @@
             _ => a * 16
         }
 
-        puts(str(r))
+        if a > 1 then {
+            puts("It's more than 1!")
+            nil
+        }
 
         fn strnum(num: Int) -> String {
             let buffer: String = malloc(22)
@@ -139,7 +147,7 @@
         }
 
         fn overload() {
-            // TODO we don't allow recursion in overloaded functions, although I don't know that that can be fixed without constricted types
+            // TODO we don't allow recursion in overloaded functions, although I don't know that that can be fixed without constrained types
             fn strnum(num: Int, suffix: String) -> String {
                 strnum(num)
                 "poop"
@@ -154,20 +162,31 @@
         puts(strnum(12))
         puts(strnum(1.214))
 
-        let buffer = malloc(30)
 
+        // TODO not yet implemented
         //try str(123) with
         //    _ => a * 16
 
+
+        let alloc = malloc(30)
+
+	let buffer = new Buffer[Int](5)
+        buffer[0] = 124
+	puts(str(buffer[0]))
+
+        let list3 = new List[Int]()
+        list3.push(4)
+        list3[4] = 123
+        puts(str(list3[4]))
+
         let list: List['thing] = [ 1, 2, 3 ]
-        // TODO compiles but can't run because the integer isn't cast to varpointer
-        //list[1] = 5
+        list[1] = 5
         puts(str(list[1]))
         //puts(str("Thing"[2]))
-        let list2 = [ TestClass::new(), Stuff::new(), TestClass::new() ]
+        let list2 = [ new TestClass(), new Stuff(), new TestClass() ]
 
-        //if a > 1 then
-        //    puts("It's more than 1!")
+
+        // TODO this doesn't compile because of a type error
 
         class NumList['a] extends List[Int] {
             let x: 'a = nil
@@ -180,13 +199,16 @@
 
         class B['it, 'jt] extends A['jt] {
             let bar: 'it = nil
+
         }
 
-        let c: B[Real, Int] = B::new()
+        let c = new B[Real, Int]()
         // TODO compiles but can't run because the real isn't cast to varpointer
         //c.bar = 3.2
 
         class Thing {
+            fn new(self) { }
+
             let foo = fn a => {
                 a * 4
             }
@@ -200,7 +222,7 @@
             }
         }
 
-        let thing = Thing::new()
+        let thing = new Thing()
         let get_thing = fn => thing
 
         []
@@ -208,8 +230,8 @@
         [ 0, 1, 2, 3 ][0]
         let arr = [ 1, 2, 3, 4 ]
         arr[2]
-        thing.arr[1]
-        get_thing().arr[2]
+        //thing.arr[1]
+        //get_thing().arr[2]
 
         // TODO casting issues
         //thing.baz(521)
@@ -228,6 +250,9 @@
         // TODO this probably shouldn't parse without a ; or \n
         thing "things"
 
+
+        for x in [ 1, 2, 3 ]
+            puts("Count: " + str(x))
 
 
     /*

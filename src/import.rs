@@ -1,48 +1,58 @@
 
+use std::fmt::Debug;
 use std::fs::File;
 use std::io::prelude::*;
 
 use types::Type;
-use scope::{ ScopeRef, unmangle_name };
-use parser::{ AST, Decl, parse_index_or_error };
+use scope::{ ScopeRef };
+use parser::{ AST, parse_or_error };
 
 
-pub fn load_index<V, T>(scope: ScopeRef<V, T>, filename: &str) -> Vec<Decl> where V: Clone, T: Clone {
+pub fn load_index<V, T>(scope: ScopeRef<V, T>, filename: &str) -> Vec<AST> where V: Clone + Debug, T: Clone + Debug {
     let mut f = File::open(filename).expect("Error: file not found");
     let mut contents = String::new();
     f.read_to_string(&mut contents).expect("Error reading file contents");
 
-    let decl = parse_index_or_error(filename, contents.as_bytes());
+    let decl = parse_or_error(filename, contents.as_bytes());
     println!("DECL: {:?}", decl);
-    load_index_vec(scope, &decl);
+    //load_index_vec(scope, &decl);
     decl
 }
 
-pub fn load_index_vec<V, T>(scope: ScopeRef<V, T>, code: &Vec<Decl>) where V: Clone, T: Clone {
+/*
+pub fn load_index_vec<V, T>(scope: ScopeRef<V, T>, code: &Vec<Decl>) where V: Clone + Debug, T: Clone + Debug {
     for node in code {
         load_index_node(scope.clone(), node);
     }
 }
 
-fn load_index_node<V, T>(scope: ScopeRef<V, T>, node: &Decl) where V: Clone, T: Clone {
+fn load_index_node<V, T>(scope: ScopeRef<V, T>, node: &Decl) where V: Clone + Debug, T: Clone + Debug {
     match *node {
         Decl::Symbol(ref name, ref ttype) => {
-            scope.borrow_mut().define_func(name.clone(), Some(ttype.clone()), true);
+            let dscope = Scope::target(scope.clone());
+            dscope.borrow_mut().define_func(name.clone(), Some(ttype.clone()), true);
             if let Some(ref name) = unmangle_name(name) {
                 println!("OVERLOAD: {:?}", name);
-                scope.borrow_mut().define_func(name.clone(), None, true);
-                let mut stype = scope.borrow().get_variable_type(name).unwrap_or(Type::Overload(vec!()));
+                dscope.borrow_mut().define_func(name.clone(), None, true);
+                let mut stype = dscope.borrow().get_variable_type(name).unwrap_or(Type::Overload(vec!()));
                 stype = stype.add_variant(scope.clone(), ttype.clone());
-                scope.borrow_mut().update_variable_type(name, stype);
+                dscope.borrow_mut().update_variable_type(name, stype);
             }
         },
         Decl::Class(ref pair, ref parent, ref body) => {
-            // TODO how will you import classes?  I guess it's just functions that get imported, but don't you still need the structdef too, to access members?
             let classdef = scope.borrow_mut().create_class_def(pair, parent.clone());
-            load_index_vec(classdef.clone(), body);
+            let tscope = Scope::new_ref(Some(scope.clone()));
+            tscope.borrow_mut().set_class(true);
+            tscope.borrow_mut().set_basename(pair.0.clone());
+            //pair.1.iter().map(|ttype| check_for_typevars(tscope.clone(), &Some(ttype.clone()))).count();
+            //if let &Some((ref pname, ref ptypes)) = parent {
+            //    ptypes.iter().map(|ttype| check_for_typevars(tscope.clone(), &Some(ttype.clone()))).count();
+            //}
+            load_index_vec(tscope.clone(), body);
         }
     }
 }
+*/
 
 pub fn store_index<V, T>(scope: ScopeRef<V, T>, filename: &str, code: &Vec<AST>) where V: Clone, T: Clone {
     let index_text = build_index(scope, code);
@@ -74,7 +84,7 @@ fn build_index_node<V, T>(index: &mut String, scope: ScopeRef<V, T>, node: &AST)
         },
 
         AST::Class((ref name, ref types), ref parent, ref body, _) => {
-            let classdef = scope.borrow().get_class_def(name).unwrap();
+            let classdef = scope.borrow().get_class_def(name);
             let namespec = unparse_type(Type::Object(name.clone(), types.clone()));
             let fullspec = if parent.is_some() {
                 format!("{} extends {}", namespec, unparse_type(Type::make_object(parent.clone().unwrap())))
