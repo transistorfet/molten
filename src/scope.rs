@@ -41,7 +41,6 @@ pub struct TypeInfo<V, T> {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Scope<V, T> {
-    //pub id: UniqueID,
     pub basename: String,
     pub context: Context,
     pub names: HashMap<String, Symbol<V>>,
@@ -149,10 +148,6 @@ impl<V, T> Scope<V, T> where V: Clone, T: Clone {
         self.names.contains_key(name)
     }
 
-
-    //pub fn set_overloaded(&mut self, name: &String) {
-    //    self.modify(name, move |sym| sym.overloaded = true)
-    //}
 
     pub fn is_overloaded(&self, name: &String) -> bool {
         self.search(name, |sym| Some(sym.funcdefs >= 2)).unwrap()
@@ -538,12 +533,6 @@ fn bind_names_node<V, T>(map: ScopeMapRef<V, T>, scope: ScopeRef<V, T>, node: &m
         },
 
         AST::Invoke(ref mut fexpr, ref mut args, _) => {
-            //if let AST::Accessor(ref mut expr, _, _) = **fexpr {
-                //let mut obj = Box::new(AST::Underscore);
-                //mem::swap(expr, &mut obj);
-                //args.insert(0, *obj);
-            //    args.insert(0, *expr.clone());
-            //}
             bind_names_node(map.clone(), scope.clone(), fexpr);
             bind_names_vec(map.clone(), scope.clone(), args);
         },

@@ -22,7 +22,7 @@ mod types;
 mod debug;
 mod utils;
 mod import;
-mod interpreter;
+//mod interpreter;
 //mod compiler_c;
 mod compiler_llvm;
 mod lib_llvm;
@@ -39,9 +39,6 @@ fn main() {
             .arg(Arg::with_name("compile")
                 .short("c")
                 .help("Compiles to C rather than executing"))
-            .arg(Arg::with_name("interpret")
-                .short("i")
-                .help("Directly interprets the code rather than compiling"))
             .arg(Arg::with_name("library")
                 .short("l")
                 .help("Compiles as a library, without a main function"))
@@ -50,8 +47,6 @@ fn main() {
     let filename = matches.value_of("INPUT").unwrap();
     if matches.occurrences_of("compile") > 0 {
         with_file(filename, |name, text| compile_string(name, text, matches.occurrences_of("library") > 0));
-    } else if matches.occurrences_of("interpret") > 0 {
-        with_file(filename, |name, text| execute_string(name, text));
     } else {
         println!("Use the -c flag to compile");
     }
@@ -65,14 +60,6 @@ fn with_file<F>(filename: &str, with: F) where F: Fn(&str, &[u8]) -> () {
     with(filename, contents.as_bytes())
 }
 
-
-fn execute_string(name: &str, text: &[u8]) {
-    let map = interpreter::make_global();
-    let code = process_input(map.clone(), name, text);
-
-    let fin = interpreter::execute(map.clone(), &code);
-    println!("{:?}", fin);
-}
 
 fn compile_string(name: &str, text: &[u8], is_library: bool) {
     let builtins = lib_llvm::get_builtins();

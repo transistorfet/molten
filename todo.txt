@@ -1,9 +1,17 @@
 
+* make tests and examples (and commit them)
+* fix the issues where you need nil and shit to make it work.... i think parser parsing ";" into noop/nil might work
+* should you change to < > format instead of [ ] for type parameters, in the name of consistency?
+
 * what about the value initializations in the class...
+* should class bodies use different rules than blocks, with different definition statements, like "def foo: Int", such that a value isn't required for members
+
+
 
 * issue with self and super type defs; they don't contain the type info; maybe add an aliasing type?
 * there might be trouble with the argument cast in invoke compiling
 * issue with re-extending classes could be solved by renaming/mangling the type
+* what if you a 'context' passed to the node visitors that would allow "if" to know if its' return is used or not, and so whether typechecking must match
 
 * you might have a potentially big issue with duplicate type variables, specifically with map_typevars; it could mistake an undeclared
   function's typevar with an already defined typevar if they have the same name
@@ -43,8 +51,6 @@
 * there is a problem with some type inference, fn x => x() + 1; it might be fixed if the type of x can be resolve_type'd(), but that doesn't happen currently.  In some places it makes more trouble
 
 
-* should class bodies use different rules than blocks, with different definition statements, like "def foo: Int", such that a value isn't required for members
-* should you change to < > format instead of [ ] for type parameters, in the name of consistency?
 * should you change the return type annotation format to : from ->?  fn foobar(): String { } instead of fn foobar() -> String { }
 * should you add a return statement?  It's not functional, but it's practial
 * should import indexes also list all the modules that the file imports, so that class definitions in other imports can be found, if needed for arguments

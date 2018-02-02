@@ -21,17 +21,6 @@ pub fn parse_or_error(name: &str, text: &[u8]) -> Vec<AST> {
     }
 }
 
-/*
-pub fn parse_index_or_error(name: &str, text: &[u8]) -> Vec<Decl> {
-    match parse_index(text) {
-        IResult::Done(rem, _) if rem != [] => panic!("InternalError: unparsed input remaining: {:?}", rem),
-        IResult::Done(_, decls) => decls,
-        res @ IResult::Error(_) => { print_error(name, text, nom::prepare_errors(text, res).unwrap()); panic!(""); },
-        res @ _ => panic!("UnknownError: the parser returned an unknown result; {:?}", res),
-    }
-}
-*/
-
 ///// Parser /////
 
 named!(sp, eat_separator!(&b" \t"[..]));
@@ -115,8 +104,6 @@ pub enum AST {
     Accessor(Box<AST>, String, Option<Type>),
     Invoke(Box<AST>, Vec<AST>, Option<Type>),
     SideEffect(String, Vec<AST>),
-    //MethodIdentifier(String),
-    //InvokeMethod(String, Vec<AST>, Option<Type>),
     //Prefix(String, Box<AST>),
     //Infix(String, Box<AST>, Box<AST>),
     Block(Vec<AST>),
@@ -368,17 +355,7 @@ named!(function<AST>,
         (AST::Function(l.0, l.1, r, Box::new(e), UniqueID::generate()))
     )
 );
-/*
-named!(function<AST>,
-    do_parse!(
-        wscom!(tag_word!("fn")) >>
-        l: identifier_list_defaults >>
-        wscom!(tag!("=>")) >>
-        e: expression >>
-        (AST::Function(l, Box::new(e), UniqueID::generate(), None))
-    )
-);
-*/
+
 named!(identifier_list<Vec<(String, Option<Type>)>>,
     separated_list!(tag!(","), identifier_typed)
 );
@@ -479,28 +456,6 @@ impl AST {
     }
 }
 
-/*
-#[macro_export]
-macro_rules! infixer (
-    ($i:expr, $op:expr, $($sub:tt)*) => (
-        {
-            do_parse!($i,
-                left: $($sub)* >>
-                operations: many0!(do_parse!(
-                    op: call!($op) >>
-                    right: $($sub)* >>
-                    (op, right)
-                )) >>
-                (AST::fold_op(left, operations))
-            )
-        }
-    )
-);
-
-named!(infix<AST>,
-    infixer!(infix_op, alt!(atomic))
-);
-*/
 
 named!(infix<AST>,
     do_parse!(
@@ -514,12 +469,6 @@ named!(atomic<AST>,
     wscom!(alt_complete!(
         prefix |
         subatomic_operation
-        //index |
-        //accessor |
-        // TODO (expr), identifier, invoke(), literal
-        //literal |
-        //invoke |
-        //subatomic
     ))
 );
 
@@ -635,7 +584,6 @@ pub fn parse_type(s: &str) -> Option<Type> {
 named!(type_description<Type>,
     alt_complete!(
         type_function |
-        //type_list |
         type_variable |
         type_object
     )
@@ -651,13 +599,6 @@ named!(type_object<Type>,
 named!(type_variable<Type>,
     map!(preceded!(tag!("'"), identifier), |s| Type::Variable(s))
 );
-
-//named!(type_list<Type>,
-//    map!(
-//        delimited!(tag!("List["), wscom!(type_description), tag!("]")),
-//        |t| Type::List(Box::new(t))
-//    )
-//);
 
 named!(type_function<Type>,
     wscom!(do_parse!(
@@ -888,60 +829,6 @@ pub fn print_error_info(name: &str, text: &[u8], err: (nom::ErrorKind, usize, us
     println!("{}:{}:{}: ParseError: error with \"{:?}\" near {:?}", name, lines, err.1 - start, err.0, String::from(str::from_utf8(&text[start .. end]).unwrap()));
 }
 
-
-///// Index Summaries /////
-/*
-#[derive(Clone, Debug, PartialEq)]
-pub enum Decl {
-    Symbol(String, Type),
-    Class((String, Vec<Type>), Option<(String, Vec<Type>)>, Vec<Decl>),
-}
-
-named!(pub parse_index<Vec<Decl>>,
-    complete!(do_parse!(
-        e: many0!(declarations) >>
-        eof!() >>
-        (e)
-    ))
-);
-
-named!(declarations<Decl>,
-    do_parse!(
-        s: wscom!(alt_complete!(
-            symbol_decl |
-            class_decl
-        )) >>
-        separator >>
-        (s)
-    )
-);
-
-named!(symbol_name<String>,
-    map_str!(recognize!(take_while!(is_not_colon)))
-);
-
-named!(symbol_decl<Decl>,
-    do_parse!(
-        wscom!(tag_word!("decl")) >>
-        n: symbol_name >>
-        wscom!(tag!(":")) >>
-        t: alt_complete!(type_overload | type_description) >>
-        (Decl::Symbol(n, t))
-    )
-);
-
-named!(class_decl<Decl>,
-    do_parse!(
-        wscom!(tag_word!("class")) >>
-        i: class_identifier >>
-        p: opt!(preceded!(wscom!(tag_word!("extends")), class_identifier)) >>
-        wscom!(tag!("{")) >>
-        s: many0!(symbol_decl) >>
-        wscom!(tag!("}")) >>
-        (Decl::Class(i, p, s))
-    )
-);
-*/
 
 #[cfg(test)]
 mod tests {

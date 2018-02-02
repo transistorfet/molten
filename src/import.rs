@@ -19,41 +19,6 @@ pub fn load_index<V, T>(scope: ScopeRef<V, T>, filename: &str) -> Vec<AST> where
     decl
 }
 
-/*
-pub fn load_index_vec<V, T>(scope: ScopeRef<V, T>, code: &Vec<Decl>) where V: Clone + Debug, T: Clone + Debug {
-    for node in code {
-        load_index_node(scope.clone(), node);
-    }
-}
-
-fn load_index_node<V, T>(scope: ScopeRef<V, T>, node: &Decl) where V: Clone + Debug, T: Clone + Debug {
-    match *node {
-        Decl::Symbol(ref name, ref ttype) => {
-            let dscope = Scope::target(scope.clone());
-            dscope.borrow_mut().define_func(name.clone(), Some(ttype.clone()), true);
-            if let Some(ref name) = unmangle_name(name) {
-                println!("OVERLOAD: {:?}", name);
-                dscope.borrow_mut().define_func(name.clone(), None, true);
-                let mut stype = dscope.borrow().get_variable_type(name).unwrap_or(Type::Overload(vec!()));
-                stype = stype.add_variant(scope.clone(), ttype.clone());
-                dscope.borrow_mut().update_variable_type(name, stype);
-            }
-        },
-        Decl::Class(ref pair, ref parent, ref body) => {
-            let classdef = scope.borrow_mut().create_class_def(pair, parent.clone());
-            let tscope = Scope::new_ref(Some(scope.clone()));
-            tscope.borrow_mut().set_class(true);
-            tscope.borrow_mut().set_basename(pair.0.clone());
-            //pair.1.iter().map(|ttype| check_for_typevars(tscope.clone(), &Some(ttype.clone()))).count();
-            //if let &Some((ref pname, ref ptypes)) = parent {
-            //    ptypes.iter().map(|ttype| check_for_typevars(tscope.clone(), &Some(ttype.clone()))).count();
-            //}
-            load_index_vec(tscope.clone(), body);
-        }
-    }
-}
-*/
-
 pub fn store_index<V, T>(scope: ScopeRef<V, T>, filename: &str, code: &Vec<AST>) where V: Clone, T: Clone {
     let index_text = build_index(scope, code);
     let mut index_file = File::create(filename).expect("Error creating index file");
@@ -122,7 +87,6 @@ pub fn unparse_type(ttype: Type) -> String {
             name.clone() + &params
         },
         Type::Variable(name) => format!("'{}", name),
-        //Type::List(stype) => format!("List[{}]", unparse_type(*stype)),
         Type::Function(args, ret) => {
             let argstr: Vec<String> = args.iter().map(|t| unparse_type(t.clone())).collect();
             format!("({}) -> {}", argstr.join(", "), unparse_type(*ret))

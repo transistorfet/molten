@@ -251,11 +251,11 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
             value
         },
 
-        /*
         // TODO you might need to create a new function to hold the body, so that it can be resumed from, and there also
         // might be an issue when you call a function one level down, and pass it the same unwind locations... it might effect all
         // functions, all the way down
         AST::Try(ref body, ref cases) => {
+            /*
             // TODO need to add multiple cases, and also it doesn't work
             let try_block = LLVMAppendBasicBlockInContext(data.context, func, label("try"));
             let catch_block = LLVMAppendBasicBlockInContext(data.context, func, label("catch"));
@@ -277,13 +277,14 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
 
             //LLVMAddIncoming(phi, values.as_mut_ptr(), do_blocks.as_mut_ptr(), values.len() as u32);
             //phi
+            */
             zero_int(data)
         },
 
         AST::Raise(ref expr) => {
-            LLVMBuildResume(data.builder, compile_node(data, func, unwind, scope.clone(), expr))
+            //LLVMBuildResume(data.builder, compile_node(data, func, unwind, scope.clone(), expr))
+            zero_int(data)
         },
-        */
 
         AST::SideEffect(ref op, ref args) => {
             // TODO This only handles two arguments, which is all that will be parsed, but you can do better... 
@@ -403,14 +404,15 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
             LLVMBuildBr(data.builder, before_block);
 
             LLVMPositionBuilderAtEnd(data.builder, after_block);
-            //let phi = LLVMBuildPhi(data.builder, LLVMInt64TypeInContext(data.context), label("whileend"));
+            //let phi = LLVMBuildPhi(data.builder, LLVMTypeOf(body_value), label("whileend"));
 
-            //let mut values = vec![texpr_value, fexpr_value];
-            //let mut blocks = vec![texpr_block, fexpr_block];
+            //let mut values = vec![body_value];
+            //let mut blocks = vec![before_block];
 
-            //LLVMAddIncoming(phi, values.as_mut_ptr(), blocks.as_mut_ptr(), 2);
+            //LLVMAddIncoming(phi, values.as_mut_ptr(), blocks.as_mut_ptr(), 1);
             //phi
-            body_value
+            //body_value
+            zero_int(data)
         },
 
         AST::For(ref name, ref list, ref body, ref id) => {
@@ -469,15 +471,6 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
             }
             list
         },
-
-        AST::Index(_, _, _) => panic!("InternalError: ast element shouldn't appear at this late phase: {:?}", node),
-        /*
-        AST::Index(ref base, ref index, ref stype) => {
-            let list = compile_node(data, func, unwind, scope.clone(), base);
-            let index = compile_node(data, func, unwind, scope.clone(), index);
-            build_cast_from_vartype(data, build_call(data, "List_get", &mut vec!(list, index)), get_type(data, scope.clone(), stype.clone().unwrap(), true))
-        },
-        */
 
 
         AST::New((ref name, ref types)) => {
@@ -564,13 +557,12 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
             ptr::null_mut()
         },
 
+        AST::Declare(_, _) => { zero_int(data) },
+
         AST::Type(_, _) => panic!("NotImplementedError: not yet supported, {:?}", node),
 
-        _ => {
-            let int_type = LLVMInt64TypeInContext(data.context);
-            let num: isize = -12;
-            LLVMConstInt(int_type, num as u64, 0)
-        },
+        AST::Underscore |
+        AST::Index(_, _, _) => panic!("InternalError: ast element shouldn't appear at this late phase: {:?}", node),
     }
 }
 
@@ -737,50 +729,6 @@ unsafe fn collect_functions_node<'a>(data: &mut LLVM<'a>, scope: ScopeRef<Value,
     };
     None
 }
-
-/*
-unsafe fn collect_functions_decl(data: &mut LLVM, scope: ScopeRef<Value, TypeValue>, decl: &AST) {
-    match *decl {
-        AST::Declare(ref name, ref ttype) => {
-            if let &Type::Function(_, _) = ttype {
-                let fname = scope.borrow().get_full_name(&Some(name.clone()), UniqueID(0));
-                println!("*****DECLARING: {:?}", fname);
-                let function = LLVMAddFunction(data.module, label(fname.as_str()), get_type(data, scope.clone(), ttype.clone(), false));
-                scope.borrow_mut().assign(name, function);
-            }
-        },
-        AST::Class((ref name, ref types), ref parent, ref body, ref id) => {
-            let mut structdef = if let Some((ref name, ref types)) = *parent {
-                scope.borrow().get_type_value(name).unwrap().structdef
-            } else {
-                vec!()
-            };
-            for ref decl in body {
-                match **decl {
-                    AST::Declare(ref name, ref ttype) => {
-                        match *ttype {
-                            Type::Function(_, _) => { },
-                            _ => structdef.push((name.clone(), ttype.clone())),
-                        }
-                    },
-                    _ => { }
-                }
-            }
-            let lltype = build_class_type(data, scope.clone(), name, structdef);
-
-            let classdef = scope.borrow().get_class_def(name);
-            //let mut args = vec!();
-            //let ftype = LLVMFunctionType(lltype, args.as_mut_ptr(), args.len() as u32, false as i32);
-            //let function = LLVMAddFunction(data.module, label(format!("{}_new", name).as_str()), ftype);
-            //classdef.borrow_mut().assign(&String::from("new"), function);
-            for decl in body {
-                collect_functions_decl(data, classdef.clone(), decl);
-            }
-        },
-        _ => { }
-    }
-}
-*/
 
 
 pub fn label(string: &str) -> *mut i8 {

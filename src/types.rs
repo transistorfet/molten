@@ -12,7 +12,6 @@ pub enum Type {
     Variable(String),
     Function(Vec<Type>, Box<Type>),
     Overload(Vec<Type>),
-    //List(Box<Type>),
     //Generic(String, Vec<Type>),
     //Constrained(Box<&mut AST>),
 }
@@ -81,24 +80,6 @@ impl Type {
         Type::Object(nametypes.0, nametypes.1)
     }
 
-
-    /*
-    pub fn update_variable_type<V, T>(scope: ScopeRef<V, T>, name: &String, ttype: Type) where V: Clone, T: Clone {
-        let otype = scope.borrow_mut().get_variable_type(name).clone();
-        if otype.is_some() {
-            let ntype = expect_type(scope.clone(), otype, Some(ttype.clone()));
-            scope.borrow_mut().update_variable_type(name, ntype);
-        }
-    }
-
-    pub fn update_type<V, T>(scope: ScopeRef<V, T>, name: &String, ttype: Type) where V: Clone, T: Clone {
-        let otype = scope.borrow().find_type(name).clone();
-        if otype.is_some() {
-            let ntype = check_type(scope.clone(), otype, Some(ttype), false);
-            scope.borrow_mut().update_type(name, ntype.unwrap());
-        }
-    }
-    */
 }
 
 
@@ -272,7 +253,8 @@ pub fn check_types_node<V, T>(map: ScopeMapRef<V, T>, scope: ScopeRef<V, T>, nod
         AST::While(ref mut cond, ref mut body) => {
             // TODO should this require the cond type to be Bool?
             check_types_node(map.clone(), scope.clone(), cond);
-            check_types_node(map.clone(), scope.clone(), body)
+            check_types_node(map.clone(), scope.clone(), body);
+            Type::Object(String::from("Nil"), vec!())
         },
 
         AST::For(ref name, ref mut list, ref mut body, ref id) => {
@@ -294,29 +276,8 @@ pub fn check_types_node<V, T>(map: ScopeMapRef<V, T>, scope: ScopeRef<V, T>, nod
             for ref mut expr in items {
                 ltype = Some(expect_type(scope.clone(), ltype, Some(check_types_node(map.clone(), scope.clone(), expr)), Check::List));
             }
-            //Type::List(Box::new(ltype.unwrap()))
             Type::Object(String::from("List"), vec!(ltype.unwrap_or_else(|| scope.borrow_mut().new_typevar())))
         },
-
-        AST::Index(_, _, _) => panic!("InternalError: ast element shouldn't appear at this late phase: {:?}", node),
-        /*
-        AST::Index(ref mut base, ref mut index, ref mut stype) => {
-            let ltype = resolve_type(scope.clone(), check_types_node(map.clone(), scope.clone(), base));
-            let itype = expect_type(scope.clone(), Some(Type::Object(String::from("Int"), vec!())), Some(check_types_node(map.clone(), scope.clone(), index)));
-            let etype = match ltype {
-                //Type::Object(ref name, ref types) => {
-                //    let classdef = scope.borrow().get_class_def(name);
-                //    // TODO check for [] method, and return the type of the get variant?
-                //    types[0].clone()
-                //},
-                Type::Object(ref name, ref types) if name.as_str() == "List" && types.len() == 1 => types[0].clone(),
-                //Type::List(ref ttype) => *ttype.clone(),
-                _ => panic!("TypeError: List type required for indexing, but found {:?}", ltype),
-            };
-            *stype = Some(etype.clone());
-            etype
-        },
-        */
 
         AST::New((ref name, ref types)) => {
             let odtype = scope.borrow().find_type(name);
@@ -375,9 +336,11 @@ pub fn check_types_node<V, T>(map: ScopeMapRef<V, T>, scope: ScopeRef<V, T>, nod
 
         AST::Noop => Type::Object(String::from("Nil"), vec!()),
 
+        AST::Underscore => scope.borrow_mut().new_typevar(),
+
         AST::Type(_, _) => panic!("NotImplementedError: not yet supported, {:?}", node),
 
-        AST::Underscore => scope.borrow_mut().new_typevar(),
+        AST::Index(_, _, _) => panic!("InternalError: ast element shouldn't appear at this late phase: {:?}", node),
     };
     
     println!("CHECK: {:?} {:?}", x, node);
