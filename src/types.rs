@@ -570,7 +570,7 @@ fn find_variant<V, T>(scope: ScopeRef<V, T>, otype: Type, atypes: Vec<Type>) -> 
                     return variant.clone();
                 }
             }
-            panic!("No valid variant found for {:?}", atypes);
+            panic!("No valid variant found for {:?}\n\t out of {:?}", atypes, variants);
         },
         _ => otype.clone(),
     }

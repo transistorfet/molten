@@ -200,6 +200,7 @@ pub fn get_builtins<'a>() -> Vec<Builtin<'a>> {
         Builtin::Func("realloc",    "('ptr, Int) -> 'ptr",          Func::External),
         Builtin::Func("free",       "('ptr) -> Nil",                Func::External),
         Builtin::Func("memcpy",     "('ptr, 'ptr, Int) -> 'ptr",    Func::External),
+        Builtin::Func("strcmp",     "(String, String) -> Int",      Func::External),
         Builtin::Func("puts",       "(String) -> Nil",              Func::External),
         Builtin::Func("gets",       "(String) -> String",           Func::External),
         Builtin::Func("strlen",     "(String) -> Int",              Func::External),
