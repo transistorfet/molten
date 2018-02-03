@@ -25,14 +25,13 @@
 
         let testy = fn x => x + 1
         let fac = fn (x : Int, y = 5 * 3, z: String = "hey") => if not x then 1 else x - -123
-        // TODO this causes an error because the type used in not() cannot be determined
-        //let fac2 = fn x, y, z => if not x then 1 else x - -123
+        let fac2 = fn x, y, z => if not x then 1 else x - -123
         testy(3)
 
-        // TODO this once again causes a segfault; the typevar of x is not resolved correctly, I think; it only panicks instead of segfault when creating llvm type if typevars are not silently turned into ints
-	//let test2 = fn x => x()
-	//let test3 = fn x => x() + 1
-        //puts(str(test3(fn => 3)))
+        // TODO this were causing trouble, but seem to compile now...
+	let test2 = fn x => x()
+	let test3 = fn x => x() + 1
+        puts(str(test3(fn => 3)))
 
         let recfoo = fn x => begin  //comment
             if x < 1 then           //comment
@@ -45,7 +44,7 @@
         0123
         0x234
         Inf
-        //Info  // checks that Inf parses correctly
+        //Info  // checks that Inf parses correctly, and that Info doesn't
         -Inf
         NaN
         true false
@@ -55,7 +54,7 @@
         (2 * 3) + (4 - 5)
         2 + 4 * 7 - 1 / 20  == 10 - 50 * 12
 
-        // NOTE this sorta causes a type error, as it should
+        // NOTE this sorta causes a type error (actually an overload/no variant error), as it should
         //let ab = 123.24 * 3
         // TODO implement ~ complement op
         //123 + ~124 * 25
@@ -89,7 +88,6 @@
                 self.foo2(x)
             }
 
-            // TODO causing issues
             fn foo2(self, a, b) {
                 a * 4.0 * b
             }
@@ -150,7 +148,6 @@
             // TODO we don't allow recursion in overloaded functions, although I don't know that that can be fixed without constrained types
             fn strnum(num: Int, suffix: String) -> String {
                 strnum(num)
-                "poop"
             }
 
             strnum(1, "px")
@@ -182,11 +179,10 @@
         let list: List['thing] = [ 1, 2, 3 ]
         list[1] = 5
         puts(str(list[1]))
+        // TODO this is just because the builtin [] String method is shadowed by the libcore String definition
         //puts(str("Thing"[2]))
         let list2 = [ new TestClass(), new Stuff(), new TestClass() ]
 
-
-        // TODO this doesn't compile because of a type error
 
         class NumList['a] extends List[Int] {
             let x: 'a = nil
@@ -247,7 +243,7 @@
         Thing::foo(a)
 
 
-        // TODO this probably shouldn't parse without a ; or \n
+        // TODO this probably shouldn't parse without a ; or \n, but it does
         thing "things"
 
 
@@ -262,17 +258,12 @@
         while x
             noop
 
-        for x in [ 1, 2, 3 ]
-            x * 100
-
 
         try raise a with
             1 => a
             2 => a * 4
             _ => a * 16
 
-
-        import thing.stuff
 
         thing.stuff() * ~foo().bar
 
@@ -297,23 +288,12 @@
         begin 123 * 342 end
 
 
-        class Thing {
-            fn thing => {
-                things * 4
-            }
-        }
-
-        for x in list
-            x * 100
-
-
         type newint = {
             things: int,
             stuff: int
         }
 
-        // TODO this at the end causes a parse error, but works everywhere else
-        //type newfloat = float
+        type newfloat = float
 
     */
 
