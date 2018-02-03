@@ -10,6 +10,10 @@ use clap::{ App, Arg };
 #[macro_use]
 extern crate nom;
 
+mod config;
+use config::Options;
+
+#[macro_use]
 mod parser;
 use parser::AST;
 
@@ -44,29 +48,33 @@ fn main() {
                 .help("Compiles as a library, without a main function"))
             .get_matches();
 
+    let mut options = Options::new();
+    options.is_library = matches.occurrences_of("library") > 0;
+
     let filename = matches.value_of("INPUT").unwrap();
     if matches.occurrences_of("compile") > 0 {
-        with_file(filename, |name, text| compile_string(name, text, matches.occurrences_of("library") > 0));
+        with_file(filename, |name, text| compile_string(name, text, &options));
     } else {
         println!("Use the -c flag to compile");
     }
 }
 
 fn with_file<F>(filename: &str, with: F) where F: Fn(&str, &[u8]) -> () {
+    let name = filename.rsplitn(2, '.').collect::<Vec<&str>>()[1];
     let mut f = File::open(filename).expect("Error: file not found");
 
     let mut contents = String::new();
     f.read_to_string(&mut contents).expect("Error reading file contents");
-    with(filename, contents.as_bytes())
+    with(name, contents.as_bytes())
 }
 
 
-fn compile_string(name: &str, text: &[u8], is_library: bool) {
+fn compile_string(name: &str, text: &[u8], options: &Options) {
     let builtins = lib_llvm::get_builtins();
     let map = lib_llvm::make_global(&builtins);
     let mut code = process_input(map.clone(), name, text);
 
-    compiler_llvm::compile(&builtins, map.clone(), name, &mut code, is_library);
+    compiler_llvm::compile(&builtins, map.clone(), options, name, &mut code);
 }
 
 
@@ -74,7 +82,7 @@ fn process_input<V, T>(map: ScopeMapRef<V, T>, name: &str, text: &[u8]) -> Vec<A
     let mut code = parser::parse_or_error(name, text);
     code = refinery::refine(code);
     traverse(&code);
-    //import::load_index(map.get_global(), "libcore.idx");
+    //import::load_index(map.get_global(), "libcore.dec");
     scope::bind_names(map.clone(), &mut code);
     let gtype = types::check_types(map.clone(), map.get_global(), &mut code);
     println!("\n{:?}\n", code);

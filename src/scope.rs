@@ -368,7 +368,6 @@ impl<V, T> Scope<V, T> where V: Clone, T: Clone {
             },
             Type::Function(args, ret) => Type::Function(self.map_typevars_vec(names, args), Box::new(self.map_typevars(names, *ret))),
             Type::Overload(variants) => Type::Overload(self.map_typevars_vec(names, variants)),
-            //Type::List(ref ltype) => Type::List(Box::new(self.map_typevars(names, ltype))),
             Type::Object(name, types) => Type::Object(name.clone(), self.map_typevars_vec(names, types)),
         }
     }
@@ -660,7 +659,7 @@ fn bind_names_node<V, T>(map: ScopeMapRef<V, T>, scope: ScopeRef<V, T>, node: &m
         },
 
         AST::Import(ref name, ref mut decls) => {
-            let path = name.replace(".", "/") + ".idx";
+            let path = name.replace(".", "/") + ".dec";
             *decls = import::load_index(scope.clone(), path.as_str());
             bind_names_vec(map.clone(), scope.clone(), decls);
         },

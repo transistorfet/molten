@@ -10,15 +10,16 @@ use self::llvm::core::*;
 
 use import;
 use parser::AST;
+use config::Options;
 use scope::{ Scope, ScopeRef, ScopeMapRef };
 use types::{ Type, resolve_type };
 use utils::UniqueID;
 use lib_llvm::{ Builtin, BuiltinMap, initialize_builtins };
 
 
-pub fn compile(builtins: &Vec<Builtin>, map: ScopeMapRef<Value, TypeValue>, module_name: &str, code: &Vec<AST>, is_library: bool) {
+pub fn compile(builtins: &Vec<Builtin>, map: ScopeMapRef<Value, TypeValue>, options: &Options, module_name: &str, code: &Vec<AST>) {
     unsafe {
-        compile_module(builtins, map.clone(), map.get_global(), module_name, code, is_library)
+        compile_module(builtins, map.clone(), map.get_global(), options, module_name, code)
     }
 }
 
@@ -64,16 +65,10 @@ pub struct LLVM<'a> {
 type Unwind = Option<(LLVMBasicBlockRef, LLVMBasicBlockRef)>;
 
 
-unsafe fn compile_module(builtins: &Vec<Builtin>, map: ScopeMapRef<Value, TypeValue>, scope: ScopeRef<Value, TypeValue>, module_name: &str, code: &Vec<AST>, is_library: bool) {
-    let file_parts: Vec<&str> = module_name.rsplitn(2, '.').collect();
-
+unsafe fn compile_module(builtins: &Vec<Builtin>, map: ScopeMapRef<Value, TypeValue>, scope: ScopeRef<Value, TypeValue>, options: &Options, module_name: &str, code: &Vec<AST>) {
     let context = LLVMContextCreate();
-    //let module = LLVMModuleCreateWithName(b"main_module\0".as_ptr() as *const _);
     let module = LLVMModuleCreateWithName(label(module_name));
     let builder = LLVMCreateBuilderInContext(context);
-    //let funcpass = LLVMCreateFunctionPassManagerForModule(module);
-    //LLVMInitializeFunctionPassManager(funcpass);
-    //let data = &mut LLVM { map: map, builtins: HashMap::new(), functions: Vec::new(), context: context, module: module, builder: builder, funcpass: funcpass };
     let data = &mut LLVM { map: map, builtins: BuiltinMap::new(), functions: Vec::new(), context: context, module: module, builder: builder };
     //LLVMSetDataLayout(data.module, label("e-m:e-i64:64-f80:128-n8:16:32:64-S128"));
 
@@ -84,7 +79,7 @@ unsafe fn compile_module(builtins: &Vec<Builtin>, map: ScopeMapRef<Value, TypeVa
         build_function_body(data, func);
     }
 
-    let module_init_name = format!("init.{}", file_parts[1].replace("/", "."));
+    let module_init_name = format!("init.{}", module_name.replace("/", "."));
 
     let function_type = LLVMFunctionType(bool_type(data), ptr::null_mut(), 0, 0);
     let function = LLVMAddFunction(module, label(module_init_name.as_str()), function_type);
@@ -93,7 +88,7 @@ unsafe fn compile_module(builtins: &Vec<Builtin>, map: ScopeMapRef<Value, TypeVa
     LLVMBuildRet(builder, LLVMConstInt(bool_type(data), 1, 0));
 
 
-    if !is_library {
+    if !options.is_library {
         let function_type = LLVMFunctionType(int_type(data), ptr::null_mut(), 0, 0);
         let function = LLVMAddFunction(module, b"main\0".as_ptr() as *const _, function_type);
         LLVMPositionBuilderAtEnd(builder, LLVMAppendBasicBlockInContext(context, function, label("entry")));
@@ -102,13 +97,12 @@ unsafe fn compile_module(builtins: &Vec<Builtin>, map: ScopeMapRef<Value, TypeVa
     }
 
     // Output to a file, and also a string for debugging
-    //LLVMFinalizeFunctionPassManager(funcpass);
-    LLVMPrintModuleToFile(module, label(format!("{}.ll", file_parts[1]).as_str()), ptr::null_mut());
+    LLVMPrintModuleToFile(module, label(format!("{}.ll", module_name).as_str()), ptr::null_mut());
     let compiled = CString::from_raw(LLVMPrintModuleToString(module));
 
     println!("{}\n", compiled.into_string().unwrap());
 
-    import::store_index(data.map.get_global(), format!("{}.idx", file_parts[1]).as_str(), code);
+    import::store_index(data.map.get_global(), format!("{}.dec", module_name).as_str(), code);
 
     LLVMDisposeBuilder(builder);
     LLVMDisposeModule(module);

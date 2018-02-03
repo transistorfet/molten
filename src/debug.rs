@@ -4,21 +4,13 @@ use parser::AST;
 use scope::{ ScopeRef, ScopeMapRef };
 
 /*
-print_code(code: &Vec<AST>) {
-    for node in code {
-        print_code_node(node);
-    }
-}
-
-print_code_node(node: &AST) {
-    println!("{:?}", node);
-    match *node {
-        AST::Block(ref body) => { print_code(body) },
-        _ => 
-    }
+macro_rules! debug {
+    //($fmt:expr, $($arg:expr),*) => {
+    //    println!($fmt, $(unsafe_render(&$arg)),*)
+    //}
+    ($fmt:expr, $($arg:tt)*) => (println!($fmt, $($arg)*));
 }
 */
-
 
 pub fn print_types<V, T>(map: ScopeMapRef<V, T>, scope: ScopeRef<V, T>, code: &Vec<AST>) where V: Clone, T: Clone {
     for node in code {

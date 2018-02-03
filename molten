@@ -1,0 +1,70 @@
+#!/usr/bin/python3
+
+import os
+import os.path
+import argparse
+
+
+RM = "rm"
+COMPILE = "cargo run --"
+LINK = "llvm-link-5.0"
+OPT = "opt-5.0"
+RUN = "lli-5.0"
+
+
+def main():
+    parser = argparse.ArgumentParser(prog='molten', formatter_class=argparse.ArgumentDefaultsHelpFormatter, description='Simple build script for molten programs')
+    subparsers = parser.add_subparsers()
+
+    cmd = subparsers.add_parser("build", help="compile a single file program")
+    cmd.add_argument("filename")
+    cmd.set_defaults(command=command_build)
+
+    cmd = subparsers.add_parser("run", help="compile and run a single file program")
+    cmd.add_argument("filename")
+    cmd.set_defaults(command=command_run)
+
+    cmd = subparsers.add_parser("clean", help="delete all generated files")
+    cmd.set_defaults(command=command_clean)
+
+    args = parser.parse_args()
+    args.command(args)
+
+
+def command_build(args):
+    target = os.path.splitext(args.filename)[0] + ".bc"
+    compile_and_link(target, [ "lib/libcore.ml", args.filename ])
+    return target
+
+def command_run(args):
+    target = command_build(args)
+    os.system(RUN + " " + target)
+
+def command_clean(args):
+    os.system(RM + " *.ll")
+    os.system(RM + " *.dec")
+    os.system(RM + " *.bc")
+
+
+
+def compile_and_link(target, deps):
+    compiled = [ ]
+    for dep in deps:
+        compiled.append(compile(dep))
+    link(target, compiled)
+
+
+def compile(filename):
+    target = os.path.splitext(filename)[0] + ".ll"
+    if not os.path.exists(target) or os.path.getmtime(filename) > os.path.getmtime(target):
+        os.system(COMPILE + " -c " + filename)
+    return target
+
+
+def link(target, filenames):
+    os.system(LINK + " " + " ".join(filenames) + " > " + target)
+
+
+if __name__ == "__main__":
+    main()
+

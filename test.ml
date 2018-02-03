@@ -1,5 +1,5 @@
 
-        import libcore
+        import lib.libcore
 
         let msg = "Hey"
         let stringstuff = fn x: String => msg
@@ -320,4 +320,5 @@
         // things
         /* stuff */
         4 + /* things */ 5
+
 
