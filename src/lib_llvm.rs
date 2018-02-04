@@ -191,6 +191,7 @@ unsafe fn declare_irregular_functions(data: &LLVM, scope: ScopeRef<Value, TypeVa
     //declare_function(data.module, scope.clone(), "puts", &mut [bytestr_type], cint_type, false);
     declare_function(data.module, scope.clone(), "sprintf", &mut [bytestr_type, bytestr_type], cint_type, true);
 
+    declare_function(data.module, scope.clone(), "llvm.pow.f64", &mut [real_type(data), real_type(data)], real_type(data), false);
 }
 
 
@@ -224,10 +225,13 @@ pub fn get_builtins<'a>() -> Vec<Builtin<'a>> {
             Builtin::Func("add", "(Int, Int) -> Int", Func::Runtime(build_lib_add)),
         )),
 
+        /*
         Builtin::Class("String", vec!(), vec!(
             //Builtin::Func("push", "(String, String) -> String", Func::Comptime(add_int)),
             Builtin::Func("[]",   "(String, Int) -> Int",       Func::Runtime(build_string_get)),
         )),
+        */
+        Builtin::Func("getindex",   "(String, Int) -> Int",       Func::Runtime(build_string_get)),
 
         Builtin::Class("Buffer", vec!(), vec!(
             Builtin::Func("__alloc__",  "() -> Buffer['item]",                      Func::Runtime(build_buffer_allocator)),
@@ -237,7 +241,7 @@ pub fn get_builtins<'a>() -> Vec<Builtin<'a>> {
             Builtin::Func("[]",         "(Buffer['item], Int, 'item) -> 'item",     Func::Runtime(build_buffer_set)),
         )),
 
-/*
+        /*
         Builtin::Class("List", vec!(
             (String::from("items"), parse_type("'item").unwrap()),
             (String::from("size"), parse_type("Int").unwrap()),
@@ -248,15 +252,15 @@ pub fn get_builtins<'a>() -> Vec<Builtin<'a>> {
             Builtin::Func("[]",   "(List['item], Int) -> 'item",        Func::Runtime(build_list_get)),
             Builtin::Func("[]",   "(List['item], Int, 'item) -> 'item", Func::Runtime(build_list_set)),
         )),
-*/
+        */
 
 
-        Builtin::Func("*",   "(Int, Int) -> Int",  Func::Comptime(mul_int)),
-        Builtin::Func("/",   "(Int, Int) -> Int",  Func::Comptime(div_int)),
-        //Builtin::Func("^",   "(Int, Int) -> Int",  Func::Comptime(exp_int)),
-        //Builtin::Func("%",   "(Int, Int) -> Int",  Func::Comptime(mod_int)),
         Builtin::Func("+",   "(Int, Int) -> Int",  Func::Comptime(add_int)),
         Builtin::Func("-",   "(Int, Int) -> Int",  Func::Comptime(sub_int)),
+        Builtin::Func("*",   "(Int, Int) -> Int",  Func::Comptime(mul_int)),
+        Builtin::Func("/",   "(Int, Int) -> Int",  Func::Comptime(div_int)),
+        Builtin::Func("%",   "(Int, Int) -> Int",  Func::Comptime(mod_int)),
+        //Builtin::Func("^",   "(Int, Int) -> Int",  Func::Comptime(pow_int)),
         //Builtin::Func("<<",  "(Int, Int) -> Int",  Func::Comptime(shl_int)),
         //Builtin::Func(">>",  "(Int, Int) -> Int",  Func::Comptime(shr_int)),
         Builtin::Func("&",   "(Int, Int) -> Int",  Func::Comptime(and_int)),
@@ -267,15 +271,16 @@ pub fn get_builtins<'a>() -> Vec<Builtin<'a>> {
         Builtin::Func(">=",  "(Int, Int) -> Bool", Func::Comptime(gte_int)),
         Builtin::Func("==",  "(Int, Int) -> Bool", Func::Comptime(eq_int)),
         Builtin::Func("!=",  "(Int, Int) -> Bool", Func::Comptime(ne_int)),
-        //Builtin::Func("~",   "(Int) -> Int",       Func::Comptime(com_int)),
+        Builtin::Func("~",   "(Int) -> Int",       Func::Comptime(com_int)),
         Builtin::Func("not", "(Int) -> Bool",      Func::Comptime(not_int)),
 
 
-        Builtin::Func("*",   "(Real, Real) -> Real",  Func::Comptime(mul_real)),
-        Builtin::Func("/",   "(Real, Real) -> Real",  Func::Comptime(div_real)),
-        //Builtin::Func("^",   "(Real, Real) -> Real",  Func::Comptime(exp_real)),
         Builtin::Func("+",   "(Real, Real) -> Real",  Func::Comptime(add_real)),
         Builtin::Func("-",   "(Real, Real) -> Real",  Func::Comptime(sub_real)),
+        Builtin::Func("*",   "(Real, Real) -> Real",  Func::Comptime(mul_real)),
+        Builtin::Func("/",   "(Real, Real) -> Real",  Func::Comptime(div_real)),
+        Builtin::Func("%",   "(Real, Real) -> Real",  Func::Comptime(mod_real)),
+        Builtin::Func("^",   "(Real, Real) -> Real",  Func::Comptime(pow_real)),
         Builtin::Func("<",   "(Real, Real) -> Bool",  Func::Comptime(lt_real)),
         Builtin::Func(">",   "(Real, Real) -> Bool",  Func::Comptime(gt_real)),
         Builtin::Func("<=",  "(Real, Real) -> Bool",  Func::Comptime(lte_real)),
@@ -295,6 +300,7 @@ fn add_int(data: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVM
 fn sub_int(data: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildSub(data.builder, args[0], args[1], label("tmp")) } }
 fn mul_int(data: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildMul(data.builder, args[0], args[1], label("tmp")) } }
 fn div_int(data: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildSDiv(data.builder, args[0], args[1], label("tmp")) } }
+fn mod_int(data: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildSRem(data.builder, args[0], args[1], label("tmp")) } }
 fn and_int(data: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildAnd(data.builder, args[0], args[1], label("tmp")) } }
 fn or_int(data: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildOr(data.builder, args[0], args[1], label("tmp")) } }
 fn eq_int(data: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildICmp(data.builder, llvm::LLVMIntPredicate::LLVMIntEQ, args[0], args[1], label("tmp")) } }
@@ -303,12 +309,15 @@ fn lt_int(data: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMB
 fn gt_int(data: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildICmp(data.builder, llvm::LLVMIntPredicate::LLVMIntSGT, args[0], args[1], label("tmp")) } }
 fn lte_int(data: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildICmp(data.builder, llvm::LLVMIntPredicate::LLVMIntSLE, args[0], args[1], label("tmp")) } }
 fn gte_int(data: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildICmp(data.builder, llvm::LLVMIntPredicate::LLVMIntSGE, args[0], args[1], label("tmp")) } }
+fn com_int(data: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildXor(data.builder, args[0], int_value(data, 0xFFFFFFFFFFFFFFFF), label("tmp")) } }
 fn not_int(data: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildNot(data.builder, args[0], label("tmp")) } }
 
 fn add_real(data: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildFAdd(data.builder, args[0], args[1], label("tmp")) } }
 fn sub_real(data: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildFSub(data.builder, args[0], args[1], label("tmp")) } }
 fn mul_real(data: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildFMul(data.builder, args[0], args[1], label("tmp")) } }
 fn div_real(data: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildFDiv(data.builder, args[0], args[1], label("tmp")) } }
+fn mod_real(data: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildFRem(data.builder, args[0], args[1], label("tmp")) } }
+fn pow_real(data: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { build_call(data, "llvm.pow.f64", &mut vec!(args[0], args[1])) } }
 fn eq_real(data: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildFCmp(data.builder, llvm::LLVMRealPredicate::LLVMRealOEQ, args[0], args[1], label("tmp")) } }
 fn ne_real(data: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildFCmp(data.builder, llvm::LLVMRealPredicate::LLVMRealONE, args[0], args[1], label("tmp")) } }
 fn lt_real(data: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildFCmp(data.builder, llvm::LLVMRealPredicate::LLVMRealOLT, args[0], args[1], label("tmp")) } }
@@ -446,7 +455,7 @@ unsafe fn build_list_set(data: &LLVM, name: &str, objtype: LLVMTypeRef) -> LLVMV
 */
 
 unsafe fn build_string_get(data: &LLVM, name: &str, objtype: LLVMTypeRef) -> LLVMValueRef {
-    let function = build_function_start(data, name, vec!(objtype, int_type(data)), int_type(data));
+    let function = build_function_start(data, name, vec!(str_type(data), int_type(data)), int_type(data));
     LLVMSetLinkage(function, llvm::LLVMLinkage::LLVMLinkOnceAnyLinkage);
 
     let string = LLVMGetParam(function, 0);

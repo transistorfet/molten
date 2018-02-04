@@ -23,7 +23,7 @@ pub fn print_types_node<V, T>(map: ScopeMapRef<V, T>, scope: ScopeRef<V, T>, nod
         AST::Block(ref body) => print_types(map.clone(), scope, body),
         AST::Function(_, _, _, ref body, ref id) => {
             let fscope = map.get(id);
-            print_types_scope(map.clone(), fscope.clone());
+            print_types_scope(fscope.clone());
             print_types_node(map.clone(), fscope.clone(), body);
         },
         AST::Definition((ref name, ref ttype), ref body) => {
@@ -34,7 +34,7 @@ pub fn print_types_node<V, T>(map: ScopeMapRef<V, T>, scope: ScopeRef<V, T>, nod
     }
 }
 
-pub fn print_types_scope<V, T>(map: ScopeMapRef<V, T>, scope: ScopeRef<V, T>) where V: Clone, T: Clone {
+pub fn print_types_scope<V, T>(scope: ScopeRef<V, T>) where V: Clone, T: Clone {
     println!("\nNames:");
     for (ref name, ref sym) in &scope.borrow_mut().names {
         println!("{:?} {:?} {:?}", name, sym.ttype, sym.funcdefs);

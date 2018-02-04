@@ -89,7 +89,7 @@ fn process_input<V, T>(map: ScopeMapRef<V, T>, name: &str, text: &[u8]) -> Vec<A
 
     //println!("\n{:?}\n\n{:?}", &code, global.clone());
     debug::print_types(map.clone(), map.get_global(), &code);
-    debug::print_types_scope(map.clone(), map.get_global());
+    debug::print_types_scope(map.get_global());
     code
 }
 

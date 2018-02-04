@@ -60,6 +60,12 @@
         //123 + ~124 * 25
         123 + (124 * 25)
 
+        puts("Rem: " + str(10 % 3))
+        puts("2^16: " + str(2.0 ^ 16.0))
+        puts("0xff & 0x80: " + str(0xff & 0x80))
+        puts("0x00 | 0x20: " + str(0x00 | 0x20))
+        puts("Com: " + hex(~0x5555555555555555))
+
 
         class Stuff {
             fn new(self) { }
@@ -179,8 +185,7 @@
         let list: List['thing] = [ 1, 2, 3 ]
         list[1] = 5
         puts(str(list[1]))
-        // TODO this is just because the builtin [] String method is shadowed by the libcore String definition
-        //puts(str("Thing"[2]))
+        puts(str("Thing"[2]))
         let list2 = [ new TestClass(), new Stuff(), new TestClass() ]
 
 

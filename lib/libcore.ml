@@ -1,11 +1,23 @@
 
 class String {
+    fn [](self, index: Int) {
+        getindex(self, index)
+    }
+
     fn push(self, s) {
         let selflength = strlen(self)
         let slength = strlen(s)
-        let buffer: String = malloc(selflength + slength)
+        let buffer: String = malloc(selflength + slength + 1)
         sprintf(buffer, "%s%s", self, s)
         buffer
+    }
+
+    // TODO this doesn't handle UTF-8
+    fn substr(self, start: Int, length: Int) {
+        let newstr: String = malloc(length + 1)
+        // TODO this doesn't work
+        memcpy(newstr, self, length)
+        //newstr[length] = 0
     }
 }
 
@@ -19,7 +31,13 @@ fn ==(str1: String, str2: String) -> Bool {
 
 fn str(num: Int) -> String {
     let buffer: String = malloc(22)
-    sprintf(buffer, "%d", num)
+    sprintf(buffer, "%ld", num)
+    buffer
+}
+
+fn hex(num: Int) -> String {
+    let buffer: String = malloc(22)
+    sprintf(buffer, "0x%lX", num)
     buffer
 }
 
@@ -82,4 +100,23 @@ class List['item] {
         self[index]
     }
 }
+
+
+/*
+class HashMap['item] {
+    let size = 0
+    let data: Buffer['item] = nil
+
+    fn new(self) {
+        self.size = 10
+        self.data = new Buffer['item](self.size)
+    }
+
+    fn resize(self, size) {
+        self.size = size
+        self.data = self.data.resize(self.size)
+    }
+
+}
+*/
 

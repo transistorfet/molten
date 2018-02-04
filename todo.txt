@@ -1,16 +1,14 @@
 
-* make tests and examples (and commit them)
 * fix the issues where you need nil and shit to make it work.... i think parser parsing ";" into noop/nil might work
 * should you change to < > format instead of [ ] for type parameters, in the name of consistency?
+* should variables be writable... this is more about breaking with functional traditions
+* add a const expression
 
 * what about the value initializations in the class...
 * should class bodies use different rules than blocks, with different definition statements, like "def foo: Int", such that a value isn't required for members
 
 
-
 * issue with self and super type defs; they don't contain the type info; maybe add an aliasing type?
-* there might be trouble with the argument cast in invoke compiling
-* issue with re-extending classes could be solved by renaming/mangling the type
 * what if you a 'context' passed to the node visitors that would allow "if" to know if its' return is used or not, and so whether typechecking must match
 
 * you might have a potentially big issue with duplicate type variables, specifically with map_typevars; it could mistake an undeclared
@@ -21,19 +19,17 @@
 * add an iterator type that gets used in for loops; might need vtables for that
 
 
-* change the debug prints to overwrite Debug formatting for scopes
 * should you convert class name/types tuples into types
-* remove instances of List() type
+* match only works with integers... maybe call ==, but it would have to mangle correctly
+* there might be trouble with the argument cast in invoke compiling
 
 
-* fill in remaining math operators (make functions of them?)
 * fill in string and list type functions
 * add line and column numbers to error reporting
 * add error returning so multiple errors can be caught at once
 * add better support for generics; right now it just forces everything to/from a pointer type
 
 * add vtables for classes
-* add a const expression
 * implement exceptions
 * implement garbage collection
 * get llvm closures working
@@ -41,7 +37,6 @@
 
 
 
-* fix scope resolution to also work on objects, so that you can have static methods...
 
 * if you make ops methods, then everything has to be type annotated, with the type system as it is; you'd need constrained types, or multiple paths, or bidirectional or something
 * make typed functions for all math operations, with the inlinealways attribute, if you decide to make operators methods
@@ -53,6 +48,7 @@
 
 * should you change the return type annotation format to : from ->?  fn foobar(): String { } instead of fn foobar() -> String { }
 * should you add a return statement?  It's not functional, but it's practial
+* should you fix scope resolution to also work on objects, so that you can have static methods???
 * should import indexes also list all the modules that the file imports, so that class definitions in other imports can be found, if needed for arguments
 * should you require an override keyword when masking definitions in lower scopes? like class definitions
 * should you allow keyword arguments in invoke; foo(a=10, b=20)

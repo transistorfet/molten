@@ -49,15 +49,17 @@ def command_clean(args):
 
 def compile_and_link(target, deps):
     compiled = [ ]
+    main = deps.pop()
     for dep in deps:
-        compiled.append(compile(dep))
+        compiled.append(compile(dep, "-l"))
+    compiled.append(compile(main))
     link(target, compiled)
 
 
-def compile(filename):
+def compile(filename, flags=""):
     target = os.path.splitext(filename)[0] + ".ll"
     if not os.path.exists(target) or os.path.getmtime(filename) > os.path.getmtime(target):
-        os.system(COMPILE + " -c " + filename)
+        os.system(COMPILE + " -c " + flags + " " + filename)
     return target
 
 
