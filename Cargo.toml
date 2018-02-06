@@ -7,5 +7,5 @@ authors = ["transistor <trans@jabberwocky.ca>"]
 #nom = "^3.2"
 nom = { version = "^3.2", features = ["verbose-errors"] }
 clap = "^2"
-llvm-sys = "50"			# NOTE: must run before compiling `sudo ln -s /usr/bin/llvm-config-5.0 /usr/bin/llvm-config`
+llvm-sys = "50"
 

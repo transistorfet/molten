@@ -17,9 +17,9 @@ use utils::UniqueID;
 use lib_llvm::{ Builtin, BuiltinMap, initialize_builtins };
 
 
-pub fn compile(builtins: &Vec<Builtin>, map: ScopeMapRef<Value, TypeValue>, options: &Options, module_name: &str, code: &Vec<AST>) {
+pub fn compile(builtins: &Vec<Builtin>, map: ScopeMapRef<Value, TypeValue>, module_name: &str, code: &Vec<AST>) {
     unsafe {
-        compile_module(builtins, map.clone(), map.get_global(), options, module_name, code)
+        compile_module(builtins, map.clone(), map.get_global(), module_name, code)
     }
 }
 
@@ -65,7 +65,7 @@ pub struct LLVM<'a> {
 type Unwind = Option<(LLVMBasicBlockRef, LLVMBasicBlockRef)>;
 
 
-unsafe fn compile_module(builtins: &Vec<Builtin>, map: ScopeMapRef<Value, TypeValue>, scope: ScopeRef<Value, TypeValue>, options: &Options, module_name: &str, code: &Vec<AST>) {
+unsafe fn compile_module(builtins: &Vec<Builtin>, map: ScopeMapRef<Value, TypeValue>, scope: ScopeRef<Value, TypeValue>, module_name: &str, code: &Vec<AST>) {
     let context = LLVMContextCreate();
     let module = LLVMModuleCreateWithName(label(module_name));
     let builder = LLVMCreateBuilderInContext(context);
@@ -88,7 +88,7 @@ unsafe fn compile_module(builtins: &Vec<Builtin>, map: ScopeMapRef<Value, TypeVa
     LLVMBuildRet(builder, LLVMConstInt(bool_type(data), 1, 0));
 
 
-    if !options.is_library {
+    if !Options::as_ref().is_library {
         let function_type = LLVMFunctionType(int_type(data), ptr::null_mut(), 0, 0);
         let function = LLVMAddFunction(module, b"main\0".as_ptr() as *const _, function_type);
         LLVMPositionBuilderAtEnd(builder, LLVMAppendBasicBlockInContext(context, function, label("entry")));
@@ -805,6 +805,7 @@ pub unsafe fn build_function_start(data: &LLVM, name: &str, mut args: Vec<LLVMTy
         panic!("ArgsError: argument counts don't match");
     }
 
+    // TODO maybe these shouldn't be here, but it causes problems for library functions without it
     let bb = LLVMAppendBasicBlockInContext(data.context, function, label("entry"));
     LLVMPositionBuilderAtEnd(data.builder, bb);
 

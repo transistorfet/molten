@@ -15,6 +15,10 @@ You will need `rustc` and `cargo` installed.  It's recommended that you use
 You will also need LLVM 5.0 installed.  On Debian/Ubuntu, the packages are
 `llvm-5.0`, `llvm-5.0-runtime`, and `llvm-5.0-dev`
 
+You may need to run the following before the rust llvm package will compile:
+```
+sudo ln -s /usr/bin/llvm-config-5.0 /usr/bin/llvm-config
+```
 
 Running
 -------

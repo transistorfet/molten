@@ -48,12 +48,13 @@ fn main() {
                 .help("Compiles as a library, without a main function"))
             .get_matches();
 
-    let mut options = Options::new();
-    options.is_library = matches.occurrences_of("library") > 0;
+    //let mut options = Options::new();
+    Options::init();
+    Options::as_ref().is_library = matches.occurrences_of("library") > 0;
 
     let filename = matches.value_of("INPUT").unwrap();
     if matches.occurrences_of("compile") > 0 {
-        with_file(filename, |name, text| compile_string(name, text, &options));
+        with_file(filename, |name, text| compile_string(name, text));
     } else {
         println!("Use the -c flag to compile");
     }
@@ -69,12 +70,12 @@ fn with_file<F>(filename: &str, with: F) where F: Fn(&str, &[u8]) -> () {
 }
 
 
-fn compile_string(name: &str, text: &[u8], options: &Options) {
+fn compile_string(name: &str, text: &[u8]) {
     let builtins = lib_llvm::get_builtins();
     let map = lib_llvm::make_global(&builtins);
     let mut code = process_input(map.clone(), name, text);
 
-    compiler_llvm::compile(&builtins, map.clone(), options, name, &mut code);
+    compiler_llvm::compile(&builtins, map.clone(), name, &mut code);
 }
 
 

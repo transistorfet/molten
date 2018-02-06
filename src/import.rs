@@ -1,15 +1,18 @@
 
-use std::fmt::Debug;
 use std::fs::File;
+use std::path::Path;
+use std::fmt::Debug;
 use std::io::prelude::*;
 
 use types::Type;
+use config::Options;
 use scope::{ ScopeRef };
 use parser::{ AST, parse_or_error };
 
 
 pub fn load_index<V, T>(scope: ScopeRef<V, T>, filename: &str) -> Vec<AST> where V: Clone + Debug, T: Clone + Debug {
-    let mut f = File::open(filename).expect("Error: file not found");
+    //let mut f = File::open(filename).expect("Error: file not found");
+    let mut f = find_file(filename);
     let mut contents = String::new();
     f.read_to_string(&mut contents).expect("Error reading file contents");
 
@@ -17,6 +20,16 @@ pub fn load_index<V, T>(scope: ScopeRef<V, T>, filename: &str) -> Vec<AST> where
     println!("DECL: {:?}", decl);
     //load_index_vec(scope, &decl);
     decl
+}
+
+pub fn find_file(filename: &str) -> File {
+    for ref path in &Options::as_ref().libpath {
+        match File::open(Path::new(path).join(filename)) {
+            Ok(f) => return f,
+            Err(_) => { },
+        }
+    }
+    panic!("Error: file not found, {}", filename);
 }
 
 pub fn store_index<V, T>(scope: ScopeRef<V, T>, filename: &str, code: &Vec<AST>) where V: Clone, T: Clone {

@@ -53,11 +53,7 @@
         2 + 4 * 7 - 1 / 20  * 10 - 50 * 12
         (2 * 3) + (4 - 5)
         2 + 4 * 7 - 1 / 20  == 10 - 50 * 12
-
-        // NOTE this sorta causes a type error (actually an overload/no variant error), as it should
-        //let ab = 123.24 * 3
-        // TODO implement ~ complement op
-        //123 + ~124 * 25
+        123 + ~124 * 25
         123 + (124 * 25)
 
         puts("Rem: " + str(10 % 3))
@@ -65,6 +61,9 @@
         puts("0xff & 0x80: " + str(0xff & 0x80))
         puts("0x00 | 0x20: " + str(0x00 | 0x20))
         puts("Com: " + hex(~0x5555555555555555))
+
+        // NOTE this sorta causes a type error (actually an overload/no variant error), as it should
+        //let ab = 123.24 * 3
 
 
         class Stuff {

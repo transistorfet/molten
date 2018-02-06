@@ -3,13 +3,15 @@
 * should you change to < > format instead of [ ] for type parameters, in the name of consistency?
 * should variables be writable... this is more about breaking with functional traditions
 * add a const expression
+* modify classes so that function definitions as members (ie. let something = fn x => athing) becomes a function pointer as a struct element,
+  rather than syntactic sugar for a regular function defined on that class... it would mean each object would have it's own function pointer, but it kinda makes sense
 
 * what about the value initializations in the class...
 * should class bodies use different rules than blocks, with different definition statements, like "def foo: Int", such that a value isn't required for members
 
 
+
 * issue with self and super type defs; they don't contain the type info; maybe add an aliasing type?
-* what if you a 'context' passed to the node visitors that would allow "if" to know if its' return is used or not, and so whether typechecking must match
 
 * you might have a potentially big issue with duplicate type variables, specifically with map_typevars; it could mistake an undeclared
   function's typevar with an already defined typevar if they have the same name
@@ -38,6 +40,7 @@
 
 
 
+* what if you a 'context' passed to the node visitors that would allow "if" to know if its' return is used or not, and so whether typechecking must match
 * if you make ops methods, then everything has to be type annotated, with the type system as it is; you'd need constrained types, or multiple paths, or bidirectional or something
 * make typed functions for all math operations, with the inlinealways attribute, if you decide to make operators methods
 * is it even possible to add a special "constrained" type, which has &AST that must type check correctly in order to match (checks done in check_type)

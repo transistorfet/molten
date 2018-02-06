@@ -3,3 +3,6 @@ Cargo.lock
 .*.swo
 /target/
 **/*.rs.bk
+*.ll
+*.bc
+*.dec
