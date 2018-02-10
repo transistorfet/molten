@@ -7,8 +7,8 @@ as well as from Rust and Python.  The compiler is written in Rust and uses
 LLVM to generate IR which can be compiled to machine code.
 
 The goal of this project is to create a language with a focus on pragmatism.
-It is not a purely functional language, or a purely object oriented language,
-but it allows programming in either of those paradigms.
+It is not a purely functional language, as it has some side-effects, and it
+has a class-based object system with function and method overloading.
 
 
 Installing
