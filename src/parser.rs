@@ -552,7 +552,7 @@ named!(identifier<String>,
 named!(class_identifier<(String, Vec<Type>)>,
     do_parse!(
         i: identifier >>
-        p: opt!(complete!(delimited!(tag!("["), separated_list!(wscom!(tag!(",")), type_description), tag!("]")))) >>
+        p: opt!(complete!(delimited!(tag!("<"), separated_list!(wscom!(tag!(",")), type_description), tag!(">")))) >>
         ((i, p.unwrap_or(vec!())))
     )
 );

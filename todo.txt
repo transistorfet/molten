@@ -2,7 +2,6 @@
 * molten script doesn't check to see if cargo needs to be re-run, in which case recompile everything
 
 * fix the issues where you need nil and shit to make it work.... i think parser parsing ";" into noop/nil might work
-* should you change to < > format instead of [ ] for type parameters, in the name of consistency?
 * should variables be writable... this is more about breaking with functional traditions
 * add a const expression
 

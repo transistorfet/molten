@@ -53,15 +53,15 @@ fn +(s1: String, s2: String) -> String {
 
 
 
-class List['item] {
+class List<'item> {
     let capacity = 0
     let length = 0
-    let data: Buffer['item] = nil
+    let data: Buffer<'item> = nil
 
     fn new(self) {
         self.length = 0
         self.capacity = 10
-        self.data = new Buffer['item](self.capacity)
+        self.data = new Buffer<'item>(self.capacity)
     }
 
     fn len(self) {
@@ -103,13 +103,13 @@ class List['item] {
 
 
 /*
-class HashMap['item] {
+class HashMap<'item> {
     let size = 0
-    let data: Buffer['item] = nil
+    let data: Buffer<'item> = nil
 
     fn new(self) {
         self.size = 10
-        self.data = new Buffer['item](self.size)
+        self.data = new Buffer<'item>(self.size)
     }
 
     fn resize(self, size) {

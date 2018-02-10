@@ -2,9 +2,13 @@
 Molten
 ======
 
-Molten is a programming language which borrows heavily from the ML family of
-languages.  The compiler is written in Rust and uses LLVM to generate IR which
-can be compiled to machine code.
+Molten is a programming language which borrows from the ML family of languages,
+as well as from Rust and Python.  The compiler is written in Rust and uses
+LLVM to generate IR which can be compiled to machine code.
+
+The goal of this project is to create a language with a focus on pragmatism.
+It is not a purely functional language, or a purely object oriented language,
+but it allows programming in either of those paradigms.
 
 
 Installing
@@ -53,4 +57,121 @@ fn fac(x) {
 puts(str(fac(10)))
 ```
 
+### Types
+```
+Nil
+Bool
+Byte
+Int
+Real
+String
+() -> Int               // function type
+'a                      // type variable
+List<Int>               // list of integers
+```
+
+### Declarations
+```
+let foo = 0
+let bar: String = "Hey"
+```
+
+### Functions
+```
+fn foo(x, y) => x + y			// named inline function
+
+fn foo(x, y) { x + y }			// named block function
+
+let foo = fn x, y => x + y		// anonymous function
+
+foo(x: Int, y) -> Int => x + y		// with optional type annotations
+
+```
+
+### Invoking Functions
+Unlike in ML, the brackets of a function call are not elidable.  This is a
+design decision to improve readability of the code and to make the parser
+simpler and more predictable.
+```
+foo(1, 2)
+```
+
+### Classes
+```
+class Foo {
+    let name = "Unnamed"            // this may change in future
+
+    fn new(self, name) {
+        self.name = name
+    }
+
+    fn get(self) => self.name
+
+    fn static(x) => x * 2
+}
+
+class Bar extends Foo {
+    fn get(self, title) => self.name + " " + title
+}
+
+let bar = new Bar("Mischief")
+bar.get("The Cat")
+Foo::static(5)
+```
+
+### Flow Control
+```
+if x == 5 then
+    "It's five"
+else
+    "It's not five"
+
+match x {
+    1 => "It's one"
+    5 => "It's five"
+    _ => "It's not five"
+}
+```
+
+### Loops
+```
+while is_true
+    puts("looping")
+
+for i in [ 1, 2, 3 ]
+    puts("counting " + i)
+```
+
+### Blocks
+A block is a collection of statements which return the result of the last
+expression in the block.  They can be used in place of a single expression.
+```
+if self.x < 0 then {
+    self.x = 0
+    true
+} else {
+    false
+}
+```
+
+### Lists
+```
+let list1 = [ 1, 3, 6 ]
+let list2 = new List<String>();
+list2[1] = "Hello"
+puts(list2[1])
+
+for x in list1
+    puts(str(x))
+```
+
+### And / Or
+The keyword operators `and` and `or` have side-effects and will not execute
+the second expression if the result can be determined from the first
+expression.
+
+### Import
+```
+import libcore
+```
 

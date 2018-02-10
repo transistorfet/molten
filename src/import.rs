@@ -96,7 +96,7 @@ fn build_index_node<V, T>(index: &mut String, scope: ScopeRef<V, T>, node: &AST)
 pub fn unparse_type(ttype: Type) -> String {
     match ttype {
         Type::Object(name, types) => {
-            let params = if types.len() > 0 { format!("[{}]", types.iter().map(|p| unparse_type(p.clone())).collect::<Vec<String>>().join(", ")) } else { String::from("") };
+            let params = if types.len() > 0 { format!("<{}>", types.iter().map(|p| unparse_type(p.clone())).collect::<Vec<String>>().join(", ")) } else { String::from("") };
             name.clone() + &params
         },
         Type::Variable(name) => format!("'{}", name),

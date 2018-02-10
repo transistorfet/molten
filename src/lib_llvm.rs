@@ -235,11 +235,11 @@ pub fn get_builtins<'a>() -> Vec<Builtin<'a>> {
         Builtin::Func("getindex",   "(String, Int) -> Int",       Func::Runtime(build_string_get)),
 
         Builtin::Class("Buffer", vec!(), vec!(
-            Builtin::Func("__alloc__",  "() -> Buffer['item]",                      Func::Runtime(build_buffer_allocator)),
-            Builtin::Func("new",        "(Buffer['item], Int) -> Buffer['item]",    Func::Runtime(build_buffer_constructor)),
-            Builtin::Func("resize",     "(Buffer['item], Int) -> Buffer['item]",    Func::Runtime(build_buffer_resize)),
-            Builtin::Func("[]",         "(Buffer['item], Int) -> 'item",            Func::Runtime(build_buffer_get)),
-            Builtin::Func("[]",         "(Buffer['item], Int, 'item) -> 'item",     Func::Runtime(build_buffer_set)),
+            Builtin::Func("__alloc__",  "() -> Buffer<'item>",                      Func::Runtime(build_buffer_allocator)),
+            Builtin::Func("new",        "(Buffer<'item>, Int) -> Buffer<'item>",    Func::Runtime(build_buffer_constructor)),
+            Builtin::Func("resize",     "(Buffer<'item>, Int) -> Buffer<'item>",    Func::Runtime(build_buffer_resize)),
+            Builtin::Func("[]",         "(Buffer<'item>, Int) -> 'item",            Func::Runtime(build_buffer_get)),
+            Builtin::Func("[]",         "(Buffer<'item>, Int, 'item) -> 'item",     Func::Runtime(build_buffer_set)),
         )),
 
         /*
@@ -248,10 +248,10 @@ pub fn get_builtins<'a>() -> Vec<Builtin<'a>> {
             (String::from("size"), parse_type("Int").unwrap()),
             (String::from("capacity"), parse_type("Int").unwrap()),
         ), vec!(
-            Builtin::Func("new",  "(List['item]) -> List['item]",       Func::Runtime(build_list_constructor)),
-            Builtin::Func("push", "(List['item], 'item) -> Int",        Func::Runtime(build_list_push)),
-            Builtin::Func("[]",   "(List['item], Int) -> 'item",        Func::Runtime(build_list_get)),
-            Builtin::Func("[]",   "(List['item], Int, 'item) -> 'item", Func::Runtime(build_list_set)),
+            Builtin::Func("new",  "(List<'item>) -> List<'item>",       Func::Runtime(build_list_constructor)),
+            Builtin::Func("push", "(List<'item>, 'item) -> Int",        Func::Runtime(build_list_push)),
+            Builtin::Func("[]",   "(List<'item>, Int) -> 'item",        Func::Runtime(build_list_get)),
+            Builtin::Func("[]",   "(List<'item>, Int, 'item) -> 'item", Func::Runtime(build_list_set)),
         )),
         */
 

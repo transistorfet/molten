@@ -172,37 +172,37 @@
 
         let alloc = malloc(30)
 
-	let buffer = new Buffer[Int](5)
+	let buffer = new Buffer<Int>(5)
         buffer[0] = 124
 	puts(str(buffer[0]))
 
-        let list3 = new List[Int]()
+        let list3 = new List<Int>()
         list3.push(4)
         list3[4] = 123
         puts(str(list3[4]))
 
-        let list: List['thing] = [ 1, 2, 3 ]
+        let list: List<'thing> = [ 1, 2, 3 ]
         list[1] = 5
         puts(str(list[1]))
         puts(str("Thing"[2]))
         let list2 = [ new TestClass(), new Stuff(), new TestClass() ]
 
 
-        class NumList['a] extends List[Int] {
+        class NumList<'a> extends List<Int> {
             let x: 'a = nil
 
         }
 
-        class A['it] extends List['it] {
+        class A<'it> extends List<'it> {
             let foo = 1.2
         }
 
-        class B['it, 'jt] extends A['jt] {
+        class B<'it, 'jt> extends A<'jt> {
             let bar: 'it = nil
 
         }
 
-        let c = new B[Real, Int]()
+        let c = new B<Real, Int>()
         // TODO compiles but can't run because the real isn't cast to varpointer
         //c.bar = 3.2
 
