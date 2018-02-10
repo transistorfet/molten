@@ -1,11 +1,8 @@
 
 
-//use std::rc::Rc;
-//use std::cell::RefCell;
-use std::sync::Mutex;
-
 #[derive(Clone, Debug, PartialEq)]
 pub struct Options<'a> {
+    pub debug: bool,
     pub is_library: bool,
     pub libpath: Vec<&'a str>,
 }
@@ -20,7 +17,7 @@ static mut _OPTIONS: Option<Options<'static>> = None;
 impl Options<'static> {
     pub fn init() {
         unsafe {
-            _OPTIONS = Some(Options { is_library: false, libpath: vec!(".", "lib") });
+            _OPTIONS = Some(Options { debug: false, is_library: false, libpath: vec!(".", "lib") });
         }
     }
 

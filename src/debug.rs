@@ -3,14 +3,17 @@ use parser::AST;
 //use utils::UniqueID;
 use scope::{ ScopeRef, ScopeMapRef };
 
-/*
 macro_rules! debug {
     //($fmt:expr, $($arg:expr),*) => {
     //    println!($fmt, $(unsafe_render(&$arg)),*)
     //}
-    ($fmt:expr, $($arg:tt)*) => (println!($fmt, $($arg)*));
+    ($fmt:expr, $($arg:tt)*) => {
+        use config::Options;
+        if Options::as_ref().debug {
+            println!($fmt, $($arg)*)
+        }
+    }
 }
-*/
 
 pub fn print_types<V, T>(map: ScopeMapRef<V, T>, scope: ScopeRef<V, T>, code: &Vec<AST>) where V: Clone, T: Clone {
     for node in code {

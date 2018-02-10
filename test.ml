@@ -151,12 +151,12 @@
 
         fn overload() {
             // TODO we don't allow recursion in overloaded functions, although I don't know that that can be fixed without constrained types
-            fn strnum(num: Int, suffix: String) -> String {
-                strnum(num)
-            }
+            //fn strnum(num: Int, suffix: String) -> String {
+            //    strnum(num)
+            //}
 
-            strnum(1, "px")
-            strnum(1.0)
+            //strnum(1, "px")
+            //strnum(1.0)
         }
 
 	puts("thing" + "stuff\n")
@@ -207,7 +207,7 @@
         //c.bar = 3.2
 
         class Thing {
-            fn new(self) { }
+            //fn new(self) { }
 
             let foo = fn a => {
                 a * 4
@@ -254,6 +254,14 @@
         for x in [ 1, 2, 3 ]
             puts("Count: " + str(x))
 
+        fn test() {
+            let a = 98899
+            fn closure() {
+                a
+            }
+        }
+
+        puts(str(test()()))
 
     /*
 

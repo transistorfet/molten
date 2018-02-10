@@ -1,7 +1,6 @@
 
 use std::ptr;
 use std::fmt;
-use std::io::prelude::*;
 use std::ffi::CString;
 
 extern crate llvm_sys as llvm;
@@ -172,6 +171,7 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
                         _ => compile_node(data, func, unwind, scope.clone(), fexpr)
                     };
                 }
+                println!("**************: {:?}", LLVMGetValueKind(function));
                 LLVMDumpValue(function);
 
                 // Cast values to the function's declared type; this is a hack for typevar/generic arguments
@@ -229,7 +229,7 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
             }
         },
 
-        AST::Definition((ref name, ref ttype), ref body) => {
+        AST::Definition((ref name, ref ttype), ref value) => {
             let ltype = get_type(data, scope.clone(), ttype.clone().unwrap(), true);
             let pointer = if scope.borrow().is_global() {
                 //LLVMAddGlobal(data.module, ltype, label(name.as_str()))
@@ -240,7 +240,7 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
                 LLVMBuildAlloca(data.builder, ltype, label(name.as_str()))
             };
             scope.borrow_mut().assign(name, pointer);
-            let value = compile_node(data, func, unwind, scope, body);
+            let value = compile_node(data, func, unwind, scope, value);
             LLVMBuildStore(data.builder, value, pointer);
             value
         },
@@ -457,7 +457,6 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
 
         AST::List(ref items) => {
             // TODO this is kinda wrong, since you're passing it without type params
-            //let listdata = compile_node(data, func, unwind, scope.clone(), &AST::New((String::from("List"), vec!())));
             let list = build_call(data, "List_new", &mut vec!(compile_node(data, func, unwind, scope.clone(), &AST::New((String::from("List"), vec!())))));
             for item in items {
                 let value = build_cast_to_vartype(data, compile_node(data, func, unwind, scope.clone(), item));
@@ -474,10 +473,10 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
                 let mut largs = vec!();
                 LLVMBuildCall(data.builder, function, largs.as_mut_ptr(), largs.len() as u32, label("tmp"))
             } else {
-                let lltype = scope.borrow().get_type_value(name).map(|info| info.value).unwrap();
-                //let obj = build_malloc(data, LLVMSizeOf(LLVMGetElementType(lltype)));
-                let obj = LLVMBuildMalloc(data.builder, LLVMGetElementType(lltype), label("ptr"));
-                LLVMBuildPointerCast(data.builder, obj, lltype, label("ptr"))
+                panic!("InternalError: no __alloc__ method for {}", name);
+                //let lltype = scope.borrow().get_type_value(name).map(|info| info.value).unwrap();
+                //let obj = LLVMBuildMalloc(data.builder, LLVMGetElementType(lltype), label("ptr"));
+                //LLVMBuildPointerCast(data.builder, obj, lltype, label("ptr"))
             }
         },
 
@@ -513,11 +512,11 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
             if let Type::Function(_, _) = sym.ttype.unwrap() {
                 sym.value.unwrap()
             } else {
-                //let structdef = scope.borrow().get_struct_def(&name).unwrap();
-                let structdef = scope.borrow().get_type_value(&name).unwrap().structdef;
-                let index = structdef.iter().position(|ref r| r.0 == *right).unwrap();
-                let mut indices = vec!(i32_value(data, 0), i32_value(data, index));
-                let pointer = LLVMBuildGEP(data.builder, object, indices.as_mut_ptr(), indices.len() as u32, label("tmp"));
+                //let structdef = scope.borrow().get_type_value(&name).unwrap().structdef;
+                //let index = structdef.iter().position(|ref r| r.0 == *right).unwrap();
+                //let mut indices = vec!(i32_value(data, 0), i32_value(data, index));
+                //let pointer = LLVMBuildGEP(data.builder, object, indices.as_mut_ptr(), indices.len() as u32, label("tmp"));
+                let pointer = build_struct_access(data, scope.clone(), object, &name, right);
                 LLVMBuildLoad(data.builder, pointer, label("tmp"))
             }
         },
@@ -530,10 +529,11 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
                     let object = compile_node(data, func, unwind, scope.clone(), left);
                     let cint_type = i32_type(data);
 
-                    let structdef = scope.borrow().get_type_value(&name).unwrap().structdef;
-                    let index = structdef.iter().position(|ref r| r.0 == *right).unwrap();
-                    let mut indices = vec!(LLVMConstInt(cint_type, 0, 0), LLVMConstInt(cint_type, index as u64, 0));
-                    let pointer = LLVMBuildGEP(data.builder, object, indices.as_mut_ptr(), indices.len() as u32, label("tmp"));
+                    //let structdef = scope.borrow().get_type_value(&name).unwrap().structdef;
+                    //let index = structdef.iter().position(|ref r| r.0 == *right).unwrap();
+                    //let mut indices = vec!(LLVMConstInt(cint_type, 0, 0), LLVMConstInt(cint_type, index as u64, 0));
+                    //let pointer = LLVMBuildGEP(data.builder, object, indices.as_mut_ptr(), indices.len() as u32, label("tmp"));
+                    let pointer = build_struct_access(data, scope.clone(), object, &name, right);
                     LLVMBuildStore(data.builder, value, pointer)
                 },
                 _ => panic!("???"),
@@ -570,11 +570,11 @@ unsafe fn collect_functions_vec<'a>(data: &mut LLVM<'a>, scope: ScopeRef<Value, 
 
 unsafe fn collect_functions_node<'a>(data: &mut LLVM<'a>, scope: ScopeRef<Value, TypeValue>, node: &'a AST) -> Option<LLVMValueRef> {
     match *node {
-
         AST::Function(ref name, ref args, ref rtype, ref body, ref id) => {
             let fscope = data.map.get(id);
-            let ftype = get_type(data, scope.clone(), Type::Function(args.iter().map(|t| t.1.clone().unwrap()).collect(), Box::new(rtype.clone().unwrap())), false);
             let fname = scope.borrow().get_full_name(name, id.clone());
+
+            let ftype = get_type(data, scope.clone(), Type::Function(args.iter().map(|t| t.1.clone().unwrap()).collect(), Box::new(rtype.clone().unwrap())), false);
             let function = LLVMAddFunction(data.module, label(fname.as_str()), ftype);
             //LLVMSetGC(function, label("shadow-stack"));
 
@@ -606,9 +606,9 @@ unsafe fn collect_functions_node<'a>(data: &mut LLVM<'a>, scope: ScopeRef<Value,
 
         AST::SideEffect(_, ref args) => { collect_functions_vec(data, scope, args); },
 
-        AST::Definition((ref name, ref ttype), ref body) => {
-            //collect_functions_node(data, scope, body);
-            if let Some(function) = collect_functions_node(data, scope.clone(), body) {
+        AST::Definition((ref name, ref ttype), ref value) => {
+            //collect_functions_node(data, scope, value);
+            if let Some(function) = collect_functions_node(data, scope.clone(), value) {
                 let dscope = Scope::target(scope.clone());
                 dscope.borrow_mut().assign(name, function);
             }
@@ -666,8 +666,8 @@ unsafe fn collect_functions_node<'a>(data: &mut LLVM<'a>, scope: ScopeRef<Value,
             };
             for ref node in body.iter() {
                 match **node {
-                    AST::Definition((ref name, ref ttype), ref body) => {
-                        match **body {
+                    AST::Definition((ref name, ref ttype), ref value) => {
+                        match **value {
                             AST::Function(_, _, _, _, _) => { },
                             _ => structdef.push((name.clone(), ttype.clone().unwrap())),
                         }
@@ -684,10 +684,14 @@ unsafe fn collect_functions_node<'a>(data: &mut LLVM<'a>, scope: ScopeRef<Value,
 
             let lltype = build_class_type(data, scope.clone(), name, structdef);
 
-
-            // TODO you need to add the 'new' function definition here, but the value should be stored in cscope, not tscope...
-            //let classdef = scope.borrow().get_class_def(name);
-            //classdef.borrow_mut().assign(&String::from("new"), build_constructor(data, format!("{}_new", name).as_str(), lltype));
+            let alloc = String::from("__alloc__");
+            let classdef = scope.borrow().get_class_def(name);
+            if !classdef.borrow().contains_local(&alloc) {
+                println!("******* CREATING ALLOC: {}", name);
+                let cname = scope.borrow().get_full_name(&Some(name.clone()), id.clone());
+                classdef.borrow_mut().define(alloc.clone(), Some(Type::Function(vec!(), Box::new(Type::Object(name.clone(), types.clone())))));
+                classdef.borrow_mut().assign(&alloc, build_allocator(data, tscope.clone(), &name, format!("{}_{}", cname, alloc).as_str(), lltype, body));
+            }
             collect_functions_vec(data, tscope.clone(), body);
         },
 
@@ -709,9 +713,6 @@ unsafe fn collect_functions_node<'a>(data: &mut LLVM<'a>, scope: ScopeRef<Value,
         },
 
         AST::Import(_, ref decls) => {
-            //for decl in decls {
-            //    collect_functions_decl(data, scope.clone(), decl);
-            //}
             collect_functions_vec(data, scope.clone(), decls);
         },
 
@@ -836,15 +837,53 @@ pub unsafe fn build_call(data: &LLVM, name: &str, largs: &mut Vec<LLVMValueRef>)
     LLVMBuildCall(data.builder, function, largs.as_mut_ptr(), largs.len() as u32, label("tmp"))
 }
 
+pub unsafe fn build_allocator(data: &LLVM, scope: ScopeRef<Value, TypeValue>, cname: &String, fname: &str, lltype: LLVMTypeRef, body: &Vec<AST>) -> LLVMValueRef {
+    let function = build_function_start(data, fname, vec!(), lltype);
+    //let obj = build_malloc(data, LLVMSizeOf(LLVMGetElementType(lltype)));
+    let mem = LLVMBuildMalloc(data.builder, LLVMGetElementType(lltype), label("ptr"));
+    let object = LLVMBuildPointerCast(data.builder, mem, lltype, label("ptr"));
+
+    let structdef = scope.borrow().get_type_value(&cname).unwrap().structdef;
+    for ref node in body.iter() {
+        match **node {
+            AST::Definition((ref name, ref ttype), ref value) => {
+                match **value {
+                    AST::Function(_, _, _, _, _) => { },
+                    _ => {
+                        //let lvalue = compile_node(data, function, None, scope.clone(), value);
+                        //let index = structdef.iter().position(|ref r| r.0 == *name).unwrap();
+                        //let mut indices = vec!(LLVMConstInt(i32_type(data), 0, 0), LLVMConstInt(i32_type(data), index as u64, 0));
+                        //let pointer = LLVMBuildGEP(data.builder, object, indices.as_mut_ptr(), indices.len() as u32, label("tmp"));
+                        //LLVMBuildStore(data.builder, lvalue, pointer);
+                    },
+                }
+            },
+            _ => { }
+        }
+    }
+
+    LLVMBuildRet(data.builder, object);
+    function
+}
+
+pub unsafe fn build_struct_access(data: &LLVM, scope: ScopeRef<Value, TypeValue>, object: LLVMValueRef, typename: &String, field: &String) -> LLVMValueRef {
+    let structdef = scope.borrow().get_type_value(&typename).unwrap().structdef;
+    let index = structdef.iter().position(|ref r| r.0 == *field).unwrap();
+    let mut indices = vec!(i32_value(data, 0), i32_value(data, index));
+    LLVMBuildGEP(data.builder, object, indices.as_mut_ptr(), indices.len() as u32, label("tmp"))
+}
+
 pub unsafe fn build_class_type(data: &LLVM, scope: ScopeRef<Value, TypeValue>, name: &String, structdef: Vec<(String, Type)>) -> LLVMTypeRef {
+    let lltype = LLVMStructCreateNamed(data.context, label(name));
+    let pltype = LLVMPointerType(lltype, 0);
+    scope.borrow_mut().set_type_value(name, TypeValue { structdef: structdef.clone(), value: pltype });
+
     let mut types = vec!();
     for &(_, ref ttype) in &structdef {
         types.push(get_type(data, scope.clone(), ttype.clone(), true))
     }
-    let lltype = LLVMStructCreateNamed(data.context, label(name));
     LLVMStructSetBody(lltype, types.as_mut_ptr(), types.len() as u32, false as i32);
-    let pltype = LLVMPointerType(lltype, 0);
-    scope.borrow_mut().set_type_value(name, TypeValue { structdef: structdef, value: pltype });
+
     pltype
 }
 
@@ -860,8 +899,9 @@ pub unsafe fn get_type(data: &LLVM, scope: ScopeRef<Value, TypeValue>, ttype: Ty
 
             _ => match scope.borrow().get_type_value(tname) {
                 Some(typedata) => typedata.value,
-                // TODO this should panic...
+                // TODO this should panic...  but Nil doesn't have a value (because it needs to know the type of null pointer it should be)
                 None => LLVMInt64TypeInContext(data.context),
+                //None => panic!("CompileError: unassigned type value, {:?}", tname),
             }
         },
         Type::Function(ref args, ref ret) => {

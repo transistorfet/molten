@@ -6,6 +6,7 @@ import argparse
 
 
 RM = "rm"
+BUILD = "cargo build"
 COMPILE = "cargo run --"
 LINK = "llvm-link-5.0"
 OPT = "opt-5.0"
@@ -14,6 +15,7 @@ RUN = "lli-5.0"
 
 def main():
     parser = argparse.ArgumentParser(prog='molten', formatter_class=argparse.ArgumentDefaultsHelpFormatter, description='Simple build script for molten programs')
+    parser.add_argument('-f', '--force', action='store_true', help='Force a recompile of all files')
     subparsers = parser.add_subparsers()
 
     cmd = subparsers.add_parser("build", help="compile a single file program")
@@ -33,7 +35,7 @@ def main():
 
 def command_build(args):
     target = os.path.splitext(args.filename)[0] + ".bc"
-    compile_and_link(target, [ "lib/libcore.ml", args.filename ])
+    compile_and_link(target, [ "lib/libcore.ml", args.filename ], force=args.force)
     return target
 
 def command_run(args):
@@ -41,24 +43,22 @@ def command_run(args):
     os.system(RUN + " " + target)
 
 def command_clean(args):
-    os.system(RM + " *.ll")
-    os.system(RM + " *.dec")
-    os.system(RM + " *.bc")
+    os.system(RM + " *.ll *.dec *.bc")
 
 
 
-def compile_and_link(target, deps):
+def compile_and_link(target, deps, force=False):
     compiled = [ ]
     main = deps.pop()
     for dep in deps:
-        compiled.append(compile(dep, "-l"))
-    compiled.append(compile(main))
+        compiled.append(compile(dep, flags="-l", force=force))
+    compiled.append(compile(main, force=force))
     link(target, compiled)
 
 
-def compile(filename, flags=""):
+def compile(filename, flags="", force=False):
     target = os.path.splitext(filename)[0] + ".ll"
-    if not os.path.exists(target) or os.path.getmtime(filename) > os.path.getmtime(target):
+    if force or not os.path.exists(target) or os.path.getmtime(filename) > os.path.getmtime(target):
         os.system(COMPILE + " -c " + flags + " " + filename)
     return target
 

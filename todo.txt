@@ -1,8 +1,11 @@
 
+* molten script doesn't check to see if cargo needs to be re-run, in which case recompile everything
+
 * fix the issues where you need nil and shit to make it work.... i think parser parsing ";" into noop/nil might work
 * should you change to < > format instead of [ ] for type parameters, in the name of consistency?
 * should variables be writable... this is more about breaking with functional traditions
 * add a const expression
+
 * modify classes so that function definitions as members (ie. let something = fn x => athing) becomes a function pointer as a struct element,
   rather than syntactic sugar for a regular function defined on that class... it would mean each object would have it's own function pointer, but it kinda makes sense
 
@@ -13,9 +16,9 @@
 
 * issue with self and super type defs; they don't contain the type info; maybe add an aliasing type?
 
+* should you change Real to Float?  also should you change them to lower case names, which is in line with sml, ocmal, f#
 * you might have a potentially big issue with duplicate type variables, specifically with map_typevars; it could mistake an undeclared
   function's typevar with an already defined typevar if they have the same name
-* could you pass an extra argument to check_types_node() with an expected type, so it can use that if needed, rather than creating a typevar
 * make nil work without using a typevar?  Or just eliminate unnecessary typevars
 * if you had a tuple type, you could use a typevar to represent a tuple of the arguments to a function: Type::Function(Type::Variable(..), Type::Variable(..)) or 'a -> 'b where 'a = ('c, 'd, 'e)
 * add an iterator type that gets used in for loops; might need vtables for that
@@ -31,10 +34,10 @@
 * add error returning so multiple errors can be caught at once
 * add better support for generics; right now it just forces everything to/from a pointer type
 
+* get llvm closures working
 * add vtables for classes
 * implement exceptions
 * implement garbage collection
-* get llvm closures working
 * implement type definition ast element (enum type?)
 
 

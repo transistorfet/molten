@@ -68,6 +68,10 @@ impl<V, T> Scope<V, T> where V: Clone, T: Clone {
         Rc::new(RefCell::new(Scope::new(parent)))
     }
 
+    pub fn is_local(&self) -> bool {
+        self.context == Context::Local
+    }
+
     pub fn is_global(&self) -> bool {
         self.context == Context::Global
     }
@@ -205,6 +209,25 @@ impl<V, T> Scope<V, T> where V: Clone, T: Clone {
         dscope.borrow_mut().update_variable_type(name, ftype.clone());
     }
 
+    pub fn is_closure_var(&self, name: &String) -> bool {
+        if self.names.contains_key(name) {
+            return false;
+        }
+
+        let mut parent = self.parent.clone();
+        while parent.is_some() {
+            let scope = parent.unwrap();
+            if scope.borrow().context == Context::Global {
+                return false;
+            }
+            if scope.borrow().contains_local(name) {
+                return true;
+            }
+            parent = scope.borrow().parent.clone();
+        }
+        false
+    }
+
 
     ///// Type Functions /////
 
@@ -277,9 +300,6 @@ impl<V, T> Scope<V, T> where V: Clone, T: Clone {
             },
             None => { }
         };
-
-        // Add constructor method
-        //classdef.borrow_mut().define(String::from("new"), Some(Type::Function(vec!(), Box::new(Type::Object(name.clone(), types.clone())))));
 
         // Define the class in the local scope
         self.define_type(name.clone(), Type::Object(name.clone(), types.clone()));
@@ -660,7 +680,7 @@ fn bind_names_node<V, T>(map: ScopeMapRef<V, T>, scope: ScopeRef<V, T>, node: &m
 
         AST::Import(ref name, ref mut decls) => {
             let path = name.replace(".", "/") + ".dec";
-            *decls = import::load_index(scope.clone(), path.as_str());
+            *decls = import::load_index(path.as_str());
             bind_names_vec(map.clone(), scope.clone(), decls);
         },
 

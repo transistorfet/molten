@@ -2,6 +2,7 @@
 
 use parser::AST;
 use types::Type;
+use utils::UniqueID;
 
 pub fn refine(code: Vec<AST>) -> Vec<AST> {
     refine_vec(code)
@@ -92,7 +93,7 @@ pub fn refine_node(node: AST) -> AST {
         AST::Class(pair, parent, body, id) => {
             // Make sure constructors take "self" as the first argument, and return "self" at the end
             let mut has_new = false;
-            let body = body.into_iter().map(|node| {
+            let mut body: Vec<AST> = body.into_iter().map(|node| {
                 match node {
                     AST::Function(name, mut args, ret, mut body, id) => {
                         if name == Some(String::from("new")) {
@@ -108,9 +109,10 @@ pub fn refine_node(node: AST) -> AST {
                     _ => node
                 }
             }).collect();
-            //if !has_new {
-            //    panic!("SyntaxError: you must declare a \"new\" method on a class");
-            //}
+            if !has_new {
+                body.insert(0, AST::Function(Some(String::from("new")), vec!((String::from("self"), None, None)), None, Box::new(AST::Identifier(String::from("self"))), UniqueID::generate()));
+                //panic!("SyntaxError: you must declare a \"new\" method on a class");
+            }
             AST::Class(pair, parent, refine_vec(body), id)
         },
 

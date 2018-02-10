@@ -14,6 +14,9 @@ mod config;
 use config::Options;
 
 #[macro_use]
+mod debug;
+
+#[macro_use]
 mod parser;
 use parser::AST;
 
@@ -23,11 +26,11 @@ mod scope;
 use scope::ScopeMapRef;
 
 mod types;
-mod debug;
 mod utils;
 mod import;
 //mod interpreter;
 //mod compiler_c;
+//mod closures;
 mod compiler_llvm;
 mod lib_llvm;
 
@@ -46,10 +49,14 @@ fn main() {
             .arg(Arg::with_name("library")
                 .short("l")
                 .help("Compiles as a library, without a main function"))
+            .arg(Arg::with_name("debug")
+                .short("d")
+                .help("Enables debug logging"))
             .get_matches();
 
     //let mut options = Options::new();
     Options::init();
+    Options::as_ref().debug = matches.occurrences_of("debug") > 0;
     Options::as_ref().is_library = matches.occurrences_of("library") > 0;
 
     let filename = matches.value_of("INPUT").unwrap();
@@ -74,6 +81,7 @@ fn compile_string(name: &str, text: &[u8]) {
     let builtins = lib_llvm::get_builtins();
     let map = lib_llvm::make_global(&builtins);
     let mut code = process_input(map.clone(), name, text);
+    //code = closures::convert_closures(map.clone(), code);
 
     compiler_llvm::compile(&builtins, map.clone(), name, &mut code);
 }

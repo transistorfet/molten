@@ -10,7 +10,7 @@ use scope::{ ScopeRef };
 use parser::{ AST, parse_or_error };
 
 
-pub fn load_index<V, T>(scope: ScopeRef<V, T>, filename: &str) -> Vec<AST> where V: Clone + Debug, T: Clone + Debug {
+pub fn load_index(filename: &str) -> Vec<AST> {
     //let mut f = File::open(filename).expect("Error: file not found");
     let mut f = find_file(filename);
     let mut contents = String::new();
@@ -18,7 +18,6 @@ pub fn load_index<V, T>(scope: ScopeRef<V, T>, filename: &str) -> Vec<AST> where
 
     let decl = parse_or_error(filename, contents.as_bytes());
     println!("DECL: {:?}", decl);
-    //load_index_vec(scope, &decl);
     decl
 }
 
@@ -71,6 +70,7 @@ fn build_index_node<V, T>(index: &mut String, scope: ScopeRef<V, T>, node: &AST)
             };
 
             index.push_str(format!("class {} {{\n", fullspec).as_str());
+            index.push_str(format!("    decl __alloc__ : () -> {}\n", namespec).as_str());
             for node in body {
                 match *node {
                     AST::Definition((ref name, ref ttype), _) => {
