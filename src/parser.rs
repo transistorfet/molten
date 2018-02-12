@@ -1,7 +1,7 @@
 
 
 extern crate nom;
-use nom::{ digit, hex_digit, oct_digit, line_ending, not_line_ending, space, multispace, is_alphanumeric, is_alphabetic, is_space, IResult };
+use nom::{ digit, hex_digit, oct_digit, line_ending, not_line_ending, space, multispace, is_alphanumeric, is_alphabetic, is_space, IResult, ErrorKind };
 
 use std;
 use std::f64;
@@ -134,7 +134,7 @@ named!(pub parse<Vec<AST>>,
 );
 
 named!(statement<AST>,
-    //separated_list!(ws!(tag!(",")), do_parse!(
+    //separated_list_complete!(ws!(tag!(",")), do_parse!(
     do_parse!(
         s: wscom!(alt_complete!(
             import |
@@ -156,7 +156,7 @@ named!(statement<AST>,
 named!(import<AST>,
     do_parse!(
         wscom!(tag_word!("import")) >>
-        e: map_str!(recognize!(separated_list!(tag!("."), identifier))) >>
+        e: map_str!(recognize!(separated_list_complete!(tag!("."), identifier))) >>
         (AST::Import(e, vec!()))
     )
 );
@@ -165,9 +165,11 @@ named!(definition<AST>,
     do_parse!(
         wscom!(tag_word!("let")) >>
         i: identifier_typed >>
-        wscom!(tag!("=")) >>
-        e: expression >>
-        (AST::Definition(i, Box::new(e)))
+        e: opt!(preceded!(
+            wscom!(tag!("=")),
+            expression
+        )) >>
+        (AST::Definition(i, Box::new(if e.is_some() { e.unwrap() } else { AST::Nil(None) })))
     )
 );
 
@@ -196,7 +198,12 @@ named!(class<AST>,
         i: class_identifier >>
         p: opt!(preceded!(wscom!(tag_word!("extends")), class_identifier)) >>
         wscom!(tag!("{")) >>
-        s: many0!(statement) >>
+        s: many0!(alt_complete!(
+            typedef |
+            definition |
+            declare |
+            function
+        )) >>
         wscom!(tag!("}")) >>
         (AST::Class(i, p, s, UniqueID::generate()))
     )
@@ -209,7 +216,7 @@ named!(typedef<AST>,
         wscom!(tag!("=")) >>
         s: alt!(
             map!(identifier_typed, |i| vec!(i)) |
-            delimited!(wscom!(tag!("{")), separated_list!(wscom!(tag!(",")), identifier_typed), wscom!(tag!("}")))
+            delimited!(wscom!(tag!("{")), separated_list_complete!(wscom!(tag!(",")), identifier_typed), wscom!(tag!("}")))
         ) >>
         (AST::Type(i, s))
     )
@@ -220,6 +227,7 @@ named!(typedef<AST>,
 named!(expression<AST>,
     alt_complete!(
         noop |
+        underscore |
         block |
         ifexpr |
         trywith |
@@ -235,6 +243,10 @@ named!(expression<AST>,
 
 named!(noop<AST>,
     value!(AST::Noop, tag_word!("noop"))
+);
+
+named!(underscore<AST>,
+    value!(AST::Underscore, tag!("_"))
 );
 
 named!(block<AST>,
@@ -292,7 +304,7 @@ named!(matchcase<AST>,
 );
 
 named!(caselist<Vec<(AST, AST)>>,
-    //separated_list!(wscom!(tag!(",")), do_parse!(
+    //separated_list_complete!(wscom!(tag!(",")), do_parse!(
     many1!(do_parse!(
         //wscom!(tag!("|")) >>
         c: alt_complete!(value!(AST::Underscore, tag!("_")) | literal) >>
@@ -357,11 +369,11 @@ named!(function<AST>,
 );
 
 named!(identifier_list<Vec<(String, Option<Type>)>>,
-    separated_list!(tag!(","), identifier_typed)
+    separated_list_complete!(tag!(","), identifier_typed)
 );
 
 named!(identifier_list_defaults<Vec<(String, Option<Type>, Option<AST>)>>,
-    separated_list!(tag!(","),
+    separated_list_complete!(tag!(","),
         do_parse!(
             i: identifier_typed >>
             d: opt!(preceded!(tag!("="), expression)) >>
@@ -533,7 +545,7 @@ named!(subatomic<AST>,
 );
 
 named!(expression_list<Vec<AST>>,
-    separated_list!(tag!(","), expression)
+    separated_list_complete!(tag!(","), expression)
 );
 
 named!(identifier<String>,
@@ -552,7 +564,7 @@ named!(identifier<String>,
 named!(class_identifier<(String, Vec<Type>)>,
     do_parse!(
         i: identifier >>
-        p: opt!(complete!(delimited!(tag!("<"), separated_list!(wscom!(tag!(",")), type_description), tag!(">")))) >>
+        p: opt!(complete!(delimited!(tag!("<"), separated_list_complete!(wscom!(tag!(",")), type_description), tag!(">")))) >>
         ((i, p.unwrap_or(vec!())))
     )
 );
@@ -602,7 +614,7 @@ named!(type_variable<Type>,
 
 named!(type_function<Type>,
     wscom!(do_parse!(
-        args: delimited!(tag!("("), separated_list!(wscom!(tag!(",")), type_description), tag!(")")) >>
+        args: delimited!(tag!("("), separated_list_complete!(wscom!(tag!(",")), type_description), tag!(")")) >>
         wscom!(tag!("->")) >>
         ret: type_description >>
         (Type::Function(args, Box::new(ret)))
@@ -611,14 +623,14 @@ named!(type_function<Type>,
 
 named!(type_overload<Type>,
     map!(
-        delimited!(tag!("Overload["), wscom!(separated_list!(wscom!(tag!(",")), type_description)), tag!("]")),
+        delimited!(tag!("Overload["), wscom!(separated_list_complete!(wscom!(tag!(",")), type_description)), tag!("]")),
         |t| Type::Overload(t)
     )
 );
 
 named!(reserved,
     alt!(
-        tag_word!("do") | tag_word!("end") | tag_word!("while")
+        tag_word!("do") | tag_word!("end") | tag_word!("while") | tag_word!("class")
     )
 );
 
@@ -718,7 +730,7 @@ named!(list<AST>,
     map!(
         delimited!(
             wscom!(tag!("[")),
-            separated_list!(wscom!(tag!(",")), expression),
+            separated_list_complete!(wscom!(tag!(",")), expression),
             wscom!(tag!("]"))
         ),
         |e| AST::List(e)

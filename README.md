@@ -120,6 +120,9 @@ Foo::static(5)
 ```
 
 ### Flow Control
+The return value of an if statement is the result of the expression of the
+clause that is evaluated.  The types of both clauses must match.  The `else`
+clause can be left out as long as the true clause evaluates to Nil.
 ```
 if x == 5 then
     "It's five"
@@ -146,7 +149,7 @@ for i in [ 1, 2, 3 ]
 A block is a collection of statements which return the result of the last
 expression in the block.  They can be used in place of a single expression.
 ```
-if self.x < 0 then {
+let is_zero = if self.x < 0 then {
     self.x = 0
     true
 } else {
@@ -168,7 +171,8 @@ for x in list1
 ### And / Or
 The keyword operators `and` and `or` have side-effects and will not execute
 the second expression if the result can be determined from the first
-expression.
+expression.  The resulting value is the last expression that was executed.
+Operands are not limited to Bool values, although that may change in future.
 
 ### Import
 ```

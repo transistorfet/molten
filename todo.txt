@@ -1,31 +1,20 @@
 
-* molten script doesn't check to see if cargo needs to be re-run, in which case recompile everything
+* either add in the initialization of class variables, possibly limited to constant expressions only, or else raise an error if an initializer is provided
 
-* fix the issues where you need nil and shit to make it work.... i think parser parsing ";" into noop/nil might work
 * should variables be writable... this is more about breaking with functional traditions
 * add a const expression
 
-* modify classes so that function definitions as members (ie. let something = fn x => athing) becomes a function pointer as a struct element,
-  rather than syntactic sugar for a regular function defined on that class... it would mean each object would have it's own function pointer, but it kinda makes sense
-
-* what about the value initializations in the class...
-* should class bodies use different rules than blocks, with different definition statements, like "def foo: Int", such that a value isn't required for members
-
-
-
 * issue with self and super type defs; they don't contain the type info; maybe add an aliasing type?
+* "match" only works with integers... maybe call ==, but it would have to mangle correctly
+* there might be trouble with the argument cast in invoke compiling
+* fix the issues where you need nil and shit to make it work.... i think parser parsing ";" into noop/nil might work, if i can get the parser working
 
 * should you change Real to Float?  also should you change them to lower case names, which is in line with sml, ocmal, f#
 * you might have a potentially big issue with duplicate type variables, specifically with map_typevars; it could mistake an undeclared
   function's typevar with an already defined typevar if they have the same name
-* make nil work without using a typevar?  Or just eliminate unnecessary typevars
 * if you had a tuple type, you could use a typevar to represent a tuple of the arguments to a function: Type::Function(Type::Variable(..), Type::Variable(..)) or 'a -> 'b where 'a = ('c, 'd, 'e)
 * add an iterator type that gets used in for loops; might need vtables for that
 
-
-* should you convert class name/types tuples into types
-* match only works with integers... maybe call ==, but it would have to mangle correctly
-* there might be trouble with the argument cast in invoke compiling
 
 
 * fill in string and list type functions
@@ -42,6 +31,8 @@
 
 
 
+* if even the global/module scope was a closure, then you could make a module be equivallent to an implicit function that is called when the module is imported, which could have the name of the
+  module; so a module called main would become the main() function
 * what if you a 'context' passed to the node visitors that would allow "if" to know if its' return is used or not, and so whether typechecking must match
 * if you make ops methods, then everything has to be type annotated, with the type system as it is; you'd need constrained types, or multiple paths, or bidirectional or something
 * make typed functions for all math operations, with the inlinealways attribute, if you decide to make operators methods
@@ -53,7 +44,8 @@
 
 * should you change the return type annotation format to : from ->?  fn foobar(): String { } instead of fn foobar() -> String { }
 * should you add a return statement?  It's not functional, but it's practial
-* should you fix scope resolution to also work on objects, so that you can have static methods???
+* should you add break/continue statements for loops
+* should you fix scope resolution to also work on objects, so that you can have static methods from the object without explicitly referencing its type
 * should import indexes also list all the modules that the file imports, so that class definitions in other imports can be found, if needed for arguments
 * should you require an override keyword when masking definitions in lower scopes? like class definitions
 * should you allow keyword arguments in invoke; foo(a=10, b=20)

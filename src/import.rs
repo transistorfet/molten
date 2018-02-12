@@ -70,13 +70,15 @@ fn build_index_node<V, T>(index: &mut String, scope: ScopeRef<V, T>, node: &AST)
             };
 
             index.push_str(format!("class {} {{\n", fullspec).as_str());
-            index.push_str(format!("    decl __alloc__ : () -> {}\n", namespec).as_str());
+            //index.push_str(format!("    decl __alloc__ : () -> {}\n", namespec).as_str());
+            //index.push_str(format!("    decl __init__ : ({}) -> Nil\n", namespec).as_str());
             for node in body {
                 match *node {
                     AST::Definition((ref name, ref ttype), _) => {
                         //let stype = classdef.borrow().get_variable_type(name).unwrap();
                         //println!("WHICH ONE??? {:?} {:?}", ttype, stype);
-                        index.push_str(format!("    decl {} : {}\n", name, unparse_type(ttype.clone().unwrap())).as_str());
+                        //index.push_str(format!("    decl {} : {}\n", name, unparse_type(ttype.clone().unwrap())).as_str());
+                        index.push_str(format!("    let {} : {}\n", name, unparse_type(ttype.clone().unwrap())).as_str());
                     },
                     AST::Function(ref name, _, _, _, _) => {
                         if let Some(ref name) = *name {

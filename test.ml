@@ -66,6 +66,7 @@
         //let ab = 123.24 * 3
 
 
+
         class Stuff {
             fn new(self) { }
 
@@ -207,17 +208,23 @@
         //c.bar = 3.2
 
         class Thing {
-            //fn new(self) { }
+            fn new(self) {
+                //self.bar = fn a => [ a, a, a ]
+                self.arr = [ 1, 2, 3, 4 ]
+                self.foobar = [ fn x => x * 16, fn x => x * 100 ]
+            }
 
-            let foo = fn a => {
+            fn foo(a) {
                 a * 4
             }
 
             let bar = fn a => [ a, a, a ]
             let arr = [ 1, 2, 3, 4 ]
             let foobar = [ fn x => x * 16, fn x => x * 100 ]
+            //let arr = [ 1, 2, 3, 4 ]
+            //let foobar = [ fn x => x * 16, fn x => x * 100 ]
 
-            let baz = fn self: Thing, a => {
+            fn baz(self: Thing, a) {
 
             }
         }
@@ -230,12 +237,12 @@
         [ 0, 1, 2, 3 ][0]
         let arr = [ 1, 2, 3, 4 ]
         arr[2]
-        //thing.arr[1]
-        //get_thing().arr[2]
+        thing.arr[1]
+        get_thing().arr[2]
 
-        // TODO casting issues
-        //thing.baz(521)
-        //get_thing().baz(985)
+        // TODO casting issues, now appears to be type checking issue
+        thing.baz(521)
+        get_thing().baz(985)
         //thing.bar()[1]
         //(thing.bar())[1]
         //get_thing().bar()[1]
@@ -250,10 +257,12 @@
         // TODO this probably shouldn't parse without a ; or \n, but it does
         thing "things"
 
-
-        for x in [ 1, 2, 3 ]
+        let numbers = [ 1, 2, 3 ]
+        numbers.insert(1, 5)
+        for x in numbers
             puts("Count: " + str(x))
 
+/*
         fn test() {
             let a = 98899
             fn closure() {
@@ -262,6 +271,7 @@
         }
 
         puts(str(test()()))
+*/
 
     /*
 

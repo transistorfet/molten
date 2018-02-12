@@ -15,7 +15,7 @@ class String {
     // TODO this doesn't handle UTF-8
     fn substr(self, start: Int, length: Int) {
         let newstr: String = malloc(length + 1)
-        // TODO this doesn't work
+        // TODO this doesn't work because you can't get a pointer to an indexed position
         memcpy(newstr, self, length)
         //newstr[length] = 0
     }
@@ -26,6 +26,10 @@ fn ==(str1: String, str2: String) -> Bool {
         true
     else
         false
+}
+
+fn +(s1: String, s2: String) -> String {
+    s1.push(s2)
 }
 
 
@@ -47,9 +51,6 @@ fn str(num: Real) -> String {
     buffer
 }
 
-fn +(s1: String, s2: String) -> String {
-    s1.push(s2)
-} 
 
 
 
@@ -98,6 +99,20 @@ class List<'item> {
 
     fn get(self, index: Int) {
         self[index]
+    }
+
+    fn insert(self, index: Int, item: 'item) -> Int {
+        self.move_right(index, item)
+    }
+
+    fn move_right(self, index: Int, item: 'item) -> Int {
+        if index >= self.length then {
+            self.push(item)
+        } else {
+            let cur = self.data[index]
+            self.data[index] = item
+            self.move_right(index + 1, cur)
+        }
     }
 }
 
