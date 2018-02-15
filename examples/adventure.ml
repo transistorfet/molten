@@ -10,7 +10,7 @@ class Input {
 
     fn loop(self) {
         while not self.stopflag {
-            puts("> ")
+            println("> ")
             let input = readline()
 
             if input == "quit" then {
@@ -18,7 +18,7 @@ class Input {
                 nil
             }
             else {
-                puts(input)
+                println(input)
             }
         }
     }

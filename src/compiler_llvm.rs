@@ -129,7 +129,7 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
     println!("COMPILE: {:?}", node);
     match *node {
         AST::Noop => ptr::null_mut(),
-        AST::Nil(ref ttype) => null_value(get_type(data, scope.clone(), resolve_type(scope.clone(), ttype.clone().unwrap()), true)),
+        AST::Nil(ref ttype) => null_value(get_type(data, scope.clone(), ttype.clone().unwrap(), true)),
         AST::Boolean(ref num) => LLVMConstInt(bool_type(data), *num as u64, 0),
         AST::Integer(ref num) => LLVMConstInt(int_type(data), *num as u64, 0),
         AST::Real(ref num) => LLVMConstReal(real_type(data), *num),
@@ -138,8 +138,8 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
         AST::Block(ref body) => { compile_vec(data, func, unwind, scope, body) },
 
         AST::Invoke(ref fexpr, ref args, ref stype) => {
-            let atypes = match stype.clone().unwrap() {
-                Type::Function(atypes, _) => atypes,
+            let (atypes, rtype) = match stype.clone().unwrap() {
+                Type::Function(atypes, rtype) => (atypes, *rtype),
                 stype @ _ => panic!("TypeError: expected function type: {:?}", stype),
             };
 
@@ -171,7 +171,6 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
                         _ => compile_node(data, func, unwind, scope.clone(), fexpr)
                     };
                 }
-                println!("**************: {:?}", LLVMGetValueKind(function));
                 LLVMDumpValue(function);
 
                 // Cast values to the function's declared type; this is a hack for typevar/generic arguments
@@ -185,22 +184,25 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
                 for i in 0 .. ltypes.len() {
                     if ltypes[i] != LLVMTypeOf(largs[i]) {
                         println!("{:?} -> {:?}", LLVMGetTypeKind(LLVMTypeOf(largs[i])), LLVMGetTypeKind(ltypes[i]));
-                        if LLVMGetTypeKind(LLVMTypeOf(largs[i])) == llvm::LLVMTypeKind::LLVMPointerTypeKind {
-                            largs[i] = LLVMBuildPointerCast(data.builder, largs[i], ltypes[i], label("ptr"));
-                        } else {
-                            largs[i] = LLVMBuildIntToPtr(data.builder, largs[i], ltypes[i], label("ptr"));
-                        }
+                        largs[i] = build_generic_cast(data, largs[i], ltypes[i]);
                     }
                 }
 
                 //LLVMBuildCall(data.builder, function, largs.as_mut_ptr(), largs.len() as u32, label("tmp").as_ptr())
-                match unwind {
+                let mut value = match unwind {
                     None => LLVMBuildCall(data.builder, function, largs.as_mut_ptr(), largs.len() as u32, label("tmp")),
                     Some((then, catch)) => {
                         LLVMBuildInvoke(data.builder, function, largs.as_mut_ptr(), largs.len() as u32, then, catch, label("tmp"))
                         //LLVMSetUnwindDest(invoke, unwind.unwrap());
                     }
+                };
+
+                let lrtype = get_type(data, scope.clone(), rtype, true);
+                if lrtype != LLVMTypeOf(value) {
+                    println!("RETURN {:?} -> {:?}", LLVMGetTypeKind(LLVMTypeOf(value)), LLVMGetTypeKind(lrtype));
+                    value = build_generic_cast(data, value, lrtype);
                 }
+                value
             }
         },
 
@@ -272,12 +274,14 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
             //LLVMAddIncoming(phi, values.as_mut_ptr(), do_blocks.as_mut_ptr(), values.len() as u32);
             //phi
             */
-            zero_int(data)
+            //zero_int(data)
+            null_value(str_type(data))
         },
 
         AST::Raise(ref expr) => {
             //LLVMBuildResume(data.builder, compile_node(data, func, unwind, scope.clone(), expr))
-            zero_int(data)
+            //zero_int(data)
+            null_value(str_type(data))
         },
 
         AST::SideEffect(ref op, ref args) => {
@@ -406,7 +410,8 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
             //LLVMAddIncoming(phi, values.as_mut_ptr(), blocks.as_mut_ptr(), 1);
             //phi
             //body_value
-            zero_int(data)
+            //zero_int(data)
+            null_value(str_type(data))
         },
 
         AST::For(ref name, ref list, ref body, ref id) => {
@@ -492,7 +497,8 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
             // TODO you still need to compile the body of the func, if you're going to allow that... like an init function
             //compile_vec(data, func, unwind, tscope.clone(), body);
 
-            zero_int(data)
+            //zero_int(data)
+            null_value(str_type(data))
         },
 
         AST::Resolver(ref left, ref right) => {
@@ -775,6 +781,22 @@ pub unsafe fn int_value(data: &LLVM, num: usize) -> LLVMValueRef {
 
 pub unsafe fn build_str_const(data: &LLVM, string: &str) -> LLVMValueRef {
     LLVMBuildGlobalStringPtr(data.builder, label(string), label("str"))
+}
+
+pub unsafe fn build_generic_cast(data: &LLVM, value: LLVMValueRef, ltype: LLVMTypeRef) -> LLVMValueRef {
+    if LLVMGetTypeKind(LLVMTypeOf(value)) == llvm::LLVMTypeKind::LLVMPointerTypeKind {
+        if LLVMGetTypeKind(ltype) == llvm::LLVMTypeKind::LLVMPointerTypeKind {
+            LLVMBuildPointerCast(data.builder, value, ltype, label("ptr"))
+        } else {
+            LLVMBuildPtrToInt(data.builder, value, ltype, label("ptr"))
+        }
+    } else {
+        if LLVMGetTypeKind(ltype) == llvm::LLVMTypeKind::LLVMPointerTypeKind {
+            LLVMBuildIntToPtr(data.builder, value, ltype, label("ptr"))
+        } else {
+            panic!("I HAVEN'T DONE THIS");
+        }
+    }
 }
 
 pub unsafe fn build_cast_to_vartype(data: &LLVM, value: LLVMValueRef) -> LLVMValueRef {

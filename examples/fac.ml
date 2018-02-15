@@ -7,6 +7,6 @@ fn fac(x) {
     else
 	x * fac(x - 1)
 }
-puts(str(fac(10))) 
+println(str(fac(10))) 
 
 

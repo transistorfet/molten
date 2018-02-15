@@ -18,7 +18,12 @@ pub fn refine_vec(code: Vec<AST>) -> Vec<AST> {
 
 pub fn refine_node(node: AST) -> AST {
     match node {
-        AST::Block(code) => { AST::Block(refine_vec(code)) },
+        AST::Block(mut code) => {
+            if code.len() == 0 {
+                code.push(AST::Nil(None))
+            }
+            AST::Block(refine_vec(code))
+        },
 
         AST::Definition((name, ttype), code) => {
             AST::Definition((name, ttype), Box::new(refine_node(*code)))

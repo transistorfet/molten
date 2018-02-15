@@ -16,8 +16,9 @@ use utils::UniqueID;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Context {
-    Local,
+    Primative,
     Global,
+    Local,
     Class,
 }
 
@@ -73,11 +74,15 @@ impl<V, T> Scope<V, T> where V: Clone, T: Clone {
     }
 
     pub fn is_global(&self) -> bool {
-        self.context == Context::Global
+        self.context == Context::Global || self.context == Context::Primative
     }
 
-    pub fn set_global(&mut self, value: bool) {
-        self.context = if value { Context::Global } else { Context::Local };
+    pub fn is_primative(&self) -> bool {
+        self.context == Context::Primative
+    }
+
+    pub fn set_context(&mut self, context: Context) {
+        self.context = context;
     }
 
     pub fn set_class(&mut self, value: bool) {
@@ -251,7 +256,9 @@ impl<V, T> Scope<V, T> where V: Clone, T: Clone {
         match self.types.entry(name.clone()) {
             Entry::Occupied(mut entry) => f(entry.get_mut()),
             _ => match self.parent {
-                Some(ref parent) => parent.borrow_mut().modify_type(name, f),
+                Some(ref parent) => {
+                    parent.borrow_mut().modify_type(name, f);
+                },
                 _ => panic!("NameError: type is undefined; {:?}", name),
             },
         }
@@ -357,6 +364,19 @@ impl<V, T> Scope<V, T> where V: Clone, T: Clone {
     }
 
 
+    pub fn locate_type(scope: ScopeRef<V, T>, name: &String) -> Option<ScopeRef<V, T>> {
+        if let Some(ref info) = scope.borrow().types.get(name) {
+            return Some(scope.clone());
+        }
+
+        let parent = scope.borrow().parent.clone();
+        if parent.is_some() {
+            Scope::locate_type(parent.unwrap(), name)
+        } else {
+            None
+        }
+    }
+
     ////// Type Variable Functions //////
 
     pub fn map_all_typevars(&mut self, ttype: Type) -> Type {
@@ -403,7 +423,7 @@ println!("RAISING");
             match info.ttype {
                 Type::Variable(ref vname) => {
                     //if name == vname {
-println!("RAISE TYPE: {:?} {:?}", self.get_full_name(&Some(String::from("")), UniqueID(0)), vname);
+println!("RAISE TYPEVAR: {:?} {:?}", self.get_full_name(&Some(String::from("")), UniqueID(0)), vname);
                         // TODO this is probably wrong because we might be unifying different type vars
                         //if !self.types.contains_key(name) {
                             self.define_type(name.clone(), info.ttype.clone());
@@ -420,13 +440,48 @@ println!("RAISE TYPE: {:?} {:?}", self.get_full_name(&Some(String::from("")), Un
         }
     }
 
+    pub fn raise_type(&mut self, fscope: ScopeRef<V, T>, ttype: Type) {
+        let mut names = vec!();
+        Scope::<V, T>::collect_typevars(&mut names, ttype.clone());
+        for name in names {
+            if fscope.borrow().contains_type(&name) {
+                println!("RAISE TYPEVAR: {:?} {:?}", name, ttype);
+                let otype = fscope.borrow().find_type(&name).unwrap();
+                fscope.borrow_mut().types.remove(&name);
+                self.define_type(name.clone(), otype);
+            }
+        }
+    }
+
+    pub fn collect_typevars(names: &mut Vec<String>, ttype: Type) {
+        match ttype {
+            Type::Variable(name) => {
+                if !names.contains(&name) {
+                    names.push(name);
+                }
+            },
+            Type::Function(args, ret) => {
+                for arg in args {
+                    Scope::<V, T>::collect_typevars(names, arg);
+                }
+                Scope::<V, T>::collect_typevars(names, *ret);
+            },
+            Type::Overload(list) |
+            Type::Object(_, list) => {
+                for item in list {
+                    Scope::<V, T>::collect_typevars(names, item)
+                }
+            },
+        }
+    }
+
     pub fn new_typevar(&mut self) -> Type {
         for ch in b'a' .. b'z' + 1 {
             let name = (ch as char).to_string();
             if self.find_type(&name).is_none() {
                 let ttype = Type::Variable(name.clone());
                 self.define_type(name, ttype.clone());
-println!("NEW TYPEVAR: {:?} {:?}", self.get_full_name(&Some(String::from("")), UniqueID(0)), ttype);
+println!("NEW TYPEVAR: {:?} {:?}", self.get_basename(), ttype);
                 return ttype;
             }
         }
@@ -706,7 +761,7 @@ pub fn check_for_typevars<V, T>(scope: ScopeRef<V, T>, ttype: &Option<Type>) whe
                 check_for_typevars(scope.clone(), &Some(*ret.clone()));
             },
             &Type::Variable(ref name) => {
-                 if !scope.borrow().contains_type(name) {
+                if !scope.borrow().contains_type(name) {
                     scope.borrow_mut().define_type(name.clone(), ttype.clone());
                 }
             },

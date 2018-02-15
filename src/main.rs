@@ -30,7 +30,7 @@ mod utils;
 mod import;
 //mod interpreter;
 //mod compiler_c;
-//mod closures;
+mod precompiler;
 mod compiler_llvm;
 mod lib_llvm;
 
@@ -81,7 +81,7 @@ fn compile_string(name: &str, text: &[u8]) {
     let builtins = lib_llvm::get_builtins();
     let map = lib_llvm::make_global(&builtins);
     let mut code = process_input(map.clone(), name, text);
-    //code = closures::convert_closures(map.clone(), code);
+    code = precompiler::precompile(map.clone(), code);
 
     compiler_llvm::compile(&builtins, map.clone(), name, &mut code);
 }

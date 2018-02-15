@@ -3,8 +3,8 @@
 
         let msg = "Hey"
         let stringstuff = fn x: String => msg
-        puts(msg)
-        puts(str(10))
+        println(msg)
+        println(str(10))
 
         2 + 5
 
@@ -31,7 +31,7 @@
         // TODO this were causing trouble, but seem to compile now...
 	let test2 = fn x => x()
 	let test3 = fn x => x() + 1
-        puts(str(test3(fn => 3)))
+        println(str(test3(fn => 3)))
 
         let recfoo = fn x => begin  //comment
             if x < 1 then           //comment
@@ -39,7 +39,7 @@
             else                    //comment
                 x * recfoo(x - 1)   //comment
         end                         //comment
-        puts(str(recfoo(5)))
+        println(str(recfoo(5)))
 
         0123
         0x234
@@ -56,11 +56,11 @@
         123 + ~124 * 25
         123 + (124 * 25)
 
-        puts("Rem: " + str(10 % 3))
-        puts("2^16: " + str(2.0 ^ 16.0))
-        puts("0xff & 0x80: " + str(0xff & 0x80))
-        puts("0x00 | 0x20: " + str(0x00 | 0x20))
-        puts("Com: " + hex(~0x5555555555555555))
+        println("Rem: " + str(10 % 3))
+        println("2^16: " + str(2.0 ^ 16.0))
+        println("0xff & 0x80: " + str(0xff & 0x80))
+        println("0x00 | 0x20: " + str(0x00 | 0x20))
+        println("Com: " + hex(~0x5555555555555555))
 
         // NOTE this sorta causes a type error (actually an overload/no variant error), as it should
         //let ab = 123.24 * 3
@@ -106,10 +106,10 @@
         let thingy = new TestClass()
         thingy.a = 1337
         thingy.add(124)
-        puts(str(thingy.a))
+        println(str(thingy.a))
 
         while thingy.a > 0 {
-            puts("Hey again")
+            println("Hey again")
             thingy.a = thingy.a - 1000
         }
 
@@ -118,7 +118,7 @@
             2 => a * 4
             _ => a * 16
 	}
-        puts(str(r))
+        println(str(r))
 
         match x == true {
             true => x
@@ -134,7 +134,7 @@
         }
 
         if a > 1 then {
-            puts("It's more than 1!")
+            println("It's more than 1!")
             nil
         }
 
@@ -160,10 +160,10 @@
             //strnum(1.0)
         }
 
-	puts("thing" + "stuff\n")
-        puts("STUFF".push(" things"))
-        puts(strnum(12))
-        puts(strnum(1.214))
+	println("thing" + "stuff\n")
+        println("STUFF".push(" things"))
+        println(strnum(12))
+        println(strnum(1.214))
 
 
         // TODO not yet implemented
@@ -175,17 +175,17 @@
 
 	let buffer = new Buffer<Int>(5)
         buffer[0] = 124
-	puts(str(buffer[0]))
+	println(str(buffer[0]))
 
         let list3 = new List<Int>()
         list3.push(4)
         list3[4] = 123
-        puts(str(list3[4]))
+        println(str(list3[4]))
 
         let list: List<'thing> = [ 1, 2, 3 ]
         list[1] = 5
-        puts(str(list[1]))
-        puts(str("Thing"[2]))
+        println(str(list[1]))
+        println(str("Thing"[2]))
         let list2 = [ new TestClass(), new Stuff(), new TestClass() ]
 
 
@@ -209,7 +209,7 @@
 
         class Thing {
             fn new(self) {
-                //self.bar = fn a => [ a, a, a ]
+                self.bar = fn a => [ a, a, a ]
                 self.arr = [ 1, 2, 3, 4 ]
                 self.foobar = [ fn x => x * 16, fn x => x * 100 ]
             }
@@ -260,7 +260,7 @@
         let numbers = [ 1, 2, 3 ]
         numbers.insert(1, 5)
         for x in numbers
-            puts("Count: " + str(x))
+            println("Count: " + str(x))
 
 /*
         fn test() {
@@ -270,7 +270,7 @@
             }
         }
 
-        puts(str(test()()))
+        println(str(test()()))
 */
 
     /*

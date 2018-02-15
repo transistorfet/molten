@@ -12,7 +12,7 @@ use self::llvm::core::*;
 use types::{ Type, check_type, Check };
 use utils::UniqueID;
 use parser::{ parse_type };
-use scope::{ Scope, ScopeRef, ScopeMapRef, check_for_typevars, mangle_name, unmangle_name };
+use scope::{ Scope, ScopeRef, ScopeMapRef, Context, check_for_typevars, mangle_name, unmangle_name };
 use compiler_llvm::*;
 
 
@@ -74,12 +74,12 @@ impl<'a> BuiltinMap<'a> {
 pub fn make_global<'a, V, T>(builtins: &Vec<Builtin<'a>>) -> ScopeMapRef<V, T> where V: Clone + Debug, T: Clone + Debug {
     let map = ScopeMapRef::new();
     let primatives = map.add(ScopeMapRef::<V, T>::PRIMATIVE, None);
-    primatives.borrow_mut().set_global(true);
+    primatives.borrow_mut().set_context(Context::Primative);
 
     register_builtins_vec(primatives.clone(), primatives.clone(), builtins);
 
     let global = map.add(ScopeMapRef::<V, T>::GLOBAL, Some(primatives));
-    global.borrow_mut().set_global(true);
+    global.borrow_mut().set_context(Context::Global);
 
     return map;
 }
@@ -208,6 +208,7 @@ pub fn get_builtins<'a>() -> Vec<Builtin<'a>> {
         Builtin::Func("strlen",     "(String) -> Int",              Func::External),
         Builtin::Func("sprintf",    "'tmp",                         Func::Undefined),
 
+        Builtin::Func("println",    "(String) -> Nil",              Func::Runtime(build_lib_println)),
         Builtin::Func("readline",   "() -> String",                 Func::Runtime(build_lib_readline)),
 
 
@@ -481,6 +482,16 @@ unsafe fn build_lib_add(data: &LLVM, name: &str, objtype: LLVMTypeRef) -> LLVMVa
     function
 }
 
+
+
+unsafe fn build_lib_println(data: &LLVM, name: &str, objtype: LLVMTypeRef) -> LLVMValueRef {
+    let function = build_function_start(data, name, vec!(str_type(data)), str_type(data));
+    LLVMSetLinkage(function, llvm::LLVMLinkage::LLVMLinkOnceAnyLinkage);
+
+    let value = build_call(data, "puts", &mut vec!(LLVMGetParam(function, 0)));
+    LLVMBuildRet(data.builder, value);
+    function
+}
 
 unsafe fn build_lib_readline(data: &LLVM, name: &str, objtype: LLVMTypeRef) -> LLVMValueRef {
     let function = build_function_start(data, name, vec!(), str_type(data));

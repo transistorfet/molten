@@ -1,5 +1,5 @@
 
-
+use std::rc::Rc;
 use std::fmt::Debug;
 
 use parser::AST;
@@ -80,6 +80,23 @@ impl Type {
         Type::Object(nametypes.0, nametypes.1)
     }
 
+    pub fn update_type<V, T>(scope: ScopeRef<V, T>, name: &String, ttype: Type) where V: Clone, T: Clone {
+        let pscope = Scope::locate_type(scope.clone(), name).unwrap();
+        let otype = pscope.borrow().find_type(name).clone();
+        if otype.is_some() && !pscope.borrow().is_primative() {
+            let ntype = check_type(scope.clone(), otype.clone(), Some(ttype.clone()), Check::Def, false);
+            match ntype {
+                Ok(utype) => scope.borrow_mut().update_type(name, utype),
+                Err(msg) => panic!("while updating type {:?}:\n{:?}", name, msg),
+            }
+
+            //if !Rc::ptr_eq(&pscope, &scope) {
+            //    println!("RAISING: {:?} {:?} {:?}", pscope.borrow().get_basename(), otype, ttype);
+            //    pscope.borrow_mut().raise_type(scope.clone(), otype.unwrap());
+            //    pscope.borrow_mut().raise_type(scope.clone(), ttype);
+            //}
+        }
+    }
 }
 
 
@@ -146,6 +163,9 @@ pub fn check_types_node<V, T>(map: ScopeMapRef<V, T>, scope: ScopeRef<V, T>, nod
                 //dscope.borrow_mut().update_variable_type(&dname, nftype.clone());
                 Scope::add_func_variant(dscope.clone(), &dname, scope.clone(), nftype.clone());
             }
+
+            println!("RAISING: {:?} {:?} {:?}", scope.borrow().get_basename(), fscope.borrow().get_basename(), nftype);
+            scope.borrow_mut().raise_type(fscope.clone(), nftype.clone());
             nftype
         },
 
@@ -184,8 +204,8 @@ pub fn check_types_node<V, T>(map: ScopeMapRef<V, T>, scope: ScopeRef<V, T>, nod
                     //if let AST::Identifier(ref fname) = **fexpr {
                     //    update_type(scope.clone(), fname, ftype.clone());
                     //}
-                    tscope.borrow_mut().update_type(name, ftype.clone());
-                    //Type::update_type(scope.clone(), name, ftype.clone());
+                    //tscope.borrow_mut().update_type(name, ftype.clone());
+                    Type::update_type(tscope.clone(), name, ftype.clone());
                     ftype
                 },
                 _ => panic!("Not a function: {:?}", fexpr),
@@ -312,7 +332,7 @@ pub fn check_types_node<V, T>(map: ScopeMapRef<V, T>, scope: ScopeRef<V, T>, nod
 
             let classdef = scope.borrow().get_class_def(&ltype.get_name());
             let mut cborrow = classdef.borrow_mut();
-            cborrow.get_variable_type(field).unwrap_or_else(|| expected.unwrap_or_else(|| cborrow.new_typevar()))
+            cborrow.get_variable_type(field).unwrap_or_else(|| expected.unwrap_or_else(|| scope.borrow_mut().new_typevar()))
         },
 
         AST::Accessor(ref mut left, ref mut field, ref mut stype) => {
@@ -321,7 +341,7 @@ pub fn check_types_node<V, T>(map: ScopeMapRef<V, T>, scope: ScopeRef<V, T>, nod
 
             let classdef = scope.borrow().get_class_def(&ltype.get_name());
             let mut cborrow = classdef.borrow_mut();
-            cborrow.get_variable_type(field).unwrap_or_else(|| expected.unwrap_or_else(|| cborrow.new_typevar()))
+            cborrow.get_variable_type(field).unwrap_or_else(|| expected.unwrap_or_else(|| scope.borrow_mut().new_typevar()))
         },
 
         AST::Assignment(ref mut left, ref mut right) => {
@@ -378,13 +398,13 @@ pub fn check_type<V, T>(scope: ScopeRef<V, T>, odtype: Option<Type>, octype: Opt
 
         if let Type::Variable(ref name) = dtype {
             println!("UPDATING: {:?} {:?}", name, dtype);
-            if update { scope.borrow_mut().update_type(name, ctype.clone()); }
-            //if update { Type::update_type(scope.clone(), name, ctype.clone()); }
+            //if update { scope.borrow_mut().update_type(name, ctype.clone()); }
+            if update { Type::update_type(scope.clone(), name, ctype.clone()); }
             Ok(ctype)
         } else if let Type::Variable(ref name) = ctype {
             println!("UPDATING: {:?} {:?}", name, dtype);
-            if update { scope.borrow_mut().update_type(name, dtype.clone()); }
-            //if update { Type::update_type(scope.clone(), name, dtype.clone()); }
+            //if update { scope.borrow_mut().update_type(name, dtype.clone()); }
+            if update { Type::update_type(scope.clone(), name, dtype.clone()); }
             Ok(dtype)
         } else {
             match (dtype.clone(), ctype.clone()) {
@@ -490,7 +510,7 @@ pub fn resolve_type<V, T>(scope: ScopeRef<V, T>, ttype: Type) -> Type where V: C
             }
         },
         Type::Variable(ref name) => {
-println!("VARIABLE: {:?} {:?} {:?}", scope.borrow().get_full_name(&Some(String::from("")), UniqueID(0)), name, scope.borrow().find_type(name));
+            println!("VARIABLE: {:?} {:?} {:?}", scope.borrow().get_full_name(&Some(String::from("")), UniqueID(0)), name, scope.borrow().find_type(name));
             match scope.borrow().find_type(name) {
                 Some(vtype) => {
                     if Type::Variable(name.clone()) == vtype {
@@ -504,9 +524,6 @@ println!("VARIABLE: {:?} {:?} {:?}", scope.borrow().get_full_name(&Some(String::
                 None => panic!("TypeError: undefined type variable {:?}", name),
             }
         },
-        //Type::List(ref ttype) => {
-        //    Type::List(Box::new(resolve_type(scope.clone(), *ttype.clone())))
-        //},
         Type::Function(ref args, ref ret) => {
             let argtypes = args.iter().map(|arg| resolve_type(scope.clone(), arg.clone())).collect();
             Type::Function(argtypes, Box::new(resolve_type(scope.clone(), *ret.clone())))
@@ -541,16 +558,17 @@ fn find_variant<V, T>(scope: ScopeRef<V, T>, otype: Type, atypes: Vec<Type>) -> 
 }
 
 
-fn update_scope_variable_types<V, T>(scope: ScopeRef<V, T>) where V: Clone, T: Clone {
+pub fn update_scope_variable_types<V, T>(scope: ScopeRef<V, T>) where V: Clone, T: Clone {
+    let dscope = Scope::target(scope.clone());
     let mut names = vec!();
-    for name in scope.borrow().names.keys() {
+    for name in dscope.borrow().names.keys() {
         names.push(name.clone());
     }
 
     for name in &names {
-        let otype = scope.borrow_mut().get_variable_type(name).unwrap().clone();
+        let otype = dscope.borrow_mut().get_variable_type(name).unwrap().clone();
         let ntype = resolve_type(scope.clone(), otype);
-        scope.borrow_mut().update_variable_type(name, ntype);
+        dscope.borrow_mut().update_variable_type(name, ntype);
     }
 }
 

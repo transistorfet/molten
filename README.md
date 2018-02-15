@@ -54,7 +54,7 @@ fn fac(x) {
 	x * fac(x - 1)
 }
 
-puts(str(fac(10)))
+println(str(fac(10)))
 ```
 
 ### Types
@@ -65,9 +65,9 @@ Byte
 Int
 Real
 String
-() -> Int               // function type
-'a                      // type variable
-List<Int>               // list of integers
+() -> Int           // function type
+'a                  // type variable
+List<Int>           // list of integers
 ```
 
 ### Declarations
@@ -78,13 +78,13 @@ let bar: String = "Hey"
 
 ### Functions
 ```
-fn foo(x, y) => x + y			// named inline function
+fn foo(x, y) => x + y		    // named inline function
 
-fn foo(x, y) { x + y }			// named block function
+fn foo(x, y) { x + y }		    // named block function
 
-let foo = fn x, y => x + y		// anonymous function
+let foo = fn x, y => x + y	    // anonymous function
 
-foo(x: Int, y) -> Int => x + y		// with optional type annotations
+fnfoo(x: Int, y) -> Int => x + y    // with optional type annotations
 
 ```
 
@@ -99,7 +99,7 @@ foo(1, 2)
 ### Classes
 ```
 class Foo {
-    let name = "Unnamed"            // this may change in future
+    let name: String
 
     fn new(self, name) {
         self.name = name
@@ -115,7 +115,7 @@ class Bar extends Foo {
 }
 
 let bar = new Bar("Mischief")
-bar.get("The Cat")
+bar.get("The Cat")              // returns "Mischief The Cat"
 Foo::static(5)
 ```
 
@@ -139,10 +139,10 @@ match x {
 ### Loops
 ```
 while is_true
-    puts("looping")
+    println("looping")
 
 for i in [ 1, 2, 3 ]
-    puts("counting " + i)
+    println("counting " + i)
 ```
 
 ### Blocks
@@ -160,12 +160,12 @@ let is_zero = if self.x < 0 then {
 ### Lists
 ```
 let list1 = [ 1, 3, 6 ]
+for x in list1
+    println(str(x))
+
 let list2 = new List<String>();
 list2[1] = "Hello"
-puts(list2[1])
-
-for x in list1
-    puts(str(x))
+println(list2[1])
 ```
 
 ### And / Or
@@ -178,4 +178,31 @@ Operands are not limited to Bool values, although that may change in future.
 ```
 import libcore
 ```
+
+Yet To Complete
+---------------
+
+- Closure conversion is not yet fully implemented.  I haven't decided yet
+  whether to make all functions be closures (and to add a way to declare a
+  function as an external C or C++ function, which might be a good idea
+  regardless), or to add a distinct type for closures vs non-closure functions
+  (like Closure<(Int) -> Int>, or perhaps something shorter)
+
+- Execptions haven't been implemented yet.  This somewhat relates to the
+  above issue of making all functions support throwing execptions, which
+  means a need to declare C/C++ functions that do not allow exceptions.
+
+- Class members can be declared with an optional initial value, but the
+  initial value is ignored.  Instead you must initialize the value in the
+  class constructor.  Ideally I'd like to get it working, but given that
+  the AST cannot be duplicated without side effects, and it needs to work
+  with inherited members too, I haven't gotten it working yet.  The simple
+  solution is to just disallow initial values in class members
+
+- Dynamic dispatch for class methods is not yet implemented.  At the moment,
+  it's possible to declare a class member that's a function, with each
+  object having a pointer to the correct subclass method.  It's a hack, but
+  it works for now.
+
+- Garbage collection is not yet implemented
 

@@ -101,11 +101,11 @@ class List<'item> {
         self[index]
     }
 
-    fn insert(self, index: Int, item: 'item) -> Int {
+    fn insert(self, index: Int, item: 'item) {
         self.move_right(index, item)
     }
 
-    fn move_right(self, index: Int, item: 'item) -> Int {
+    fn move_right(self, index: Int, item: 'item) {
         if index >= self.length then {
             self.push(item)
         } else {
