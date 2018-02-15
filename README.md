@@ -84,7 +84,7 @@ fn foo(x, y) { x + y }		    // named block function
 
 let foo = fn x, y => x + y	    // anonymous function
 
-fnfoo(x: Int, y) -> Int => x + y    // with optional type annotations
+fn foo(x: Int, y) -> Int => x + y    // with optional type annotations
 
 ```
 
@@ -149,7 +149,7 @@ for i in [ 1, 2, 3 ]
 A block is a collection of statements which return the result of the last
 expression in the block.  They can be used in place of a single expression.
 ```
-let is_zero = if self.x < 0 then {
+let is_zero = if self.x <= 0 then {
     self.x = 0
     true
 } else {
@@ -200,9 +200,9 @@ Yet To Complete
   solution is to just disallow initial values in class members
 
 - Dynamic dispatch for class methods is not yet implemented.  At the moment,
-  it's possible to declare a class member that's a function, with each
-  object having a pointer to the correct subclass method.  It's a hack, but
-  it works for now.
+  it's possible to declare a class member that holds a function-typed value,
+  with each object storing a reference to the correct subclass method in the
+  class member.  It's a hack, but it works for now.
 
 - Garbage collection is not yet implemented
 
