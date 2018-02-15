@@ -1,6 +1,5 @@
 
 use std::ptr;
-use std::fmt;
 use std::ffi::CString;
 
 extern crate llvm_sys as llvm;
@@ -11,7 +10,7 @@ use import;
 use parser::AST;
 use config::Options;
 use scope::{ Scope, ScopeRef, ScopeMapRef };
-use types::{ Type, resolve_type };
+use types::Type;
 use utils::UniqueID;
 use lib_llvm::{ Builtin, BuiltinMap, initialize_builtins };
 
@@ -398,7 +397,8 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
             LLVMBuildCondBr(data.builder, is_nonzero, body_block, after_block);
 
             LLVMPositionBuilderAtEnd(data.builder, body_block);
-            let body_value = compile_node(data, func, unwind, scope.clone(), body);
+            //let body_value = compile_node(data, func, unwind, scope.clone(), body);
+            compile_node(data, func, unwind, scope.clone(), body);
             LLVMBuildBr(data.builder, before_block);
 
             LLVMPositionBuilderAtEnd(data.builder, after_block);
@@ -491,8 +491,8 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
         },
 
         AST::Class((ref name, ref types), ref parent, ref body, ref id) => {
-            let tscope = data.map.get(id);
-            let classdef = scope.borrow().get_class_def(name);
+            //let tscope = data.map.get(id);
+            //let classdef = scope.borrow().get_class_def(name);
 
             // TODO you still need to compile the body of the func, if you're going to allow that... like an init function
             //compile_vec(data, func, unwind, tscope.clone(), body);
@@ -523,10 +523,6 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
             if let Type::Function(_, _) = sym.ttype.unwrap() {
                 sym.value.unwrap()
             } else {
-                //let structdef = scope.borrow().get_type_value(&name).unwrap().structdef;
-                //let index = structdef.iter().position(|ref r| r.0 == *right).unwrap();
-                //let mut indices = vec!(i32_value(data, 0), i32_value(data, index));
-                //let pointer = LLVMBuildGEP(data.builder, object, indices.as_mut_ptr(), indices.len() as u32, label("tmp"));
                 let pointer = build_struct_access(data, scope.clone(), object, &name, right);
                 LLVMBuildLoad(data.builder, pointer, label("tmp"))
             }
@@ -538,12 +534,6 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
                 AST::Accessor(ref left, ref right, ref ltype) => {
                     let name = ltype.clone().unwrap().get_name();
                     let object = compile_node(data, func, unwind, scope.clone(), left);
-                    let cint_type = i32_type(data);
-
-                    //let structdef = scope.borrow().get_type_value(&name).unwrap().structdef;
-                    //let index = structdef.iter().position(|ref r| r.0 == *right).unwrap();
-                    //let mut indices = vec!(LLVMConstInt(cint_type, 0, 0), LLVMConstInt(cint_type, index as u64, 0));
-                    //let pointer = LLVMBuildGEP(data.builder, object, indices.as_mut_ptr(), indices.len() as u32, label("tmp"));
                     let pointer = build_struct_access(data, scope.clone(), object, &name, right);
                     LLVMBuildStore(data.builder, value, pointer)
                 },
@@ -613,11 +603,11 @@ unsafe fn collect_functions_node<'a>(data: &mut LLVM<'a>, scope: ScopeRef<Value,
 
         AST::List(ref items) => { collect_functions_vec(data, scope, items); },
 
-        AST::Invoke(ref name, ref args, _) => { collect_functions_vec(data, scope, args); },
+        AST::Invoke(_, ref args, _) => { collect_functions_vec(data, scope, args); },
 
         AST::SideEffect(_, ref args) => { collect_functions_vec(data, scope, args); },
 
-        AST::Definition((ref name, ref ttype), ref value) => {
+        AST::Definition((ref name, _), ref value) => {
             //collect_functions_node(data, scope, value);
             if let Some(function) = collect_functions_node(data, scope.clone(), value) {
                 let dscope = Scope::target(scope.clone());
@@ -654,7 +644,7 @@ unsafe fn collect_functions_node<'a>(data: &mut LLVM<'a>, scope: ScopeRef<Value,
             }
         },
 
-        AST::For(ref name, ref cond, ref body, ref id) => {
+        AST::For(_, ref cond, ref body, ref id) => {
             let lscope = data.map.get(id);
             collect_functions_node(data, lscope.clone(), cond);
             collect_functions_node(data, lscope.clone(), body);
@@ -755,11 +745,11 @@ pub unsafe fn real_type(data: &LLVM) -> LLVMTypeRef {
 }
 
 pub unsafe fn str_type(data: &LLVM) -> LLVMTypeRef {
-    LLVMPointerType(LLVMInt8Type(), 0)
+    LLVMPointerType(LLVMInt8TypeInContext(data.context), 0)
 }
 
 pub unsafe fn ptr_type(data: &LLVM) -> LLVMTypeRef {
-    LLVMPointerType(LLVMPointerType(LLVMInt8Type(), 0), 0)
+    LLVMPointerType(LLVMPointerType(LLVMInt8TypeInContext(data.context), 0), 0)
 }
 
 
@@ -779,9 +769,9 @@ pub unsafe fn int_value(data: &LLVM, num: usize) -> LLVMValueRef {
     LLVMConstInt(int_type(data), num as u64, 0)
 }
 
-pub unsafe fn build_str_const(data: &LLVM, string: &str) -> LLVMValueRef {
-    LLVMBuildGlobalStringPtr(data.builder, label(string), label("str"))
-}
+//pub unsafe fn build_str_const(data: &LLVM, string: &str) -> LLVMValueRef {
+//    LLVMBuildGlobalStringPtr(data.builder, label(string), label("str"))
+//}
 
 pub unsafe fn build_generic_cast(data: &LLVM, value: LLVMValueRef, ltype: LLVMTypeRef) -> LLVMValueRef {
     if LLVMGetTypeKind(LLVMTypeOf(value)) == llvm::LLVMTypeKind::LLVMPointerTypeKind {
@@ -816,10 +806,10 @@ pub unsafe fn build_cast_from_vartype(data: &LLVM, value: LLVMValueRef, ltype: L
 }
 
 
-pub unsafe fn get_attribute(data: &LLVM, name: &str) -> LLVMAttributeRef {
-    let kind = LLVMGetEnumAttributeKindForName(label(name), name.len());
-    LLVMCreateEnumAttribute(data.context, kind, 0)
-}
+//pub unsafe fn get_attribute(data: &LLVM, name: &str) -> LLVMAttributeRef {
+//    let kind = LLVMGetEnumAttributeKindForName(label(name), name.len());
+//    LLVMCreateEnumAttribute(data.context, kind, 0)
+//}
 
 pub unsafe fn build_function_start(data: &LLVM, name: &str, mut args: Vec<LLVMTypeRef>, return_type: LLVMTypeRef) -> LLVMValueRef {
     let ftype = LLVMFunctionType(return_type, args.as_mut_ptr(), args.len() as u32, false as i32);
@@ -838,7 +828,7 @@ pub unsafe fn build_function_start(data: &LLVM, name: &str, mut args: Vec<LLVMTy
 }
 
 unsafe fn build_function_body(data: &LLVM, node: &AST) {
-    if let AST::Function(ref name, ref args, ref rtype, ref body, ref id) = *node {
+    if let AST::Function(ref name, _, _, ref body, ref id) = *node {
         let fscope = data.map.get(id);
         let pscope = fscope.borrow().parent.clone().unwrap();
         let fname = pscope.borrow().get_full_name(name, id.clone());
@@ -905,12 +895,12 @@ pub unsafe fn get_type(data: &LLVM, scope: ScopeRef<Value, TypeValue>, ttype: Ty
     match ttype {
         Type::Object(ref tname, ref ptypes) => match tname.as_str() {
             "Nil" => str_type(data),
-            "Bool" => LLVMInt1TypeInContext(data.context),
+            "Bool" => bool_type(data),
             "Byte" => LLVMInt8TypeInContext(data.context),
-            "Int" => LLVMInt64TypeInContext(data.context),
-            "Real" => LLVMDoubleTypeInContext(data.context),
-            "String" => LLVMPointerType(LLVMInt8TypeInContext(data.context), 0),
-            "Buffer" => LLVMPointerType(LLVMPointerType(LLVMInt8TypeInContext(data.context), 0), 0),
+            "Int" => int_type(data),
+            "Real" => real_type(data),
+            "String" => str_type(data),
+            "Buffer" => ptr_type(data),
 
             _ => match scope.borrow().get_type_value(tname) {
                 Some(typedata) => typedata.value,
@@ -934,7 +924,7 @@ pub unsafe fn get_type(data: &LLVM, scope: ScopeRef<Value, TypeValue>, ttype: Ty
         },
         // TODO this is not the correct way to deal with type variables... there should be overloaded functions generated
         //Type::Variable(ref tname) => LLVMInt64TypeInContext(data.context),
-        Type::Variable(ref tname) => str_type(data), //ptr_type(data),
+        Type::Variable(_) => str_type(data), //ptr_type(data),
         _ => panic!("InvalidType: cannot convert to llvm, {:?}", ttype),
     }
 }

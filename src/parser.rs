@@ -1,7 +1,7 @@
 
 
 extern crate nom;
-use nom::{ digit, hex_digit, oct_digit, line_ending, not_line_ending, space, multispace, is_alphanumeric, is_alphabetic, is_space, IResult, ErrorKind };
+use nom::{ digit, hex_digit, oct_digit, line_ending, not_line_ending, space, multispace, is_alphanumeric, is_alphabetic, is_space, IResult };
 
 use std;
 use std::f64;
@@ -368,9 +368,9 @@ named!(function<AST>,
     )
 );
 
-named!(identifier_list<Vec<(String, Option<Type>)>>,
-    separated_list_complete!(tag!(","), identifier_typed)
-);
+//named!(identifier_list<Vec<(String, Option<Type>)>>,
+//    separated_list_complete!(tag!(","), identifier_typed)
+//);
 
 named!(identifier_list_defaults<Vec<(String, Option<Type>, Option<AST>)>>,
     separated_list_complete!(tag!(","),
@@ -621,12 +621,12 @@ named!(type_function<Type>,
     ))
 );
 
-named!(type_overload<Type>,
-    map!(
-        delimited!(tag!("Overload["), wscom!(separated_list_complete!(wscom!(tag!(",")), type_description)), tag!("]")),
-        |t| Type::Overload(t)
-    )
-);
+//named!(type_overload<Type>,
+//    map!(
+//        delimited!(tag!("Overload["), wscom!(separated_list_complete!(wscom!(tag!(",")), type_description)), tag!("]")),
+//        |t| Type::Overload(t)
+//    )
+//);
 
 named!(reserved,
     alt!(

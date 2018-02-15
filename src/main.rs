@@ -25,7 +25,9 @@ mod refinery;
 mod scope;
 use scope::ScopeMapRef;
 
+mod binding;
 mod types;
+mod typecheck;
 mod utils;
 mod import;
 //mod interpreter;
@@ -92,8 +94,8 @@ fn process_input<V, T>(map: ScopeMapRef<V, T>, name: &str, text: &[u8]) -> Vec<A
     code = refinery::refine(code);
     traverse(&code);
     //import::load_index(map.get_global(), "libcore.dec");
-    scope::bind_names(map.clone(), &mut code);
-    let gtype = types::check_types(map.clone(), map.get_global(), &mut code);
+    binding::bind_names(map.clone(), &mut code);
+    typecheck::check_types(map.clone(), map.get_global(), &mut code);
     println!("\n{:?}\n", code);
 
     //println!("\n{:?}\n\n{:?}", &code, global.clone());

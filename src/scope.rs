@@ -1,7 +1,6 @@
 
 use std::str;
 use std::rc::Rc;
-use std::fmt::Debug;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::collections::hash_map::Entry;
@@ -9,8 +8,6 @@ use std::collections::hash_map::Entry;
 extern crate nom;
 use nom::{ digit };
 
-use import;
-use parser::AST;
 use types::Type;
 use utils::UniqueID;
 
@@ -130,6 +127,7 @@ impl<V, T> Scope<V, T> where V: Clone, T: Clone {
         }
     }
 
+    /*
     pub fn modify<F>(&mut self, name: &String, mut f: F) -> () where F: FnMut(&mut Symbol<V>) -> () {
         // TODO this might be an issue with overloaded functions; this was changed to make overloading work when in different scopes, which might cause a name/type error if something in a
         // more global scope tries to access an overloaded type specified in a more local scope... maybe the solution is to create a new entry with the new variant only accessible from the
@@ -141,7 +139,8 @@ impl<V, T> Scope<V, T> where V: Clone, T: Clone {
                 _ => panic!("NameError: type is undefined; {:?}", name),
             },
         }
-    } 
+    }
+    */
 
     pub fn search<F, U>(&self, name: &String, f: F) -> Option<U> where F: Fn(&Symbol<V>) -> Option<U> {
         if let Some(sym) = self.names.get(name) {
@@ -280,18 +279,11 @@ impl<V, T> Scope<V, T> where V: Clone, T: Clone {
     }
 
     pub fn update_type(&mut self, name: &String, ttype: Type) {
-        //if let Type::Variable(_) = ttype {
-        //    return;
-        //}
         self.modify_type(name, |info| {
             println!("CHANGE: {:?} from {:?} to {:?}", name, info.ttype, ttype);
             info.ttype = ttype.clone()
         })
     }
-
-    //pub fn swap_type<F>(&mut self, name: &String, f: F) where F: Fn(Type) -> Type {
-    //    self.modify_type(name, |info| info.ttype = f(info.ttype.clone()))
-    //}
 
     pub fn create_class_def(&mut self, pair: &(String, Vec<Type>), parent: Option<(String, Vec<Type>)>) -> ScopeRef<V, T> {
         // Create class name bindings for checking ast::accessors
@@ -365,7 +357,7 @@ impl<V, T> Scope<V, T> where V: Clone, T: Clone {
 
 
     pub fn locate_type(scope: ScopeRef<V, T>, name: &String) -> Option<ScopeRef<V, T>> {
-        if let Some(ref info) = scope.borrow().types.get(name) {
+        if let Some(_) = scope.borrow().types.get(name) {
             return Some(scope.clone());
         }
 
@@ -417,13 +409,13 @@ impl<V, T> Scope<V, T> where V: Clone, T: Clone {
     }
 
     pub fn raise_types(&mut self, fscope: ScopeRef<V, T>) {
-println!("RAISING");
+        //println!("RAISING");
         let mut names = vec!();
         for (name, info) in &mut fscope.borrow_mut().types {
             match info.ttype {
                 Type::Variable(ref vname) => {
                     //if name == vname {
-println!("RAISE TYPEVAR: {:?} {:?}", self.get_full_name(&Some(String::from("")), UniqueID(0)), vname);
+                        println!("RAISE TYPEVAR: {:?} {:?}", self.get_full_name(&Some(String::from("")), UniqueID(0)), vname);
                         // TODO this is probably wrong because we might be unifying different type vars
                         //if !self.types.contains_key(name) {
                             self.define_type(name.clone(), info.ttype.clone());
@@ -481,7 +473,7 @@ println!("RAISE TYPEVAR: {:?} {:?}", self.get_full_name(&Some(String::from("")),
             if self.find_type(&name).is_none() {
                 let ttype = Type::Variable(name.clone());
                 self.define_type(name, ttype.clone());
-println!("NEW TYPEVAR: {:?} {:?}", self.get_basename(), ttype);
+                println!("NEW TYPEVAR: {:?} {:?}", self.get_basename(), ttype);
                 return ttype;
             }
         }
@@ -539,11 +531,11 @@ impl<V, T> ScopeMapRef<V, T> where V: Clone, T: Clone {
         self.get(&ScopeMapRef::<V, T>::GLOBAL)
     }
 
-    pub fn foreach<F>(&self, f: F) where F: Fn(ScopeRef<V, T>) -> () {
-        for (i, scope) in self.0.borrow().iter() {
-            f(scope.clone());
-        }
-    }
+    //pub fn foreach<F>(&self, f: F) where F: Fn(ScopeRef<V, T>) -> () {
+    //    for (_, scope) in self.0.borrow().iter() {
+    //        f(scope.clone());
+    //    }
+    //}
 }
 
 pub fn mangle_name(name: &String, argtypes: &Vec<Type>) -> String {
@@ -563,10 +555,7 @@ pub fn mangle_name(name: &String, argtypes: &Vec<Type>) -> String {
 pub fn unmangle_name(name: &String) -> Option<String> {
     named!(unmangle<String>,
         preceded!(tag!("_Z"),
-            map!(
-                length_bytes!(map!(digit, |s| usize::from_str_radix(str::from_utf8(s).unwrap(), 10).unwrap())),
-                |s| String::from(str::from_utf8(s).unwrap())
-            )
+            map_str!(length_bytes!(map!(digit, |s| usize::from_str_radix(str::from_utf8(s).unwrap(), 10).unwrap())))
         )
     );
     match unmangle(name.as_bytes()) {
@@ -575,199 +564,4 @@ pub fn unmangle_name(name: &String) -> Option<String> {
     }
 }
 
-
-pub fn bind_names<V, T>(map: ScopeMapRef<V, T>, code: &mut Vec<AST>) where V: Clone + Debug, T: Clone + Debug {
-    bind_names_vec(map.clone(), map.get_global().clone(), code);
-}
-
-pub fn bind_names_vec<V, T>(map: ScopeMapRef<V, T>, scope: ScopeRef<V, T>, code: &mut Vec<AST>) where V: Clone + Debug, T: Clone + Debug {
-    for node in code {
-        bind_names_node(map.clone(), scope.clone(), node);
-    }
-}
-
-fn bind_names_node<V, T>(map: ScopeMapRef<V, T>, scope: ScopeRef<V, T>, node: &mut AST) where V: Clone + Debug, T: Clone + Debug {
-    match *node {
-        AST::Function(ref name, ref args, ref ret, ref mut body, ref id) => {
-            let fscope = map.add(id.clone(), Some(scope.clone()));
-            fscope.borrow_mut().set_basename(name.as_ref().map_or(format!("anon{}", id), |name| name.clone()));
-
-            if let Some(ref name) = *name {
-                let dscope = Scope::target(scope.clone());
-                dscope.borrow_mut().define_func(name.clone(), None, false);
-            }
-
-            for arg in args {
-                check_for_typevars(scope.clone(), &arg.1);
-                fscope.borrow_mut().define(arg.0.clone(), arg.1.clone());
-            }
-            check_for_typevars(scope.clone(), ret);
-
-            bind_names_node(map.clone(), fscope.clone(), body)
-        },
-
-        AST::Invoke(ref mut fexpr, ref mut args, _) => {
-            bind_names_node(map.clone(), scope.clone(), fexpr);
-            bind_names_vec(map.clone(), scope.clone(), args);
-        },
-
-        AST::Definition((ref name, ref ttype), ref mut code) => {
-            check_for_typevars(scope.clone(), ttype);
-            let dscope = Scope::target(scope.clone());
-            dscope.borrow_mut().define(name.clone(), ttype.clone());
-            bind_names_node(map.clone(), scope.clone(), code);
-        },
-
-        AST::Declare(ref name, ref ttype) => {
-            let dscope = Scope::target(scope.clone());
-            dscope.borrow_mut().define_func(name.clone(), Some(ttype.clone()), true);
-            if let Some(ref mname) = unmangle_name(name) {
-                println!("OVERLOAD: {:?}", mname);
-                dscope.borrow_mut().define_func(mname.clone(), None, true);
-                let mut stype = dscope.borrow().get_variable_type(mname).unwrap_or(Type::Overload(vec!()));
-                stype = stype.add_variant(scope.clone(), ttype.clone());
-                dscope.borrow_mut().update_variable_type(mname, stype);
-            }
-        },
-
-        AST::Identifier(ref name) => {
-            if scope.borrow().find(name).is_none() {
-                panic!("NameError: undefined identifier {:?}", name);
-            }
-        },
-
-        AST::SideEffect(_, ref mut args) => {
-            bind_names_vec(map.clone(), scope.clone(), args);
-        },
-
-        AST::If(ref mut cond, ref mut texpr, ref mut fexpr) => {
-            bind_names_node(map.clone(), scope.clone(), cond);
-            bind_names_node(map.clone(), scope.clone(), texpr);
-            bind_names_node(map.clone(), scope.clone(), fexpr);
-        },
-
-        AST::Try(ref mut cond, ref mut cases) |
-        AST::Match(ref mut cond, ref mut cases) => {
-            bind_names_node(map.clone(), scope.clone(), cond);
-            // TODO check to make sure AST::Underscore only occurs as the last case, if at all
-            for &mut (ref mut case, ref mut body) in cases {
-                bind_names_node(map.clone(), scope.clone(), case);
-                bind_names_node(map.clone(), scope.clone(), body);
-            }
-        },
-
-        AST::Raise(ref mut expr) => {
-            bind_names_node(map.clone(), scope.clone(), expr);
-        },
-
-        AST::While(ref mut cond, ref mut body) => {
-            bind_names_node(map.clone(), scope.clone(), cond);
-            bind_names_node(map.clone(), scope.clone(), body);
-        },
-
-        AST::For(ref name, ref mut cond, ref mut body, ref id) => {
-            let lscope = map.add(id.clone(), Some(scope.clone()));
-            lscope.borrow_mut().define(name.clone(), None);
-            bind_names_node(map.clone(), lscope.clone(), cond);
-            bind_names_node(map.clone(), lscope.clone(), body);
-        },
-
-        AST::List(ref mut code) |
-        AST::Block(ref mut code) => { bind_names_vec(map, scope, code); },
-
-        AST::Index(ref mut base, ref mut index, _) => {
-            bind_names_node(map.clone(), scope.clone(), base);
-            bind_names_node(map.clone(), scope.clone(), index);
-        },
-
-
-        AST::New((ref name, ref types)) => {
-            if scope.borrow().find_type(name).is_none() {
-                panic!("NameError: undefined identifier {:?}", name);
-            }
-        },
-
-        AST::Class(ref pair, ref parent, ref mut body, ref id) => {
-            let classdef = scope.borrow_mut().create_class_def(pair, parent.clone());
-            let &(ref name, ref types) = pair;
-
-            // Create a temporary invisible scope to name check the class body
-            let tscope = map.add(id.clone(), Some(scope.clone()));
-            tscope.borrow_mut().set_class(true);
-            tscope.borrow_mut().set_basename(name.clone());
-
-            // Define Self and Super, and check for typevars in the type params
-            tscope.borrow_mut().define_type(String::from("Self"), Type::Object(name.clone(), types.clone()));
-            types.iter().map(|ttype| check_for_typevars(tscope.clone(), &Some(ttype.clone()))).count();
-            if let &Some((ref pname, ref ptypes)) = parent {
-                tscope.borrow_mut().define_type(String::from("Super"), Type::Object(pname.clone(), ptypes.clone()));
-                ptypes.iter().map(|ttype| check_for_typevars(tscope.clone(), &Some(ttype.clone()))).count();
-            }
-
-            bind_names_vec(map.clone(), tscope.clone(), body);
-        },
-
-        AST::Resolver(ref mut left, _) => {
-            // TODO should this always work on a type reference, or should classes be added as values as well as types?
-            //bind_names_node(map.clone(), scope, left);
-            match **left {
-                AST::Identifier(ref name) => {
-                    if scope.borrow().find_type(name).is_none() {
-                        panic!("NameError: undefined type {:?}", name);
-                    }
-                },
-                _ => panic!("SyntaxError: left-hand side of scope resolver must be identifier")
-            }
-        },
-
-        AST::Accessor(ref mut left, _, _) => {
-            bind_names_node(map.clone(), scope, left);
-        },
-
-        AST::Assignment(ref mut left, ref mut right) => {
-            match **left {
-                AST::Accessor(_, _, _) | AST::Index(_, _, _) => { },
-                _ => panic!("SyntaxError: assignment to something other than a list or class element: {:?}", left),
-            };
-            bind_names_node(map.clone(), scope.clone(), left);
-            bind_names_node(map.clone(), scope.clone(), right);
-        },
-
-        AST::Import(ref name, ref mut decls) => {
-            let path = name.replace(".", "/") + ".dec";
-            *decls = import::load_index(path.as_str());
-            bind_names_vec(map.clone(), scope.clone(), decls);
-        },
-
-        AST::Type(_, _) => panic!("NotImplementedError: not yet supported, {:?}", node),
-
-        AST::Noop | AST::Underscore | AST::Nil(_) |
-        AST::Boolean(_) | AST::Integer(_) | AST::Real(_) | AST::String(_) => { }
-    }
-}
-
-pub fn check_for_typevars<V, T>(scope: ScopeRef<V, T>, ttype: &Option<Type>) where V: Clone, T: Clone {
-    match ttype {
-        &Some(ref ttype) => match ttype {
-            &Type::Object(_, ref types) => {
-                for ttype in types {
-                    check_for_typevars(scope.clone(), &Some(ttype.clone()))
-                }
-            },
-            &Type::Function(ref args, ref ret) => {
-                for atype in args {
-                    check_for_typevars(scope.clone(), &Some(atype.clone()))
-                }
-                check_for_typevars(scope.clone(), &Some(*ret.clone()));
-            },
-            &Type::Variable(ref name) => {
-                if !scope.borrow().contains_type(name) {
-                    scope.borrow_mut().define_type(name.clone(), ttype.clone());
-                }
-            },
-            _ => { },
-        },
-        _ => { },
-    }
-}
 

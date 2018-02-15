@@ -9,11 +9,12 @@ extern crate llvm_sys as llvm;
 use self::llvm::prelude::*;
 use self::llvm::core::*;
 
-use types::{ Type, check_type, Check };
-use utils::UniqueID;
 use parser::{ parse_type };
-use scope::{ Scope, ScopeRef, ScopeMapRef, Context, check_for_typevars, mangle_name, unmangle_name };
+use scope::{ self, Scope, ScopeRef, ScopeMapRef, Context };
+use binding::{ declare_typevars };
+use types::{ Type, check_type, Check };
 use compiler_llvm::*;
+use utils::UniqueID;
 
 
 pub type RuntimeFunction = unsafe fn(&LLVM, &str, LLVMTypeRef) -> LLVMValueRef;
@@ -50,7 +51,7 @@ impl<'a> BuiltinMap<'a> {
     }
 
     pub unsafe fn compile_builtin(data: &LLVM, scope: ScopeRef<Value, TypeValue>, name: &String, largs: &Vec<LLVMValueRef>, stype: Type) -> Option<LLVMValueRef> {
-        let name = if let Some(uname) = unmangle_name(name) {
+        let name = if let Some(uname) = scope::unmangle_name(name) {
             uname
         } else {
             name.clone()
@@ -95,7 +96,7 @@ pub fn register_builtins_node<'a, V, T>(scope: ScopeRef<V, T>, tscope: ScopeRef<
         Builtin::Type(ref name, ref ttype) => scope.borrow_mut().define_type(String::from(*name), ttype.clone()),
         Builtin::Func(ref name, ref ftype, _) => {
             let ftype = parse_type(ftype);
-            check_for_typevars(tscope.clone(), &ftype);
+            declare_typevars(tscope.clone(), &ftype);
             Scope::define_func_variant(scope.clone(), String::from(*name), tscope.clone(), ftype.clone().unwrap());
         },
         Builtin::Class(ref name, _, ref entries) => {
@@ -137,7 +138,7 @@ pub unsafe fn declare_builtins_node<'a>(data: &mut LLVM<'a>, objtype: LLVMTypeRe
                 },
                 Func::Runtime(func) => {
                     if scope.borrow().get_variable_type(&name).unwrap().is_overloaded() {
-                        name = mangle_name(&name, ftype.get_argtypes());
+                        name = scope::mangle_name(&name, ftype.get_argtypes());
                         scope.borrow_mut().define(name.clone(), Some(ftype));
                     }
                     let fname = scope.borrow().get_full_name(&Some(name.clone()), UniqueID(0));

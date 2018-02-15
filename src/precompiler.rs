@@ -2,9 +2,11 @@
 use std::fmt::Debug;
 
 use parser::AST;
-use types::{ Type, resolve_type, update_scope_variable_types };
-use scope::{ Scope, ScopeRef, ScopeMapRef };
-use utils::UniqueID;
+use types::{ resolve_type };
+use typecheck::{ update_scope_variable_types };
+use scope::{ ScopeRef, ScopeMapRef };
+//use utils::UniqueID;
+
 
 pub fn precompile<V, T>(map: ScopeMapRef<V, T>, code: Vec<AST>) -> Vec<AST> where V: Clone + Debug, T: Clone + Debug {
     update_scope_variable_types(map.get_global());
@@ -87,7 +89,7 @@ pub fn precompile_node<V, T>(map: ScopeMapRef<V, T>, scope: ScopeRef<V, T>, node
             //}
         },
 
-        AST::Invoke(fexpr, mut args, stype) => {
+        AST::Invoke(fexpr, args, stype) => {
             // TODO you could detect a closure with an explicit tag on variable??? no you'de have to process fexpr
             //if something {
             //args.insert(0, precompile_node(map.clone(), scope.clone(), *fexpr));
@@ -145,7 +147,7 @@ pub fn precompile_node<V, T>(map: ScopeMapRef<V, T>, scope: ScopeRef<V, T>, node
         AST::Class(pair, parent, body, id) => {
             let tscope = map.get(&id);
             //update_scope_variable_types(tscope.clone());
-            let classdef = scope.borrow().get_class_def(&pair.0);
+            //let classdef = scope.borrow().get_class_def(&pair.0);
             //update_scope_variable_types(classdef.clone());
             let mut body = precompile_vec(map.clone(), tscope.clone(), body);
 

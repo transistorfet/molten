@@ -1,7 +1,6 @@
 
 use std::fs::File;
 use std::path::Path;
-use std::fmt::Debug;
 use std::io::prelude::*;
 
 use types::Type;
@@ -11,7 +10,6 @@ use parser::{ AST, parse_or_error };
 
 
 pub fn load_index(filename: &str) -> Vec<AST> {
-    //let mut f = File::open(filename).expect("Error: file not found");
     let mut f = find_file(filename);
     let mut contents = String::new();
     f.read_to_string(&mut contents).expect("Error reading file contents");

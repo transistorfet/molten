@@ -1,7 +1,6 @@
 
 
 use parser::AST;
-use types::Type;
 use utils::UniqueID;
 
 pub fn refine(code: Vec<AST>) -> Vec<AST> {
@@ -43,16 +42,6 @@ pub fn refine_node(node: AST) -> AST {
             }
             AST::Invoke(Box::new(refine_node(*fexpr)), refine_vec(args), ttype)
         },
-
-        /*
-        AST::Infix(_, _, _) => {
-            let old = mem::replace(node, AST::Noop);
-            if let AST::Infix(name, left, right) = old {
-                mem::replace(node, AST::Invoke(Box::new(AST::Identifier(name)), vec!(*left, *right), None));
-                println!("STUFF: {:?}", node);
-            } else {panic!("FUGK"); }
-        },
-        */
 
         AST::SideEffect(op, args) => {
             AST::SideEffect(op, refine_vec(args))
@@ -100,7 +89,7 @@ pub fn refine_node(node: AST) -> AST {
             let mut has_new = false;
             let mut body: Vec<AST> = body.into_iter().map(|node| {
                 match node {
-                    AST::Function(name, mut args, ret, mut body, id) => {
+                    AST::Function(name, args, ret, mut body, id) => {
                         if name == Some(String::from("new")) {
                             has_new = true;
                             if args.len() > 0 && args[0].0 == String::from("self") {
