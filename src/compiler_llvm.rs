@@ -517,7 +517,7 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
 
             let name = ltype.clone().unwrap().get_name();
             let classdef = scope.borrow().get_class_def(&name);
-            let sym = classdef.borrow().find(right).unwrap();
+            let sym = classdef.borrow().search(right, |sym| Some(sym.clone())).unwrap();
             println!("*ACCESS: {:?} {:?}", right, classdef);
 
             if let Type::Function(_, _) = sym.ttype.unwrap() {

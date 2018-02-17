@@ -1,4 +1,10 @@
 
+* there are constant problems with type variables such that you either need to create too many of them, or you mistake variables with the same name, in
+  different scopes.  We can either add a uniqueid to variables (which is either generated when the variable is generated as a variable-unique id, or
+  it could be the id of the scope in which it is defined, which would mean changing it every time we raise it, but which would be easy to look up given
+  a scope map...)  Or we could possible somehow have unassigned type variables, which would only be assigned in certain instances... I'm not sure this
+  would solve the conflict issue, but it would reduced the number of assigned type variables...)
+
 * either add in the initialization of class variables, possibly limited to constant expressions only, or else raise an error if an initializer is provided
 
 * should variables be writable... this is more about breaking with functional traditions

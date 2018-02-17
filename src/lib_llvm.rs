@@ -132,7 +132,7 @@ pub unsafe fn declare_builtins_node<'a>(data: &mut LLVM<'a>, objtype: LLVMTypeRe
             match *func {
                 Func::External => {
                     let func = LLVMAddFunction(data.module, label(name.as_str()), get_type(data, scope.clone(), ftype, false));
-                    if scope.borrow().find(&name).is_some() {
+                    if scope.borrow().contains(&name) {
                         scope.borrow_mut().assign(&name, func);
                     }
                 },
@@ -173,7 +173,7 @@ pub unsafe fn declare_function(module: LLVMModuleRef, scope: ScopeRef<Value, Typ
     let ftype = LLVMFunctionType(ret_type, args.as_mut_ptr(), args.len() as u32, vargs as i32);
     let func = LLVMAddFunction(module, label(name), ftype);
     let name = &String::from(name);
-    if scope.borrow().find(name).is_some() {
+    if scope.borrow().contains(name) {
         scope.borrow_mut().assign(name, func);
     }
 }

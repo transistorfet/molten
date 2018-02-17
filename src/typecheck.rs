@@ -15,7 +15,7 @@ pub fn check_types<V, T>(map: ScopeMapRef<V, T>, scope: ScopeRef<V, T>, code: &m
 }
 
 pub fn check_types_node<V, T>(map: ScopeMapRef<V, T>, scope: ScopeRef<V, T>, node: &mut AST, expected: Option<Type>) -> Type where V: Clone + Debug, T: Clone + Debug {
-    let x = match *node {
+    let rtype = match *node {
         AST::Boolean(_) => Type::Object(String::from("Bool"), vec!()),
         AST::Integer(_) => Type::Object(String::from("Int"), vec!()),
         AST::Real(_) => Type::Object(String::from("Real"), vec!()),
@@ -33,7 +33,7 @@ pub fn check_types_node<V, T>(map: ScopeMapRef<V, T>, scope: ScopeRef<V, T>, nod
                     stype = fscope.borrow_mut().map_all_typevars(stype);
                     atype = expect_type(fscope.clone(), Some(atype), Some(stype), Check::Def);
                 }
-                fscope.borrow_mut().update_variable_type(name, atype.clone());
+                fscope.borrow_mut().set_variable_type(name, atype.clone());
                 //Type::update_variable_type(fscope.clone(), name, atype.clone());
                 argtypes.push(atype);
             }
@@ -45,7 +45,7 @@ pub fn check_types_node<V, T>(map: ScopeMapRef<V, T>, scope: ScopeRef<V, T>, nod
             for i in 0 .. argtypes.len() {
                 argtypes[i] = resolve_type(fscope.clone(), argtypes[i].clone());
                 // TODO this is still not checking for type compatibility
-                fscope.borrow_mut().update_variable_type(&args[i].0, argtypes[i].clone());
+                fscope.borrow_mut().set_variable_type(&args[i].0, argtypes[i].clone());
                 //Type::update_variable_type(fscope.clone(), &args[i].0, argtypes[i].clone());
                 args[i].1 = Some(argtypes[i].clone());
             }
@@ -65,7 +65,7 @@ pub fn check_types_node<V, T>(map: ScopeMapRef<V, T>, scope: ScopeRef<V, T>, nod
 
                 //let mut otype = dscope.borrow().get_variable_type(&dname);
                 //nftype = otype.map(|ttype| ttype.add_variant(scope.clone(), nftype.clone())).unwrap_or(nftype);
-                //dscope.borrow_mut().update_variable_type(&dname, nftype.clone());
+                //dscope.borrow_mut().set_variable_type(&dname, nftype.clone());
                 Scope::add_func_variant(dscope.clone(), &dname, scope.clone(), nftype.clone());
             }
 
@@ -132,7 +132,7 @@ pub fn check_types_node<V, T>(map: ScopeMapRef<V, T>, scope: ScopeRef<V, T>, nod
         AST::Definition((ref name, ref mut ttype), ref mut body) => {
             let dscope = Scope::target(scope.clone());
             let btype = expect_type(scope.clone(), ttype.clone(), Some(check_types_node(map.clone(), scope.clone(), body, ttype.clone())), Check::Def);
-            dscope.borrow_mut().update_variable_type(name, btype.clone());
+            dscope.borrow_mut().set_variable_type(name, btype.clone());
             //Type::update_variable_type(dscope.clone(), name, btype.clone());
             *ttype = Some(btype.clone());
             btype
@@ -140,7 +140,7 @@ pub fn check_types_node<V, T>(map: ScopeMapRef<V, T>, scope: ScopeRef<V, T>, nod
 
         AST::Declare(ref name, ref ttype) => {
             //let dscope = Scope::target(scope.clone());
-            //dscope.borrow_mut().update_variable_type(name, ttype.clone());
+            //dscope.borrow_mut().set_variable_type(name, ttype.clone());
             ttype.clone()
         },
 
@@ -187,8 +187,8 @@ pub fn check_types_node<V, T>(map: ScopeMapRef<V, T>, scope: ScopeRef<V, T>, nod
             let itype = lscope.borrow().get_variable_type(name).unwrap_or_else(|| expected.unwrap_or_else(|| scope.borrow_mut().new_typevar()));
             let etype = Some(Type::Object(String::from("List"), vec!(itype)));
             let ltype = expect_type(lscope.clone(), etype.clone(), Some(check_types_node(map.clone(), lscope.clone(), list, etype.clone())), Check::Def);
-            lscope.borrow_mut().update_variable_type(name, ltype.get_params()[0].clone());
-            //Type::update_variable_type(lscope.clone(), name, ltype);
+            lscope.borrow_mut().set_variable_type(name, ltype.get_params()[0].clone());
+            //Type::update_variable_type(lscope.clone(), name, ltype.get_params()[0].clone());
             check_types_node(map.clone(), lscope.clone(), body, None)
         },
 
@@ -269,8 +269,8 @@ pub fn check_types_node<V, T>(map: ScopeMapRef<V, T>, scope: ScopeRef<V, T>, nod
         AST::Index(_, _, _) => panic!("InternalError: ast element shouldn't appear at this late phase: {:?}", node),
     };
     
-    println!("CHECK: {:?} {:?}", x, node);
-    x
+    println!("CHECK: {:?} {:?}", rtype, node);
+    rtype
 }
 
 
@@ -284,7 +284,7 @@ pub fn update_scope_variable_types<V, T>(scope: ScopeRef<V, T>) where V: Clone, 
     for name in &names {
         let otype = dscope.borrow_mut().get_variable_type(name).unwrap().clone();
         let ntype = resolve_type(scope.clone(), otype);
-        dscope.borrow_mut().update_variable_type(name, ntype);
+        dscope.borrow_mut().set_variable_type(name, ntype);
     }
 }
 

@@ -630,7 +630,19 @@ named!(type_function<Type>,
 
 named!(reserved,
     alt!(
-        tag_word!("do") | tag_word!("end") | tag_word!("while") | tag_word!("class")
+        tag_word!("do") |
+        tag_word!("end") |
+        tag_word!("while") |
+        tag_word!("class") |
+        tag_word!("import") |
+        tag_word!("let") |
+        tag_word!("type") |
+        tag_word!("match") |
+        tag_word!("if") | tag_word!("then") | tag_word!("else") |
+        tag_word!("try") | tag_word!("with") | tag_word!("raise") |
+        tag_word!("for") | tag_word!("in") |
+        tag_word!("fn") | tag_word!("decl") |
+        tag_word!("noop")
     )
 );
 

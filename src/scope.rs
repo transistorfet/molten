@@ -66,18 +66,6 @@ impl<V, T> Scope<V, T> where V: Clone, T: Clone {
         Rc::new(RefCell::new(Scope::new(parent)))
     }
 
-    pub fn is_local(&self) -> bool {
-        self.context == Context::Local
-    }
-
-    pub fn is_global(&self) -> bool {
-        self.context == Context::Global || self.context == Context::Primative
-    }
-
-    pub fn is_primative(&self) -> bool {
-        self.context == Context::Primative
-    }
-
     pub fn set_context(&mut self, context: Context) {
         self.context = context;
     }
@@ -86,12 +74,31 @@ impl<V, T> Scope<V, T> where V: Clone, T: Clone {
         self.context = if value { Context::Class } else { Context::Local };
     }
 
+    pub fn is_primative(&self) -> bool {
+        self.context == Context::Primative
+    }
+
+    pub fn is_global(&self) -> bool {
+        self.context == Context::Global || self.context == Context::Primative
+    }
+
+    pub fn is_local(&self) -> bool {
+        self.context == Context::Local
+    }
+
     pub fn set_parent(&mut self, parent: ScopeRef<V, T>) {
         self.parent = Some(parent);
     }
 
     pub fn get_parent(&self) -> Option<ScopeRef<V, T>> {
         self.parent.clone()
+    }
+
+    pub fn target(scope: ScopeRef<V, T>) -> ScopeRef<V, T> {
+        match scope.borrow().context {
+            Context::Class => scope.borrow().get_self_class_def().unwrap(),
+            _ => scope.clone(),
+        }
     }
 
     ///// Variable Functions /////
@@ -104,14 +111,14 @@ impl<V, T> Scope<V, T> where V: Clone, T: Clone {
     }
 
     pub fn define_func(&mut self, name: String, ttype: Option<Type>, external: bool) {
-        // TODO we don't really do the right this with type here
         let funcs = self.search(&name, |sym| Some(sym.funcdefs)).unwrap_or(0);
         match self.names.entry(name.clone()) {
+            Entry::Vacant(entry) => { entry.insert(Symbol { ttype: ttype, value: None, funcdefs: funcs + 1, external: external }); },
             Entry::Occupied(mut entry) => match entry.get().funcdefs {
                 0 => panic!("NameError: variable is already defined as a non-function; {:?}", name),
+                // TODO we don't really do the right this with type here, but we don't have a scoperef to pass to Type::add_variant
                 _ => entry.get_mut().funcdefs += 1,
             },
-            Entry::Vacant(entry) => { entry.insert(Symbol { ttype: ttype, value: None, funcdefs: funcs + 1, external: external }); },
         };
     }
 
@@ -152,6 +159,13 @@ impl<V, T> Scope<V, T> where V: Clone, T: Clone {
         }
     }
 
+    pub fn contains(&self, name: &String) -> bool {
+        match self.search(name, |sym| Some(true)) {
+            Some(true) => true,
+            _ => false,
+        }
+    }
+
     pub fn contains_local(&self, name: &String) -> bool {
         self.names.contains_key(name)
     }
@@ -172,8 +186,8 @@ impl<V, T> Scope<V, T> where V: Clone, T: Clone {
         }
     }
 
-    pub fn find(&self, name: &String) -> Option<Symbol<V>> {
-        self.search(name, |sym| Some(sym.clone()))
+    pub fn set_variable_type(&mut self, name: &String, ttype: Type) {
+        self.modify_local(name, move |sym| sym.ttype = Some(ttype.clone()))
     }
 
     pub fn get_variable_type(&self, name: &String) -> Option<Type> {
@@ -194,10 +208,6 @@ impl<V, T> Scope<V, T> where V: Clone, T: Clone {
         }
     }
 
-    pub fn update_variable_type(&mut self, name: &String, ttype: Type) {
-        self.modify_local(name, move |sym| sym.ttype = Some(ttype.clone()))
-    }
-
     pub fn get_all_variants(&self, name: &String, local: bool) -> Vec<Type> {
         let mut variants = self.names.get(name).as_ref().map(|sym| sym.ttype.as_ref().map(|ttype| ttype.get_variants()).unwrap_or(vec!())).unwrap_or(vec!());
         if !local {
@@ -208,9 +218,8 @@ impl<V, T> Scope<V, T> where V: Clone, T: Clone {
 
     pub fn add_func_variant(dscope: ScopeRef<V, T>, name: &String, tscope: ScopeRef<V, T>, ftype: Type) {
         let otype = dscope.borrow().get_variable_type_full(name, true);
-        let mut ftype = ftype.clone();
-        ftype = otype.map(|ttype| ttype.add_variant(tscope.clone(), ftype.clone())).unwrap_or(ftype);
-        dscope.borrow_mut().update_variable_type(name, ftype.clone());
+        let ftype = otype.map(|ttype| ttype.add_variant(tscope.clone(), ftype.clone())).unwrap_or(ftype);
+        dscope.borrow_mut().set_variable_type(name, ftype.clone());
     }
 
     pub fn is_closure_var(&self, name: &String) -> bool {
@@ -247,7 +256,7 @@ impl<V, T> Scope<V, T> where V: Clone, T: Clone {
         };
     }
 
-    pub fn contains_type(&self, name: &String) -> bool {
+    pub fn contains_type_local(&self, name: &String) -> bool {
         self.types.contains_key(name)
     }
 
@@ -329,22 +338,13 @@ impl<V, T> Scope<V, T> where V: Clone, T: Clone {
     }
 
     pub fn get_class_info(&self, name: &String) -> Option<(Type, Option<Type>)> {
-        self.search_type(name, |info| Some(match info.parent {
-            Some((ref name, ref params)) => (info.ttype.clone(), Some(Type::Object(name.clone(), params.clone()))),
-            None => (info.ttype.clone(), None),
-        }))
+        self.search_type(name, |info| {
+            Some((info.ttype.clone(), info.parent.clone().map(|(name, params)| Type::Object(name, params))))
+        })
     }
 
     pub fn get_self_class_def(&self) -> Option<ScopeRef<V, T>> {
         self.search_type(&self.basename, |info| info.classdef.clone())
-    }
-
-    pub fn target(scope: ScopeRef<V, T>) -> ScopeRef<V, T> {
-        if scope.borrow().context == Context::Class {
-            scope.borrow().get_self_class_def().unwrap()
-        } else {
-            scope
-        }
     }
 
     pub fn set_type_value(&mut self, name: &String, value: T) {
@@ -362,10 +362,9 @@ impl<V, T> Scope<V, T> where V: Clone, T: Clone {
         }
 
         let parent = scope.borrow().parent.clone();
-        if parent.is_some() {
-            Scope::locate_type(parent.unwrap(), name)
-        } else {
-            None
+        match parent {
+            Some(parent) => Scope::locate_type(parent, name),
+            _ => None
         }
     }
 
@@ -436,7 +435,7 @@ impl<V, T> Scope<V, T> where V: Clone, T: Clone {
         let mut names = vec!();
         Scope::<V, T>::collect_typevars(&mut names, ttype.clone());
         for name in names {
-            if fscope.borrow().contains_type(&name) {
+            if fscope.borrow().contains_type_local(&name) {
                 println!("RAISE TYPEVAR: {:?} {:?}", name, ttype);
                 let otype = fscope.borrow().find_type(&name).unwrap();
                 fscope.borrow_mut().types.remove(&name);

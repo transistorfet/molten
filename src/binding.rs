@@ -57,12 +57,12 @@ fn bind_names_node<V, T>(map: ScopeMapRef<V, T>, scope: ScopeRef<V, T>, node: &m
                 dscope.borrow_mut().define_func(mname.clone(), None, true);
                 let mut stype = dscope.borrow().get_variable_type(mname).unwrap_or(Type::Overload(vec!()));
                 stype = stype.add_variant(scope.clone(), ttype.clone());
-                dscope.borrow_mut().update_variable_type(mname, stype);
+                dscope.borrow_mut().set_variable_type(mname, stype);
             }
         },
 
         AST::Identifier(ref name) => {
-            if scope.borrow().find(name).is_none() {
+            if !scope.borrow().contains(name) {
                 panic!("NameError: undefined identifier {:?}", name);
             }
         },
@@ -192,7 +192,7 @@ pub fn declare_typevars<V, T>(scope: ScopeRef<V, T>, ttype: &Option<Type>) where
                 declare_typevars(scope.clone(), &Some(*ret.clone()));
             },
             &Type::Variable(ref name) => {
-                if !scope.borrow().contains_type(name) {
+                if !scope.borrow().contains_type_local(name) {
                     scope.borrow_mut().define_type(name.clone(), ttype.clone());
                 }
             },
