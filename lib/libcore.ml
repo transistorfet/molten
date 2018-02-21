@@ -116,15 +116,26 @@ class List<'item> {
     }
 }
 
-
 /*
+class HashMapNode<'item> {
+    let key: String
+    let data: 'item
+    let next: HashMapNode<'item>
+
+    fn new(self, key, data) {
+        self.key = key
+        self.data = data
+        self.next = nil
+    }
+}
+
 class HashMap<'item> {
     let size = 0
-    let data: Buffer<'item> = nil
+    let data: Buffer<HashMapNode<'item>> = nil
 
     fn new(self) {
         self.size = 10
-        self.data = new Buffer<'item>(self.size)
+        self.data = new Buffer<HashMapNode<'item>>(self.size)
     }
 
     fn resize(self, size) {

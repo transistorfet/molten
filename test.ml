@@ -196,11 +196,18 @@
 
         class A<'it> extends List<'it> {
             let foo = 1.2
+
+            fn test(self) {
+
+            }
         }
 
         class B<'it, 'jt> extends A<'jt> {
             let bar: 'it = nil
 
+            fn test2(self) {
+                //Super::test(self)
+            }
         }
 
         let c = new B<Real, Int>()

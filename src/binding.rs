@@ -6,6 +6,7 @@ use import;
 use parser::AST;
 use types::Type;
 use scope::{ self, Scope, ScopeRef, ScopeMapRef };
+use utils::UniqueID;
 
 
 pub fn bind_names<V, T>(map: ScopeMapRef<V, T>, code: &mut Vec<AST>) where V: Clone + Debug, T: Clone + Debug {
@@ -20,7 +21,7 @@ pub fn bind_names_vec<V, T>(map: ScopeMapRef<V, T>, scope: ScopeRef<V, T>, code:
 
 fn bind_names_node<V, T>(map: ScopeMapRef<V, T>, scope: ScopeRef<V, T>, node: &mut AST) where V: Clone + Debug, T: Clone + Debug {
     match *node {
-        AST::Function(ref name, ref args, ref ret, ref mut body, ref id) => {
+        AST::Function(ref name, ref mut args, ref mut ret, ref mut body, ref id) => {
             let fscope = map.add(id.clone(), Some(scope.clone()));
             fscope.borrow_mut().set_basename(name.as_ref().map_or(format!("anon{}", id), |name| name.clone()));
 
@@ -29,11 +30,11 @@ fn bind_names_node<V, T>(map: ScopeMapRef<V, T>, scope: ScopeRef<V, T>, node: &m
                 dscope.borrow_mut().define_func(name.clone(), None, false);
             }
 
-            for arg in args {
-                declare_typevars(scope.clone(), &arg.1);
+            for ref mut arg in &mut args.iter_mut() {
+                declare_typevars(fscope.clone(), arg.1.as_mut(), false);
                 fscope.borrow_mut().define(arg.0.clone(), arg.1.clone());
             }
-            declare_typevars(scope.clone(), ret);
+            declare_typevars(fscope.clone(), ret.as_mut(), false);
 
             bind_names_node(map.clone(), fscope.clone(), body)
         },
@@ -43,14 +44,15 @@ fn bind_names_node<V, T>(map: ScopeMapRef<V, T>, scope: ScopeRef<V, T>, node: &m
             bind_names_vec(map.clone(), scope.clone(), args);
         },
 
-        AST::Definition((ref name, ref ttype), ref mut code) => {
-            declare_typevars(scope.clone(), ttype);
+        AST::Definition((ref name, ref mut ttype), ref mut code) => {
+            declare_typevars(scope.clone(), ttype.as_mut(), false);
             let dscope = Scope::target(scope.clone());
             dscope.borrow_mut().define(name.clone(), ttype.clone());
             bind_names_node(map.clone(), scope.clone(), code);
         },
 
-        AST::Declare(ref name, ref ttype) => {
+        AST::Declare(ref name, ref mut ttype) => {
+            declare_typevars(scope.clone(), Some(ttype), false);
             let dscope = Scope::target(scope.clone());
             dscope.borrow_mut().define_func(name.clone(), Some(ttype.clone()), true);
             if let Some(ref mname) = scope::unmangle_name(name) {
@@ -112,15 +114,15 @@ fn bind_names_node<V, T>(map: ScopeMapRef<V, T>, scope: ScopeRef<V, T>, node: &m
         },
 
 
-        AST::New((ref name, _)) => {
+        AST::New((ref name, ref mut types)) => {
+            types.iter_mut().map(|ref mut ttype| declare_typevars(scope.clone(), Some(ttype), false)).count();
             if scope.borrow().find_type(name).is_none() {
                 panic!("NameError: undefined identifier {:?}", name);
             }
         },
 
-        AST::Class(ref pair, ref parent, ref mut body, ref id) => {
-            let classdef = scope.borrow_mut().create_class_def(pair, parent.clone());
-            let &(ref name, ref types) = pair;
+        AST::Class(ref mut pair, ref mut parent, ref mut body, ref id) => {
+            let &mut (ref name, ref mut types) = pair;
 
             // Create a temporary invisible scope to name check the class body
             let tscope = map.add(id.clone(), Some(scope.clone()));
@@ -128,13 +130,14 @@ fn bind_names_node<V, T>(map: ScopeMapRef<V, T>, scope: ScopeRef<V, T>, node: &m
             tscope.borrow_mut().set_basename(name.clone());
 
             // Define Self and Super, and check for typevars in the type params
+            types.iter_mut().map(|ref mut ttype| declare_typevars(tscope.clone(), Some(ttype), true)).count();
             tscope.borrow_mut().define_type(String::from("Self"), Type::Object(name.clone(), types.clone()));
-            types.iter().map(|ttype| declare_typevars(tscope.clone(), &Some(ttype.clone()))).count();
-            if let &Some((ref pname, ref ptypes)) = parent {
+            if let &mut Some((ref pname, ref mut ptypes)) = parent {
+                ptypes.iter_mut().map(|ref mut ttype| declare_typevars(tscope.clone(), Some(ttype), false)).count();
                 tscope.borrow_mut().define_type(String::from("Super"), Type::Object(pname.clone(), ptypes.clone()));
-                ptypes.iter().map(|ttype| declare_typevars(tscope.clone(), &Some(ttype.clone()))).count();
             }
 
+            let classdef = scope.borrow_mut().create_class_def(&(name.clone(), types.clone()), parent.clone());
             bind_names_vec(map.clone(), tscope.clone(), body);
         },
 
@@ -177,26 +180,35 @@ fn bind_names_node<V, T>(map: ScopeMapRef<V, T>, scope: ScopeRef<V, T>, node: &m
     }
 }
 
-pub fn declare_typevars<V, T>(scope: ScopeRef<V, T>, ttype: &Option<Type>) where V: Clone, T: Clone {
+pub fn declare_typevars<V, T>(scope: ScopeRef<V, T>, ttype: Option<&mut Type>, always_new: bool) where V: Clone, T: Clone {
     match ttype {
-        &Some(ref ttype) => match ttype {
-            &Type::Object(_, ref types) => {
-                for ttype in types {
-                    declare_typevars(scope.clone(), &Some(ttype.clone()))
+        Some(ttype) => match ttype {
+            &mut Type::Object(_, ref mut types) => {
+                for ttype in types.iter_mut() {
+                    declare_typevars(scope.clone(), Some(ttype), always_new)
                 }
             },
-            &Type::Function(ref args, ref ret) => {
-                for atype in args {
-                    declare_typevars(scope.clone(), &Some(atype.clone()))
+            &mut Type::Function(ref mut args, ref mut ret) => {
+                for atype in args.iter_mut() {
+                    declare_typevars(scope.clone(), Some(atype), always_new)
                 }
-                declare_typevars(scope.clone(), &Some(*ret.clone()));
+                declare_typevars(scope.clone(), Some(ret.as_mut()), always_new);
             },
-            &Type::Variable(ref name) => {
-                if !scope.borrow().contains_type_local(name) {
-                    scope.borrow_mut().define_type(name.clone(), ttype.clone());
+            &mut Type::Variable(ref name, ref mut id) => {
+                let vtype = scope.borrow().find_type(name);
+                match vtype {
+                    Some(Type::Variable(_, ref eid)) if !always_new => *id = eid.clone(),
+                    _ => {
+                        *id = UniqueID::generate();
+                        let gscope = Scope::global(scope.clone());
+                        gscope.borrow_mut().define_type(id.to_string(), Type::Variable(name.clone(), id.clone()));
+                        if !scope.borrow().contains_type_local(name) {
+                            scope.borrow_mut().define_type(name.clone(), Type::Variable(name.clone(), id.clone()));
+                        }
+                    }
                 }
             },
-            _ => { },
+            &mut Type::Overload(_) => { },
         },
         _ => { },
     }

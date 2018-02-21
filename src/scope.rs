@@ -2,6 +2,7 @@
 use std::str;
 use std::rc::Rc;
 use std::cell::RefCell;
+use std::ops::DerefMut;
 use std::collections::HashMap;
 use std::collections::hash_map::Entry;
 
@@ -256,6 +257,13 @@ impl<V, T> Scope<V, T> where V: Clone, T: Clone {
         };
     }
 
+    pub fn contains_type(&self, name: &String) -> bool {
+        match self.search_type(name, |info| Some(true)) {
+            Some(true) => true,
+            _ => false,
+        }
+    }
+
     pub fn contains_type_local(&self, name: &String) -> bool {
         self.types.contains_key(name)
     }
@@ -355,6 +363,17 @@ impl<V, T> Scope<V, T> where V: Clone, T: Clone {
         self.search_type(name, |info| info.value.clone())
     }
 
+    pub fn locate_variable(scope: ScopeRef<V, T>, name: &String) -> Option<ScopeRef<V, T>> {
+        if let Some(_) = scope.borrow().names.get(name) {
+            return Some(scope.clone());
+        }
+
+        let parent = scope.borrow().parent.clone();
+        match parent {
+            Some(parent) => Scope::locate_variable(parent, name),
+            _ => None
+        }
+    }
 
     pub fn locate_type(scope: ScopeRef<V, T>, name: &String) -> Option<ScopeRef<V, T>> {
         if let Some(_) = scope.borrow().types.get(name) {
@@ -368,53 +387,66 @@ impl<V, T> Scope<V, T> where V: Clone, T: Clone {
         }
     }
 
+    pub fn global(scope: ScopeRef<V, T>) -> ScopeRef<V, T> {
+        if scope.borrow().is_global() {
+            scope
+        } else {
+            Scope::global(scope.borrow().parent.clone().unwrap())
+        }
+    }
+
+
     ////// Type Variable Functions //////
 
     pub fn map_all_typevars(&mut self, ttype: Type) -> Type {
-        let mut names = Scope::<V, T>::map_new();
-        self.map_typevars(&mut names, ttype)
+        let mut varmap = Scope::<V, T>::map_new();
+        self.map_typevars(&mut varmap, ttype)
     }
 
-    pub fn map_new() -> HashMap<String, Type> {
+    pub fn map_new() -> HashMap<UniqueID, Type> {
         HashMap::new()
     }
 
-    pub fn map_typevars(&mut self, names: &mut HashMap<String, Type>, ttype: Type) -> Type {
+    pub fn map_typevars(&mut self, varmap: &mut HashMap<UniqueID, Type>, ttype: Type) -> Type {
         match ttype {
-            Type::Variable(name) => {
-                match names.get(&name).map(|x| x.clone()) {
+            Type::Variable(name, id) => {
+                match varmap.get(&id).map(|x| x.clone()) {
                     Some(ptype) => ptype,
                     None => {
-                        // TODO this maybe isn't right because it might link unrelated variables...
-                        if let Some(dtype) = self.find_type(&name) {
-                            //dtype.clone()
-                            Type::Variable(name)
-                        } else {
-                            let v = self.new_typevar();
-                            names.insert(name, v.clone());
-                            v.clone()
+                        let etype = self.find_type(&name);
+                        println!("EXISTING TYPEVAR for {:?}: {:?} vs {:?}", name, etype, id);
+                        match etype {
+                            Some(Type::Variable(_, ref eid)) if *eid == id => etype.clone().unwrap(),
+                            None | Some(Type::Variable(_, _)) => {
+                                let v = self.new_typevar();
+                                varmap.insert(v.get_varid(), v.clone());
+                                v
+                            },
+                            _ => etype.clone().unwrap(),
                         }
                     }
                 }
             },
-            Type::Function(args, ret) => Type::Function(self.map_typevars_vec(names, args), Box::new(self.map_typevars(names, *ret))),
-            Type::Overload(variants) => Type::Overload(self.map_typevars_vec(names, variants)),
-            Type::Object(name, types) => Type::Object(name.clone(), self.map_typevars_vec(names, types)),
+            //Type::Function(args, ret) => Type::Function(self.map_typevars_vec(varmap, args), Box::new(self.map_typevars(varmap, *ret))),
+            Type::Function(args, ret) => Type::Function(self.map_typevars_vec(varmap, args), ret),
+            Type::Overload(variants) => Type::Overload(self.map_typevars_vec(varmap, variants)),
+            Type::Object(name, types) => Type::Object(name.clone(), self.map_typevars_vec(varmap, types)),
         }
     }
 
-    pub fn map_typevars_vec(&mut self, names: &mut HashMap<String, Type>, types: Vec<Type>) -> Vec<Type> {
-        types.into_iter().map(|vtype| self.map_typevars(names, vtype)).collect()
+    pub fn map_typevars_vec(&mut self, varmap: &mut HashMap<UniqueID, Type>, types: Vec<Type>) -> Vec<Type> {
+        types.into_iter().map(|vtype| self.map_typevars(varmap, vtype)).collect()
     }
 
+/*
     pub fn raise_types(&mut self, fscope: ScopeRef<V, T>) {
         //println!("RAISING");
         let mut names = vec!();
         for (name, info) in &mut fscope.borrow_mut().types {
             match info.ttype {
-                Type::Variable(ref vname) => {
+                Type::Variable(_, ref id) => {
                     //if name == vname {
-                        println!("RAISE TYPEVAR: {:?} {:?}", self.get_full_name(&Some(String::from("")), UniqueID(0)), vname);
+                        println!("RAISE TYPEVAR: {:?} {:?}", self.get_full_name(&Some(String::from("")), UniqueID(0)), info.ttype);
                         // TODO this is probably wrong because we might be unifying different type vars
                         //if !self.types.contains_key(name) {
                             self.define_type(name.clone(), info.ttype.clone());
@@ -465,20 +497,57 @@ impl<V, T> Scope<V, T> where V: Clone, T: Clone {
             },
         }
     }
+*/
 
     pub fn new_typevar(&mut self) -> Type {
-        for ch in b'a' .. b'z' + 1 {
-            let name = (ch as char).to_string();
-            if self.find_type(&name).is_none() {
-                let ttype = Type::Variable(name.clone());
-                self.define_type(name, ttype.clone());
-                println!("NEW TYPEVAR: {:?} {:?}", self.get_basename(), ttype);
-                return ttype;
+        let id = UniqueID::generate();
+        let name = self.new_typevar_name();
+        let ttype = Type::Variable(name.clone(), id.clone());
+
+        self.define_type(name, ttype.clone());
+        if self.is_global() {
+            self.define_type(id.to_string(), ttype.clone());
+        } else {
+            let gscope = Scope::global(self.parent.clone().unwrap());
+            gscope.borrow_mut().define_type(id.to_string(), ttype.clone());
+        }
+        println!("NEW TYPEVAR: {:?} {:?}", self.get_basename(), ttype);
+        ttype
+
+/*
+        let f = |gborrow: &mut Scope<V, T>| {
+            let id = UniqueID::generate();
+            let name = gborrow.new_typevar_name();
+            let ttype = Type::Variable(name.clone(), id.clone());
+            //let ttype = Type::Variable(String::from("blank"), id.clone());
+
+            gborrow.define_type(name, ttype.clone());
+            gborrow.define_type(id.to_string(), ttype.clone());
+            println!("NEW TYPEVAR: {:?}", ttype);
+            ttype
+        };
+
+        let gscope = Scope::global(self.parent.clone().unwrap());
+        if self.is_global() {
+            f(self)
+        } else {
+            f(gscope.borrow_mut().deref_mut())
+        }
+*/
+    }
+
+    pub fn new_typevar_name(&mut self) -> String {
+        for mut ch1 in b'`' .. b'z' {
+            let name = if ch1 == b'`' { String::from("") } else { (ch1 as char).to_string() };
+            for ch2 in b'a' .. b'z' + 1 {
+                let name = name.clone() + &(ch2 as char).to_string();
+                if self.find_type(&name).is_none() {
+                    return name;
+                }
             }
         }
         panic!("SillyError: ran out of type variable names");
     }
-
 
     ///// Name Functions /////
 
@@ -542,7 +611,7 @@ pub fn mangle_name(name: &String, argtypes: &Vec<Type>) -> String {
     for ttype in argtypes {
         args = args + &match *ttype {
             // TODO add type paramaters into name
-            Type::Variable(_) => format!("V"),
+            Type::Variable(_, _) => format!("V"),
             Type::Object(ref name, ref types) => format!("N{}{}", name.len(), name),
             // TODO this isn't complete, you have to deal with other types
             _ => String::from(""),

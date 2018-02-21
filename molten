@@ -3,6 +3,7 @@
 import os
 import os.path
 import argparse
+import subprocess
 
 
 RM = "rm"
@@ -27,6 +28,7 @@ def main():
     cmd.set_defaults(command=command_run)
 
     cmd = subparsers.add_parser("clean", help="delete all generated files")
+    cmd.add_argument("directory", nargs='?', default=".")
     cmd.set_defaults(command=command_clean)
 
     args = parser.parse_args()
@@ -43,7 +45,7 @@ def command_run(args):
     os.system(RUN + " " + target)
 
 def command_clean(args):
-    os.system(RM + " *.ll *.dec *.bc")
+    os.system("cd " + args.directory + " && " + RM + " *.ll *.dec *.bc")
 
 
 
@@ -59,12 +61,23 @@ def compile_and_link(target, deps, force=False):
 def compile(filename, flags="", force=False):
     target = os.path.splitext(filename)[0] + ".ll"
     if force or not os.path.exists(target) or os.path.getmtime(filename) > os.path.getmtime(target):
-        os.system(COMPILE + " -c " + flags + " " + filename)
+        runordie(COMPILE + " -c " + flags + " " + filename)
     return target
 
 
 def link(target, filenames):
-    os.system(LINK + " " + " ".join(filenames) + " > " + target)
+    runordie(LINK + " " + " ".join(filenames) + " > " + target)
+
+
+def runcmd(cmd):
+    result = subprocess.run(cmd)
+    result.returncode
+
+def runordie(cmd):
+    result = subprocess.run(cmd, shell=True)
+    if result.returncode != 0:
+        raise Exception("{} exited with code {}".format(cmd, result.returncode))
+
 
 
 if __name__ == "__main__":

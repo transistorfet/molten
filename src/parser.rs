@@ -609,7 +609,7 @@ named!(type_object<Type>,
 );
 
 named!(type_variable<Type>,
-    map!(preceded!(tag!("'"), identifier), |s| Type::Variable(s))
+    map!(preceded!(tag!("'"), identifier), |s| Type::Variable(s, UniqueID(0)))
 );
 
 named!(type_function<Type>,

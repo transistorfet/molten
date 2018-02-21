@@ -100,7 +100,7 @@ unsafe fn compile_module(builtins: &Vec<Builtin>, map: ScopeMapRef<Value, TypeVa
 
     println!("{}\n", compiled.into_string().unwrap());
 
-    import::store_index(data.map.get_global(), format!("{}.dec", module_name).as_str(), code);
+    import::store_index(data.map.clone(), data.map.get_global(), format!("{}.dec", module_name).as_str(), code);
 
     LLVMDisposeBuilder(builder);
     LLVMDisposeModule(module);
@@ -923,8 +923,8 @@ pub unsafe fn get_type(data: &LLVM, scope: ScopeRef<Value, TypeValue>, ttype: Ty
             }
         },
         // TODO this is not the correct way to deal with type variables... there should be overloaded functions generated
-        //Type::Variable(ref tname) => LLVMInt64TypeInContext(data.context),
-        Type::Variable(_) => str_type(data), //ptr_type(data),
+        //Type::Variable(_, _) => LLVMInt64TypeInContext(data.context),
+        Type::Variable(_, _) => str_type(data), //ptr_type(data),
         _ => panic!("InvalidType: cannot convert to llvm, {:?}", ttype),
     }
 }

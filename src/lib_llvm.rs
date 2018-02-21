@@ -93,10 +93,14 @@ pub fn register_builtins_vec<'a, V, T>(scope: ScopeRef<V, T>, tscope: ScopeRef<V
 
 pub fn register_builtins_node<'a, V, T>(scope: ScopeRef<V, T>, tscope: ScopeRef<V, T>, node: &Builtin<'a>) where V: Clone + Debug, T: Clone + Debug {
     match *node {
-        Builtin::Type(ref name, ref ttype) => scope.borrow_mut().define_type(String::from(*name), ttype.clone()),
+        Builtin::Type(ref name, ref ttype) => {
+            let mut ttype = ttype.clone();
+            declare_typevars(tscope.clone(), Some(&mut ttype), true);
+            scope.borrow_mut().define_type(String::from(*name), ttype.clone());
+        },
         Builtin::Func(ref name, ref ftype, _) => {
-            let ftype = parse_type(ftype);
-            declare_typevars(tscope.clone(), &ftype);
+            let mut ftype = parse_type(ftype);
+            declare_typevars(tscope.clone(), ftype.as_mut(), false);
             Scope::define_func_variant(scope.clone(), String::from(*name), tscope.clone(), ftype.clone().unwrap());
         },
         Builtin::Class(ref name, _, ref entries) => {
@@ -220,8 +224,8 @@ pub fn get_builtins<'a>() -> Vec<Builtin<'a>> {
         Builtin::Type("Real",   Type::Object(String::from("Real"), vec!())),
         Builtin::Type("String", Type::Object(String::from("String"), vec!())),
         //Builtin::Type("Class",  Type::Object(String::from("Class"), vec!())),
-        Builtin::Type("Buffer", Type::Object(String::from("Buffer"), vec!(Type::Variable(String::from("item"))))),
-        Builtin::Type("List",   Type::Object(String::from("List"), vec!(Type::Variable(String::from("item"))))),
+        Builtin::Type("Buffer", Type::Object(String::from("Buffer"), vec!(Type::Variable(String::from("item"), UniqueID(0))))),
+        Builtin::Type("List",   Type::Object(String::from("List"), vec!(Type::Variable(String::from("item"), UniqueID(0))))),
 
         Builtin::Class("Int", vec!(), vec!(
             Builtin::Func("+",   "(Int, Int) -> Int", Func::Comptime(add_int)),

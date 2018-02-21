@@ -8,7 +8,7 @@ use utils::UniqueID;
 #[derive(Clone, Debug, PartialEq)]
 pub enum Type {
     Object(String, Vec<Type>),
-    Variable(String),
+    Variable(String, UniqueID),
     Function(Vec<Type>, Box<Type>),
     Overload(Vec<Type>),
     //Generic(String, Vec<Type>),
@@ -33,14 +33,28 @@ impl Type {
     pub fn get_argtypes(&self) -> &Vec<Type> {
         match self {
             &Type::Function(ref args, _) => args,
-            _ => panic!("TypeError: expected function, found {:?}", self),
+            _ => panic!("TypeError: expected function type, found {:?}", self),
         }
     }
 
     pub fn get_rettype(&self) -> &Type {
         match self {
             &Type::Function(_, ref ret) => &**ret,
-            _ => panic!("TypeError: expected function, found {:?}", self),
+            _ => panic!("TypeError: expected function type, found {:?}", self),
+        }
+    }
+
+    pub fn get_varid(&self) -> UniqueID {
+        match self {
+            &Type::Variable(_, ref id) => id.clone(),
+            _ => panic!("TypeError: expected variable type, found {:?}", self),
+        }
+    }
+
+    pub fn is_variable(&self) -> bool {
+        match *self {
+            Type::Variable(_, _) => true,
+            _ => false
         }
     }
 
@@ -79,13 +93,26 @@ impl Type {
         Type::Object(nametypes.0, nametypes.1)
     }
 
+    pub fn update_variable_type<V, T>(scope: ScopeRef<V, T>, name: &String, ttype: Type) where V: Clone, T: Clone {
+        let dscope = Scope::target(scope.clone());
+        let pscope = Scope::locate_variable(dscope.clone(), name).unwrap();
+        let otype = pscope.borrow().get_variable_type(name).clone();
+        if !pscope.borrow().is_primative() {
+            let ntype = check_type(scope.clone(), otype.clone(), Some(ttype.clone()), Check::Def, false);
+            match ntype {
+                Ok(utype) => dscope.borrow_mut().set_variable_type(name, utype),
+                Err(msg) => panic!("while updating variable type {:?}:\n{:?}", name, msg),
+            }
+        }
+    }
+
     pub fn update_type<V, T>(scope: ScopeRef<V, T>, name: &String, ttype: Type) where V: Clone, T: Clone {
         let pscope = Scope::locate_type(scope.clone(), name).unwrap();
         let otype = pscope.borrow().find_type(name).clone();
-        if otype.is_some() && !pscope.borrow().is_primative() {
+        if !pscope.borrow().is_primative() {
             let ntype = check_type(scope.clone(), otype.clone(), Some(ttype.clone()), Check::Def, false);
             match ntype {
-                Ok(utype) => scope.borrow_mut().update_type(name, utype),
+                Ok(utype) => pscope.borrow_mut().update_type(name, utype),
                 Err(msg) => panic!("while updating type {:?}:\n{:?}", name, msg),
             }
 
@@ -119,21 +146,25 @@ pub fn expect_type<V, T>(scope: ScopeRef<V, T>, ottype: Option<Type>, obtype: Op
 pub fn check_type<V, T>(scope: ScopeRef<V, T>, odtype: Option<Type>, octype: Option<Type>, mode: Check, update: bool) -> Result<Type, String> where V: Clone, T: Clone {
     if odtype.is_none() {
         // TODO should the else case just be Nil... 
-        Ok(octype.unwrap_or_else(|| scope.borrow_mut().new_typevar()))
+        //Ok(octype.unwrap_or_else(|| scope.borrow_mut().new_typevar()))
+        match octype {
+            Some(ctype) => Ok(resolve_type(scope.clone(), ctype)),
+            None => Ok(scope.borrow_mut().new_typevar()),
+        }
     } else if octype.is_none() {
         Ok(odtype.unwrap())
     } else {
         let dtype = resolve_type(scope.clone(), odtype.unwrap());
         let ctype = resolve_type(scope.clone(), octype.unwrap());
 
-        if let Type::Variable(ref name) = dtype {
-            //if update { scope.borrow_mut().update_type(name, ctype.clone()); }
-            if update { Type::update_type(scope.clone(), name, ctype.clone()); }
-            Ok(ctype)
-        } else if let Type::Variable(ref name) = ctype {
-            //if update { scope.borrow_mut().update_type(name, dtype.clone()); }
-            if update { Type::update_type(scope.clone(), name, dtype.clone()); }
+        if let Type::Variable(ref name, ref id) = ctype {
+            //if update { scope.borrow_mut().update_type(&id.to_string(), dtype.clone()); }
+            if update { Type::update_type(scope.clone(), &id.to_string(), dtype.clone()); }
             Ok(dtype)
+        } else if let Type::Variable(_, ref id) = dtype {
+            //if update { scope.borrow_mut().update_type(&id.to_string(), ctype.clone()); }
+            if update { Type::update_type(scope.clone(), &id.to_string(), ctype.clone()); }
+            Ok(ctype)
         } else {
             match (dtype.clone(), ctype.clone()) {
                 //(Type::List(ref a), Type::List(ref b)) => Ok(Type::List(Box::new(check_type(scope.clone(), Some(*a.clone()), Some(*b.clone()), mode, update)?))),
@@ -179,17 +210,15 @@ fn is_subclass_of<V, T>(scope: ScopeRef<V, T>, adef: (&String, &Vec<Type>), bdef
     loop {
         let (mut class, parent) = scope.borrow().get_class_info(&adef.0).unwrap();
         let mut names = Scope::<V, T>::map_new();
-        if update {
-            class = tscope.borrow_mut().map_typevars(&mut names, class);
-        }
+        class = tscope.borrow_mut().map_typevars(&mut names, class);
         adef.1 = check_type_params(tscope.clone(), &class.get_params(), &adef.1, mode.clone(), true)?;
 
         if *bdef.0 == adef.0 {
             if bdef.1.len() > 0 || adef.1.len() > 0 {
                 let ptypes = check_type_params(tscope.clone(), &adef.1, bdef.1, mode.clone(), true)?;
-                if update {
-                    scope.borrow_mut().raise_types(tscope.clone());
-                }
+                //if update {
+                //    scope.borrow_mut().raise_types(tscope.clone());
+                //}
                 return Ok(Type::Object(adef.0, ptypes));
             } else {
                 return Ok(Type::Object(adef.0, vec!()));
@@ -198,11 +227,7 @@ fn is_subclass_of<V, T>(scope: ScopeRef<V, T>, adef: (&String, &Vec<Type>), bdef
         if parent.is_none() {
             return Err(format!("TypeError: type mismatch, expected {:?} but found {:?}", Type::Object(adef.0.clone(), adef.1), Type::Object(bdef.0.clone(), bdef.1.clone())));
         }
-        let parent = if update {
-            tscope.borrow_mut().map_typevars(&mut names, parent.unwrap())
-        } else {
-            parent.unwrap()
-        };
+        let parent = tscope.borrow_mut().map_typevars(&mut names, parent.unwrap());
         match resolve_type(tscope.clone(), parent) {
             Type::Object(name, params) => adef = (name, params),
             ttype @ _ => return Err(format!("TypeError: expected Object but found {:?}", ttype)),
@@ -234,19 +259,16 @@ pub fn resolve_type<V, T>(scope: ScopeRef<V, T>, ttype: Type) -> Type where V: C
                 None => panic!("TypeError: undefined type {:?}", name),
             }
         },
-        Type::Variable(ref name) => {
-            println!("VARIABLE: {:?} {:?} {:?}", scope.borrow().get_full_name(&Some(String::from("")), UniqueID(0)), name, scope.borrow().find_type(name));
-            match scope.borrow().find_type(name) {
+        Type::Variable(_, ref id) => {
+            //println!("VARIABLE: in {:?}: {:?} resolves to {:?}", scope.borrow().get_full_name(&Some(String::from("")), UniqueID(0)), ttype, scope.borrow().find_type(&id.to_string()));
+            match scope.borrow().find_type(&id.to_string()) {
                 Some(vtype) => {
-                    if Type::Variable(name.clone()) == vtype {
-                        vtype
-                    } else {
-                        resolve_type(scope.clone(), vtype)
+                    match vtype {
+                        Type::Variable(_, ref eid) if eid == id => vtype.clone(),
+                        _ => resolve_type(scope.clone(), vtype),
                     }
                 },
-                // TODO I changed this because I was getting a bunch of errors... maybe i need better rules on typevars?
-                //None => Type::Variable(name.clone()),//panic!("TypeError: undefined type variable {:?}", name),
-                None => panic!("TypeError: undefined type variable {:?}", name),
+                None => panic!("TypeError: undefined type variable {:?}", ttype),
             }
         },
         Type::Function(ref args, ref ret) => {
