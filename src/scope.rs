@@ -9,6 +9,7 @@ use std::collections::hash_map::Entry;
 extern crate nom;
 use nom::{ digit };
 
+use parser;
 use types::Type;
 use utils::UniqueID;
 
@@ -621,12 +622,12 @@ pub fn mangle_name(name: &String, argtypes: &Vec<Type>) -> String {
 }
 
 pub fn unmangle_name(name: &String) -> Option<String> {
-    named!(unmangle<String>,
+    named!(unmangle(parser::Span) -> String,
         preceded!(tag!("_Z"),
-            map_str!(length_bytes!(map!(digit, |s| usize::from_str_radix(str::from_utf8(s).unwrap(), 10).unwrap())))
+            map_str!(length_bytes!(map!(digit, |s| usize::from_str_radix(str::from_utf8(s.fragment).unwrap(), 10).unwrap())))
         )
     );
-    match unmangle(name.as_bytes()) {
+    match unmangle(parser::Span::new(name.as_bytes())) {
         nom::IResult::Done(_, value) => Some(value),
         _ => None,
     }

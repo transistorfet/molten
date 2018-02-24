@@ -46,19 +46,19 @@ pub fn build_index<V, T>(map: ScopeMapRef<V, T>, scope: ScopeRef<V, T>, code: &V
 
 fn build_index_node<V, T>(index: &mut String, map: ScopeMapRef<V, T>, scope: ScopeRef<V, T>, node: &AST) where V: Clone, T: Clone {
     match *node {
-        AST::Function(ref name, _, _, _, _) => {
+        AST::Function(_, ref name, _, _, _, _) => {
             if let Some(ref name) = *name {
                 let ttype = scope.borrow().get_variable_type(name).unwrap();
                 index.push_str(format!("decl {} : {}\n", name, unparse_type(scope.clone(), ttype)).as_str());
             }
         },
 
-        AST::Definition((_, _), ref body) => match **body {
-            ref node @ AST::Class(_, _, _, _) => build_index_node(index, map, scope, node),
+        AST::Definition(_, (_, _), ref body) => match **body {
+            ref node @ AST::Class(_, _, _, _, _) => build_index_node(index, map, scope, node),
             _ => { },
         },
 
-        AST::Class((ref name, ref types), ref parent, ref body, ref id) => {
+        AST::Class(_, (ref name, ref types), ref parent, ref body, ref id) => {
             let tscope = map.get(&id);
             let classdef = scope.borrow().get_class_def(name);
             let namespec = unparse_type(tscope.clone(), Type::Object(name.clone(), types.clone()));
@@ -73,13 +73,13 @@ fn build_index_node<V, T>(index: &mut String, map: ScopeMapRef<V, T>, scope: Sco
             //index.push_str(format!("    decl __init__ : ({}) -> Nil\n", namespec).as_str());
             for node in body {
                 match *node {
-                    AST::Definition((ref name, ref ttype), _) => {
+                    AST::Definition(_, (ref name, ref ttype), _) => {
                         //let stype = classdef.borrow().get_variable_type(name).unwrap();
                         //println!("WHICH ONE??? {:?} {:?}", ttype, stype);
                         //index.push_str(format!("    decl {} : {}\n", name, unparse_type(tscope.clone(), ttype.clone().unwrap())).as_str());
                         index.push_str(format!("    let {} : {}\n", name, unparse_type(tscope.clone(), ttype.clone().unwrap())).as_str());
                     },
-                    AST::Function(ref name, _, _, _, _) => {
+                    AST::Function(_, ref name, _, _, _, _) => {
                         if let Some(ref name) = *name {
                             let ttype = classdef.borrow().get_variable_type(name).unwrap();
                             index.push_str(format!("    decl {} : {}\n", name, unparse_type(tscope.clone(), ttype)).as_str());

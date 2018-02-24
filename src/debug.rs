@@ -23,13 +23,13 @@ pub fn print_types<V, T>(map: ScopeMapRef<V, T>, scope: ScopeRef<V, T>, code: &V
 
 pub fn print_types_node<V, T>(map: ScopeMapRef<V, T>, scope: ScopeRef<V, T>, node: &AST) where V: Clone, T: Clone {
     match *node {
-        AST::Block(ref body) => print_types(map.clone(), scope, body),
-        AST::Function(_, _, _, ref body, ref id) => {
+        AST::Block(_, ref body) => print_types(map.clone(), scope, body),
+        AST::Function(_, _, _, _, ref body, ref id) => {
             let fscope = map.get(id);
             print_types_scope(fscope.clone());
             print_types_node(map.clone(), fscope.clone(), body);
         },
-        AST::Definition((ref name, ref ttype), ref body) => {
+        AST::Definition(_, (ref name, ref ttype), ref body) => {
             println!("\nDefining: {:?} {:?}", name, ttype);
             print_types_node(map.clone(), scope, body);
         },

@@ -21,7 +21,7 @@ pub fn check_types_node<V, T>(map: ScopeMapRef<V, T>, scope: ScopeRef<V, T>, nod
         AST::Real(_) => Type::Object(String::from("Real"), vec!()),
         AST::String(_) => Type::Object(String::from("String"), vec!()),
 
-        AST::Function(ref mut name, ref mut args, ref mut rtype, ref mut body, ref id) => {
+        AST::Function(ref pos, ref mut name, ref mut args, ref mut rtype, ref mut body, ref id) => {
             let fscope = map.get(id);
 
             let mut argtypes = vec!();
@@ -70,7 +70,7 @@ pub fn check_types_node<V, T>(map: ScopeMapRef<V, T>, scope: ScopeRef<V, T>, nod
             nftype
         },
 
-        AST::Invoke(ref mut fexpr, ref mut args, ref mut stype) => {
+        AST::Invoke(ref pos, ref mut fexpr, ref mut args, ref mut stype) => {
             let mut atypes = vec!();
             for ref mut value in args {
                 atypes.push(check_types_node(map.clone(), scope.clone(), value, None));
@@ -83,9 +83,9 @@ pub fn check_types_node<V, T>(map: ScopeMapRef<V, T>, scope: ScopeRef<V, T>, nod
             if let Type::Overload(_) = etype {
                 etype = find_variant(tscope.clone(), etype, atypes.clone());
                 match **fexpr {
-                    AST::Resolver(_, ref mut name) |
-                    AST::Accessor(_, ref mut name, _) |
-                    AST::Identifier(ref mut name) => *name = scope::mangle_name(name, etype.get_argtypes()),
+                    AST::Resolver(_, _, ref mut name) |
+                    AST::Accessor(_, _, ref mut name, _) |
+                    AST::Identifier(_, ref mut name) => *name = scope::mangle_name(name, etype.get_argtypes()),
                     _ => panic!("OverloadError: call to overloaded method not allowed here"),
                 }
             }
@@ -117,7 +117,7 @@ pub fn check_types_node<V, T>(map: ScopeMapRef<V, T>, scope: ScopeRef<V, T>, nod
             ftype.get_rettype().clone()
         },
 
-        AST::SideEffect(_, ref mut args) => {
+        AST::SideEffect(ref pos, _, ref mut args) => {
             let mut ltype = None;
             for ref mut expr in args {
                 ltype = Some(expect_type(scope.clone(), ltype.clone(), Some(check_types_node(map.clone(), scope.clone(), expr, ltype.clone())), Check::List));
@@ -125,7 +125,7 @@ pub fn check_types_node<V, T>(map: ScopeMapRef<V, T>, scope: ScopeRef<V, T>, nod
             ltype.unwrap()
         },
 
-        AST::Definition((ref name, ref mut ttype), ref mut body) => {
+        AST::Definition(ref pos, (ref name, ref mut ttype), ref mut body) => {
             let dscope = Scope::target(scope.clone());
             let btype = expect_type(scope.clone(), ttype.clone(), Some(check_types_node(map.clone(), scope.clone(), body, ttype.clone())), Check::Def);
             //dscope.borrow_mut().set_variable_type(name, btype.clone());
@@ -134,18 +134,18 @@ pub fn check_types_node<V, T>(map: ScopeMapRef<V, T>, scope: ScopeRef<V, T>, nod
             btype
         },
 
-        AST::Declare(ref name, ref ttype) => {
+        AST::Declare(ref pos, ref name, ref ttype) => {
             ttype.clone()
         },
 
-        AST::Identifier(ref name) => {
+        AST::Identifier(ref pos, ref name) => {
             let mut bscope = scope.borrow_mut();
             bscope.get_variable_type(name).unwrap_or_else(|| expected.unwrap_or_else(|| bscope.new_typevar()))
         },
 
-        AST::Block(ref mut body) => check_types(map, scope, body),
+        AST::Block(ref pos, ref mut body) => check_types(map, scope, body),
 
-        AST::If(ref mut cond, ref mut texpr, ref mut fexpr) => {
+        AST::If(ref pos, ref mut cond, ref mut texpr, ref mut fexpr) => {
             // TODO should this require the cond type to be Bool?
             check_types_node(map.clone(), scope.clone(), cond, None);
             let ttype = check_types_node(map.clone(), scope.clone(), texpr, None);
@@ -153,8 +153,8 @@ pub fn check_types_node<V, T>(map: ScopeMapRef<V, T>, scope: ScopeRef<V, T>, nod
             expect_type(scope.clone(), Some(ttype), Some(ftype), Check::List)
         },
 
-        AST::Try(ref mut cond, ref mut cases) |
-        AST::Match(ref mut cond, ref mut cases) => {
+        AST::Try(ref pos, ref mut cond, ref mut cases) |
+        AST::Match(ref pos, ref mut cond, ref mut cases) => {
             let mut ctype = Some(check_types_node(map.clone(), scope.clone(), cond, None));
             let mut rtype = None;
             for &mut (ref mut case, ref mut expr) in cases {
@@ -164,19 +164,19 @@ pub fn check_types_node<V, T>(map: ScopeMapRef<V, T>, scope: ScopeRef<V, T>, nod
             rtype.unwrap()
         },
 
-        AST::Raise(ref mut expr) => {
+        AST::Raise(ref pos, ref mut expr) => {
             // TODO should you check for a special error/exception type?
             check_types_node(map.clone(), scope.clone(), expr, None)
         },
 
-        AST::While(ref mut cond, ref mut body) => {
+        AST::While(ref pos, ref mut cond, ref mut body) => {
             // TODO should this require the cond type to be Bool?
             check_types_node(map.clone(), scope.clone(), cond, None);
             check_types_node(map.clone(), scope.clone(), body, None);
             Type::Object(String::from("Nil"), vec!())
         },
 
-        AST::For(ref name, ref mut list, ref mut body, ref id) => {
+        AST::For(ref pos, ref name, ref mut list, ref mut body, ref id) => {
             let lscope = map.get(id);
             let itype = lscope.borrow().get_variable_type(name).unwrap_or_else(|| expected.unwrap_or_else(|| scope.borrow_mut().new_typevar()));
             let etype = Some(Type::Object(String::from("List"), vec!(itype)));
@@ -191,7 +191,7 @@ pub fn check_types_node<V, T>(map: ScopeMapRef<V, T>, scope: ScopeRef<V, T>, nod
             ttype.clone().unwrap()
         },
 
-        AST::List(ref mut items) => {
+        AST::List(ref pos, ref mut items) => {
             let mut ltype = None;
             for ref mut expr in items {
                 ltype = Some(expect_type(scope.clone(), ltype.clone(), Some(check_types_node(map.clone(), scope.clone(), expr, ltype.clone())), Check::List));
@@ -199,7 +199,7 @@ pub fn check_types_node<V, T>(map: ScopeMapRef<V, T>, scope: ScopeRef<V, T>, nod
             Type::Object(String::from("List"), vec!(ltype.unwrap_or_else(|| expected.unwrap_or_else(|| scope.borrow_mut().new_typevar()))))
         },
 
-        AST::New((ref name, ref types)) => {
+        AST::New(ref pos, (ref name, ref types)) => {
             let odtype = scope.borrow().find_type(name);
             match odtype {
                 Some(dtype) => {
@@ -215,17 +215,17 @@ pub fn check_types_node<V, T>(map: ScopeMapRef<V, T>, scope: ScopeRef<V, T>, nod
             Type::Object(name.clone(), types.clone())
         },
 
-        AST::Class(_, _, ref mut body, ref id) => {
+        AST::Class(ref pos, _, _, ref mut body, ref id) => {
             let tscope = map.get(id);
             check_types(map.clone(), tscope.clone(), body);
             Type::Object(String::from("Nil"), vec!())
         },
 
-        AST::Resolver(ref mut left, ref mut field) => {
+        AST::Resolver(ref pos, ref mut left, ref mut field) => {
             let ltype = match **left {
                 // TODO this caused an issue with types that have typevars that aren't declared (ie. Buffer['item])
-                //AST::Identifier(ref name) => resolve_type(scope.clone(), scope.borrow().find_type(name).unwrap().clone()),
-                AST::Identifier(ref name) => scope.borrow().find_type(name).unwrap().clone(),
+                //AST::Identifier(_, ref name) => resolve_type(scope.clone(), scope.borrow().find_type(name).unwrap().clone()),
+                AST::Identifier(_, ref name) => scope.borrow().find_type(name).unwrap().clone(),
                 _ => panic!("SyntaxError: left-hand side of scope resolver must be identifier")
             };
 
@@ -234,7 +234,7 @@ pub fn check_types_node<V, T>(map: ScopeMapRef<V, T>, scope: ScopeRef<V, T>, nod
             cborrow.get_variable_type(field).unwrap_or_else(|| expected.unwrap_or_else(|| scope.borrow_mut().new_typevar()))
         },
 
-        AST::Accessor(ref mut left, ref mut field, ref mut stype) => {
+        AST::Accessor(ref pos, ref mut left, ref mut field, ref mut stype) => {
             let ltype = resolve_type(scope.clone(), check_types_node(map.clone(), scope.clone(), left, None));
             *stype = Some(ltype.clone());
 
@@ -243,13 +243,13 @@ pub fn check_types_node<V, T>(map: ScopeMapRef<V, T>, scope: ScopeRef<V, T>, nod
             cborrow.get_variable_type(field).unwrap_or_else(|| expected.unwrap_or_else(|| scope.borrow_mut().new_typevar()))
         },
 
-        AST::Assignment(ref mut left, ref mut right) => {
+        AST::Assignment(ref pos, ref mut left, ref mut right) => {
             let ltype = check_types_node(map.clone(), scope.clone(), left, None);
             let rtype = check_types_node(map.clone(), scope.clone(), right, Some(ltype.clone()));
             expect_type(scope.clone(), Some(ltype), Some(rtype), Check::Def)
         },
 
-        AST::Import(_, ref mut decls) => {
+        AST::Import(ref pos, _, ref mut decls) => {
             check_types(map.clone(), scope.clone(), decls);
             Type::Object(String::from("Nil"), vec!())
         },
@@ -258,9 +258,9 @@ pub fn check_types_node<V, T>(map: ScopeMapRef<V, T>, scope: ScopeRef<V, T>, nod
 
         AST::Underscore => expected.unwrap_or_else(|| scope.borrow_mut().new_typevar()),
 
-        AST::Type(_, _) => panic!("NotImplementedError: not yet supported, {:?}", node),
+        AST::Type(_, _, _) => panic!("NotImplementedError: not yet supported, {:?}", node),
 
-        AST::Index(_, _, _) => panic!("InternalError: ast element shouldn't appear at this late phase: {:?}", node),
+        AST::Index(_, _, _, _) => panic!("InternalError: ast element shouldn't appear at this late phase: {:?}", node),
     };
     
     println!("CHECK: {:?} {:?}", rtype, node);

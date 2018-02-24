@@ -23,17 +23,17 @@ pub fn precompile_vec<V, T>(map: ScopeMapRef<V, T>, scope: ScopeRef<V, T>, code:
 
 pub fn precompile_node<V, T>(map: ScopeMapRef<V, T>, scope: ScopeRef<V, T>, node: AST) -> AST where V: Clone + Debug, T: Clone + Debug {
     match node {
-        AST::Block(code) => { AST::Block(precompile_vec(map.clone(), scope.clone(), code)) },
+        AST::Block(pos, code) => { AST::Block(pos, precompile_vec(map.clone(), scope.clone(), code)) },
 
-        AST::Definition((name, ttype), code) => {
-            AST::Definition((name, Some(resolve_type(scope.clone(), ttype.unwrap()))), Box::new(precompile_node(map.clone(), scope.clone(), *code)))
+        AST::Definition(pos, (name, ttype), code) => {
+            AST::Definition(pos, (name, Some(resolve_type(scope.clone(), ttype.unwrap()))), Box::new(precompile_node(map.clone(), scope.clone(), *code)))
         },
 
-        AST::Declare(name, ttype) => {
-            AST::Declare(name, resolve_type(scope.clone(), ttype))
+        AST::Declare(pos, name, ttype) => {
+            AST::Declare(pos, name, resolve_type(scope.clone(), ttype))
         },
 
-        AST::Function(name, mut args, ret, body, id) => {
+        AST::Function(pos, name, mut args, ret, body, id) => {
             let fscope = map.get(&id);
             update_scope_variable_types(fscope.clone());
             /*
@@ -85,19 +85,19 @@ pub fn precompile_node<V, T>(map: ScopeMapRef<V, T>, scope: ScopeRef<V, T>, node
             } else {
             */
                 // TODO resolve types of args
-                AST::Function(name, args, Some(resolve_type(fscope.clone(), ret.unwrap())), Box::new(precompile_node(map.clone(), fscope.clone(), *body)), id)
+                AST::Function(pos, name, args, Some(resolve_type(fscope.clone(), ret.unwrap())), Box::new(precompile_node(map.clone(), fscope.clone(), *body)), id)
             //}
         },
 
-        AST::Invoke(fexpr, args, stype) => {
+        AST::Invoke(pos, fexpr, args, stype) => {
             // TODO you could detect a closure with an explicit tag on variable??? no you'de have to process fexpr
             //if something {
             //args.insert(0, precompile_node(map.clone(), scope.clone(), *fexpr));
             //}
-            AST::Invoke(Box::new(precompile_node(map.clone(), scope.clone(), *fexpr)), precompile_vec(map.clone(), scope.clone(), args), Some(resolve_type(scope.clone(), stype.unwrap())))
+            AST::Invoke(pos, Box::new(precompile_node(map.clone(), scope.clone(), *fexpr)), precompile_vec(map.clone(), scope.clone(), args), Some(resolve_type(scope.clone(), stype.unwrap())))
         },
 
-        AST::Identifier(name) => {
+        AST::Identifier(pos, name) => {
             /*
             if scope.borrow().is_closure_var(&name) {
                 let ctype = scope.borrow().get_variable_type(&String::from("__context__")).unwrap();
@@ -107,44 +107,46 @@ pub fn precompile_node<V, T>(map: ScopeMapRef<V, T>, scope: ScopeRef<V, T>, node
                 AST::Accessor(Box::new(AST::Identifier(String::from("__context__"))), name, scope.borrow().get_variable_type(&String::from("__context__")))
             } else {
             */
-                AST::Identifier(name)
+                AST::Identifier(pos, name)
             //}
         },
 
-        AST::SideEffect(op, args) => {
-            AST::SideEffect(op, precompile_vec(map.clone(), scope.clone(), args))
+        AST::SideEffect(pos, op, args) => {
+            AST::SideEffect(pos, op, precompile_vec(map.clone(), scope.clone(), args))
         },
 
-        AST::If(cond, texpr, fexpr) => {
-            AST::If(Box::new(precompile_node(map.clone(), scope.clone(), *cond)), Box::new(precompile_node(map.clone(), scope.clone(), *texpr)), Box::new(precompile_node(map.clone(), scope.clone(), *fexpr)))
+        AST::If(pos, cond, texpr, fexpr) => {
+            AST::If(pos, Box::new(precompile_node(map.clone(), scope.clone(), *cond)), Box::new(precompile_node(map.clone(), scope.clone(), *texpr)), Box::new(precompile_node(map.clone(), scope.clone(), *fexpr)))
         },
 
-        AST::Match(cond, cases) => {
+        AST::Match(pos, cond, cases) => {
             let cases = cases.into_iter().map(|(case, body)| ( precompile_node(map.clone(), scope.clone(), case), precompile_node(map.clone(), scope.clone(), body) )).collect();
-            AST::Match(Box::new(precompile_node(map.clone(), scope.clone(), *cond)), cases)
+            AST::Match(pos, Box::new(precompile_node(map.clone(), scope.clone(), *cond)), cases)
         },
 
-        AST::Try(cond, cases) => {
+        AST::Try(pos, cond, cases) => {
             let cases = cases.into_iter().map(|(case, body)| ( precompile_node(map.clone(), scope.clone(), case), precompile_node(map.clone(), scope.clone(), body) )).collect();
-            AST::Try(Box::new(precompile_node(map.clone(), scope.clone(), *cond)), cases)
+            AST::Try(pos, Box::new(precompile_node(map.clone(), scope.clone(), *cond)), cases)
         },
 
-        AST::Raise(expr) => {
-            AST::Raise(Box::new(precompile_node(map.clone(), scope.clone(), *expr)))
+        AST::Raise(pos, expr) => {
+            AST::Raise(pos, Box::new(precompile_node(map.clone(), scope.clone(), *expr)))
         },
 
-        AST::While(cond, body) => {
-            AST::While(Box::new(precompile_node(map.clone(), scope.clone(), *cond)), Box::new(precompile_node(map.clone(), scope.clone(), *body)))
+        AST::While(pos, cond, body) => {
+            AST::While(pos, Box::new(precompile_node(map.clone(), scope.clone(), *cond)), Box::new(precompile_node(map.clone(), scope.clone(), *body)))
         },
 
-        AST::For(name, cond, body, id) => {
+        AST::For(pos, name, cond, body, id) => {
             let lscope = map.get(&id);
-            AST::For(name, Box::new(precompile_node(map.clone(), lscope.clone(), *cond)), Box::new(precompile_node(map.clone(), lscope.clone(), *body)), id)
+            AST::For(pos, name, Box::new(precompile_node(map.clone(), lscope.clone(), *cond)), Box::new(precompile_node(map.clone(), lscope.clone(), *body)), id)
         },
 
-        AST::List(code) => { AST::List(precompile_vec(map.clone(), scope.clone(), code)) },
+        AST::List(pos, code) => { AST::List(pos, precompile_vec(map.clone(), scope.clone(), code)) },
 
-        AST::Class(pair, parent, body, id) => {
+        AST::New(_, _) => { node },
+
+        AST::Class(pos, pair, parent, body, id) => {
             let tscope = map.get(&id);
             //update_scope_variable_types(tscope.clone());
             //let classdef = scope.borrow().get_class_def(&pair.0);
@@ -184,24 +186,24 @@ pub fn precompile_node<V, T>(map: ScopeMapRef<V, T>, scope: ScopeRef<V, T>, node
             }
             */
 
-            AST::Class(pair, parent, body, id)
+            AST::Class(pos, pair, parent, body, id)
         },
 
 
-        AST::Resolver(left, right) => {
-            AST::Resolver(Box::new(precompile_node(map.clone(), scope.clone(), *left)), right)
+        AST::Resolver(pos, left, right) => {
+            AST::Resolver(pos, Box::new(precompile_node(map.clone(), scope.clone(), *left)), right)
         },
 
-        AST::Accessor(left, right, stype) => {
-            AST::Accessor(Box::new(precompile_node(map.clone(), scope.clone(), *left)), right, Some(resolve_type(scope.clone(), stype.unwrap())))
+        AST::Accessor(pos, left, right, stype) => {
+            AST::Accessor(pos, Box::new(precompile_node(map.clone(), scope.clone(), *left)), right, Some(resolve_type(scope.clone(), stype.unwrap())))
         },
 
-        AST::Assignment(left, right) => {
-            AST::Assignment(Box::new(precompile_node(map.clone(), scope.clone(), *left)), Box::new(precompile_node(map.clone(), scope.clone(), *right)))
+        AST::Assignment(pos, left, right) => {
+            AST::Assignment(pos, Box::new(precompile_node(map.clone(), scope.clone(), *left)), Box::new(precompile_node(map.clone(), scope.clone(), *right)))
         },
 
-        AST::Import(name, decls) => {
-            AST::Import(name, precompile_vec(map.clone(), scope.clone(), decls))
+        AST::Import(pos, name, decls) => {
+            AST::Import(pos, name, precompile_vec(map.clone(), scope.clone(), decls))
         },
 
         AST::Nil(stype) => { AST::Nil(Some(resolve_type(scope.clone(), stype.unwrap()))) },
@@ -212,10 +214,9 @@ pub fn precompile_node<V, T>(map: ScopeMapRef<V, T>, scope: ScopeRef<V, T>, node
         AST::Integer(_) => { node },
         AST::Real(_) => { node },
         AST::String(_) => { node },
-        AST::New(_) => { node },
-        AST::Type(_, _) => { node },
+        AST::Type(_, _, _) => { node },
 
-        AST::Index(_, _, _) => panic!("InternalError: ast element shouldn't appear at this late phase: {:?}", node),
+        AST::Index(_, _, _, _) => panic!("InternalError: ast element shouldn't appear at this late phase: {:?}", node),
     }
 }
 

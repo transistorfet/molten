@@ -72,8 +72,7 @@ impl<'a> BuiltinMap<'a> {
     }
 }
 
-pub fn make_global<'a, V, T>(builtins: &Vec<Builtin<'a>>) -> ScopeMapRef<V, T> where V: Clone + Debug, T: Clone + Debug {
-    let map = ScopeMapRef::new();
+pub fn make_global<'a, V, T>(map: ScopeMapRef<V, T>, builtins: &Vec<Builtin<'a>>) where V: Clone + Debug, T: Clone + Debug {
     let primatives = map.add(ScopeMapRef::<V, T>::PRIMATIVE, None);
     primatives.borrow_mut().set_context(Context::Primative);
 
@@ -81,8 +80,6 @@ pub fn make_global<'a, V, T>(builtins: &Vec<Builtin<'a>>) -> ScopeMapRef<V, T> w
 
     let global = map.add(ScopeMapRef::<V, T>::GLOBAL, Some(primatives));
     global.borrow_mut().set_context(Context::Global);
-
-    return map;
 }
  
 pub fn register_builtins_vec<'a, V, T>(scope: ScopeRef<V, T>, tscope: ScopeRef<V, T>, entries: &Vec<Builtin<'a>>) where V: Clone + Debug, T: Clone + Debug {
@@ -198,6 +195,8 @@ unsafe fn declare_irregular_functions(data: &LLVM, scope: ScopeRef<Value, TypeVa
     declare_function(data.module, scope.clone(), "sprintf", &mut [bytestr_type, bytestr_type], cint_type, true);
 
     declare_function(data.module, scope.clone(), "llvm.pow.f64", &mut [real_type(data), real_type(data)], real_type(data), false);
+
+    //declare_function(data.module, scope.clone(), "__gxx_personality_v0", &mut [bytestr_type, bytestr_type], cint_type, true);
 }
 
 

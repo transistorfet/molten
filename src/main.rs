@@ -9,6 +9,8 @@ use clap::{ App, Arg };
 
 #[macro_use]
 extern crate nom;
+#[macro_use(position)]
+extern crate nom_locate;
 
 mod config;
 use config::Options;
@@ -25,13 +27,14 @@ mod refinery;
 mod scope;
 use scope::ScopeMapRef;
 
+mod session;
+use session::SessionRef;
+
 mod binding;
 mod types;
 mod typecheck;
 mod utils;
 mod import;
-//mod interpreter;
-//mod compiler_c;
 mod precompiler;
 mod compiler_llvm;
 mod lib_llvm;
@@ -80,21 +83,24 @@ fn with_file<F>(filename: &str, with: F) where F: Fn(&str, &[u8]) -> () {
 
 
 fn compile_string(name: &str, text: &[u8]) {
+    let session = session::Session::new_ref();
+    let map = session.borrow().map.clone();
     let builtins = lib_llvm::get_builtins();
-    let map = lib_llvm::make_global(&builtins);
-    let mut code = process_input(map.clone(), name, text);
+    lib_llvm::make_global(map.clone(), &builtins);
+    let mut code = process_input(session.clone(), name, text);
     code = precompiler::precompile(map.clone(), code);
 
     compiler_llvm::compile(&builtins, map.clone(), name, &mut code);
 }
 
 
-fn process_input<V, T>(map: ScopeMapRef<V, T>, name: &str, text: &[u8]) -> Vec<AST> where V: Clone + Debug, T: Clone + Debug {
+fn process_input<V, T>(session: SessionRef<V, T>, name: &str, text: &[u8]) -> Vec<AST> where V: Clone + Debug, T: Clone + Debug {
+    let map = session.borrow().map.clone();
     let mut code = parser::parse_or_error(name, text);
     code = refinery::refine(code);
     traverse(&code);
     //import::load_index(map.get_global(), "libcore.dec");
-    binding::bind_names(map.clone(), &mut code);
+    binding::bind_names(session.clone(), &mut code);
     typecheck::check_types(map.clone(), map.get_global(), &mut code);
     println!("\n{:?}\n", code);
 
@@ -108,7 +114,7 @@ fn traverse(tree: &Vec<AST>) {
     for node in tree {
         println!("{:?}", node);
         match *node {
-            AST::Block(ref x) => traverse(x),
+            AST::Block(_, ref x) => traverse(x),
             _ => ()
         }
     }
