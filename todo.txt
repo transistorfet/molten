@@ -1,17 +1,14 @@
 
+* make sure to redo the escaped string parsing
+
 * there is one last issue with typevar names, such that building the index/decls uses either overlapping names when it shouldn't, or now using different names when it shouldn't
 * there's still a problem with typevars not resolving fully, where a function that should return a concrete returns a free typevar....
 
 * either add in the initialization of class variables, possibly limited to constant expressions only, or else raise an error if an initializer is provided
 
-* should variables be writable... this is more about breaking with functional traditions
-* add a const expression
-
-* issue with self and super type defs; they don't contain the type info; maybe add an aliasing type?
 * "match" only works with integers... maybe call ==, but it would have to mangle correctly
+* issue with self and super type defs; they don't contain the type info; maybe add an aliasing type?
 * fix the issues where you need nil and shit to make it work.... i think parser parsing ";" into noop/nil might work, if i can get the parser working
-* you might have a potentially big issue with duplicate type variables, specifically with map_typevars; it could mistake an undeclared
-  function's typevar with an already defined typevar if they have the same name
 
 * should you change Real to Float?  also should you change them to lower case names, which is in line with sml, ocmal, f#
 * if you had a tuple type, you could use a typevar to represent a tuple of the arguments to a function: Type::Function(Type::Variable(..), Type::Variable(..)) or 'a -> 'b where 'a = ('c, 'd, 'e)
@@ -32,6 +29,9 @@
 
 
 
+
+* should variables be writable... this is more about breaking with functional traditions
+* add a const expression
 
 * if even the global/module scope was a closure, then you could make a module be equivallent to an implicit function that is called when the module is imported, which could have the name of the
   module; so a module called main would become the main() function

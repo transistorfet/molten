@@ -6,9 +6,9 @@ Molten is a programming language which borrows from the ML family of languages,
 as well as from Rust and Python.  The compiler is written in Rust and uses
 LLVM to generate IR which can be compiled to machine code.
 
-The goal of this project is to create a language with a focus on pragmatism.
-It is not a purely functional language, as it has some side-effects, and it
-has a class-based object system with function and method overloading.
+The goal of this project is to create a language with a focus on getting things
+done.  It is not a purely functional language, as it allows some side-effects,
+and it has a class-based object system with function and method overloading.
 
 
 Installing
@@ -84,7 +84,7 @@ fn foo(x, y) { x + y }		    // named block function
 
 let foo = fn x, y => x + y	    // anonymous function
 
-fn foo(x: Int, y) -> Int => x + y    // with optional type annotations
+fn foo(x: Int, y) -> Int { x + y }  // with optional type annotations
 
 ```
 
@@ -148,6 +148,9 @@ for i in [ 1, 2, 3 ]
 ### Blocks
 A block is a collection of statements which return the result of the last
 expression in the block.  They can be used in place of a single expression.
+They do not create their own local scope, at least at the moment, so variables
+defined inside blocks will appear in the parent scope (usually the function
+the block is in).
 ```
 let is_zero = if self.x <= 0 then {
     self.x = 0
@@ -164,8 +167,8 @@ for x in list1
     println(str(x))
 
 let list2 = new List<String>();
-list2[1] = "Hello"
-println(list2[1])
+list2.insert(0, "Hello")
+println(list2[0])
 ```
 
 ### And / Or
@@ -189,7 +192,7 @@ Yet To Complete
   (like Closure<(Int) -> Int>, or perhaps something shorter)
 
 - Execptions haven't been implemented yet.  This somewhat relates to the
-  above issue of making all functions support throwing execptions, which
+  above issue of making all functions support throwing exceptions, which
   means a need to declare C/C++ functions that do not allow exceptions.
 
 - Class members can be declared with an optional initial value, but the
@@ -205,4 +208,9 @@ Yet To Complete
   class member.  It's a hack, but it works for now.
 
 - Garbage collection is not yet implemented
+
+
+I'd be happy to hear of any additional features ideas or suggestions, if
+you'd like to leave them under "Issues" on github.
+
 
