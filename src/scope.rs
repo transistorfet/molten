@@ -420,7 +420,7 @@ impl<V, T> Scope<V, T> where V: Clone, T: Clone {
                             Some(Type::Variable(_, ref eid)) if *eid == id => etype.clone().unwrap(),
                             None | Some(Type::Variable(_, _)) => {
                                 let v = self.new_typevar();
-                                varmap.insert(v.get_varid(), v.clone());
+                                varmap.insert(id, v.clone());
                                 v
                             },
                             _ => etype.clone().unwrap(),
