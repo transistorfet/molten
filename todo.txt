@@ -1,4 +1,5 @@
 
+* new typevar/typecheck bug where the type of new List<Int>() is using a typevar as the list param instead of correctly deducing Int
 * make sure to redo the escaped string parsing
 
 * there is one last issue with typevar names, such that building the index/decls uses either overlapping names when it shouldn't, or now using different names when it shouldn't

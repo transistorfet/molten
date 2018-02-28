@@ -9,6 +9,7 @@ use scope::{ ScopeRef, ScopeMapRef };
 use parser::{ AST, parse_or_error };
 
 
+/*
 pub fn load_index(filename: &str) -> Vec<AST> {
     let mut f = find_file(filename);
     let mut contents = String::new();
@@ -28,6 +29,7 @@ pub fn find_file(filename: &str) -> File {
     }
     panic!("Error: file not found, {}", filename);
 }
+*/
 
 pub fn store_index<V, T>(map: ScopeMapRef<V, T>, scope: ScopeRef<V, T>, filename: &str, code: &Vec<AST>) where V: Clone, T: Clone {
     let index_text = build_index(map, scope, code);

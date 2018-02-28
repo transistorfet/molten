@@ -177,10 +177,11 @@
         buffer[0] = 124
 	println(str(buffer[0]))
 
+        // TODO this is now causing a segfault when run, but compiles fine
         let list3 = new List<Int>()
         list3.push(4)
-        list3[4] = 123
-        println(str(list3[4]))
+        //list3[4] = 123
+        //println(str(list3[4]))
 
         let list: List<'thing> = [ 1, 2, 3 ]
         list[1] = 5

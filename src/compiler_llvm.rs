@@ -10,16 +10,11 @@ use import;
 use types::Type;
 use utils::UniqueID;
 use config::Options;
+use session::Session;
 use parser::{ AST, Pos };
 use scope::{ Scope, ScopeRef, ScopeMapRef };
 use lib_llvm::{ Builtin, BuiltinMap, initialize_builtins };
 
-
-pub fn compile(builtins: &Vec<Builtin>, map: ScopeMapRef<Value, TypeValue>, module_name: &str, code: &Vec<AST>) {
-    unsafe {
-        compile_module(builtins, map.clone(), map.get_global(), module_name, code)
-    }
-}
 
 
 pub type Value = LLVMValueRef;
@@ -50,6 +45,7 @@ pub struct TypeValue {
 
 
 pub struct LLVM<'a> {
+    pub session: &'a Session<Value, TypeValue>,
     pub map: ScopeMapRef<Value, TypeValue>,
     //pub builtins: TypeFunctionMap,
     pub builtins: BuiltinMap<'a>,
@@ -63,11 +59,25 @@ pub struct LLVM<'a> {
 type Unwind = Option<(LLVMBasicBlockRef, LLVMBasicBlockRef)>;
 
 
-unsafe fn compile_module(builtins: &Vec<Builtin>, map: ScopeMapRef<Value, TypeValue>, scope: ScopeRef<Value, TypeValue>, module_name: &str, code: &Vec<AST>) {
+pub fn compile(builtins: &Vec<Builtin>, session: &Session<Value, TypeValue>, module_name: &str, code: &Vec<AST>) {
+    unsafe {
+        compile_module(builtins, session, session.map.get_global(), module_name, code)
+    }
+}
+
+unsafe fn compile_module(builtins: &Vec<Builtin>, session: &Session<Value, TypeValue>, scope: ScopeRef<Value, TypeValue>, module_name: &str, code: &Vec<AST>) {
     let context = LLVMContextCreate();
     let module = LLVMModuleCreateWithName(label(module_name));
     let builder = LLVMCreateBuilderInContext(context);
-    let data = &mut LLVM { map: map, builtins: BuiltinMap::new(), functions: Vec::new(), context: context, module: module, builder: builder };
+    let data = &mut LLVM {
+        session: session,
+        map: session.map.clone(),
+        builtins: BuiltinMap::new(),
+        functions: Vec::new(),
+        context: context,
+        module: module,
+        builder: builder
+    };
     //LLVMSetDataLayout(data.module, label("e-m:e-i64:64-f80:128-n8:16:32:64-S128"));
 
     initialize_builtins(data, scope.clone(), builtins);
@@ -88,7 +98,7 @@ unsafe fn compile_module(builtins: &Vec<Builtin>, map: ScopeMapRef<Value, TypeVa
 
 
     if !Options::as_ref().is_library {
-        let pos = Pos::new_empty();
+        let pos = Pos::empty();
         let function_type = LLVMFunctionType(int_type(data), ptr::null_mut(), 0, 0);
         let function = LLVMAddFunction(module, b"main\0".as_ptr() as *const _, function_type);
         //LLVMSetPersonalityFn(function, LLVMGetNamedFunction(data.module, label("__gxx_personality_v0")));
@@ -128,7 +138,7 @@ unsafe fn compile_vec(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: Sc
 }
 
 unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: ScopeRef<Value, TypeValue>, node: &AST) -> LLVMValueRef {
-    println!("COMPILE: {:?}", node);
+    debug!("COMPILE: {:?}", node);
     match *node {
         AST::Noop => ptr::null_mut(),
         AST::Nil(ref ttype) => null_value(get_type(data, scope.clone(), ttype.clone().unwrap(), true)),
@@ -162,7 +172,7 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
             };
 
             if let Some(result) = BuiltinMap::compile_builtin(data, scope.clone(), &name, &largs, stype.clone().unwrap()) {
-                println!("BUILTIN: {:?}", result);
+                debug!("BUILTIN: {:?}", result);
                 result
             } else {
                 let mut function = LLVMGetNamedFunction(data.module, label(name.as_str()));
@@ -185,7 +195,7 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
                 LLVMGetParamTypes(lftype, ltypes.as_mut_ptr());
                 for i in 0 .. ltypes.len() {
                     if ltypes[i] != LLVMTypeOf(largs[i]) {
-                        println!("{:?} -> {:?}", LLVMGetTypeKind(LLVMTypeOf(largs[i])), LLVMGetTypeKind(ltypes[i]));
+                        debug!("{:?} -> {:?}", LLVMGetTypeKind(LLVMTypeOf(largs[i])), LLVMGetTypeKind(ltypes[i]));
                         largs[i] = build_generic_cast(data, largs[i], ltypes[i]);
                     }
                 }
@@ -201,7 +211,7 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
 
                 let lrtype = get_type(data, scope.clone(), rtype, true);
                 if lrtype != LLVMTypeOf(value) {
-                    println!("RETURN {:?} -> {:?}", LLVMGetTypeKind(LLVMTypeOf(value)), LLVMGetTypeKind(lrtype));
+                    debug!("RETURN {:?} -> {:?}", LLVMGetTypeKind(LLVMTypeOf(value)), LLVMGetTypeKind(lrtype));
                     value = build_generic_cast(data, value, lrtype);
                 }
                 value
@@ -224,7 +234,7 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
                     pointer
                 }
             };
-            println!("IDENT: {:?} {:?}", LLVMGetValueKind(pointer), LLVMGetTypeKind(LLVMTypeOf(pointer)));
+            debug!("IDENT: {:?} {:?}", LLVMGetValueKind(pointer), LLVMGetTypeKind(LLVMTypeOf(pointer)));
             //if LLVMGetTypeKind(LLVMTypeOf(pointer)) == llvm::LLVMTypeKind::LLVMPointerTypeKind {
             match LLVMGetValueKind(pointer) {
                 llvm::LLVMValueKind::LLVMArgumentValueKind |
@@ -521,7 +531,7 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
             let name = ltype.clone().unwrap().get_name();
             let classdef = scope.borrow().get_class_def(&name);
             let sym = classdef.borrow().search(right, |sym| Some(sym.clone())).unwrap();
-            println!("*ACCESS: {:?} {:?}", right, classdef);
+            debug!("*ACCESS: {:?} {:?}", right, classdef);
             // TODO add a check for vtables
 
             if struct_has_member(scope.clone(), &name, right) {
@@ -691,7 +701,7 @@ unsafe fn collect_functions_node<'a>(data: &mut LLVM<'a>, scope: ScopeRef<Value,
             //let alloc = String::from("__alloc__");
             //let classdef = scope.borrow().get_class_def(name);
             //if !classdef.borrow().contains_local(&alloc) {
-            //    println!("******* CREATING ALLOC: {}", name);
+            //    debug!("******* CREATING ALLOC: {}", name);
             //    let cname = scope.borrow().get_full_name(&Some(name.clone()), id.clone());
             //    classdef.borrow_mut().define(alloc.clone(), Some(Type::Function(vec!(), Box::new(Type::Object(name.clone(), types.clone())))));
             //    classdef.borrow_mut().assign(&alloc, build_allocator(data, tscope.clone(), &name, format!("{}_{}", cname, alloc).as_str(), lltype));

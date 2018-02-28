@@ -55,8 +55,8 @@ fn str(num: Real) -> String {
 
 
 class List<'item> {
-    let capacity = 0
-    let length = 0
+    let capacity: Int
+    let length: Int
     let data: Buffer<'item> = nil
 
     fn new(self) {
@@ -116,7 +116,6 @@ class List<'item> {
     }
 }
 
-/*
 class HashMapNode<'item> {
     let key: String
     let data: 'item
@@ -143,6 +142,14 @@ class HashMap<'item> {
         self.data = self.data.resize(self.size)
     }
 
+    fn insert(self, key: String, item: 'item) {
+        
+    }
+
+
+
+    fn hash(key: String) -> Int {
+
+    }
 }
-*/
 

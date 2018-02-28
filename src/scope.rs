@@ -298,7 +298,7 @@ impl<V, T> Scope<V, T> where V: Clone, T: Clone {
 
     pub fn update_type(&mut self, name: &String, ttype: Type) {
         self.modify_type(name, |info| {
-            println!("CHANGE: {:?} from {:?} to {:?}", name, info.ttype, ttype);
+            debug!("CHANGE: {:?} from {:?} to {:?}", name, info.ttype, ttype);
             info.ttype = ttype.clone()
         })
     }
@@ -415,7 +415,7 @@ impl<V, T> Scope<V, T> where V: Clone, T: Clone {
                     Some(ptype) => ptype,
                     None => {
                         let etype = self.find_type(&name);
-                        println!("EXISTING TYPEVAR for {:?}: {:?} vs {:?}", name, etype, id);
+                        debug!("EXISTING TYPEVAR for {:?}: {:?} vs {:?}", name, etype, id);
                         match etype {
                             Some(Type::Variable(_, ref eid)) if *eid == id => etype.clone().unwrap(),
                             None | Some(Type::Variable(_, _)) => {
@@ -428,8 +428,9 @@ impl<V, T> Scope<V, T> where V: Clone, T: Clone {
                     }
                 }
             },
-            //Type::Function(args, ret) => Type::Function(self.map_typevars_vec(varmap, args), Box::new(self.map_typevars(varmap, *ret))),
-            Type::Function(args, ret) => Type::Function(self.map_typevars_vec(varmap, args), ret),
+            Type::Function(args, ret) => Type::Function(self.map_typevars_vec(varmap, args), Box::new(self.map_typevars(varmap, *ret))),
+            // TODO why did I do this?  Was it because of a bug or just to reduce typevars, because it caused another bug with constructors
+            //Type::Function(args, ret) => Type::Function(self.map_typevars_vec(varmap, args), ret),
             Type::Overload(variants) => Type::Overload(self.map_typevars_vec(varmap, variants)),
             Type::Object(name, types) => Type::Object(name.clone(), self.map_typevars_vec(varmap, types)),
         }
@@ -441,13 +442,13 @@ impl<V, T> Scope<V, T> where V: Clone, T: Clone {
 
 /*
     pub fn raise_types(&mut self, fscope: ScopeRef<V, T>) {
-        //println!("RAISING");
+        //debug!("RAISING");
         let mut names = vec!();
         for (name, info) in &mut fscope.borrow_mut().types {
             match info.ttype {
                 Type::Variable(_, ref id) => {
                     //if name == vname {
-                        println!("RAISE TYPEVAR: {:?} {:?}", self.get_full_name(&Some(String::from("")), UniqueID(0)), info.ttype);
+                        debug!("RAISE TYPEVAR: {:?} {:?}", self.get_full_name(&Some(String::from("")), UniqueID(0)), info.ttype);
                         // TODO this is probably wrong because we might be unifying different type vars
                         //if !self.types.contains_key(name) {
                             self.define_type(name.clone(), info.ttype.clone());
@@ -469,7 +470,7 @@ impl<V, T> Scope<V, T> where V: Clone, T: Clone {
         Scope::<V, T>::collect_typevars(&mut names, ttype.clone());
         for name in names {
             if fscope.borrow().contains_type_local(&name) {
-                println!("RAISE TYPEVAR: {:?} {:?}", name, ttype);
+                debug!("RAISE TYPEVAR: {:?} {:?}", name, ttype);
                 let otype = fscope.borrow().find_type(&name).unwrap();
                 fscope.borrow_mut().types.remove(&name);
                 self.define_type(name.clone(), otype);
@@ -512,7 +513,7 @@ impl<V, T> Scope<V, T> where V: Clone, T: Clone {
             let gscope = Scope::global(self.parent.clone().unwrap());
             gscope.borrow_mut().define_type(id.to_string(), ttype.clone());
         }
-        println!("NEW TYPEVAR: {:?} {:?}", self.get_basename(), ttype);
+        debug!("NEW TYPEVAR: {:?} {:?}", self.get_basename(), ttype);
         ttype
 
 /*
@@ -524,7 +525,7 @@ impl<V, T> Scope<V, T> where V: Clone, T: Clone {
 
             gborrow.define_type(name, ttype.clone());
             gborrow.define_type(id.to_string(), ttype.clone());
-            println!("NEW TYPEVAR: {:?}", ttype);
+            debug!("NEW TYPEVAR: {:?}", ttype);
             ttype
         };
 

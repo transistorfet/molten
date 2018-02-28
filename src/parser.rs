@@ -12,7 +12,6 @@ use std::fmt;
 use std::f64;
 use std::str;
 use std::str::FromStr;
-use std::string::ToString;
 
 use types::Type;
 use utils::UniqueID;
@@ -104,6 +103,7 @@ pub struct Pos {
     pub offset: usize,
     pub column: usize,
     pub line: u32,
+    pub filenum: u16,
 }
 
 impl Pos {
@@ -112,11 +112,23 @@ impl Pos {
             offset: span.offset,
             column: span.get_column_utf8().unwrap(),
             line: span.line,
+            filenum: 0,
         }
     }
 
-    pub fn new_empty() -> Pos {
-        Pos { offset: 0, column: 0, line: 0 }
+    pub fn empty() -> Pos {
+        Pos { offset: 0, column: 0, line: 0, filenum: 0 }
+    }
+
+    pub fn exerpt(&self, text: &[u8]) -> String {
+        let mut end = self.offset + 1;
+        for i in self.offset .. text.len() {
+            if text[i] == b'\n' {
+                end = i;
+                break;
+            }
+        }
+        String::from(str::from_utf8(&text[self.offset .. end]).unwrap())
     }
 }
 
@@ -164,6 +176,36 @@ pub enum AST {
     Assignment(Pos, Box<AST>, Box<AST>),
     While(Pos, Box<AST>, Box<AST>),
     Type(Pos, String, Vec<(String, Option<Type>)>),
+}
+
+impl AST {
+    pub fn get_pos(&self) -> Pos {
+        match *self {
+            AST::List(ref pos, _) |
+            AST::Identifier(ref pos, _) |
+            AST::Index(ref pos, _, _, _) |
+            AST::Resolver(ref pos, _, _) |
+            AST::Accessor(ref pos, _, _, _) |
+            AST::Invoke(ref pos, _, _, _) |
+            AST::SideEffect(ref pos, _, _) |
+            AST::Block(ref pos, _) |
+            AST::If(ref pos, _, _, _) |
+            AST::Raise(ref pos, _) |
+            AST::Try(ref pos, _, _) |
+            AST::Match(ref pos, _, _) |
+            AST::For(ref pos, _, _, _, _) |
+            AST::Declare(ref pos, _, _) |
+            AST::Function(ref pos, _, _, _, _, _) |
+            AST::New(ref pos, _) |
+            AST::Class(ref pos, _, _, _, _) |
+            AST::Import(ref pos, _, _) |
+            AST::Definition(ref pos, _, _) |
+            AST::Assignment(ref pos, _, _) |
+            AST::While(ref pos, _, _) |
+            AST::Type(ref pos, _, _) => { pos.clone() }
+            _ => Pos::empty(),
+        }
+    }
 }
 
 
@@ -733,7 +775,7 @@ named!(boolean(Span) -> AST,
 );
 
 /*
-named!(string_contents(Span) -> AST,
+named!(string_contents(&[u8]) -> AST,
     map!(
         escaped_transform!(is_not!("\"\\"), '\\',
             alt!(
@@ -750,14 +792,22 @@ named!(string_contents(Span) -> AST,
     )
 );
 
+fn string_contents_middle(span: Span) -> IResult<Span, AST> {
+    match string_contents(span.fragment) {
+        IResult::Done(rem, res) => IResult::Done(span, res),
+        IResult::Error(Err(e)) => IResult::Error(span),
+    }
+}
+
 named!(string(Span) -> AST,
     delimited!(
         tag!("\""),
-        string_contents,
+        string_contents_middle,
         tag!("\"")
     )
 );
 */
+
 
 named!(string(Span) -> AST,
     map!(
@@ -769,6 +819,7 @@ named!(string(Span) -> AST,
         |s| AST::String(span_to_string(s))
     )
 );
+
 
 named!(number(Span) -> AST,
     alt_complete!(
@@ -885,6 +936,7 @@ pub fn is_not_colon(ch: u8) -> bool {
 }
 
 
+/*
 #[derive(Clone, Debug, PartialEq)]
 pub struct Position {
     line: usize,
@@ -895,7 +947,7 @@ static mut _lines: usize = 0;
 pub fn count_lines(text: &[u8]) {
     for ch in text {
         if *ch == '\n' as u8 {
-            //*lines.get_mut() += 1;
+            // *lines.get_mut() += 1;
             unsafe { _lines += 1; }
         }
     }
@@ -906,7 +958,7 @@ pub fn position() -> Position {
         Position { line: _lines }
     }
 }
-
+*/
 
 
 pub fn print_error(name: &str, span: Span, errors: Vec<(nom::ErrorKind, usize, usize)>) {

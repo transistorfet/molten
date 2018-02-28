@@ -28,7 +28,7 @@ mod scope;
 use scope::ScopeMapRef;
 
 mod session;
-use session::SessionRef;
+use session::Session;
 
 mod binding;
 mod types;
@@ -66,12 +66,13 @@ fn main() {
 
     let filename = matches.value_of("INPUT").unwrap();
     if matches.occurrences_of("compile") > 0 {
-        with_file(filename, |name, text| compile_string(name, text));
+        compile_string(filename);
     } else {
         println!("Use the -c flag to compile");
     }
 }
 
+/*
 fn with_file<F>(filename: &str, with: F) where F: Fn(&str, &[u8]) -> () {
     let name = filename.rsplitn(2, '.').collect::<Vec<&str>>()[1];
     let mut f = File::open(filename).expect("Error: file not found");
@@ -80,36 +81,37 @@ fn with_file<F>(filename: &str, with: F) where F: Fn(&str, &[u8]) -> () {
     f.read_to_string(&mut contents).expect("Error reading file contents");
     with(name, contents.as_bytes())
 }
+*/
 
-
-fn compile_string(name: &str, text: &[u8]) {
-    let session = session::Session::new_ref();
-    let map = session.borrow().map.clone();
+fn compile_string(filename: &str) {
+    let session = session::Session::new();
     let builtins = lib_llvm::get_builtins();
-    lib_llvm::make_global(map.clone(), &builtins);
-    let mut code = process_input(session.clone(), name, text);
-    code = precompiler::precompile(map.clone(), code);
+    lib_llvm::make_global(session.map.clone(), &builtins);
 
-    compiler_llvm::compile(&builtins, map.clone(), name, &mut code);
+    let mut code = session.parse_file(filename);
+    //code = refinery::refine(code);
+    process_input(&session, &mut code);
+    code = precompiler::precompile(&session, code);
+
+    let name = filename.rsplitn(2, '.').collect::<Vec<&str>>()[1];
+    compiler_llvm::compile(&builtins, &session, name, &mut code);
 }
 
 
-fn process_input<V, T>(session: SessionRef<V, T>, name: &str, text: &[u8]) -> Vec<AST> where V: Clone + Debug, T: Clone + Debug {
-    let map = session.borrow().map.clone();
-    let mut code = parser::parse_or_error(name, text);
-    code = refinery::refine(code);
-    traverse(&code);
-    //import::load_index(map.get_global(), "libcore.dec");
-    binding::bind_names(session.clone(), &mut code);
-    typecheck::check_types(map.clone(), map.get_global(), &mut code);
+fn process_input<V, T>(session: &Session<V, T>, code: &mut Vec<AST>) where V: Clone + Debug, T: Clone + Debug {
+    //traverse(&code);
+
+    let global = session.map.get_global();
+    binding::bind_names(session, code);
+    typecheck::check_types(session, global.clone(), code);
+
     println!("\n{:?}\n", code);
-
     //println!("\n{:?}\n\n{:?}", &code, global.clone());
-    debug::print_types(map.clone(), map.get_global(), &code);
-    debug::print_types_scope(map.get_global());
-    code
+    debug::print_types(session.map.clone(), global.clone(), code);
+    debug::print_types_scope(global);
 }
 
+/*
 fn traverse(tree: &Vec<AST>) {
     for node in tree {
         println!("{:?}", node);
@@ -119,5 +121,5 @@ fn traverse(tree: &Vec<AST>) {
         }
     }
 }
-
+*/
 

@@ -101,6 +101,12 @@ pub fn refine_node(node: AST) -> AST {
                         }
                         AST::Function(pos, name, args, ret, body, id)
                     },
+                    AST::Declare(pos, name, ttype) => {
+                        if name == String::from("new") {
+                            has_new = true;
+                        }
+                        AST::Declare(pos, name, ttype)
+                    },
                     _ => node
                 }
             }).collect();
@@ -143,12 +149,13 @@ pub fn refine_node(node: AST) -> AST {
             //AST::Assignment(Box::new(refine_node(*left)), Box::new(refine_node(*right)))
         },
 
-        AST::Import(pos, name, _) => {
-            let path = name.replace(".", "/") + ".dec";
-            let decls = import::load_index(path.as_str());
-            //*decls = session.borrow_mut().load_index(path.as_str());
-            AST::Import(pos, name, decls)
-        },
+        AST::Import(_, _, _) => { node },
+        //AST::Import(pos, name, _) => {
+        //    let path = name.replace(".", "/") + ".dec";
+        //    let decls = import::load_index(path.as_str());
+        //    //let decls = session.parse_file(path.as_str());
+        //    AST::Import(pos, name, refine_vec(decls))
+        //},
 
         AST::Noop => { node },
         AST::Underscore => { node },

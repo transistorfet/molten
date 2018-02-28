@@ -1,8 +1,9 @@
 
-//use std::rc::Rc;
+use std::fmt;
 
-use scope::{ Scope, ScopeRef };
 use utils::UniqueID;
+use scope::{ Scope, ScopeRef };
+use session::{ Session, Error };
 
 
 #[derive(Clone, Debug, PartialEq)]
@@ -84,7 +85,7 @@ impl Type {
                 nvariants.push(ntype);
                 Type::Overload(nvariants)
             },
-            _ => expect_type(scope.clone(), Some(self), Some(ntype.clone()), Check::Def),
+            _ => expect_type(scope.clone(), Some(self), Some(ntype.clone()), Check::Def).unwrap_or_else(|e| panic!("{}", e)),
         };
         rtype
     }
@@ -101,7 +102,7 @@ impl Type {
             let ntype = check_type(scope.clone(), otype.clone(), Some(ttype.clone()), Check::Def, false);
             match ntype {
                 Ok(utype) => dscope.borrow_mut().set_variable_type(name, utype),
-                Err(msg) => panic!("while updating variable type {:?}:\n{:?}", name, msg),
+                Err(err) => panic!("while updating variable type {:?}:\n{:?}", name, err),
             }
         }
     }
@@ -113,17 +114,45 @@ impl Type {
             let ntype = check_type(scope.clone(), otype.clone(), Some(ttype.clone()), Check::Def, false);
             match ntype {
                 Ok(utype) => pscope.borrow_mut().update_type(name, utype),
-                Err(msg) => panic!("while updating type {:?}:\n{:?}", name, msg),
+                Err(err) => panic!("while updating type {:?}:\n{:?}", name, err),
             }
 
             //if !Rc::ptr_eq(&pscope, &scope) {
-            //    println!("RAISING: {:?} {:?} {:?}", pscope.borrow().get_basename(), otype, ttype);
+            //    debug!("RAISING: {:?} {:?} {:?}", pscope.borrow().get_basename(), otype, ttype);
             //    pscope.borrow_mut().raise_type(scope.clone(), otype.unwrap());
             //    pscope.borrow_mut().raise_type(scope.clone(), ttype);
             //}
         }
     }
 }
+
+impl fmt::Display for Type {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            Type::Object(ref name, ref types) => {
+                let params = if types.len() > 0 { format!("<{}>", types.iter().map(|p| format!("{}", p)).collect::<Vec<String>>().join(", ")) } else { String::from("") };
+                write!(f, "{}{}", name, params)
+            },
+            Type::Variable(ref name, ref id) => {
+                write!(f, "'{}", name)
+            }
+            Type::Function(ref args, ref ret) => {
+                let argstr: Vec<String> = args.iter().map(|t| format!("{}", t)).collect();
+                write!(f, "({}) -> {}", argstr.join(", "), format!("{}", *ret))
+            }
+            Type::Overload(ref variants) => {
+                let varstr: Vec<String> = variants.iter().map(|v| format!("{}", v)).collect();
+                write!(f, "Overload[{}]", varstr.join(", "))
+            },
+        }
+    }
+}
+
+//impl fmt::Display for Vec<Type> {
+//    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+//        self.iter().map(|t| format!("{}", t)).collect().join(", ")
+//    }
+//}
 
 
 #[derive(Clone)]
@@ -132,18 +161,19 @@ pub enum Check {
     List,
 }
 
-pub fn expect_type<V, T>(scope: ScopeRef<V, T>, ottype: Option<Type>, obtype: Option<Type>, mode: Check) -> Type where V: Clone, T: Clone {
-    match check_type(scope, ottype, obtype, mode, true) {
-        Ok(ttype) => ttype,
-        Err(msg) => panic!(msg),
-    }
+pub fn expect_type<V, T>(scope: ScopeRef<V, T>, odtype: Option<Type>, octype: Option<Type>, mode: Check) -> Result<Type, Error> where V: Clone, T: Clone {
+    //match check_type(scope, odtype, octype, mode, true) {
+    //    Ok(ttype) => ttype,
+    //    Err(err) => panic!("{}", err),
+    //}
+    check_type(scope, odtype, octype, mode, true)
 }
 
 //
 // Compare the defined type to the calculated type and return the common type, or error if they do not match
 // dtype < ctype: ie. ctype will be downcast to match dtype, but not the inverse
 //
-pub fn check_type<V, T>(scope: ScopeRef<V, T>, odtype: Option<Type>, octype: Option<Type>, mode: Check, update: bool) -> Result<Type, String> where V: Clone, T: Clone {
+pub fn check_type<V, T>(scope: ScopeRef<V, T>, odtype: Option<Type>, octype: Option<Type>, mode: Check, update: bool) -> Result<Type, Error> where V: Clone, T: Clone {
     if odtype.is_none() {
         // TODO should the else case just be Nil... 
         //Ok(octype.unwrap_or_else(|| scope.borrow_mut().new_typevar()))
@@ -176,7 +206,7 @@ pub fn check_type<V, T>(scope: ScopeRef<V, T>, odtype: Option<Type>, octype: Opt
                         }
                         Ok(Type::Function(argtypes, Box::new(check_type(scope.clone(), Some(*aret.clone()), Some(*bret.clone()), mode, update)?)))
                     } else {
-                        Err(format!("TypeError: type mismatch, expected {:?} but found {:?}", dtype, ctype))
+                        Err(Error::new(format!("TypeError: type mismatch, expected {} but found {}", dtype, ctype)))
                     }
                 },
                 (Type::Object(ref aname, ref atypes), Type::Object(ref bname, ref btypes)) => {
@@ -189,12 +219,12 @@ pub fn check_type<V, T>(scope: ScopeRef<V, T>, odtype: Option<Type>, octype: Opt
                     }
                 },
                 (_, Type::Overload(_)) |
-                (Type::Overload(_), _) => Err(format!("TypeError: overloaded types are not allowed here...")),
+                (Type::Overload(_), _) => Err(Error::new(format!("TypeError: overloaded types are not allowed here..."))),
                 _ => {
                     if dtype == ctype {
                         Ok(dtype)
                     } else {
-                        Err(format!("TypeError: type mismatch, expected {:?} but found {:?}", dtype, ctype))
+                        Err(Error::new(format!("TypeError: type mismatch, expected {} but found {}", dtype, ctype)))
                     }
                 }
             }
@@ -203,13 +233,13 @@ pub fn check_type<V, T>(scope: ScopeRef<V, T>, odtype: Option<Type>, octype: Opt
 }
 
 
-fn is_subclass_of<V, T>(scope: ScopeRef<V, T>, adef: (&String, &Vec<Type>), bdef: (&String, &Vec<Type>), mode: Check, update: bool) -> Result<Type, String> where V: Clone, T: Clone {
+fn is_subclass_of<V, T>(scope: ScopeRef<V, T>, adef: (&String, &Vec<Type>), bdef: (&String, &Vec<Type>), mode: Check, update: bool) -> Result<Type, Error> where V: Clone, T: Clone {
     let tscope = Scope::new_ref(Some(scope.clone()));
+    let mut names = Scope::<V, T>::map_new();
     let mut adef = (adef.0.clone(), adef.1.clone());
 
     loop {
         let (mut class, parent) = scope.borrow().get_class_info(&adef.0).unwrap();
-        let mut names = Scope::<V, T>::map_new();
         class = tscope.borrow_mut().map_typevars(&mut names, class);
         adef.1 = check_type_params(tscope.clone(), &class.get_params(), &adef.1, mode.clone(), true)?;
 
@@ -225,19 +255,19 @@ fn is_subclass_of<V, T>(scope: ScopeRef<V, T>, adef: (&String, &Vec<Type>), bdef
             }
         }
         if parent.is_none() {
-            return Err(format!("TypeError: type mismatch, expected {:?} but found {:?}", Type::Object(adef.0.clone(), adef.1), Type::Object(bdef.0.clone(), bdef.1.clone())));
+            return Err(Error::new(format!("TypeError: type mismatch, expected {} but found {}", Type::Object(adef.0.clone(), adef.1), Type::Object(bdef.0.clone(), bdef.1.clone()))));
         }
         let parent = tscope.borrow_mut().map_typevars(&mut names, parent.unwrap());
         match resolve_type(tscope.clone(), parent) {
             Type::Object(name, params) => adef = (name, params),
-            ttype @ _ => return Err(format!("TypeError: expected Object but found {:?}", ttype)),
+            ttype @ _ => return Err(Error::new(format!("TypeError: expected Object but found {}", ttype))),
         }
     }
 }
 
-pub fn check_type_params<V, T>(scope: ScopeRef<V, T>, dtypes: &Vec<Type>, ctypes: &Vec<Type>, mode: Check, update: bool) -> Result<Vec<Type>, String> where V: Clone, T: Clone {
+pub fn check_type_params<V, T>(scope: ScopeRef<V, T>, dtypes: &Vec<Type>, ctypes: &Vec<Type>, mode: Check, update: bool) -> Result<Vec<Type>, Error> where V: Clone, T: Clone {
     if dtypes.len() != ctypes.len() {
-        Err(format!("TypeError: number of type parameters don't match: expected {:?} but found {:?}", dtypes, ctypes))
+        Err(Error::new(format!("TypeError: number of type parameters don't match: expected {:?} but found {:?}", dtypes, ctypes)))
     } else {
         let mut ptypes = vec!();
         for (dtype, ctype) in dtypes.iter().zip(ctypes.iter()) {
@@ -260,7 +290,7 @@ pub fn resolve_type<V, T>(scope: ScopeRef<V, T>, ttype: Type) -> Type where V: C
             }
         },
         Type::Variable(_, ref id) => {
-            //println!("VARIABLE: in {:?}: {:?} resolves to {:?}", scope.borrow().get_full_name(&Some(String::from("")), UniqueID(0)), ttype, scope.borrow().find_type(&id.to_string()));
+            //debug!("VARIABLE: in {:?}: {:?} resolves to {:?}", scope.borrow().get_full_name(&Some(String::from("")), UniqueID(0)), ttype, scope.borrow().find_type(&id.to_string()));
             match scope.borrow().find_type(&id.to_string()) {
                 Some(vtype) => {
                     match vtype {
@@ -268,7 +298,7 @@ pub fn resolve_type<V, T>(scope: ScopeRef<V, T>, ttype: Type) -> Type where V: C
                         _ => resolve_type(scope.clone(), vtype),
                     }
                 },
-                None => panic!("TypeError: undefined type variable {:?}", ttype),
+                None => panic!("TypeError: undefined type variable {}", ttype),
             }
         },
         Type::Function(ref args, ref ret) => {

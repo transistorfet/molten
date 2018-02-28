@@ -71,7 +71,7 @@ def link(target, filenames):
 
 def runcmd(cmd):
     result = subprocess.run(cmd)
-    result.returncode
+    return result.returncode
 
 def runordie(cmd):
     result = subprocess.run(cmd, shell=True)
