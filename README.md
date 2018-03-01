@@ -6,9 +6,12 @@ Molten is a programming language which borrows from the ML family of languages,
 as well as from Rust and Python.  The compiler is written in Rust and uses
 LLVM to generate IR which can be compiled to machine code.
 
-The goal of this project is to create a language with a focus on getting things
-done.  It is not a purely functional language, as it allows some side-effects,
-and it has a class-based object system with function and method overloading.
+The goal of this project is to create a high level language with a full object
+system that facilitates both functional and object-oriented programming.  Some
+syntax elements have been changed from typical ML languages to follow
+conventions found in more common languages, such as C++, Java, and Rust, to
+appeal to a broader audience (eg. parenthesis-delimited blocks, conventional
+class definitions, generics/type parameters, etc)
 
 
 Installing
@@ -191,7 +194,7 @@ Yet To Complete
   regardless), or to add a distinct type for closures vs non-closure functions
   (like Closure<(Int) -> Int>, or perhaps something shorter)
 
-- Execptions haven't been implemented yet.  This somewhat relates to the
+- Exceptions haven't been implemented yet.  This somewhat relates to the
   above issue of making all functions support throwing exceptions, which
   means a need to declare C/C++ functions that do not allow exceptions.
 
