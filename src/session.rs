@@ -7,9 +7,10 @@ use std::cell::Cell;
 use std::cell::RefCell;
 use std::io::prelude::*;
 
+use parser;
 use refinery;
 use config::Options;
-use parser::{ self, AST, Pos };
+use ast::{ AST, Pos };
 use scope::{ ScopeMapRef };
 
 

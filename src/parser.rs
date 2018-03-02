@@ -5,31 +5,27 @@ use nom::{ digit, hex_digit, oct_digit, line_ending, not_line_ending, space, mul
 
 extern crate nom_locate;
 use nom_locate::LocatedSpan;
-pub type Span<'a> = LocatedSpan<&'a [u8]>;
 
 use std;
-use std::fmt;
 use std::f64;
 use std::str;
 use std::str::FromStr;
 
 use types::Type;
 use utils::UniqueID;
+use ast::{ AST, Pos };
 
 
-pub fn parse_or_error(name: &str, text: &[u8]) -> Vec<AST> {
-    let span = Span::new(text);
-    match parse(span) {
-        IResult::Done(rem, _) if rem.fragment != [] => panic!("InternalError: unparsed input remaining: {:?}", rem),
-        IResult::Done(_, code) => code,
-        res @ IResult::Error(_) => { /*print_error(name, span, nom::prepare_errors(text, res).unwrap());*/ panic!("{:?}", res); },
-        res @ _ => panic!("UnknownError: the parser returned an unknown result; {:?}", res),
-    }
+///// Parsing Macros /////
+
+pub type Span<'a> = LocatedSpan<&'a [u8]>;
+
+#[inline]
+pub fn span_to_string(s: Span) -> String {
+    String::from(str::from_utf8(s.fragment).unwrap())
 }
 
-///// Parser /////
-
-named!(sp, eat_separator!(&b" \t"[..]));
+//named!(sp, eat_separator!(&b" \t"[..]));
 
 #[macro_export]
 macro_rules! sp (
@@ -81,11 +77,6 @@ macro_rules! tag_word (
     )
 );
 
-#[inline]
-pub fn span_to_string(s: Span) -> String {
-    String::from(str::from_utf8(s.fragment).unwrap())
-}
-
 #[macro_export]
 macro_rules! map_str (
     ($i:expr, $($args:tt)*) => (
@@ -98,113 +89,15 @@ macro_rules! map_str (
 );
 
 
-#[derive(Clone, PartialEq)]
-pub struct Pos {
-    pub offset: usize,
-    pub column: usize,
-    pub line: u32,
-    pub filenum: u16,
-}
+///// Parser /////
 
-impl Pos {
-    pub fn new(span: Span) -> Pos {
-        Pos {
-            offset: span.offset,
-            column: span.get_column_utf8().unwrap(),
-            line: span.line,
-            filenum: 0,
-        }
-    }
-
-    pub fn empty() -> Pos {
-        Pos { offset: 0, column: 0, line: 0, filenum: 0 }
-    }
-
-    pub fn exerpt(&self, text: &[u8]) -> String {
-        let mut end = self.offset + 1;
-        for i in self.offset .. text.len() {
-            if text[i] == b'\n' {
-                end = i;
-                break;
-            }
-        }
-        String::from(str::from_utf8(&text[self.offset .. end]).unwrap())
-    }
-}
-
-impl fmt::Debug for Pos {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}:{}", self.line, self.column)
-    }
-}
-
-
-#[derive(Clone, Debug, PartialEq)]
-pub enum AST {
-    Noop,
-    //Comment(String),
-
-    Underscore,
-    Boolean(bool),
-    Integer(isize),
-    Real(f64),
-    String(String),
-    Nil(Option<Type>),
-    List(Pos, Vec<AST>),
-
-    Identifier(Pos, String),
-    Index(Pos, Box<AST>, Box<AST>, Option<Type>),
-    Resolver(Pos, Box<AST>, String),
-    Accessor(Pos, Box<AST>, String, Option<Type>),
-    Invoke(Pos, Box<AST>, Vec<AST>, Option<Type>),
-    SideEffect(Pos, String, Vec<AST>),
-    //Prefix(Pos, String, Box<AST>),
-    //Infix(Pos, String, Box<AST>, Box<AST>),
-    Block(Pos, Vec<AST>),
-    If(Pos, Box<AST>, Box<AST>, Box<AST>),
-    Raise(Pos, Box<AST>),
-    Try(Pos, Box<AST>, Vec<(AST, AST)>),
-    Match(Pos, Box<AST>, Vec<(AST, AST)>),
-    For(Pos, String, Box<AST>, Box<AST>, UniqueID),
-    Declare(Pos, String, Type, String),
-    Function(Pos, Option<String>, Vec<(String, Option<Type>, Option<AST>)>, Option<Type>, Box<AST>, UniqueID),
-    New(Pos, (String, Vec<Type>)),
-    Class(Pos, (String, Vec<Type>), Option<(String, Vec<Type>)>, Vec<AST>, UniqueID),
-
-    Import(Pos, String, Vec<AST>),
-    Definition(Pos, (String, Option<Type>), Box<AST>),
-    Assignment(Pos, Box<AST>, Box<AST>),
-    While(Pos, Box<AST>, Box<AST>),
-    Type(Pos, String, Vec<(String, Option<Type>)>),
-}
-
-impl AST {
-    pub fn get_pos(&self) -> Pos {
-        match *self {
-            AST::List(ref pos, _) |
-            AST::Identifier(ref pos, _) |
-            AST::Index(ref pos, _, _, _) |
-            AST::Resolver(ref pos, _, _) |
-            AST::Accessor(ref pos, _, _, _) |
-            AST::Invoke(ref pos, _, _, _) |
-            AST::SideEffect(ref pos, _, _) |
-            AST::Block(ref pos, _) |
-            AST::If(ref pos, _, _, _) |
-            AST::Raise(ref pos, _) |
-            AST::Try(ref pos, _, _) |
-            AST::Match(ref pos, _, _) |
-            AST::For(ref pos, _, _, _, _) |
-            AST::Declare(ref pos, _, _, _) |
-            AST::Function(ref pos, _, _, _, _, _) |
-            AST::New(ref pos, _) |
-            AST::Class(ref pos, _, _, _, _) |
-            AST::Import(ref pos, _, _) |
-            AST::Definition(ref pos, _, _) |
-            AST::Assignment(ref pos, _, _) |
-            AST::While(ref pos, _, _) |
-            AST::Type(ref pos, _, _) => { pos.clone() }
-            _ => Pos::empty(),
-        }
+pub fn parse_or_error(name: &str, text: &[u8]) -> Vec<AST> {
+    let span = Span::new(text);
+    match parse(span) {
+        IResult::Done(rem, _) if rem.fragment != [] => panic!("InternalError: unparsed input remaining: {:?}", rem),
+        IResult::Done(_, code) => code,
+        res @ IResult::Error(_) => { /*print_error(name, span, nom::prepare_errors(text, res).unwrap());*/ panic!("{:?}", res); },
+        res @ _ => panic!("UnknownError: the parser returned an unknown result; {:?}", res),
     }
 }
 

@@ -1,6 +1,6 @@
 
 
-use parser::AST;
+use ast::AST;
 use utils::UniqueID;
 
 pub fn refine(code: Vec<AST>) -> Vec<AST> {

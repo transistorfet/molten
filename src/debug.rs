@@ -1,5 +1,5 @@
 
-use parser::AST;
+use ast::AST;
 //use utils::UniqueID;
 use scope::{ ScopeRef, ScopeMapRef };
 

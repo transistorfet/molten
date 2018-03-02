@@ -2,7 +2,7 @@
 use std::fs::File;
 use std::io::prelude::*;
 
-use parser::AST;
+use ast::AST;
 use types::Type;
 use utils::UniqueID;
 use config::Options;

@@ -1,7 +1,7 @@
 
 use std::fmt::Debug;
 
-use parser::AST;
+use ast::AST;
 use session::{ Session, Error };
 use scope::{ self, Scope, ScopeRef };
 use types::{ Type, Check, expect_type, resolve_type, find_variant, check_type_params };

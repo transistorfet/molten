@@ -11,7 +11,7 @@ use types::Type;
 use utils::UniqueID;
 use config::Options;
 use session::Session;
-use parser::{ AST, Pos };
+use ast::{ AST, Pos };
 use scope::{ Scope, ScopeRef, ScopeMapRef };
 use lib_llvm::{ Builtin, BuiltinMap, initialize_builtins };
 

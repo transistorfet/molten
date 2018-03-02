@@ -1,7 +1,7 @@
 
 use std::fmt::Debug;
 
-use parser::AST;
+use ast::AST;
 use session::Session;
 use types::{ resolve_type };
 use typecheck::{ update_scope_variable_types };

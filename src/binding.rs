@@ -2,7 +2,7 @@
 
 use std::fmt::Debug;
 
-use parser::AST;
+use ast::AST;
 use types::Type;
 use session::{ Session, Error };
 use scope::{ self, Scope, ScopeRef };
