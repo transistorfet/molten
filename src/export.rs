@@ -1,37 +1,13 @@
 
 use std::fs::File;
-use std::path::Path;
 use std::io::prelude::*;
 
+use parser::AST;
 use types::Type;
-use config::Options;
 use scope::{ ScopeRef, ScopeMapRef };
-use parser::{ AST, parse_or_error };
 
 
-/*
-pub fn load_index(filename: &str) -> Vec<AST> {
-    let mut f = find_file(filename);
-    let mut contents = String::new();
-    f.read_to_string(&mut contents).expect("Error reading file contents");
-
-    let decl = parse_or_error(filename, contents.as_bytes());
-    println!("DECL: {:?}", decl);
-    decl
-}
-
-pub fn find_file(filename: &str) -> File {
-    for ref path in &Options::as_ref().libpath {
-        match File::open(Path::new(path).join(filename)) {
-            Ok(f) => return f,
-            Err(_) => { },
-        }
-    }
-    panic!("Error: file not found, {}", filename);
-}
-*/
-
-pub fn store_index<V, T>(map: ScopeMapRef<V, T>, scope: ScopeRef<V, T>, filename: &str, code: &Vec<AST>) where V: Clone, T: Clone {
+pub fn write_exports<V, T>(map: ScopeMapRef<V, T>, scope: ScopeRef<V, T>, filename: &str, code: &Vec<AST>) where V: Clone, T: Clone {
     let index_text = build_index(map, scope, code);
     let mut index_file = File::create(filename).expect("Error creating index file");
     index_file.write_all(index_text.as_bytes()).unwrap();

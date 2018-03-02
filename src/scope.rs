@@ -2,7 +2,6 @@
 use std::str;
 use std::rc::Rc;
 use std::cell::RefCell;
-use std::ops::DerefMut;
 use std::collections::HashMap;
 use std::collections::hash_map::Entry;
 
@@ -11,6 +10,7 @@ use nom::{ digit };
 
 use parser;
 use types::Type;
+use session::Error;
 use utils::UniqueID;
 
 #[derive(Clone, Debug, PartialEq)]
@@ -181,10 +181,11 @@ impl<V, T> Scope<V, T> where V: Clone, T: Clone {
         self.modify_local(name, move |sym| sym.value = Some(value.clone()))
     }
 
-    pub fn get_variable_value(&self, name: &String) -> Option<V> {
+    pub fn get_variable_value(&self, name: &String) -> Result<V, Error> {
         match self.search(name, |sym| Some(sym.value.clone())) {
-            Some(value) => value,
-            None => panic!("NameError: variable is undefined; {:?}", name),
+            Some(Some(value)) => Ok(value),
+            Some(_) => Err(Error::new(format!("UnsetError: variable is unset; {:?}", name))),
+            None => Err(Error::new(format!("NameError: variable is undefined; {:?}", name))),
         }
     }
 
@@ -303,7 +304,7 @@ impl<V, T> Scope<V, T> where V: Clone, T: Clone {
         })
     }
 
-    pub fn create_class_def(&mut self, pair: &(String, Vec<Type>), parent: Option<(String, Vec<Type>)>) -> ScopeRef<V, T> {
+    pub fn create_class_def(&mut self, pair: &(String, Vec<Type>), parent: Option<(String, Vec<Type>)>) -> Result<ScopeRef<V, T>, Error> {
         // Create class name bindings for checking ast::accessors
         let &(ref name, ref types) = pair;
         let classdef = Scope::new_ref(None);
@@ -313,7 +314,7 @@ impl<V, T> Scope<V, T> where V: Clone, T: Clone {
         match parent {
              Some((ref pname, ref types)) => match self.search_type(&pname, |info| info.classdef.clone()) {
                 Some(ref parentdef) => classdef.borrow_mut().set_parent(parentdef.clone()),
-                None => panic!("NameError: undefined parent class {:?} for {:?}", pname, name),
+                None => return Err(Error::new(format!("NameError: undefined parent class {:?} for {:?}", pname, name))),
             },
             None => { }
         };
@@ -323,7 +324,7 @@ impl<V, T> Scope<V, T> where V: Clone, T: Clone {
         self.set_class_def(name, parent.clone(), classdef.clone());
         // TODO i don't like this type == Class thing, but i don't know how i'll do struct types yet either
         //self.define(name.clone(), Some(Type::Object(name.clone(), vec!())));
-        classdef
+        Ok(classdef)
     }
 
     pub fn set_class_def(&mut self, name: &String, parentclass: Option<(String, Vec<Type>)>, classdef: ScopeRef<V, T>) {

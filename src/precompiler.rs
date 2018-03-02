@@ -5,7 +5,7 @@ use parser::AST;
 use session::Session;
 use types::{ resolve_type };
 use typecheck::{ update_scope_variable_types };
-use scope::{ ScopeRef, ScopeMapRef };
+use scope::{ ScopeRef };
 //use utils::UniqueID;
 
 
@@ -48,7 +48,7 @@ pub fn precompile_node<V, T>(session: &Session<V, T>, scope: ScopeRef<V, T>, nod
 
                 // Create class type named __closure__
                 let cpair = (String::from(format!("__closure{}__", cid)), vec!());
-                let classdef = scope.borrow_mut().create_class_def(&cpair, None);
+                let classdef = scope.borrow_mut().create_class_def(&cpair, None).unwrap();
                 let ctype = Type::make_object(cpair.clone());
                 tscope.borrow_mut().define_type(String::from("Self"), ctype.clone());
 

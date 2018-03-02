@@ -2,16 +2,18 @@
 
 use std::fmt::Debug;
 
-use import;
 use parser::AST;
 use types::Type;
 use session::{ Session, Error };
-use scope::{ self, Scope, ScopeRef, ScopeMapRef };
+use scope::{ self, Scope, ScopeRef };
 use utils::UniqueID;
 
 
 pub fn bind_names<V, T>(session: &Session<V, T>, code: &mut Vec<AST>) where V: Clone + Debug, T: Clone + Debug {
     bind_names_vec(session, session.map.get_global().clone(), code);
+    if session.errors.get() > 0 {
+        panic!("Exiting due to previous errors");
+    }
 }
 
 pub fn bind_names_vec<V, T>(session: &Session<V, T>, scope: ScopeRef<V, T>, code: &mut Vec<AST>) where V: Clone + Debug, T: Clone + Debug {
@@ -20,7 +22,14 @@ pub fn bind_names_vec<V, T>(session: &Session<V, T>, scope: ScopeRef<V, T>, code
     }
 }
 
-fn bind_names_node<V, T>(session: &Session<V, T>, scope: ScopeRef<V, T>, node: &mut AST) where V: Clone + Debug, T: Clone + Debug {
+pub fn bind_names_node<V, T>(session: &Session<V, T>, scope: ScopeRef<V, T>, node: &mut AST) where V: Clone + Debug, T: Clone + Debug {
+    match bind_names_node_or_error(session, scope.clone(), node) {
+        Ok(_) => { },
+        Err(err) => session.print_error(err.add_pos(&node.get_pos())),
+    }
+}
+
+fn bind_names_node_or_error<V, T>(session: &Session<V, T>, scope: ScopeRef<V, T>, node: &mut AST) -> Result<(), Error> where V: Clone + Debug, T: Clone + Debug {
     match *node {
         AST::Function(ref pos, ref name, ref mut args, ref mut ret, ref mut body, ref id) => {
             let fscope = session.map.add(id.clone(), Some(scope.clone()));
@@ -66,7 +75,7 @@ fn bind_names_node<V, T>(session: &Session<V, T>, scope: ScopeRef<V, T>, node: &
 
         AST::Identifier(ref pos, ref name) => {
             if !scope.borrow().contains(name) {
-                panic!("NameError:{:?}: undefined identifier {:?}", pos, name);
+                return Err(Error::new(format!("NameError: undefined identifier {:?}", name)));
             }
         },
 
@@ -118,7 +127,7 @@ fn bind_names_node<V, T>(session: &Session<V, T>, scope: ScopeRef<V, T>, node: &
         AST::New(ref pos, (ref name, ref mut types)) => {
             types.iter_mut().map(|ref mut ttype| declare_typevars(scope.clone(), Some(ttype), false)).count();
             if scope.borrow().find_type(name).is_none() {
-                panic!("NameError:{:?}: undefined identifier {:?}", pos, name);
+                return Err(Error::new(format!("NameError: undefined identifier {:?}", name)));
             }
         },
 
@@ -138,7 +147,7 @@ fn bind_names_node<V, T>(session: &Session<V, T>, scope: ScopeRef<V, T>, node: &
                 tscope.borrow_mut().define_type(String::from("Super"), Type::Object(pname.clone(), ptypes.clone()));
             }
 
-            let classdef = scope.borrow_mut().create_class_def(&(name.clone(), types.clone()), parent.clone());
+            let classdef = scope.borrow_mut().create_class_def(&(name.clone(), types.clone()), parent.clone())?;
             bind_names_vec(session, tscope.clone(), body);
         },
 
@@ -148,10 +157,10 @@ fn bind_names_node<V, T>(session: &Session<V, T>, scope: ScopeRef<V, T>, node: &
             match **left {
                 AST::Identifier(_, ref name) => {
                     if scope.borrow().find_type(name).is_none() {
-                        session.raise_error(pos, format!("NameError: undefined type {:?}", name));
+                        return Err(Error::new(format!("NameError: undefined type {:?}", name)));
                     }
                 },
-                _ => panic!("SyntaxError:{:?}: left-hand side of scope resolver must be identifier", pos)
+                _ => { return Err(Error::new(format!("SyntaxError: left-hand side of scope resolver must be identifier"))); }
             }
         },
 
@@ -162,7 +171,7 @@ fn bind_names_node<V, T>(session: &Session<V, T>, scope: ScopeRef<V, T>, node: &
         AST::Assignment(ref pos, ref mut left, ref mut right) => {
             match **left {
                 AST::Accessor(_, _, _, _) | AST::Index(_, _, _, _) => { },
-                _ => panic!("SyntaxError:{:?}: assignment to something other than a list or class element: {:?}", pos, left),
+                _ => return Err(Error::new(format!("SyntaxError: assignment to something other than a list or class element: {:?}", left))),
             };
             bind_names_node(session, scope.clone(), left);
             bind_names_node(session, scope.clone(), right);
@@ -170,7 +179,6 @@ fn bind_names_node<V, T>(session: &Session<V, T>, scope: ScopeRef<V, T>, node: &
 
         AST::Import(_, ref name, ref mut decls) => {
             let path = name.replace(".", "/") + ".dec";
-            //*decls = import::load_index(path.as_str());
             *decls = session.parse_file(path.as_str());
             bind_names_vec(session, scope.clone(), decls);
         },
@@ -180,6 +188,7 @@ fn bind_names_node<V, T>(session: &Session<V, T>, scope: ScopeRef<V, T>, node: &
         AST::Noop | AST::Underscore | AST::Nil(_) |
         AST::Boolean(_) | AST::Integer(_) | AST::Real(_) | AST::String(_) => { }
     }
+    Ok(())
 }
 
 pub fn declare_typevars<V, T>(scope: ScopeRef<V, T>, ttype: Option<&mut Type>, always_new: bool) where V: Clone, T: Clone {

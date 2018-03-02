@@ -3,7 +3,7 @@ use std::fmt;
 
 use utils::UniqueID;
 use scope::{ Scope, ScopeRef };
-use session::{ Session, Error };
+use session::{ Error };
 
 
 #[derive(Clone, Debug, PartialEq)]
@@ -312,7 +312,7 @@ pub fn resolve_type<V, T>(scope: ScopeRef<V, T>, ttype: Type) -> Type where V: C
     }
 }
 
-pub fn find_variant<V, T>(scope: ScopeRef<V, T>, otype: Type, atypes: Vec<Type>) -> Type where V: Clone, T: Clone {
+pub fn find_variant<V, T>(scope: ScopeRef<V, T>, otype: Type, atypes: Vec<Type>) -> Result<Type, Error> where V: Clone, T: Clone {
     match otype {
         Type::Overload(ref variants) => {
             'outer: for variant in variants {
@@ -328,7 +328,7 @@ pub fn find_variant<V, T>(scope: ScopeRef<V, T>, otype: Type, atypes: Vec<Type>)
                     return variant.clone();
                 }
             }
-            panic!("No valid variant found for {:?}\n\t out of {:?}", atypes, variants);
+            return Err(Error::new(format!("OverloadError: No valid variant found for {:?}\n\t out of {:?}", atypes, variants)));
         },
         _ => otype.clone(),
     }

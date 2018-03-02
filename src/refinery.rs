@@ -1,6 +1,5 @@
 
 
-use import;
 use parser::AST;
 use utils::UniqueID;
 

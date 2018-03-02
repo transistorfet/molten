@@ -6,7 +6,7 @@ extern crate llvm_sys as llvm;
 use self::llvm::prelude::*;
 use self::llvm::core::*;
 
-use import;
+use export;
 use types::Type;
 use utils::UniqueID;
 use config::Options;
@@ -113,7 +113,7 @@ unsafe fn compile_module(builtins: &Vec<Builtin>, session: &Session<Value, TypeV
 
     println!("{}\n", compiled.into_string().unwrap());
 
-    import::store_index(data.map.clone(), data.map.get_global(), format!("{}.dec", module_name).as_str(), code);
+    export::write_exports(data.map.clone(), data.map.get_global(), format!("{}.dec", module_name).as_str(), code);
 
     LLVMDisposeBuilder(builder);
     LLVMDisposeModule(module);
@@ -225,8 +225,8 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
 
         AST::Identifier(ref pos, ref name) => {
             let pointer = match scope.borrow().get_variable_value(name) {
-                Some(x) => x,
-                None => {
+                Ok(x) => x,
+                Err(_) => {
                     let pointer = LLVMGetNamedGlobal(data.module, label(name.as_str()));
                     if pointer.is_null() {
                         panic!("UnsetError:{:?}: use before assignment {:?}", pos, name);

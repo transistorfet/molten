@@ -3,8 +3,9 @@ use std::fmt::Debug;
 
 use parser::AST;
 use session::{ Session, Error };
-use types::{ Type, Check, expect_type, check_type, resolve_type, find_variant, check_type_params };
-use scope::{ self, Scope, ScopeRef, ScopeMapRef };
+use scope::{ self, Scope, ScopeRef };
+use types::{ Type, Check, expect_type, resolve_type, find_variant, check_type_params };
+
 
 pub fn check_types<V, T>(session: &Session<V, T>, scope: ScopeRef<V, T>, code: &mut Vec<AST>) -> Type where V: Clone + Debug, T: Clone + Debug {
     let ttype = check_types_vec(session, scope, code);
@@ -99,12 +100,12 @@ pub fn check_types_node_or_error<V, T>(session: &Session<V, T>, scope: ScopeRef<
             etype = tscope.borrow_mut().map_all_typevars(etype.clone());
 
             if let Type::Overload(_) = etype {
-                etype = find_variant(tscope.clone(), etype, atypes.clone());
+                etype = find_variant(tscope.clone(), etype, atypes.clone())?;
                 match **fexpr {
                     AST::Resolver(_, _, ref mut name) |
                     AST::Accessor(_, _, ref mut name, _) |
                     AST::Identifier(_, ref mut name) => *name = scope::mangle_name(name, etype.get_argtypes()),
-                    _ => panic!("OverloadError: call to overloaded method not allowed here"),
+                    _ => return Err(Error::new(format!("OverloadError: calling an overloaded function must be by name: not {:?}", fexpr))),
                 }
             }
 
@@ -127,7 +128,7 @@ pub fn check_types_node_or_error<V, T>(session: &Session<V, T>, scope: ScopeRef<
                     Type::update_type(tscope.clone(), &id.to_string(), ftype.clone());
                     ftype
                 },
-                _ => panic!("NotAFunction: {:?}", fexpr),
+                _ => return Err(Error::new(format!("NotAFunction: {:?}", fexpr))),
             };
 
             //scope.borrow_mut().raise_types(tscope.clone());
@@ -223,12 +224,9 @@ pub fn check_types_node_or_error<V, T>(session: &Session<V, T>, scope: ScopeRef<
                 Some(dtype) => {
                     let tscope = Scope::new_ref(Some(scope.clone()));
                     let mtype = tscope.borrow_mut().map_all_typevars(dtype.clone());
-                    if let Err(msg) = check_type_params(scope.clone(), &dtype.get_params(), types, Check::Def, false) {
-                        panic!(msg);
-                    }
-                    //scope.borrow_mut().raise_types(tscope.clone());
+                    check_type_params(scope.clone(), &dtype.get_params(), types, Check::Def, false)?;
                 },
-                None => panic!("TypeError: undefined type {:?}", name),
+                None => return Err(Error::new(format!("TypeError: undefined type {:?}", name))),
             };
             Type::Object(name.clone(), types.clone())
         },
@@ -244,7 +242,7 @@ pub fn check_types_node_or_error<V, T>(session: &Session<V, T>, scope: ScopeRef<
                 // TODO this caused an issue with types that have typevars that aren't declared (ie. Buffer['item])
                 //AST::Identifier(_, ref name) => resolve_type(scope.clone(), scope.borrow().find_type(name).unwrap().clone()),
                 AST::Identifier(_, ref name) => scope.borrow().find_type(name).unwrap().clone(),
-                _ => panic!("SyntaxError: left-hand side of scope resolver must be identifier")
+                _ => return Err(Error::new(format!("SyntaxError: left-hand side of scope resolver must be identifier")))
             };
 
             let classdef = scope.borrow().get_class_def(&ltype.get_name());
@@ -276,7 +274,7 @@ pub fn check_types_node_or_error<V, T>(session: &Session<V, T>, scope: ScopeRef<
 
         AST::Underscore => expected.unwrap_or_else(|| scope.borrow_mut().new_typevar()),
 
-        AST::Type(_, _, _) => panic!("NotImplementedError: not yet supported, {:?}", node),
+        AST::Type(_, _, _) => return Err(Error::new(format!("NotImplementedError: not yet supported, {:?}", node))),
 
         AST::Index(_, _, _, _) => panic!("InternalError: ast element shouldn't appear at this late phase: {:?}", node),
     };
