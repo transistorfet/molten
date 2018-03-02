@@ -105,28 +105,36 @@ impl<V, T> Scope<V, T> where V: Clone, T: Clone {
 
     ///// Variable Functions /////
 
-    pub fn define(&mut self, name: String, ttype: Option<Type>) {
+    #[must_use]
+    pub fn define(&mut self, name: String, ttype: Option<Type>) -> Result<(), Error> {
         match self.names.contains_key(&name) {
-            true => panic!("NameError: variable is already defined; {:?}", name),
-            false => self.names.insert(name, Symbol { ttype: ttype, value: None, funcdefs: 0, external: false }),
-        };
+            true => Err(Error::new(format!("NameError: variable is already defined; {:?}", name))),
+            false => {
+                self.names.insert(name, Symbol { ttype: ttype, value: None, funcdefs: 0, external: false });
+                Ok(())
+            },
+        }
     }
 
-    pub fn define_func(&mut self, name: String, ttype: Option<Type>, external: bool) {
+    #[must_use]
+    pub fn define_func(&mut self, name: String, ttype: Option<Type>, external: bool) -> Result<(), Error> {
         let funcs = self.search(&name, |sym| Some(sym.funcdefs)).unwrap_or(0);
         match self.names.entry(name.clone()) {
-            Entry::Vacant(entry) => { entry.insert(Symbol { ttype: ttype, value: None, funcdefs: funcs + 1, external: external }); },
+            Entry::Vacant(entry) => { entry.insert(Symbol { ttype: ttype, value: None, funcdefs: funcs + 1, external: external }); Ok(()) },
             Entry::Occupied(mut entry) => match entry.get().funcdefs {
-                0 => panic!("NameError: variable is already defined as a non-function; {:?}", name),
+                0 => Err(Error::new(format!("NameError: variable is already defined as a non-function; {:?}", name))),
                 // TODO we don't really do the right this with type here, but we don't have a scoperef to pass to Type::add_variant
-                _ => entry.get_mut().funcdefs += 1,
+                _ => { entry.get_mut().funcdefs += 1; Ok(()) },
             },
-        };
+        }
     }
 
-    pub fn define_func_variant(dscope: ScopeRef<V, T>, name: String, tscope: ScopeRef<V, T>, ftype: Type) {
-        dscope.borrow_mut().define_func(name.clone(), None, false);
+    #[must_use]
+    pub fn define_func_variant(dscope: ScopeRef<V, T>, name: String, tscope: ScopeRef<V, T>, ftype: Type) -> Result<(), Error> {
+        dscope.borrow_mut().define_func(name.clone(), None, false)?;
+        // TODO add error handling to add_func_variant
         Scope::add_func_variant(dscope, &name, tscope, ftype);
+        Ok(())
     }
 
     pub fn modify_local<F>(&mut self, name: &String, mut f: F) -> () where F: FnMut(&mut Symbol<V>) -> () {
@@ -162,7 +170,7 @@ impl<V, T> Scope<V, T> where V: Clone, T: Clone {
     }
 
     pub fn contains(&self, name: &String) -> bool {
-        match self.search(name, |sym| Some(true)) {
+        match self.search(name, |_sym| Some(true)) {
             Some(true) => true,
             _ => false,
         }
@@ -221,7 +229,7 @@ impl<V, T> Scope<V, T> where V: Clone, T: Clone {
 
     pub fn add_func_variant(dscope: ScopeRef<V, T>, name: &String, tscope: ScopeRef<V, T>, ftype: Type) {
         let otype = dscope.borrow().get_variable_type_full(name, true);
-        let ftype = otype.map(|ttype| ttype.add_variant(tscope.clone(), ftype.clone())).unwrap_or(ftype);
+        let ftype = otype.map(|ttype| ttype.add_variant(tscope.clone(), ftype.clone()).unwrap()).unwrap_or(ftype);
         dscope.borrow_mut().set_variable_type(name, ftype.clone());
     }
 
@@ -247,20 +255,24 @@ impl<V, T> Scope<V, T> where V: Clone, T: Clone {
 
     ///// Type Functions /////
 
-    pub fn define_type(&mut self, name: String, ttype: Type) {
+    #[must_use]
+    pub fn define_type(&mut self, name: String, ttype: Type) -> Result<(), Error> {
         match self.types.contains_key(&name) {
-            true => panic!("NameError: type is already defined; {:?}", name),
-            false => self.types.insert(name, TypeInfo {
-                ttype: ttype,
-                classdef: None,
-                parent: None,
-                value: None
-            }),
-        };
+            true => Err(Error::new(format!("NameError: type is already defined; {:?}", name))),
+            false => {
+                self.types.insert(name, TypeInfo {
+                    ttype: ttype,
+                    classdef: None,
+                    parent: None,
+                    value: None
+                });
+                Ok(())
+            },
+        }
     }
 
     pub fn contains_type(&self, name: &String) -> bool {
-        match self.search_type(name, |info| Some(true)) {
+        match self.search_type(name, |_info| Some(true)) {
             Some(true) => true,
             _ => false,
         }
@@ -312,7 +324,7 @@ impl<V, T> Scope<V, T> where V: Clone, T: Clone {
 
         // Find the parent class definitions, which the new class will inherit from
         match parent {
-             Some((ref pname, ref types)) => match self.search_type(&pname, |info| info.classdef.clone()) {
+             Some((ref pname, ref _types)) => match self.search_type(&pname, |info| info.classdef.clone()) {
                 Some(ref parentdef) => classdef.borrow_mut().set_parent(parentdef.clone()),
                 None => return Err(Error::new(format!("NameError: undefined parent class {:?} for {:?}", pname, name))),
             },
@@ -320,10 +332,10 @@ impl<V, T> Scope<V, T> where V: Clone, T: Clone {
         };
 
         // Define the class in the local scope
-        self.define_type(name.clone(), Type::Object(name.clone(), types.clone()));
+        self.define_type(name.clone(), Type::Object(name.clone(), types.clone()))?;
         self.set_class_def(name, parent.clone(), classdef.clone());
         // TODO i don't like this type == Class thing, but i don't know how i'll do struct types yet either
-        //self.define(name.clone(), Some(Type::Object(name.clone(), vec!())));
+        //self.define(name.clone(), Some(Type::Object(name.clone(), vec!())))?;
         Ok(classdef)
     }
 
@@ -507,12 +519,12 @@ impl<V, T> Scope<V, T> where V: Clone, T: Clone {
         let name = self.new_typevar_name();
         let ttype = Type::Variable(name.clone(), id.clone());
 
-        self.define_type(name, ttype.clone());
+        self.define_type(name, ttype.clone()).unwrap();
         if self.is_global() {
-            self.define_type(id.to_string(), ttype.clone());
+            self.define_type(id.to_string(), ttype.clone()).unwrap();
         } else {
             let gscope = Scope::global(self.parent.clone().unwrap());
-            gscope.borrow_mut().define_type(id.to_string(), ttype.clone());
+            gscope.borrow_mut().define_type(id.to_string(), ttype.clone()).unwrap();
         }
         debug!("NEW TYPEVAR: {:?} {:?}", self.get_basename(), ttype);
         ttype
@@ -524,8 +536,8 @@ impl<V, T> Scope<V, T> where V: Clone, T: Clone {
             let ttype = Type::Variable(name.clone(), id.clone());
             //let ttype = Type::Variable(String::from("blank"), id.clone());
 
-            gborrow.define_type(name, ttype.clone());
-            gborrow.define_type(id.to_string(), ttype.clone());
+            gborrow.define_type(name, ttype.clone()).unwrap();
+            gborrow.define_type(id.to_string(), ttype.clone()).unwrap();
             debug!("NEW TYPEVAR: {:?}", ttype);
             ttype
         };

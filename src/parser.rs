@@ -166,7 +166,7 @@ pub enum AST {
     Try(Pos, Box<AST>, Vec<(AST, AST)>),
     Match(Pos, Box<AST>, Vec<(AST, AST)>),
     For(Pos, String, Box<AST>, Box<AST>, UniqueID),
-    Declare(Pos, String, Type),
+    Declare(Pos, String, Type, String),
     Function(Pos, Option<String>, Vec<(String, Option<Type>, Option<AST>)>, Option<Type>, Box<AST>, UniqueID),
     New(Pos, (String, Vec<Type>)),
     Class(Pos, (String, Vec<Type>), Option<(String, Vec<Type>)>, Vec<AST>, UniqueID),
@@ -194,7 +194,7 @@ impl AST {
             AST::Try(ref pos, _, _) |
             AST::Match(ref pos, _, _) |
             AST::For(ref pos, _, _, _, _) |
-            AST::Declare(ref pos, _, _) |
+            AST::Declare(ref pos, _, _, _) |
             AST::Function(ref pos, _, _, _, _, _) |
             AST::New(ref pos, _) |
             AST::Class(ref pos, _, _, _, _) |
@@ -440,10 +440,11 @@ named!(declare(Span) -> AST,
     do_parse!(
         pos: position!() >>
         wscom!(tag_word!("decl")) >>
+        a: opt!(delimited!(tag!("\""), is_not!("\""), tag!("\""))) >>
         n: symbol_name >>
         wscom!(tag!(":")) >>
         t: type_description >>
-        (AST::Declare(Pos::new(pos), n, t))
+        (AST::Declare(Pos::new(pos), n, t, if a.is_some() { span_to_string(a.unwrap()) } else { String::from("") }))
     )
 );
 

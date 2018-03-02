@@ -28,8 +28,8 @@ pub fn refine_node(node: AST) -> AST {
             AST::Definition(pos, (name, ttype), Box::new(refine_node(*code)))
         },
 
-        AST::Declare(pos, name, ttype) => {
-            AST::Declare(pos, name, ttype)
+        AST::Declare(pos, name, ttype, abi) => {
+            AST::Declare(pos, name, ttype, abi)
         },
 
         AST::Function(pos, name, args, ret, body, id) => {
@@ -100,11 +100,11 @@ pub fn refine_node(node: AST) -> AST {
                         }
                         AST::Function(pos, name, args, ret, body, id)
                     },
-                    AST::Declare(pos, name, ttype) => {
+                    AST::Declare(pos, name, ttype, abi) => {
                         if name == String::from("new") {
                             has_new = true;
                         }
-                        AST::Declare(pos, name, ttype)
+                        AST::Declare(pos, name, ttype, abi)
                     },
                     _ => node
                 }

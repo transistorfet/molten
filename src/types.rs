@@ -17,38 +17,38 @@ pub enum Type {
 }
 
 impl Type {
-    pub fn get_name(&self) -> String {
+    pub fn get_name(&self) -> Result<String, Error> {
         match *self {
-            Type::Object(ref name, _) => name.clone(),
-            _ => panic!("TypeError: expected a class or concrete type, found {:?}", self),
+            Type::Object(ref name, _) => Ok(name.clone()),
+            _ => Err(Error::new(format!("TypeError: expected a class or concrete type, found {:?}", self))),
         }
     }
 
-    pub fn get_params(&self) -> Vec<Type> {
+    pub fn get_params(&self) -> Result<Vec<Type>, Error> {
         match *self {
-            Type::Object(_, ref params) => params.clone(),
-            _ => panic!("TypeError: expected a class or concrete type, found {:?}", self),
+            Type::Object(_, ref params) => Ok(params.clone()),
+            _ => Err(Error::new(format!("TypeError: expected a class or concrete type, found {:?}", self))),
         }
     }
 
-    pub fn get_argtypes(&self) -> &Vec<Type> {
+    pub fn get_argtypes(&self) -> Result<&Vec<Type>, Error> {
         match self {
-            &Type::Function(ref args, _) => args,
-            _ => panic!("TypeError: expected function type, found {:?}", self),
+            &Type::Function(ref args, _) => Ok(args),
+            _ => Err(Error::new(format!("TypeError: expected function type, found {:?}", self))),
         }
     }
 
-    pub fn get_rettype(&self) -> &Type {
+    pub fn get_rettype(&self) -> Result<&Type, Error> {
         match self {
-            &Type::Function(_, ref ret) => &**ret,
-            _ => panic!("TypeError: expected function type, found {:?}", self),
+            &Type::Function(_, ref ret) => Ok(&**ret),
+            _ => Err(Error::new(format!("TypeError: expected function type, found {:?}", self))),
         }
     }
 
-    pub fn get_varid(&self) -> UniqueID {
+    pub fn get_varid(&self) -> Result<UniqueID, Error> {
         match self {
-            &Type::Variable(_, ref id) => id.clone(),
-            _ => panic!("TypeError: expected variable type, found {:?}", self),
+            &Type::Variable(_, ref id) => Ok(id.clone()),
+            _ => Err(Error::new(format!("TypeError: expected variable type, found {:?}", self))),
         }
     }
 
@@ -73,21 +73,21 @@ impl Type {
         }
     }
 
-    pub fn add_variant<V, T>(self, scope: ScopeRef<V, T>, ntype: Type) -> Type where V: Clone, T: Clone {
+    pub fn add_variant<V, T>(self, scope: ScopeRef<V, T>, ntype: Type) -> Result<Type, Error> where V: Clone, T: Clone {
         let rtype = match self {
             Type::Overload(ref variants) => {
                 for variant in variants {
                     if check_type(scope.clone(), Some(variant.clone()), Some(ntype.clone()), Check::Def, false).is_ok() {
-                        panic!("OverloadError: function definitions overlap; {:?} vs {:?}", variant, ntype);
+                        return Err(Error::new(format!("OverloadError: function definitions overlap; {:?} vs {:?}", variant, ntype)));
                     }
                 }
                 let mut nvariants = variants.clone();
                 nvariants.push(ntype);
                 Type::Overload(nvariants)
             },
-            _ => expect_type(scope.clone(), Some(self), Some(ntype.clone()), Check::Def).unwrap_or_else(|e| panic!("{}", e)),
+            _ => expect_type(scope.clone(), Some(self), Some(ntype.clone()), Check::Def)?,
         };
-        rtype
+        Ok(rtype)
     }
 
     pub fn make_object(nametypes: (String, Vec<Type>)) -> Type {
@@ -133,7 +133,7 @@ impl fmt::Display for Type {
                 let params = if types.len() > 0 { format!("<{}>", types.iter().map(|p| format!("{}", p)).collect::<Vec<String>>().join(", ")) } else { String::from("") };
                 write!(f, "{}{}", name, params)
             },
-            Type::Variable(ref name, ref id) => {
+            Type::Variable(ref name, ref _id) => {
                 write!(f, "'{}", name)
             }
             Type::Function(ref args, ref ret) => {
@@ -187,7 +187,7 @@ pub fn check_type<V, T>(scope: ScopeRef<V, T>, odtype: Option<Type>, octype: Opt
         let dtype = resolve_type(scope.clone(), odtype.unwrap());
         let ctype = resolve_type(scope.clone(), octype.unwrap());
 
-        if let Type::Variable(ref name, ref id) = ctype {
+        if let Type::Variable(_, ref id) = ctype {
             //if update { scope.borrow_mut().update_type(&id.to_string(), dtype.clone()); }
             if update { Type::update_type(scope.clone(), &id.to_string(), dtype.clone()); }
             Ok(dtype)
@@ -241,7 +241,7 @@ fn is_subclass_of<V, T>(scope: ScopeRef<V, T>, adef: (&String, &Vec<Type>), bdef
     loop {
         let (mut class, parent) = scope.borrow().get_class_info(&adef.0).unwrap();
         class = tscope.borrow_mut().map_typevars(&mut names, class);
-        adef.1 = check_type_params(tscope.clone(), &class.get_params(), &adef.1, mode.clone(), true)?;
+        adef.1 = check_type_params(tscope.clone(), &class.get_params()?, &adef.1, mode.clone(), true)?;
 
         if *bdef.0 == adef.0 {
             if bdef.1.len() > 0 || adef.1.len() > 0 {
@@ -325,12 +325,12 @@ pub fn find_variant<V, T>(scope: ScopeRef<V, T>, otype: Type, atypes: Vec<Type>)
                             continue 'outer;
                         }
                     }
-                    return variant.clone();
+                    return Ok(variant.clone());
                 }
             }
             return Err(Error::new(format!("OverloadError: No valid variant found for {:?}\n\t out of {:?}", atypes, variants)));
         },
-        _ => otype.clone(),
+        _ => Ok(otype.clone()),
     }
 }
 

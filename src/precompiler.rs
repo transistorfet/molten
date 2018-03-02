@@ -30,8 +30,8 @@ pub fn precompile_node<V, T>(session: &Session<V, T>, scope: ScopeRef<V, T>, nod
             AST::Definition(pos, (name, Some(resolve_type(scope.clone(), ttype.unwrap()))), Box::new(precompile_node(session, scope.clone(), *code)))
         },
 
-        AST::Declare(pos, name, ttype) => {
-            AST::Declare(pos, name, resolve_type(scope.clone(), ttype))
+        AST::Declare(pos, name, ttype, abi) => {
+            AST::Declare(pos, name, resolve_type(scope.clone(), ttype), abi)
         },
 
         AST::Function(pos, name, mut args, ret, body, id) => {

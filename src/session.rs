@@ -1,7 +1,6 @@
 
 use std::str;
 use std::fmt;
-use std::rc::Rc;
 use std::fs::File;
 use std::path::Path;
 use std::cell::Cell;
@@ -49,7 +48,9 @@ impl<V, T> Session<V, T> where V: Clone, T: Clone {
         self.files.borrow_mut().push((String::from(name), contents));
         let mut code = parser::parse_or_error(name, self.files.borrow().last().unwrap().1.as_bytes());
         code = refinery::refine(code);
-        println!("\n{:?}\n", code);
+        if Options::as_ref().debug {
+            println!("\n{:?}\n", code);
+        }
         code
     }
 
@@ -65,10 +66,13 @@ impl<V, T> Session<V, T> where V: Clone, T: Clone {
     pub fn print_error(&self, err: Error) {
         self.errors.set(self.errors.get() + 1);
         let fborrow = self.files.borrow();
-        let filename = &fborrow[err.pos.filenum as usize].0;
-        //let exerpt = fborrow[err.pos.filenum as usize].1.as_bytes()[err.pos.offset];
-        let exerpt = err.pos.exerpt(fborrow[err.pos.filenum as usize].1.as_bytes());
-        println!("\x1B[1;31m{}:{:?}: {}\n        at {}\x1B[0m", filename, err.pos, err.msg, exerpt)
+        if let Some(ref pos) = err.pos {
+            let filename = &fborrow[pos.filenum as usize].0;
+            let exerpt = pos.exerpt(fborrow[pos.filenum as usize].1.as_bytes());
+            println!("\x1B[1;31m{}:{:?}: {}\n        at {}\x1B[0m", filename, pos, err.msg, exerpt);
+        } else {
+            println!("\x1B[1;31m{}\n\x1B[0m", err.msg);
+        }
     }
 
     pub fn raise_error(&self, pos: &Pos, msg: String) -> Error {
@@ -80,32 +84,34 @@ impl<V, T> Session<V, T> where V: Clone, T: Clone {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Error {
-    pub pos: Pos,
+    pub pos: Option<Pos>,
     pub msg: String,
 }
 
 impl Error {
     pub fn new(msg: String) -> Error {
-        Error { pos: Pos::empty(), msg: msg }
+        Error { pos: None, msg: msg }
     }
 
     pub fn new_pos(pos: &Pos, msg: String) -> Error {
-        Error { pos: pos.clone(), msg: msg }
+        Error { pos: Some(pos.clone()), msg: msg }
     }
 
     pub fn add_pos(mut self, pos: &Pos) -> Error {
-        self.pos = pos.clone();
+        self.pos = Some(pos.clone());
         self
     }
 
+    /*
     pub fn pos<R>(res: Result<R, Error>, pos: &Pos) -> Result<R, Error> {
         res.map_err(|mut err| { err.pos = pos.clone(); err })
     }
+    */
 }
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "\x1B[1;31m{:?}: {}\x1B[0m", self.pos, self.msg)
+        write!(f, "\x1B[1;31m{:?}: {}\x1B[0m", self.pos.as_ref().unwrap_or(&Pos::empty()), self.msg)
     }
 }
 

@@ -31,20 +31,20 @@ pub fn bind_names_node<V, T>(session: &Session<V, T>, scope: ScopeRef<V, T>, nod
 
 fn bind_names_node_or_error<V, T>(session: &Session<V, T>, scope: ScopeRef<V, T>, node: &mut AST) -> Result<(), Error> where V: Clone + Debug, T: Clone + Debug {
     match *node {
-        AST::Function(ref pos, ref name, ref mut args, ref mut ret, ref mut body, ref id) => {
+        AST::Function(_, ref name, ref mut args, ref mut ret, ref mut body, ref id) => {
             let fscope = session.map.add(id.clone(), Some(scope.clone()));
             fscope.borrow_mut().set_basename(name.as_ref().map_or(format!("anon{}", id), |name| name.clone()));
 
             if let Some(ref name) = *name {
                 let dscope = Scope::target(scope.clone());
-                dscope.borrow_mut().define_func(name.clone(), None, false);
+                dscope.borrow_mut().define_func(name.clone(), None, false)?;
             }
 
             for ref mut arg in &mut args.iter_mut() {
-                declare_typevars(fscope.clone(), arg.1.as_mut(), false);
-                fscope.borrow_mut().define(arg.0.clone(), arg.1.clone());
+                declare_typevars(fscope.clone(), arg.1.as_mut(), false)?;
+                fscope.borrow_mut().define(arg.0.clone(), arg.1.clone())?;
             }
-            declare_typevars(fscope.clone(), ret.as_mut(), false);
+            declare_typevars(fscope.clone(), ret.as_mut(), false)?;
 
             bind_names_node(session, fscope.clone(), body)
         },
@@ -54,26 +54,27 @@ fn bind_names_node_or_error<V, T>(session: &Session<V, T>, scope: ScopeRef<V, T>
             bind_names_vec(session, scope.clone(), args);
         },
 
-        AST::Definition(ref pos, (ref name, ref mut ttype), ref mut code) => {
-            declare_typevars(scope.clone(), ttype.as_mut(), false);
+        AST::Definition(_, (ref name, ref mut ttype), ref mut code) => {
+            declare_typevars(scope.clone(), ttype.as_mut(), false)?;
             let dscope = Scope::target(scope.clone());
-            dscope.borrow_mut().define(name.clone(), ttype.clone());
+            dscope.borrow_mut().define(name.clone(), ttype.clone())?;
             bind_names_node(session, scope.clone(), code);
         },
 
-        AST::Declare(ref pos, ref name, ref mut ttype) => {
-            declare_typevars(scope.clone(), Some(ttype), false);
+        AST::Declare(_, ref name, ref mut ttype, _) => {
+            // TODO maybe check abi to see if it's valid?
+            declare_typevars(scope.clone(), Some(ttype), false)?;
             let dscope = Scope::target(scope.clone());
-            dscope.borrow_mut().define_func(name.clone(), Some(ttype.clone()), true);
+            dscope.borrow_mut().define_func(name.clone(), Some(ttype.clone()), true)?;
             if let Some(ref mname) = scope::unmangle_name(name) {
-                dscope.borrow_mut().define_func(mname.clone(), None, true);
+                dscope.borrow_mut().define_func(mname.clone(), None, true)?;
                 let mut stype = dscope.borrow().get_variable_type(mname).unwrap_or(Type::Overload(vec!()));
-                stype = stype.add_variant(scope.clone(), ttype.clone());
+                stype = stype.add_variant(scope.clone(), ttype.clone())?;
                 dscope.borrow_mut().set_variable_type(mname, stype);
             }
         },
 
-        AST::Identifier(ref pos, ref name) => {
+        AST::Identifier(_, ref name) => {
             if !scope.borrow().contains(name) {
                 return Err(Error::new(format!("NameError: undefined identifier {:?}", name)));
             }
@@ -110,7 +111,7 @@ fn bind_names_node_or_error<V, T>(session: &Session<V, T>, scope: ScopeRef<V, T>
 
         AST::For(_, ref name, ref mut cond, ref mut body, ref id) => {
             let lscope = session.map.add(id.clone(), Some(scope.clone()));
-            lscope.borrow_mut().define(name.clone(), None);
+            lscope.borrow_mut().define(name.clone(), None)?;
             bind_names_node(session, lscope.clone(), cond);
             bind_names_node(session, lscope.clone(), body);
         },
@@ -124,14 +125,14 @@ fn bind_names_node_or_error<V, T>(session: &Session<V, T>, scope: ScopeRef<V, T>
         },
 
 
-        AST::New(ref pos, (ref name, ref mut types)) => {
-            types.iter_mut().map(|ref mut ttype| declare_typevars(scope.clone(), Some(ttype), false)).count();
+        AST::New(_, (ref name, ref mut types)) => {
+            types.iter_mut().map(|ref mut ttype| declare_typevars(scope.clone(), Some(ttype), false).unwrap()).count();
             if scope.borrow().find_type(name).is_none() {
                 return Err(Error::new(format!("NameError: undefined identifier {:?}", name)));
             }
         },
 
-        AST::Class(ref pos, ref mut pair, ref mut parent, ref mut body, ref id) => {
+        AST::Class(_, ref mut pair, ref mut parent, ref mut body, ref id) => {
             let &mut (ref name, ref mut types) = pair;
 
             // Create a temporary invisible scope to name check the class body
@@ -140,18 +141,18 @@ fn bind_names_node_or_error<V, T>(session: &Session<V, T>, scope: ScopeRef<V, T>
             tscope.borrow_mut().set_basename(name.clone());
 
             // Define Self and Super, and check for typevars in the type params
-            types.iter_mut().map(|ref mut ttype| declare_typevars(tscope.clone(), Some(ttype), true)).count();
-            tscope.borrow_mut().define_type(String::from("Self"), Type::Object(name.clone(), types.clone()));
+            types.iter_mut().map(|ref mut ttype| declare_typevars(tscope.clone(), Some(ttype), true).unwrap()).count();
+            tscope.borrow_mut().define_type(String::from("Self"), Type::Object(name.clone(), types.clone()))?;
             if let &mut Some((ref pname, ref mut ptypes)) = parent {
-                ptypes.iter_mut().map(|ref mut ttype| declare_typevars(tscope.clone(), Some(ttype), false)).count();
-                tscope.borrow_mut().define_type(String::from("Super"), Type::Object(pname.clone(), ptypes.clone()));
+                ptypes.iter_mut().map(|ref mut ttype| declare_typevars(tscope.clone(), Some(ttype), false).unwrap()).count();
+                tscope.borrow_mut().define_type(String::from("Super"), Type::Object(pname.clone(), ptypes.clone()))?;
             }
 
             let classdef = scope.borrow_mut().create_class_def(&(name.clone(), types.clone()), parent.clone())?;
             bind_names_vec(session, tscope.clone(), body);
         },
 
-        AST::Resolver(ref pos, ref mut left, _) => {
+        AST::Resolver(_, ref mut left, _) => {
             // TODO should this always work on a type reference, or should classes be added as values as well as types?
             //bind_names_node(session, scope, left);
             match **left {
@@ -168,7 +169,7 @@ fn bind_names_node_or_error<V, T>(session: &Session<V, T>, scope: ScopeRef<V, T>
             bind_names_node(session, scope, left);
         },
 
-        AST::Assignment(ref pos, ref mut left, ref mut right) => {
+        AST::Assignment(_, ref mut left, ref mut right) => {
             match **left {
                 AST::Accessor(_, _, _, _) | AST::Index(_, _, _, _) => { },
                 _ => return Err(Error::new(format!("SyntaxError: assignment to something other than a list or class element: {:?}", left))),
@@ -191,19 +192,20 @@ fn bind_names_node_or_error<V, T>(session: &Session<V, T>, scope: ScopeRef<V, T>
     Ok(())
 }
 
-pub fn declare_typevars<V, T>(scope: ScopeRef<V, T>, ttype: Option<&mut Type>, always_new: bool) where V: Clone, T: Clone {
+#[must_use]
+pub fn declare_typevars<V, T>(scope: ScopeRef<V, T>, ttype: Option<&mut Type>, always_new: bool) -> Result<(), Error> where V: Clone, T: Clone {
     match ttype {
         Some(ttype) => match ttype {
             &mut Type::Object(_, ref mut types) => {
                 for ttype in types.iter_mut() {
-                    declare_typevars(scope.clone(), Some(ttype), always_new)
+                    declare_typevars(scope.clone(), Some(ttype), always_new)?;
                 }
             },
             &mut Type::Function(ref mut args, ref mut ret) => {
                 for atype in args.iter_mut() {
-                    declare_typevars(scope.clone(), Some(atype), always_new)
+                    declare_typevars(scope.clone(), Some(atype), always_new)?;
                 }
-                declare_typevars(scope.clone(), Some(ret.as_mut()), always_new);
+                declare_typevars(scope.clone(), Some(ret.as_mut()), always_new)?;
             },
             &mut Type::Variable(ref name, ref mut id) => {
                 let vtype = scope.borrow().find_type(name);
@@ -212,9 +214,9 @@ pub fn declare_typevars<V, T>(scope: ScopeRef<V, T>, ttype: Option<&mut Type>, a
                     _ => {
                         *id = UniqueID::generate();
                         let gscope = Scope::global(scope.clone());
-                        gscope.borrow_mut().define_type(id.to_string(), Type::Variable(name.clone(), id.clone()));
+                        gscope.borrow_mut().define_type(id.to_string(), Type::Variable(name.clone(), id.clone()))?;
                         if !scope.borrow().contains_type_local(name) {
-                            scope.borrow_mut().define_type(name.clone(), Type::Variable(name.clone(), id.clone()));
+                            scope.borrow_mut().define_type(name.clone(), Type::Variable(name.clone(), id.clone()))?;
                         }
                     }
                 }
@@ -223,5 +225,6 @@ pub fn declare_typevars<V, T>(scope: ScopeRef<V, T>, ttype: Option<&mut Type>, a
         },
         _ => { },
     }
+    Ok(())
 }
 

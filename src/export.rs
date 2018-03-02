@@ -4,6 +4,8 @@ use std::io::prelude::*;
 
 use parser::AST;
 use types::Type;
+use utils::UniqueID;
+use config::Options;
 use scope::{ ScopeRef, ScopeMapRef };
 
 
@@ -11,7 +13,9 @@ pub fn write_exports<V, T>(map: ScopeMapRef<V, T>, scope: ScopeRef<V, T>, filena
     let index_text = build_index(map, scope, code);
     let mut index_file = File::create(filename).expect("Error creating index file");
     index_file.write_all(index_text.as_bytes()).unwrap();
-    println!("{}", index_text);
+    if Options::as_ref().debug {
+        println!("{}", index_text);
+    }
 }
 
 pub fn build_index<V, T>(map: ScopeMapRef<V, T>, scope: ScopeRef<V, T>, code: &Vec<AST>) -> String where V: Clone, T: Clone {
@@ -81,9 +85,9 @@ pub fn unparse_type<V, T>(scope: ScopeRef<V, T>, ttype: Type) -> String where V:
         // TODO should you possibly create a non-conflicting name if required here
         Type::Variable(mut name, id) => {
             let var = scope.borrow().find_type(&name);
-            if var.is_none() || var.clone().unwrap().is_variable() && var.unwrap().get_varid() != id {
+            if var.is_none() || var.unwrap().get_varid().unwrap_or(UniqueID(0)) != id {
                 name = scope.borrow_mut().new_typevar_name();
-                scope.borrow_mut().define_type(name.clone(), Type::Variable(name.clone(), id.clone()));
+                scope.borrow_mut().define_type(name.clone(), Type::Variable(name.clone(), id.clone())).unwrap();
             }
             // TODO i'd really like to use the name...
             //format!("'{}", name)

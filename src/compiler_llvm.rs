@@ -109,9 +109,10 @@ unsafe fn compile_module(builtins: &Vec<Builtin>, session: &Session<Value, TypeV
 
     // Output to a file, and also a string for debugging
     LLVMPrintModuleToFile(module, label(format!("{}.ll", module_name).as_str()), ptr::null_mut());
-    let compiled = CString::from_raw(LLVMPrintModuleToString(module));
 
-    println!("{}\n", compiled.into_string().unwrap());
+    if Options::as_ref().debug {
+        println!("{}\n", CString::from_raw(LLVMPrintModuleToString(module)).into_string().unwrap());
+    }
 
     export::write_exports(data.map.clone(), data.map.get_global(), format!("{}.dec", module_name).as_str(), code);
 
@@ -179,11 +180,13 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
                 if function.is_null() {
                     //function = compile_node(data, func, unwind, scope.clone(), fexpr);
                     function = match **fexpr {
-                        AST::Accessor(ref pos, _, ref name, ref stype) => compile_node(data, func, unwind, scope.clone(), &AST::Resolver(pos.clone(), Box::new(AST::Identifier(pos.clone(), stype.clone().unwrap().get_name())), name.clone())),
+                        AST::Accessor(ref pos, _, ref name, ref stype) => {
+                            compile_node(data, func, unwind, scope.clone(), &AST::Resolver(pos.clone(), Box::new(AST::Identifier(pos.clone(), stype.clone().unwrap().get_name().unwrap())), name.clone()))
+                        },
                         _ => compile_node(data, func, unwind, scope.clone(), fexpr)
                     };
                 }
-                LLVMDumpValue(function);
+                //LLVMDumpValue(function);
 
                 // Cast values to the function's declared type; this is a hack for typevar/generic arguments
                 let mut lftype = LLVMTypeOf(function);
@@ -528,7 +531,7 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
         AST::Accessor(_, ref left, ref right, ref ltype) => {
             let object = compile_node(data, func, unwind, scope.clone(), left);
 
-            let name = ltype.clone().unwrap().get_name();
+            let name = ltype.clone().unwrap().get_name().unwrap();
             let classdef = scope.borrow().get_class_def(&name);
             let sym = classdef.borrow().search(right, |sym| Some(sym.clone())).unwrap();
             debug!("*ACCESS: {:?} {:?}", right, classdef);
@@ -546,7 +549,7 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
             let value = compile_node(data, func, unwind, scope.clone(), right);
             match **left {
                 AST::Accessor(_, ref left, ref right, ref ltype) => {
-                    let name = ltype.clone().unwrap().get_name();
+                    let name = ltype.clone().unwrap().get_name().unwrap();
                     let object = compile_node(data, func, unwind, scope.clone(), left);
                     let pointer = build_struct_access(data, scope.clone(), object, &name, right);
                     LLVMBuildStore(data.builder, value, pointer)
@@ -566,7 +569,7 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
             ptr::null_mut()
         },
 
-        AST::Declare(_, _, _) => { zero_int(data) },
+        AST::Declare(_, _, _, _) => { zero_int(data) },
 
         AST::Type(_, _, _) => panic!("NotImplementedError: not yet supported, {:?}", node),
 
@@ -630,7 +633,7 @@ unsafe fn collect_functions_node<'a>(data: &mut LLVM<'a>, scope: ScopeRef<Value,
             }
         },
 
-        AST::Declare(_, ref name, ref ttype) => {
+        AST::Declare(_, ref name, ref ttype, _) => {
             if let &Type::Function(_, _) = ttype {
                 let fname = scope.borrow().get_full_name(&Some(name.clone()), UniqueID(0));
                 let function = LLVMAddFunction(data.module, label(fname.as_str()), get_type(data, scope.clone(), ttype.clone(), false));

@@ -1,36 +1,34 @@
 
+* move ast to its own file
 * make sure to redo the escaped string parsing
+* "match" only works with integers... maybe call ==, but it would have to mangle correctly
+* add an external specifier to decls
 
+* issue with self and super type defs; they don't contain the type info; maybe add an aliasing type?
 * there is one last issue with typevar names, such that building the index/decls uses either overlapping names when it shouldn't, or now using different names when it shouldn't
 * there's still a problem with typevars not resolving fully, where a function that should return a concrete returns a free typevar....
-
 * either add in the initialization of class variables, possibly limited to constant expressions only, or else raise an error if an initializer is provided
-
-* "match" only works with integers... maybe call ==, but it would have to mangle correctly
-* issue with self and super type defs; they don't contain the type info; maybe add an aliasing type?
 * fix the issues where you need nil to make it work.... i think parser parsing ";" into noop/nil might work, if i can get the parser working
 
-* should you change Real to Float?  also should you change them to lower case names, which is in line with sml, ocmal, f#
+
 * if you had a tuple type, you could use a typevar to represent a tuple of the arguments to a function: Type::Function(Type::Variable(..), Type::Variable(..)) or 'a -> 'b where 'a = ('c, 'd, 'e)
 * add an iterator type that gets used in for loops; might need vtables for that
 
 
+* fill in string and list type functions, and finish hashmap (rename to dict?)
+* make many tests
 
-* fill in string and list type functions
-* add better support for generics; right now it just forces everything to/from a pointer type
-
-* add compiler directives?
 * get llvm closures working
 * add vtables for classes
 * implement exceptions
 * implement garbage collection
 * implement type definition ast element (enum type?)
+* add compiler directives?
+* add patterns and matching of patterns
+* better support for generics; right now it just forces everything to/from a pointer type
 
 
 
-
-* should variables be writable... this is more about breaking with functional traditions
-* add a const expression
 
 * if even the global/module scope was a closure, then you could make a module be equivallent to an implicit function that is called when the module is imported, which could have the name of the
   module; so a module called main would become the main() function
@@ -42,19 +40,16 @@
 * what if you generalize overloaded types, such that they're checked in check_type, and options are eliminated, or resolved to one type over the course of checking
 
 
-* should you add a return statement?  It's not functional, but it's practial
-* should you add break/continue statements for loops
+* should you change Real to Float?  also should you change them to lower case names, which is in line with sml, ocmal, f#
 * should you fix scope resolution to also work on objects, so that you can have static methods from the object without explicitly referencing its type
 * should exports also list all the modules that the file imports, so that class definitions in other imports can be found, if needed for arguments
+* should variables be writable... maybe only with compiler directive, or only without one; if so, add a const expression
+* should you add a return statement?  It's not functional, but it's practial
+* should you add break/continue statements for loops
 * should you require an override keyword when masking definitions in lower scopes? like class definitions
 * should you allow keyword arguments in invoke; foo(a=10, b=20)
 * should you allow arguments with a default value to be omitted from a function call?, that would require a bunch of changes to typechecking
 
-
-
-TYPE CHECKING:
-
-* remove unused typechecking vars somehow...
 
 
 PARSER:

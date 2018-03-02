@@ -92,13 +92,13 @@ pub fn register_builtins_node<'a, V, T>(scope: ScopeRef<V, T>, tscope: ScopeRef<
     match *node {
         Builtin::Type(ref name, ref ttype) => {
             let mut ttype = ttype.clone();
-            declare_typevars(tscope.clone(), Some(&mut ttype), true);
-            scope.borrow_mut().define_type(String::from(*name), ttype.clone());
+            declare_typevars(tscope.clone(), Some(&mut ttype), true).unwrap();
+            scope.borrow_mut().define_type(String::from(*name), ttype.clone()).unwrap();
         },
         Builtin::Func(ref name, ref ftype, _) => {
             let mut ftype = parse_type(ftype);
-            declare_typevars(tscope.clone(), ftype.as_mut(), false);
-            Scope::define_func_variant(scope.clone(), String::from(*name), tscope.clone(), ftype.clone().unwrap());
+            declare_typevars(tscope.clone(), ftype.as_mut(), false).unwrap();
+            Scope::define_func_variant(scope.clone(), String::from(*name), tscope.clone(), ftype.clone().unwrap()).unwrap();
         },
         Builtin::Class(ref name, _, ref entries) => {
             let name = String::from(*name);
@@ -139,8 +139,8 @@ pub unsafe fn declare_builtins_node<'a>(data: &mut LLVM<'a>, objtype: LLVMTypeRe
                 },
                 Func::Runtime(func) => {
                     if scope.borrow().get_variable_type(&name).unwrap().is_overloaded() {
-                        name = scope::mangle_name(&name, ftype.get_argtypes());
-                        scope.borrow_mut().define(name.clone(), Some(ftype));
+                        name = scope::mangle_name(&name, ftype.get_argtypes().unwrap());
+                        scope.borrow_mut().define(name.clone(), Some(ftype)).unwrap();
                     }
                     let fname = scope.borrow().get_full_name(&Some(name.clone()), UniqueID(0));
                     scope.borrow_mut().assign(&name, func(data, fname.as_str(), objtype));
