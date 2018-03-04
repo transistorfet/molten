@@ -28,10 +28,24 @@ fn ==(str1: String, str2: String) -> Bool {
         false
 }
 
+fn !=(str1: String, str2: String) -> Bool {
+    if strcmp(str1, str2) != 0 then
+        true
+    else
+        false
+}
+
 fn +(s1: String, s2: String) -> String {
     s1.push(s2)
 }
 
+
+fn str(num: Bool) -> String {
+    if num then
+        "true"
+    else
+        "false"
+}
 
 fn str(num: Int) -> String {
     let buffer: String = malloc(22)

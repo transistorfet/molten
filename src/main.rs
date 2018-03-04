@@ -36,14 +36,14 @@ fn main() {
     let matches =
         App::new("molten")
             .version("0.1")
-            .about("A toy ML compiler")
+            .about("a compiler for the molten language")
             .arg(Arg::with_name("INPUT")
                 .help("Sets the input file to use")
                 .required(true)
                 .index(1))
             .arg(Arg::with_name("compile")
                 .short("c")
-                .help("Compiles to C rather than executing"))
+                .help("Compiles rather than executing"))
             .arg(Arg::with_name("library")
                 .short("l")
                 .help("Compiles as a library, without a main function"))
@@ -52,7 +52,6 @@ fn main() {
                 .help("Enables debug logging"))
             .get_matches();
 
-    //let mut options = Options::new();
     Options::init();
     Options::as_ref().debug = matches.occurrences_of("debug") > 0;
     Options::as_ref().is_library = matches.occurrences_of("library") > 0;

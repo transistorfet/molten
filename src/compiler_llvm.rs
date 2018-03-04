@@ -336,9 +336,9 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
             let cond_zero = LLVMConstInt(LLVMTypeOf(cond_value), 0, 0);
             let is_nonzero = LLVMBuildICmp(data.builder, llvm::LLVMIntPredicate::LLVMIntNE, cond_value, cond_zero, label("is_nonzero"));
 
-            let texpr_block = LLVMAppendBasicBlockInContext(data.context, func, label("if"));
-            let fexpr_block = LLVMAppendBasicBlockInContext(data.context, func, label("if"));
-            let merge_block = LLVMAppendBasicBlockInContext(data.context, func, label("if"));
+            let texpr_block = LLVMAppendBasicBlockInContext(data.context, func, label("ifthen"));
+            let fexpr_block = LLVMAppendBasicBlockInContext(data.context, func, label("ifelse"));
+            let merge_block = LLVMAppendBasicBlockInContext(data.context, func, label("ifend"));
 
             LLVMBuildCondBr(data.builder, is_nonzero, texpr_block, fexpr_block);
 
@@ -346,12 +346,12 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
             LLVMPositionBuilderAtEnd(data.builder, texpr_block);
             let texpr_value = compile_node(data, func, unwind, scope.clone(), texpr);
             LLVMBuildBr(data.builder, merge_block);
-            //let texpr_block = LLVMGetInsertBlock(data.builder);
+            let texpr_block = LLVMGetInsertBlock(data.builder);
 
             LLVMPositionBuilderAtEnd(data.builder, fexpr_block);
             let fexpr_value = compile_node(data, func, unwind, scope.clone(), fexpr);
             LLVMBuildBr(data.builder, merge_block);
-            //let fexpr_block = LLVMGetInsertBlock(data.builder);
+            let fexpr_block = LLVMGetInsertBlock(data.builder);
 
             LLVMPositionBuilderAtEnd(data.builder, merge_block);
             let phi = LLVMBuildPhi(data.builder, LLVMTypeOf(texpr_value), label("iftmp"));

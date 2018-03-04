@@ -32,6 +32,10 @@ def main():
     cmd.add_argument("directory", nargs='?', default=".")
     cmd.set_defaults(command=command_clean)
 
+    cmd = subparsers.add_parser("cleanall", help="delete all generated files including from all subdirectories")
+    cmd.add_argument("directory")
+    cmd.set_defaults(command=command_cleanall)
+
     args = parser.parse_args()
     args.command(args)
 
@@ -47,6 +51,14 @@ def command_run(args):
 
 def command_clean(args):
     os.system("cd " + args.directory + " && " + RM + " *.ll *.dec *.bc")
+
+def command_cleanall(args):
+    for (basedir, dirnames, filenames) in os.walk(args.directory):
+        for filename in filenames:
+            if filename.endswith(".bc") or filename.endswith(".ll") or filename.endswith(".dec"):
+                path = os.path.join(basedir, filename)
+                print("Deleting " + path)
+                os.unlink(path)
 
 
 

@@ -22,7 +22,6 @@ pub struct Session<V, T> {
     pub errors: Cell<u32>,
 }
 
-//pub type SessionRef<V, T> = Rc<RefCell<Session<V, T>>>;
 
 impl<V, T> Session<V, T> where V: Clone, T: Clone {
     pub fn new() -> Session<V, T> {

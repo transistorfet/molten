@@ -1,5 +1,4 @@
 
-* move ast to its own file
 * make sure to redo the escaped string parsing
 * "match" only works with integers... maybe call ==, but it would have to mangle correctly
 * add an external specifier to decls
