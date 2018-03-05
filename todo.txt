@@ -1,4 +1,10 @@
 
+* make a trait to wrap LLVMValueRef such that you can tag metainfo along with the value itself, returned by the recurvise function in compiler_llvm, including the abi
+  info, extern, any other additional properties
+* do you need to make special types for abi function calls, distict from normal functions, such that you can't assign a c function pointer to a molten function variable, since they
+  will be called in different ways...  I suppose this can't be too internalized, since programmers will need to figure out there's a problem from the error messages...
+* there's an issue with calling a function that's a struct member of a class, because method calls are converted into Resolves, which doesn't work because you need the object to get the struct member
+
 * make sure to redo the escaped string parsing
 * "match" only works with integers... maybe call ==, but it would have to mangle correctly
 * add an external specifier to decls
@@ -13,18 +19,20 @@
 * if you had a tuple type, you could use a typevar to represent a tuple of the arguments to a function: Type::Function(Type::Variable(..), Type::Variable(..)) or 'a -> 'b where 'a = ('c, 'd, 'e)
 * add an iterator type that gets used in for loops; might need vtables for that
 
+* put intermediate files somewhere else, at least as controlled by the molten script, so as not to clutter source directories
 
-* fill in string and list type functions, and finish hashmap (rename to dict?)
-* make many tests
 
 * get llvm closures working
 * add vtables for classes
 * implement exceptions
 * implement garbage collection
+* add patterns and matching of patterns
 * implement type definition ast element (enum type?)
 * add compiler directives?
-* add patterns and matching of patterns
 * better support for generics; right now it just forces everything to/from a pointer type
+
+* fill in string and list type functions, and finish hashmap (rename to dict?)
+* make many tests
 
 
 
@@ -43,6 +51,7 @@
 * should you fix scope resolution to also work on objects, so that you can have static methods from the object without explicitly referencing its type
 * should exports also list all the modules that the file imports, so that class definitions in other imports can be found, if needed for arguments
 * should variables be writable... maybe only with compiler directive, or only without one; if so, add a const expression
+* should you add access modifiers to classes, and maybe functions; public, private, protected
 * should you add a return statement?  It's not functional, but it's practial
 * should you add break/continue statements for loops
 * should you require an override keyword when masking definitions in lower scopes? like class definitions

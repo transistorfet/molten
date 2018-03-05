@@ -1,0 +1,14 @@
+
+//! 1
+//! 1.200000
+
+import lib.libcore
+
+fn f(x: Int) {
+    println(str(x))
+}
+f(1)
+
+fn g(x: Real) => println(str(x))
+g(1.2)
+

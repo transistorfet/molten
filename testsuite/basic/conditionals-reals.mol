@@ -1,0 +1,17 @@
+
+//! true
+//! false
+//! false
+//! true
+//! false
+
+import lib.libcore
+
+let b = 194.0124
+println(str(b >= 194.0))
+println(str(b >= 195.0))
+println(str(b <= 194.0))
+println(str(b <= 195.0))
+println(str(b == 195.0))
+
+

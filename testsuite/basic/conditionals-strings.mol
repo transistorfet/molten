@@ -1,0 +1,11 @@
+
+//! true
+//! false
+
+import lib.libcore
+
+let c = "String"
+println(str(c == "String"))
+println(str(c != "String"))
+
+

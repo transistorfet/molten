@@ -1,0 +1,12 @@
+
+//! 1
+
+//!dec decl f : (Int) -> Nil
+
+import lib.libcore
+
+fn f(x) {
+    println(str(x))
+}
+f(1)
+

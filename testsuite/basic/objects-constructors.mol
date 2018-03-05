@@ -1,0 +1,54 @@
+ 
+//! 235
+//! 236
+//! 470
+//! 242
+
+import lib.libcore
+
+class Object {
+    let a: Int
+
+    fn new(self, a) {
+        self.a = a
+    }
+
+    fn test(self, x) {
+        self.a = x
+    }
+}
+
+class Child1 extends Object {
+    fn new(self, a) {
+        self.a = a + 1
+    }
+
+    fn new(self, a, b) {
+        self.a = a * b
+    }
+
+    fn test(self, x) {
+        println(str(self.a + x))
+    }
+}
+
+class Child2 extends Object {
+    fn new(self, a) {
+        self.a = a + 7
+    }
+
+    fn test(self, x) {
+        println(str(self.a * x))
+    }
+}
+
+let obj0 = new Object(235)
+let obj1 = new Child1(235)
+let obj2 = new Child1(235, 2)
+let obj3 = new Child2(235)
+
+println(str(obj0.a))
+println(str(obj1.a))
+println(str(obj2.a))
+println(str(obj3.a))
+

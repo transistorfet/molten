@@ -1,0 +1,36 @@
+ 
+//! 235
+//! 270
+//! 8312
+
+import lib.libcore
+
+class Object {
+    let a: Int
+
+    fn test(self, x) {
+        self.a = x
+    }
+}
+
+class Child extends Object {
+    fn test2(self, x) {
+        println(str(self.a + x))
+    }
+}
+
+class GrandChild extends Child {
+    fn test3(self, x, b) {
+        println(str(self.a * x + b))
+    }
+}
+
+let obj = new GrandChild()
+
+obj.test(235)
+println(str(obj.a))
+
+obj.test2(35)
+
+obj.test3(35, 87)
+

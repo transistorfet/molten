@@ -1,0 +1,19 @@
+ 
+class Test {
+    fn method1(self) {
+        self.method2(3)
+    }
+
+    fn method2(self, x) {
+        x + 1
+    }
+}
+
+//fn func1() {
+//    func2(3)
+//}
+
+//fn func2(x) {
+//    x + 1
+//}
+

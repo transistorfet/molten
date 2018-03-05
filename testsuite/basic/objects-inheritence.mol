@@ -1,0 +1,27 @@
+ 
+//! 235
+//! 270
+
+import lib.libcore
+
+class Object {
+    let a: Int
+
+    fn test(self, x) {
+        self.a = x
+    }
+}
+
+class Child extends Object {
+    fn test2(self, x) {
+        println(str(self.a + x))
+    }
+}
+
+let obj = new Child()
+
+obj.test(235)
+println(str(obj.a))
+
+obj.test2(35)
+

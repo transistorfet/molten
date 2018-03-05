@@ -1,0 +1,18 @@
+ 
+//! 235
+
+import lib.libcore
+
+class Object {
+    let a: Int
+
+    fn test(self, x) {
+        self.a = x
+    }
+}
+
+let obj = new Object()
+obj.test(235)
+
+println(str(obj.a))
+

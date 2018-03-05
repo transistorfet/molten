@@ -1,0 +1,18 @@
+ 
+
+class Test {
+    let f: (Test) -> Int
+
+    fn new(self) {
+        self.f = Test::test
+    }
+
+    fn test(self) {
+        println("Works")
+        5
+    }
+}
+
+let t = new Test()
+t.f()
+

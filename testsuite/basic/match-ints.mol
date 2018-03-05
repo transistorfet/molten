@@ -1,0 +1,19 @@
+
+//! One
+//! Not One
+
+
+import lib.libcore
+
+let a = 1
+
+match a {
+    1 => { println("One") }
+    _ => { println("Not One") }
+}
+
+match a + 1 {
+    1 => { println("One") }
+    _ => { println("Not One") }
+}
+

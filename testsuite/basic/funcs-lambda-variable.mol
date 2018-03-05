@@ -1,0 +1,11 @@
+
+//! 1
+
+import lib.libcore
+
+let f = fn x: Int {
+    println(str(x))
+}
+f(1)
+
+

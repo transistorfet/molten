@@ -1,0 +1,34 @@
+
+//! 18
+//! Start End
+
+import lib.libcore
+
+class Object {
+    fn make() {
+        new Object()
+    }
+
+    fn multiply(x, y) {
+        x * y
+    }
+}
+
+class Thing extends Object {
+    let s: String
+
+    fn new(self) {
+        self.s = "Start"
+    }
+
+    fn test(self) {
+        println(self.s + " End")
+    }
+}
+
+let obj = Object::make()
+println(str(Object::multiply(2, 9)))
+
+let thing = new Thing()
+thing.test()
+

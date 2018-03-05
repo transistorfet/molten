@@ -1,0 +1,10 @@
+
+
+let test1: Bool = true
+let test2: Int = 1234
+let test3: Real = 1234.5678
+let test4: String = "Hey"
+
+let test5: (Int) -> Int = fn (x) { x + 5 }
+let test6: (Int) -> Int = fn (x: Int) -> Int { x + 5 }
+

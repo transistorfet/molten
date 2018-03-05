@@ -1,0 +1,5 @@
+
+//!should_fail
+
+let test: (Int) -> Int = fn (x) { x + 5.5 }
+

@@ -1,0 +1,25 @@
+
+//! 12
+//! A String
+
+
+import lib.libcore
+
+let a = 12
+let c = "String"
+
+
+if a == 12 then
+    println(str(a))
+else
+    println("Not " + str(a))
+
+
+if c == "SuperString" then
+    println("Super")
+else if c == "String" then
+    println("A String")
+else
+    println("Not a string")
+
+

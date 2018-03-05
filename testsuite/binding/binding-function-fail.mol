@@ -1,0 +1,12 @@
+
+//!should_fail
+
+fn test() {
+    nil
+}
+
+fn test() {
+    nil
+}
+
+

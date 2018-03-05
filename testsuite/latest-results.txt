@@ -1,0 +1,28 @@
+Mon Mar  5 15:09:05 PST 2018
+basic/conditionals-bool.mol.....................................FAIL
+basic/conditionals-ints.mol.....................................FAIL
+basic/conditionals-reals.mol....................................FAIL
+basic/conditionals-strings.mol..................................FAIL
+basic/funcs-lambda-direct.mol...................................FAIL
+basic/funcs-lambda-variable.mol.................................FAIL
+basic/funcs-named.mol...........................................FAIL
+basic/if-exprs.mol..............................................FAIL
+basic/invoke-before-define.mol..................................FAIL
+basic/match-ints.mol............................................FAIL
+basic/match-strings.mol.........................................FAIL
+basic/objects-constructors.mol..................................FAIL
+basic/objects-func-member.mol...................................FAIL
+basic/objects-inheritence-third.mol.............................FAIL
+basic/objects-inheritence-vtable.mol............................FAIL
+basic/objects-inheritence.mol...................................FAIL
+basic/objects-interface.mol.....................................FAIL
+basic/objects-simple.mol........................................FAIL
+basic/recursion.mol.............................................FAIL
+typecheck/basic.mol.............................................success
+typecheck/definition-fail.mol...................................success
+typecheck/infer-arg-as-typevar.mol..............................FAIL
+typecheck/infer-forward-method.mol..............................FAIL
+binding/binding-definition-fail.mol.............................success
+binding/binding-function-fail.mol...............................success
+binding/binding-method-fail.mol.................................success
+5 tests passed, 21 tests failed, 26 total

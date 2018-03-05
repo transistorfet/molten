@@ -1,0 +1,26 @@
+
+//! true
+//! false
+//! true
+//! true
+//! true
+//! true
+//! false
+//! false
+
+
+import lib.libcore
+
+let a = 12
+println(str(a == 12))
+println(str(a != 12))
+println(str(a >= 12))
+println(str(a <= 12))
+println(str(a >= 11))
+println(str(a <= 13))
+println(str(a <= 11))
+println(str(a >= 13))
+
+
+
+
