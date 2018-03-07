@@ -41,6 +41,8 @@ impl fmt::Debug for Value {
 pub struct TypeValue {
     pub structdef: Vec<(String, Type)>,
     pub value: LLVMTypeRef,
+    pub vtable: Vec<(String, Type)>,
+    pub vttype: Option<LLVMTypeRef>,
 }
 
 
@@ -50,6 +52,7 @@ pub struct LLVM<'a> {
     //pub builtins: TypeFunctionMap,
     pub builtins: BuiltinMap<'a>,
     pub functions: Vec<&'a AST>,
+    pub classes: Vec<&'a AST>,
     pub context: LLVMContextRef,
     pub module: LLVMModuleRef,
     pub builder: LLVMBuilderRef,
@@ -74,6 +77,7 @@ unsafe fn compile_module(builtins: &Vec<Builtin>, session: &Session<Value, TypeV
         map: session.map.clone(),
         builtins: BuiltinMap::new(),
         functions: Vec::new(),
+        classes: Vec::new(),
         context: context,
         module: module,
         builder: builder
@@ -122,6 +126,26 @@ unsafe fn compile_module(builtins: &Vec<Builtin>, session: &Session<Value, TypeV
 }
 
 unsafe fn declare_globals(data: &LLVM, scope: ScopeRef<Value, TypeValue>) {
+    for node in &data.classes {
+        if let AST::Class(_, (ref name, _), _, _, ref id) = **node {
+            let tscope = data.map.get(id);
+            let classdef = scope.borrow().get_class_def(name);
+            let value = scope.borrow().get_type_value(name).unwrap();
+
+            if value.vtable.len() > 0 {
+                let mut methods = vec!();
+                for (index, &(ref name, _)) in value.vtable.iter().enumerate() {
+                    methods.push(classdef.borrow().get_variable_value(&name).unwrap());
+                }
+
+                let vtype = value.vttype.unwrap();
+                let global = LLVMAddGlobal(data.module, LLVMGetElementType(vtype), label(format!("__{}_vtable", name).as_str()));
+                LLVMSetInitializer(global, LLVMConstNamedStruct(vtype, methods.as_mut_ptr(), methods.len() as u32));
+                LLVMSetLinkage(global, llvm::LLVMLinkage::LLVMLinkOnceAnyLinkage);
+            }
+        }
+    }
+
     for (name, sym) in &scope.borrow().names {
         if LLVMGetNamedFunction(data.module, label(name.as_str())).is_null() && !sym.ttype.as_ref().unwrap().is_overloaded() {
             let ltype = get_type(data, scope.clone(), sym.ttype.clone().unwrap(), true);
@@ -180,9 +204,10 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
                 if function.is_null() {
                     //function = compile_node(data, func, unwind, scope.clone(), fexpr);
                     function = match **fexpr {
-                        AST::Accessor(ref pos, _, ref name, ref stype) => {
-                            compile_node(data, func, unwind, scope.clone(), &AST::Resolver(pos.clone(), Box::new(AST::Identifier(pos.clone(), stype.clone().unwrap().get_name().unwrap())), name.clone()))
-                        },
+                        // TODO this is possibly very bad, but hopefully it works temporarily, for vtable
+                        //AST::Accessor(ref pos, _, ref name, ref stype) => {
+                        //    compile_node(data, func, unwind, scope.clone(), &AST::Resolver(pos.clone(), Box::new(AST::Identifier(pos.clone(), stype.clone().unwrap().get_name().unwrap())), name.clone()))
+                        //},
                         _ => compile_node(data, func, unwind, scope.clone(), fexpr)
                     };
                 }
@@ -495,9 +520,16 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
                 LLVMBuildCall(data.builder, function, largs.as_mut_ptr(), largs.len() as u32, label("tmp"))
             } else {
                 //panic!("InternalError: no __alloc__ method for {}", name);
-                let lltype = scope.borrow().get_type_value(name).map(|info| info.value).unwrap();
-                let obj = LLVMBuildMalloc(data.builder, LLVMGetElementType(lltype), label("ptr"));
-                LLVMBuildPointerCast(data.builder, obj, lltype, label("ptr"))
+                let value = scope.borrow().get_type_value(name).unwrap();
+                let mem = LLVMBuildMalloc(data.builder, LLVMGetElementType(value.value), label("ptr"));
+                let object = LLVMBuildPointerCast(data.builder, mem, value.value, label("ptr"));
+                if let Some(index) = value.structdef.iter().position(|ref r| r.0.as_str() == "__vtable__") {
+                    let vtable = LLVMGetNamedGlobal(data.module, label(format!("__{}_vtable", name).as_str()));
+                    let mut indices = vec!(i32_value(data, 0), i32_value(data, index));
+                    let pointer = LLVMBuildGEP(data.builder, object, indices.as_mut_ptr(), indices.len() as u32, label("tmp"));
+                    LLVMBuildStore(data.builder, vtable, pointer);
+                }
+                object
             };
 
             //let init = classdef.borrow().search(&String::from("__init__"), |sym| sym.value.clone());
@@ -533,15 +565,26 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
 
             let name = ltype.clone().unwrap().get_name().unwrap();
             let classdef = scope.borrow().get_class_def(&name);
-            let sym = classdef.borrow().search(right, |sym| Some(sym.clone())).unwrap();
+            //let sym = classdef.borrow().search(right, |sym| Some(sym.clone())).unwrap();
+            let value = classdef.borrow().get_variable_value(right);
             debug!("*ACCESS: {:?} {:?}", right, classdef);
             // TODO add a check for vtables
+            let typeval = scope.borrow().get_type_value(&name).unwrap();
 
             if struct_has_member(scope.clone(), &name, right) {
                 let pointer = build_struct_access(data, scope.clone(), object, &name, right);
                 LLVMBuildLoad(data.builder, pointer, label("tmp"))
+            } else if let Some(index) = typeval.vtable.iter().position(|ref r| r.0 == *right) {
+                let vindex = typeval.structdef.iter().position(|ref r| r.0.as_str() == "__vtable__").unwrap();
+                let mut indices = vec!(i32_value(data, 0), i32_value(data, vindex));
+                let pointer = LLVMBuildGEP(data.builder, object, indices.as_mut_ptr(), indices.len() as u32, label("tmp"));
+                let vtable = LLVMBuildLoad(data.builder, pointer, label("tmp"));
+
+                let mut indices = vec!(i32_value(data, 0), i32_value(data, index));
+                let pointer = LLVMBuildGEP(data.builder, vtable, indices.as_mut_ptr(), indices.len() as u32, label("tmp"));
+                LLVMBuildLoad(data.builder, pointer, label("tmp"))
             } else {
-                sym.value.unwrap()
+                value.unwrap()
             }
         },
 
@@ -678,28 +721,63 @@ unsafe fn collect_functions_node<'a>(data: &mut LLVM<'a>, scope: ScopeRef<Value,
         AST::Class(ref pos, (ref name, ref types), ref parent, ref body, ref id) => {
             let tscope = data.map.get(id);
 
-            let mut structdef = if let Some((ref name, ref types)) = *parent {
-                scope.borrow().get_type_value(name).unwrap().structdef
+            let (mut structdef, mut vtable) = if let Some((ref name, ref types)) = *parent {
+                let value = scope.borrow().get_type_value(name).unwrap();
+                (value.structdef, value.vtable)
             } else {
-                vec!()
+                (vec!(), vec!())
             };
+
+            // Build vtable for class
+            let classdef = scope.borrow().get_class_def(name);
+            let parent = classdef.borrow().get_parent().unwrap_or(Scope::new_ref(None));
+if name.as_str() != "String" {
+            for ref node in body.iter() {
+                match **node {
+                    AST::Function(_, ref fname, ref args, ref rtype, _, _) => {
+if fname.clone().unwrap().as_str() != "new" {
+debug!("***************: {:?}:{:?}", name, fname);
+                        if fname.is_some() && parent.borrow().contains(fname.as_ref().unwrap()) {
+                            vtable.push((fname.clone().unwrap(), Type::Function(args.iter().map(|t| t.1.clone().unwrap()).collect(), Box::new(rtype.clone().unwrap()))));
+                        }
+}
+                    },
+                    AST::Declare(_, ref fname, ref ttype, _) => {
+                        match *ttype {
+                            Type::Function(_, _) => {
+if fname.as_str() != "new" {
+debug!("+++++++++++++++: {:?}:{:?}", name, fname);
+                                if parent.borrow().contains(fname) {
+                                    vtable.push((fname.clone(), ttype.clone()))
+                                }
+}
+                            },
+                            _ => { },
+                        }
+                    },
+                    _ => { }
+                }
+            }
+}
+
+            // Build struct definition for class
+            if vtable.len() > 0 {
+                if let Some(index) = structdef.iter().position(|ref r| r.0.as_str() == "__vtable__") {
+                    structdef[index].1 = Type::Object(format!("{}_vtable", name), vec!());
+                } else {
+                    structdef.push((String::from("__vtable__"), Type::Object(format!("{}_vtable", name), vec!())));
+                }
+            }
             for ref node in body.iter() {
                 match **node {
                     AST::Definition(_, (ref name, ref ttype), ref value) => {
                         structdef.push((name.clone(), ttype.clone().unwrap()));
                     },
-                    //AST::Declare(_, ref name, ref ttype) => {
-                    //    match *ttype {
-                    //        Type::Function(_, _) => { },
-                    //        _ => structdef.push((name.clone(), ttype.clone())),
-                    //    }
-                    //},
                     _ => { }
                 }
             }
 
-            let lltype = build_class_type(data, scope.clone(), name, structdef);
-            // TODO create vtable; might need to tag methods that need to be virtualized during the precompile stage
+            let lltype = build_class_type(data, scope.clone(), name, structdef, vtable);
 
             //let alloc = String::from("__alloc__");
             //let classdef = scope.borrow().get_class_def(name);
@@ -710,6 +788,7 @@ unsafe fn collect_functions_node<'a>(data: &mut LLVM<'a>, scope: ScopeRef<Value,
             //    classdef.borrow_mut().assign(&alloc, build_allocator(data, tscope.clone(), &name, format!("{}_{}", cname, alloc).as_str(), lltype));
             //}
             collect_functions_vec(data, tscope.clone(), body);
+            data.classes.push(node);
         },
 
         AST::Index(_, ref left, ref right, _) => {
@@ -889,6 +968,16 @@ pub unsafe fn build_allocator(data: &LLVM, scope: ScopeRef<Value, TypeValue>, cn
 }
 */
 
+pub unsafe fn vtable_has_member(scope: ScopeRef<Value, TypeValue>, typename: &String, field: &String) -> bool {
+    scope.borrow().search_type(typename, |info| {
+        if info.value.as_ref().unwrap().vtable.iter().position(|ref r| r.0 == *field).is_some() {
+            Some(true)
+        } else {
+            Some(false)
+        }
+    }).unwrap_or(false)
+}
+
 pub unsafe fn struct_has_member(scope: ScopeRef<Value, TypeValue>, typename: &String, field: &String) -> bool {
     scope.borrow().search_type(typename, |info| {
         if info.value.as_ref().unwrap().structdef.iter().position(|ref r| r.0 == *field).is_some() {
@@ -906,16 +995,34 @@ pub unsafe fn build_struct_access(data: &LLVM, scope: ScopeRef<Value, TypeValue>
     LLVMBuildGEP(data.builder, object, indices.as_mut_ptr(), indices.len() as u32, label("tmp"))
 }
 
-pub unsafe fn build_class_type(data: &LLVM, scope: ScopeRef<Value, TypeValue>, name: &String, structdef: Vec<(String, Type)>) -> LLVMTypeRef {
+pub unsafe fn build_class_type(data: &LLVM, scope: ScopeRef<Value, TypeValue>, name: &String, structdef: Vec<(String, Type)>, vtable: Vec<(String, Type)>) -> LLVMTypeRef {
+    let (vttype, pvttype) = if vtable.len() > 0 {
+        let vtname = format!("{}_vtable", name);
+        let vttype = LLVMStructCreateNamed(data.context, label(vtname.as_str()));
+        let pvttype = LLVMPointerType(vttype, 0);
+        scope.borrow_mut().define_type(vtname.clone(), Type::Object(vtname.clone(), vec!()));
+        scope.borrow_mut().set_type_value(&vtname, TypeValue { structdef: vtable.clone(), value: pvttype, vtable: vec!(), vttype: None });
+        (Some(vttype), Some(pvttype))
+    } else {
+        (None, None)
+    };
     let lltype = LLVMStructCreateNamed(data.context, label(name));
     let pltype = LLVMPointerType(lltype, 0);
-    scope.borrow_mut().set_type_value(name, TypeValue { structdef: structdef.clone(), value: pltype });
+    scope.borrow_mut().set_type_value(name, TypeValue { structdef: structdef.clone(), value: pltype, vtable: vtable.clone(), vttype: pvttype });
 
     let mut types = vec!();
     for &(_, ref ttype) in &structdef {
         types.push(get_type(data, scope.clone(), ttype.clone(), true))
     }
     LLVMStructSetBody(lltype, types.as_mut_ptr(), types.len() as u32, false as i32);
+
+    if let Some(vttype) = vttype {
+        let mut types = vec!();
+        for &(_, ref ttype) in &vtable {
+            types.push(get_type(data, scope.clone(), ttype.clone(), true))
+        }
+        LLVMStructSetBody(vttype, types.as_mut_ptr(), types.len() as u32, false as i32);
+    }
 
     pltype
 }

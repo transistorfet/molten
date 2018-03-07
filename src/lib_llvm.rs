@@ -157,10 +157,10 @@ pub unsafe fn declare_builtins_node<'a>(data: &mut LLVM<'a>, objtype: LLVMTypeRe
 
             //let tscope = Scope::new_ref(Some(scope.clone()));
             let lltype = if structdef.len() > 0 {
-                build_class_type(data, scope.clone(), &name, structdef.clone())
+                build_class_type(data, scope.clone(), &name, structdef.clone(), vec!())
             } else {
                 let lltype = get_type(data, scope.clone(), scope.borrow().find_type(&name).unwrap(), true);
-                scope.borrow_mut().set_type_value(&name, TypeValue { structdef: structdef.clone(), value: lltype });
+                scope.borrow_mut().set_type_value(&name, TypeValue { structdef: vec!(), value: lltype, vtable: vec!(), vttype: None });
                 lltype
             };
 
