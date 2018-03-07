@@ -19,6 +19,7 @@ pub struct Session<V, T> {
     pub name: String,
     pub map: ScopeMapRef<V, T>,
     pub files: RefCell<Vec<(String, String)>>,
+    pub target: String,
     pub errors: Cell<u32>,
 }
 
@@ -30,12 +31,15 @@ impl<V, T> Session<V, T> where V: Clone, T: Clone {
             //builtins: builtins,
             map: ScopeMapRef::new(),
             files: RefCell::new(vec!()),
+            target: String::from(""),
             errors: Cell::new(0),
         }
     }
 
-    pub fn find_file(filename: &str) -> File {
-        for ref path in &Options::as_ref().libpath {
+    pub fn find_file(filename: &str, search: bool) -> File {
+        let current = vec!(".");
+        let locations = if search { &Options::as_ref().libpath } else { &current };
+        for ref path in locations {
             match File::open(Path::new(path).join(filename)) {
                 Ok(f) => return f,
                 Err(_) => { },
@@ -54,8 +58,8 @@ impl<V, T> Session<V, T> where V: Clone, T: Clone {
         code
     }
 
-    pub fn parse_file(&self, filename: &str) -> Vec<AST> {
-        let mut f = Session::<V, T>::find_file(filename);
+    pub fn parse_file(&self, filename: &str, search: bool) -> Vec<AST> {
+        let mut f = Session::<V, T>::find_file(filename, search);
         let mut contents = String::new();
         f.read_to_string(&mut contents).expect("Error reading file contents");
         self.parse_string(filename, contents)

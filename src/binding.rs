@@ -180,7 +180,7 @@ fn bind_names_node_or_error<V, T>(session: &Session<V, T>, scope: ScopeRef<V, T>
 
         AST::Import(_, ref name, ref mut decls) => {
             let path = name.replace(".", "/") + ".dec";
-            *decls = session.parse_file(path.as_str());
+            *decls = session.parse_file(path.as_str(), true);
             bind_names_vec(session, scope.clone(), decls);
         },
 

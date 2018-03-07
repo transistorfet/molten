@@ -85,6 +85,9 @@
             let a = 1
             let b: String = "aoeu"
 
+            fn virtfun(self) {
+                println("I'm Stuff")
+            }
         }
 
         let s = new Stuff()
@@ -104,12 +107,24 @@
             let add = fn self, x => {
                 self.a = self.a + x
             }
+
+            fn virtfun(self) {
+                println("I'm TestClass")
+            }
         }
 
         let thingy = new TestClass()
         thingy.a = 1337
         ////thingy.add(124)
         println(str(thingy.a))
+        thingy.virtfun()
+
+        //let stuffy: Stuff = thingy
+        //stuffy.virtfun()
+        fn vtest(s: Stuff) {
+            s.virtfun()
+        }
+        vtest(thingy)
 
         while thingy.a > 0 {
             println("Hey again")

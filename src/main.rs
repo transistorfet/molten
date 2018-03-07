@@ -41,6 +41,11 @@ fn main() {
                 .help("Sets the input file to use")
                 .required(true)
                 .index(1))
+            .arg(Arg::with_name("output")
+                .short("o")
+                .value_name("OUTPUT")
+                .takes_value(true)
+                .help("Sets the output file"))
             .arg(Arg::with_name("compile")
                 .short("c")
                 .help("Compiles rather than executing"))
@@ -56,20 +61,24 @@ fn main() {
     Options::as_ref().debug = matches.occurrences_of("debug") > 0;
     Options::as_ref().is_library = matches.occurrences_of("library") > 0;
 
-    let filename = matches.value_of("INPUT").unwrap();
+    let input = matches.value_of("INPUT").unwrap();
+    let output = matches.value_of("output");
     if matches.occurrences_of("compile") > 0 {
-        compile_file(filename);
+        compile_file(input, output);
     } else {
         println!("Use the -c flag to compile");
     }
 }
 
-fn compile_file(filename: &str) {
-    let session = session::Session::new();
+fn compile_file(input: &str, output: Option<&str>) {
+    let mut session = session::Session::new();
+    let name = input.rsplitn(2, '.').collect::<Vec<&str>>()[1];
+    session.target = output.map(|s| String::from(s)).unwrap_or_else(|| format!("{}.ll", name));
+
     let builtins = lib_llvm::get_builtins();
     lib_llvm::make_global(session.map.clone(), &builtins);
 
-    let mut code = session.parse_file(filename);
+    let mut code = session.parse_file(input, false);
     //code = refinery::refine(code);
     binding::bind_names(&session, &mut code);
     typecheck::check_types(&session, session.map.get_global(), &mut code);
@@ -84,7 +93,6 @@ fn compile_file(filename: &str) {
 
     code = precompiler::precompile(&session, code);
 
-    let name = filename.rsplitn(2, '.').collect::<Vec<&str>>()[1];
     compiler_llvm::compile(&builtins, &session, name, &mut code);
 }
 

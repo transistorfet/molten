@@ -112,13 +112,15 @@ unsafe fn compile_module(builtins: &Vec<Builtin>, session: &Session<Value, TypeV
     }
 
     // Output to a file, and also a string for debugging
-    LLVMPrintModuleToFile(module, label(format!("{}.ll", module_name).as_str()), ptr::null_mut());
+    //format!("{}.ll", module_name)
+    LLVMPrintModuleToFile(module, label(session.target.as_str()), ptr::null_mut());
 
     if Options::as_ref().debug {
         println!("{}\n", CString::from_raw(LLVMPrintModuleToString(module)).into_string().unwrap());
     }
 
-    export::write_exports(data.map.clone(), data.map.get_global(), format!("{}.dec", module_name).as_str(), code);
+    let name = session.target.rsplitn(2, '.').collect::<Vec<&str>>()[1];
+    export::write_exports(data.map.clone(), data.map.get_global(), format!("{}.dec", name).as_str(), code);
 
     LLVMDisposeBuilder(builder);
     LLVMDisposeModule(module);
@@ -736,8 +738,8 @@ if name.as_str() != "String" {
                 match **node {
                     AST::Function(_, ref fname, ref args, ref rtype, _, _) => {
 if fname.clone().unwrap().as_str() != "new" {
-debug!("***************: {:?}:{:?}", name, fname);
                         if fname.is_some() && parent.borrow().contains(fname.as_ref().unwrap()) {
+                            debug!("***************: {:?}:{:?}", name, fname);
                             vtable.push((fname.clone().unwrap(), Type::Function(args.iter().map(|t| t.1.clone().unwrap()).collect(), Box::new(rtype.clone().unwrap()))));
                         }
 }
@@ -746,8 +748,8 @@ debug!("***************: {:?}:{:?}", name, fname);
                         match *ttype {
                             Type::Function(_, _) => {
 if fname.as_str() != "new" {
-debug!("+++++++++++++++: {:?}:{:?}", name, fname);
                                 if parent.borrow().contains(fname) {
+                                    debug!("+++++++++++++++: {:?}:{:?}", name, fname);
                                     vtable.push((fname.clone(), ttype.clone()))
                                 }
 }
