@@ -87,6 +87,9 @@
 
         }
 
+        let s = new Stuff()
+        println(str(s.foo2(123)))
+
         class TestClass extends Stuff {
             fn new(self) { }
 
@@ -105,7 +108,7 @@
 
         let thingy = new TestClass()
         thingy.a = 1337
-        thingy.add(124)
+        ////thingy.add(124)
         println(str(thingy.a))
 
         while thingy.a > 0 {
