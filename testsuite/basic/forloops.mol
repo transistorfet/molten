@@ -1,0 +1,13 @@
+
+//! Count: 1
+//! Count: 5
+//! Count: 2
+//! Count: 3
+
+    import lib.libcore
+
+    let numbers = [ 1, 2, 3 ]
+    numbers.insert(1, 5)
+    for x in numbers
+        println("Count: " + str(x))
+

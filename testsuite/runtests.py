@@ -42,7 +42,8 @@ def run_all(args):
 
     total = 0
     passed = 0
-    for (basedir, dirnames, filenames) in os.walk(dirname):
+    for (basedir, dirnames, filenames) in os.walk(dirname, topdown=True):
+        dirnames.sort()
         for filename in sorted(filenames):
             if filename.endswith(".ml") or filename.endswith(".mol"):
                 total += 1

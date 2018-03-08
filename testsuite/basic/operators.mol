@@ -1,0 +1,48 @@
+
+//! 83
+//! 564
+//! inf
+//! -inf
+//! nan
+
+//! 19
+//! -570
+//! 5
+//! false
+//! -3002
+//! 3223
+
+//! false
+
+//! Rem: 1
+//! 2\^16: 65536.000000
+//! 0xff & 0x80: 128
+//! 0x00 \| 0x20: 32
+//! Com: 0xAAAAAAAAAAAAAAAA
+
+
+    import lib.libcore
+
+    println(str(0123))
+    println(str(0x234))
+    println(str(Inf))
+    println(str(-Inf))
+    println(str(NaN))
+    true false      // maybe this should fail... but currently it passes
+
+    println(str(2 * (10 + -3) + 5))
+    println(str(2 + 4 * 7 - 1 / 20  * 10 - 50 * 12))
+    println(str((2 * 3) + (4 - 5)))
+    println(str(2 + 4 * 7 - 1 / 20  == 10 - 50 * 12))
+    println(str(123 + ~124 * 25))
+    println(str(123 + (124 * 25)))
+
+    let x = 2 + 4 * 7 - 1 / 20  == 10 - 50 * 12
+    println(str(x))
+
+    println("Rem: " + str(10 % 3))
+    println("2^16: " + str(2.0 ^ 16.0))
+    println("0xff & 0x80: " + str(0xff & 0x80))
+    println("0x00 | 0x20: " + str(0x00 | 0x20))
+    println("Com: " + hex(~0x5555555555555555)) 
+
