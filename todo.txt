@@ -1,4 +1,7 @@
 
+* the buffer bool issue is becaues parse_type probably creates a new unique variable now for each field in the builtin decl...
+* the issue with the list bool is because the compiling of libcore fails to use the same variable for function returns as for inputs
+
 * make a trait to wrap LLVMValueRef such that you can tag metainfo along with the value itself, returned by the recurvise function in compiler_llvm, including the abi
   info, extern, any other additional properties
 * do you need to make special types for abi function calls, distict from normal functions, such that you can't assign a c function pointer to a molten function variable, since they

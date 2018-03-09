@@ -320,8 +320,9 @@ pub fn find_variant<V, T>(scope: ScopeRef<V, T>, otype: Type, atypes: Vec<Type>)
                     if otypes.len() != atypes.len() {
                         continue 'outer;
                     }
-                    for (atype, btype) in otypes.iter().zip(atypes.iter()) {
-                        if check_type(scope.clone(), Some(atype.clone()), Some(btype.clone()), Check::Def, false).is_err() {
+                    for (otype, atype) in otypes.iter().zip(atypes.iter()) {
+                        debug!("**CHECKING VARIANT: {:?} {:?}", otype, atype);
+                        if check_type(scope.clone(), Some(otype.clone()), Some(atype.clone()), Check::Def, false).is_err() {
                             continue 'outer;
                         }
                     }

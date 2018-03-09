@@ -13,7 +13,8 @@ use config::Options;
 use session::Session;
 use ast::{ AST, Pos };
 use scope::{ Scope, ScopeRef, ScopeMapRef };
-use lib_llvm::{ Builtin, BuiltinMap, initialize_builtins };
+
+use llvm::lib_llvm::{ Builtin, BuiltinMap, initialize_builtins };
 
 
 
@@ -35,6 +36,16 @@ impl fmt::Debug for Value {
     }
 }
 */
+
+trait Val {
+    fn compile(data: &LLVM);
+}
+
+struct Ref(LLVMValueRef);
+impl Val for Ref {
+    fn compile(data: &LLVM) {
+    }
+}
 
 
 #[derive(Clone, Debug, PartialEq)]

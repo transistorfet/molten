@@ -13,8 +13,9 @@ use parser::{ parse_type };
 use scope::{ self, Scope, ScopeRef, ScopeMapRef, Context };
 use binding::{ declare_typevars };
 use types::{ Type, check_type, Check };
-use compiler_llvm::*;
 use utils::UniqueID;
+
+use llvm::compiler_llvm::*;
 
 
 pub type RuntimeFunction = unsafe fn(&LLVM, &str, LLVMTypeRef) -> LLVMValueRef;

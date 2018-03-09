@@ -26,11 +26,12 @@ mod refinery;
 mod binding;
 mod typecheck;
 mod precompiler;
-mod compiler_llvm;
-mod lib_llvm;
 mod export;
+mod llvm;
 
 use config::Options;
+use llvm::compiler_llvm;
+use llvm::lib_llvm;
 
 fn main() {
     let matches =
