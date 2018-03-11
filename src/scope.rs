@@ -442,9 +442,9 @@ impl<V, T> Scope<V, T> where V: Clone, T: Clone {
                     }
                 }
             },
-            Type::Function(args, ret) => Type::Function(self.map_typevars_vec(varmap, args), Box::new(self.map_typevars(varmap, *ret))),
+            Type::Function(args, ret, abi) => Type::Function(self.map_typevars_vec(varmap, args), Box::new(self.map_typevars(varmap, *ret)), abi),
             // TODO why did I do this?  Was it because of a bug or just to reduce typevars, because it caused another bug with constructors
-            //Type::Function(args, ret) => Type::Function(self.map_typevars_vec(varmap, args), ret),
+            //Type::Function(args, ret, abi) => Type::Function(self.map_typevars_vec(varmap, args), ret, abi),
             Type::Overload(variants) => Type::Overload(self.map_typevars_vec(varmap, variants)),
             Type::Object(name, types) => Type::Object(name.clone(), self.map_typevars_vec(varmap, types)),
         }

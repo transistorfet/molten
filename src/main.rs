@@ -16,6 +16,7 @@ mod debug;
 #[macro_use]
 mod parser;
 
+mod abi;
 mod ast;
 mod scope;
 mod types;

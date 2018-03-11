@@ -1,6 +1,8 @@
 
 
+use abi::ABI;
 use ast::AST;
+use types::Type;
 use utils::UniqueID;
 
 pub fn refine(code: Vec<AST>) -> Vec<AST> {
@@ -28,12 +30,12 @@ pub fn refine_node(node: AST) -> AST {
             AST::Definition(pos, (name, ttype), Box::new(refine_node(*code)))
         },
 
-        AST::Declare(pos, name, ttype, abi) => {
-            AST::Declare(pos, name, ttype, abi)
+        AST::Declare(pos, name, ttype) => {
+            AST::Declare(pos, name, ttype)
         },
 
-        AST::Function(pos, name, args, ret, body, id) => {
-            AST::Function(pos, name, args, ret, Box::new(refine_node(*body)), id)
+        AST::Function(pos, name, args, ret, body, id, abi) => {
+            AST::Function(pos, name, args, ret, Box::new(refine_node(*body)), id, abi)
         },
 
         AST::Invoke(pos, fexpr, mut args, ttype) => {
@@ -74,22 +76,29 @@ pub fn refine_node(node: AST) -> AST {
         },
 
         AST::List(pos, code) => { AST::List(pos, refine_vec(code)) },
-        // TODO this almost works, but it needs to reference the list that's created, which it can't because blocks don't create their own scope, and a list variable would collide
-        //AST::List(code) => {
-        //    let mut block = vec!();
-        //    block.push(AST::Invoke(Box::new(AST::Resolver(Box::new(AST::Identifier(format!("List"))), String::from("new"))), vec!(AST::Integer(code.len() as isize)), None));
-        //    for item in code {
-        //        block.push(AST::Invoke(Box::new(AST::Resolver(Box::new(AST::Identifier(format!("List"))), String::from("push"))), vec!(item), None));
-        //    }
-        //    AST::Block(refine_vec(block))
-        //},
+        /*
+        AST::List(pos, code) => {
+            let mut block = vec!();
+            let id = format!("{}", UniqueID::generate());
+            block.push(AST::Definition(pos.clone(), (id.clone(), None),
+                Box::new(AST::Invoke(pos.clone(),
+                    Box::new(AST::Resolver(pos.clone(), Box::new(AST::Identifier(pos.clone(), format!("List"))), String::from("new"))),
+                    vec!(AST::New(pos.clone(), (format!("List"), vec!(Type::Variable(String::from("item"), UniqueID(0))))) /*, AST::Integer(code.len() as isize)*/), None))));
+            for item in code {
+                block.push(AST::Invoke(pos.clone(),
+                    Box::new(AST::Accessor(pos.clone(), Box::new(AST::Identifier(pos.clone(), id.clone())), String::from("push"), None)),
+                    vec!(item), None));
+            }
+            AST::Block(pos.clone(), refine_vec(block))
+        },
+        */
 
         AST::Class(pos, pair, parent, body, id) => {
             // Make sure constructors take "self" as the first argument, and return "self" at the end
             let mut has_new = false;
             let mut body: Vec<AST> = body.into_iter().map(|node| {
                 match node {
-                    AST::Function(pos, name, args, ret, mut body, id) => {
+                    AST::Function(pos, name, args, ret, mut body, id, abi) => {
                         if name == Some(String::from("new")) {
                             has_new = true;
                             if args.len() > 0 && args[0].0 == String::from("self") {
@@ -98,19 +107,19 @@ pub fn refine_node(node: AST) -> AST {
                                 panic!("SyntaxError: the \"new\" method on a class must have \"self\" as its first parameter");
                             }
                         }
-                        AST::Function(pos, name, args, ret, body, id)
+                        AST::Function(pos, name, args, ret, body, id, abi)
                     },
-                    AST::Declare(pos, name, ttype, abi) => {
+                    AST::Declare(pos, name, ttype) => {
                         if name == String::from("new") {
                             has_new = true;
                         }
-                        AST::Declare(pos, name, ttype, abi)
+                        AST::Declare(pos, name, ttype)
                     },
                     _ => node
                 }
             }).collect();
             if !has_new {
-                body.insert(0, AST::Function(pos.clone(), Some(String::from("new")), vec!((String::from("self"), None, None)), None, Box::new(AST::Identifier(pos.clone(), String::from("self"))), UniqueID::generate()));
+                body.insert(0, AST::Function(pos.clone(), Some(String::from("new")), vec!((String::from("self"), None, None)), None, Box::new(AST::Identifier(pos.clone(), String::from("self"))), UniqueID::generate(), ABI::Molten));
                 //panic!("SyntaxError: you must declare a \"new\" method on a class");
             }
             AST::Class(pos, pair, parent, refine_vec(body), id)

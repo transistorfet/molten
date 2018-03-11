@@ -4,7 +4,7 @@ use std::fmt::Debug;
 use ast::AST;
 use session::{ Session, Error };
 use scope::{ self, Scope, ScopeRef };
-use types::{ Type, Check, expect_type, resolve_type, find_variant, check_type_params };
+use types::{ Type, Check, ABI, expect_type, resolve_type, find_variant, check_type_params };
 
 
 pub fn check_types<V, T>(session: &Session<V, T>, scope: ScopeRef<V, T>, code: &mut Vec<AST>) -> Type where V: Clone + Debug, T: Clone + Debug {
@@ -40,7 +40,7 @@ pub fn check_types_node_or_error<V, T>(session: &Session<V, T>, scope: ScopeRef<
         AST::Real(_) => Type::Object(String::from("Real"), vec!()),
         AST::String(_) => Type::Object(String::from("String"), vec!()),
 
-        AST::Function(_, ref mut name, ref mut args, ref mut rtype, ref mut body, ref id) => {
+        AST::Function(_, ref mut name, ref mut args, ref mut rtype, ref mut body, ref id, ref abi) => {
             let fscope = session.map.get(id);
 
             let mut argtypes = vec!();
@@ -72,7 +72,7 @@ pub fn check_types_node_or_error<V, T>(session: &Session<V, T>, scope: ScopeRef<
             // TODO this fixes the type error, but makes a ton of stupid typevars
             //scope.borrow_mut().raise_types(fscope.clone());
 
-            let mut nftype = Type::Function(argtypes.clone(), Box::new(rettype));
+            let mut nftype = Type::Function(argtypes.clone(), Box::new(rettype), abi.clone());
             if name.is_some() {
                 let dscope = Scope::target(scope.clone());
                 let dname = name.clone().unwrap();
@@ -110,15 +110,15 @@ pub fn check_types_node_or_error<V, T>(session: &Session<V, T>, scope: ScopeRef<
             }
 
             let ftype = match etype {
-                Type::Function(_, _) => {
-                    let ftype = expect_type(tscope.clone(), Some(etype.clone()), Some(Type::Function(atypes, Box::new(etype.get_rettype()?.clone()))), Check::Def)?;
+                Type::Function(_, _, ref abi) => {
+                    let ftype = expect_type(tscope.clone(), Some(etype.clone()), Some(Type::Function(atypes, Box::new(etype.get_rettype()?.clone()), abi.clone())), Check::Def)?;
                     // TODO should this actually be another expect, so type resolutions that occur in later args affect earlier args?  Might not be needed unless you add typevar constraints
                     let ftype = resolve_type(tscope.clone(), ftype);        // NOTE This ensures the early arguments are resolved despite typevars not being assigned until later in the signature
 
                     ftype
                 },
                 Type::Variable(_, ref id) => {
-                    let ftype = Type::Function(atypes.clone(), Box::new(expected.unwrap_or_else(|| tscope.borrow_mut().new_typevar())));
+                    let ftype = Type::Function(atypes.clone(), Box::new(expected.unwrap_or_else(|| tscope.borrow_mut().new_typevar())), ABI::Unknown);
                     // TODO This is suspect... we might be updating type without checking for a conflict
                     // TODO we also aren't handling other function types, like accessor and resolve
                     //if let AST::Identifier(ref fname) = **fexpr {
@@ -153,7 +153,7 @@ pub fn check_types_node_or_error<V, T>(session: &Session<V, T>, scope: ScopeRef<
             btype
         },
 
-        AST::Declare(_, ref _name, ref ttype, _) => {
+        AST::Declare(_, ref _name, ref ttype) => {
             ttype.clone()
         },
 

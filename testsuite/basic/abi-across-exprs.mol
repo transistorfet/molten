@@ -1,0 +1,28 @@
+
+//! Hey
+//! Ho
+
+decl printf : (String) -> Int / C
+
+let f = if 1 == 1 then {
+    printf
+} else {
+    printf
+}
+
+f("Hey")
+// TODO this is because string escapes are currently broken...
+println("")
+
+fn prints(s: String) {
+    println(s)
+}
+
+let g = if 1 == 1 then {
+    prints
+} else {
+    prints
+}
+
+g("Ho")
+

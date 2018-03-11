@@ -11,6 +11,7 @@ use std::f64;
 use std::str;
 use std::str::FromStr;
 
+use abi::ABI;
 use types::Type;
 use utils::UniqueID;
 use ast::{ AST, Pos };
@@ -333,11 +334,10 @@ named!(declare(Span) -> AST,
     do_parse!(
         pos: position!() >>
         wscom!(tag_word!("decl")) >>
-        a: opt!(delimited!(tag!("\""), is_not!("\""), tag!("\""))) >>
         n: symbol_name >>
         wscom!(tag!(":")) >>
         t: type_description >>
-        (AST::Declare(Pos::new(pos), n, t, if a.is_some() { span_to_string(a.unwrap()) } else { String::from("") }))
+        (AST::Declare(Pos::new(pos), n, t))
     )
 );
 
@@ -356,8 +356,9 @@ named!(function(Span) -> AST,
             map!(identifier_list_defaults, |l| (None, l))
         ) >>
         r: opt!(preceded!(wscom!(tag!("->")), type_description)) >>
+        a: abi_specifier >>
         e: alt_complete!(block | preceded!(wscom!(tag!("=>")), expression)) >>
-        (AST::Function(Pos::new(pos), l.0, l.1, r, Box::new(e), UniqueID::generate()))
+        (AST::Function(Pos::new(pos), l.0, l.1, r, Box::new(e), UniqueID::generate(), a))
     )
 );
 
@@ -616,7 +617,8 @@ named!(type_function(Span) -> Type,
         args: delimited!(tag!("("), separated_list_complete!(wscom!(tag!(",")), type_description), tag!(")")) >>
         wscom!(tag!("->")) >>
         ret: type_description >>
-        (Type::Function(args, Box::new(ret)))
+        abi: abi_specifier >>
+        (Type::Function(args, Box::new(ret), abi))
     ))
 );
 
@@ -626,6 +628,14 @@ named!(type_function(Span) -> Type,
 //        |t| Type::Overload(t)
 //    )
 //);
+
+named!(abi_specifier(Span) -> ABI,
+    map!(
+        opt!(complete!(preceded!(wscom!(tag!("/")), identifier))),
+        |s| ABI::get(&s)
+    )
+);
+
 
 named!(reserved(Span) -> Span,
     alt!(
@@ -707,7 +717,7 @@ named!(string(Span) -> AST,
     map!(
         delimited!(
             tag!("\""),
-            is_not!("\""),
+            take_until!("\""),
             tag!("\"")
         ),
         |s| AST::String(span_to_string(s))

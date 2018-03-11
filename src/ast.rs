@@ -2,6 +2,7 @@
 use std::fmt;
 use std::str;
 
+use abi::ABI;
 use types::Type;
 use parser::Span;
 use utils::UniqueID;
@@ -75,8 +76,8 @@ pub enum AST {
     Try(Pos, Box<AST>, Vec<(AST, AST)>),
     Match(Pos, Box<AST>, Vec<(AST, AST)>),
     For(Pos, String, Box<AST>, Box<AST>, UniqueID),
-    Declare(Pos, String, Type, String),
-    Function(Pos, Option<String>, Vec<(String, Option<Type>, Option<AST>)>, Option<Type>, Box<AST>, UniqueID),
+    Declare(Pos, String, Type),
+    Function(Pos, Option<String>, Vec<(String, Option<Type>, Option<AST>)>, Option<Type>, Box<AST>, UniqueID, ABI),
     New(Pos, (String, Vec<Type>)),
     Class(Pos, (String, Vec<Type>), Option<(String, Vec<Type>)>, Vec<AST>, UniqueID),
 
@@ -103,8 +104,8 @@ impl AST {
             AST::Try(ref pos, _, _) |
             AST::Match(ref pos, _, _) |
             AST::For(ref pos, _, _, _, _) |
-            AST::Declare(ref pos, _, _, _) |
-            AST::Function(ref pos, _, _, _, _, _) |
+            AST::Declare(ref pos, _, _) |
+            AST::Function(ref pos, _, _, _, _, _, _) |
             AST::New(ref pos, _) |
             AST::Class(ref pos, _, _, _, _) |
             AST::Import(ref pos, _, _) |

@@ -30,11 +30,11 @@ pub fn precompile_node<V, T>(session: &Session<V, T>, scope: ScopeRef<V, T>, nod
             AST::Definition(pos, (name, Some(resolve_type(scope.clone(), ttype.unwrap()))), Box::new(precompile_node(session, scope.clone(), *code)))
         },
 
-        AST::Declare(pos, name, ttype, abi) => {
-            AST::Declare(pos, name, resolve_type(scope.clone(), ttype), abi)
+        AST::Declare(pos, name, ttype) => {
+            AST::Declare(pos, name, resolve_type(scope.clone(), ttype))
         },
 
-        AST::Function(pos, name, mut args, ret, body, id) => {
+        AST::Function(pos, name, mut args, ret, body, id, abi) => {
             let fscope = session.map.get(&id);
             update_scope_variable_types(fscope.clone());
             /*
@@ -86,7 +86,7 @@ pub fn precompile_node<V, T>(session: &Session<V, T>, scope: ScopeRef<V, T>, nod
             } else {
             */
                 // TODO resolve types of args
-                AST::Function(pos, name, args, Some(resolve_type(fscope.clone(), ret.unwrap())), Box::new(precompile_node(session, fscope.clone(), *body)), id)
+                AST::Function(pos, name, args, Some(resolve_type(fscope.clone(), ret.unwrap())), Box::new(precompile_node(session, fscope.clone(), *body)), id, abi)
             //}
         },
 

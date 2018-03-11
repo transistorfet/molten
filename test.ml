@@ -14,9 +14,9 @@
         else
             e
 
-        (12).add(3)
-        e.add(3)
-        fn test(x: Int) => x.add(2)
+        //(12).add(3)
+        //e.add(3)
+        //fn test(x: Int) => x.add(2)
 
         let a = 5 * 5
         let b : Real = 123.24
@@ -168,7 +168,10 @@
             buffer
         }
 
-        fn overload() {
+        fn overload() / C {
+            let test = "Thing"
+            println(test)
+
             // TODO we don't allow recursion in overloaded functions, although I don't know that that can be fixed without constrained types
             //fn strnum(num: Int, suffix: String) -> String {
             //    strnum(num)
@@ -245,8 +248,8 @@
             }
 
             let bar = fn a => [ a, a, a ]
-            let arr = [ 1, 2, 3, 4 ]
-            let foobar = [ fn x => x * 16, fn x => x * 100 ]
+            let arr: List<Int>
+            let foobar: List<(Int) -> Int>
             //let arr = [ 1, 2, 3, 4 ]
             //let foobar = [ fn x => x * 16, fn x => x * 100 ]
 

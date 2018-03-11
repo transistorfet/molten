@@ -1,4 +1,5 @@
  
+//! Works
 
 class Test {
     let f: (Test) -> Int

@@ -28,7 +28,7 @@ pub fn build_index<V, T>(map: ScopeMapRef<V, T>, scope: ScopeRef<V, T>, code: &V
 
 fn build_index_node<V, T>(index: &mut String, map: ScopeMapRef<V, T>, scope: ScopeRef<V, T>, node: &AST) where V: Clone, T: Clone {
     match *node {
-        AST::Function(_, ref name, _, _, _, _) => {
+        AST::Function(_, ref name, _, _, _, _, _) => {
             if let Some(ref name) = *name {
                 let ttype = scope.borrow().get_variable_type(name).unwrap();
                 index.push_str(format!("decl {} : {}\n", name, unparse_type(scope.clone(), ttype)).as_str());
@@ -61,7 +61,7 @@ fn build_index_node<V, T>(index: &mut String, map: ScopeMapRef<V, T>, scope: Sco
                         //index.push_str(format!("    decl {} : {}\n", name, unparse_type(tscope.clone(), ttype.clone().unwrap())).as_str());
                         index.push_str(format!("    let {} : {}\n", name, unparse_type(tscope.clone(), ttype.clone().unwrap())).as_str());
                     },
-                    AST::Function(_, ref name, _, _, _, _) => {
+                    AST::Function(_, ref name, _, _, _, _, _) => {
                         if let Some(ref name) = *name {
                             let ttype = classdef.borrow().get_variable_type(name).unwrap();
                             index.push_str(format!("    decl {} : {}\n", name, unparse_type(tscope.clone(), ttype)).as_str());
@@ -93,9 +93,10 @@ pub fn unparse_type<V, T>(scope: ScopeRef<V, T>, ttype: Type) -> String where V:
             //format!("'{}", name)
             format!("'v{}", id)
         }
-        Type::Function(args, ret) => {
+        Type::Function(args, ret, abi) => {
+            // TODO incorporate abi specifier
             let argstr: Vec<String> = args.iter().map(|t| unparse_type(scope.clone(), t.clone())).collect();
-            format!("({}) -> {}", argstr.join(", "), unparse_type(scope.clone(), *ret))
+            format!("({}) -> {}{}", argstr.join(", "), unparse_type(scope.clone(), *ret), abi)
         }
         Type::Overload(variants) => {
             let varstr: Vec<String> = variants.iter().map(|v| unparse_type(scope.clone(), v.clone())).collect();

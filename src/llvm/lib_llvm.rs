@@ -30,10 +30,10 @@ pub enum Func {
 }
 
 #[derive(Clone)]
-pub enum Builtin<'a> {
+pub enum BuiltinDef<'a> {
     Type(&'a str, Type),
     Func(&'a str, &'a str, Func),
-    Class(&'a str, Vec<(String, Type)>, Vec<Builtin<'a>>),
+    Class(&'a str, Vec<(String, Type)>, Vec<BuiltinDef<'a>>),
 }
 
 #[derive(Clone)]
@@ -73,7 +73,7 @@ impl<'a> BuiltinMap<'a> {
     }
 }
 
-pub fn make_global<'a, V, T>(map: ScopeMapRef<V, T>, builtins: &Vec<Builtin<'a>>) where V: Clone + Debug, T: Clone + Debug {
+pub fn make_global<'a, V, T>(map: ScopeMapRef<V, T>, builtins: &Vec<BuiltinDef<'a>>) where V: Clone + Debug, T: Clone + Debug {
     let primatives = map.add(ScopeMapRef::<V, T>::PRIMATIVE, None);
     primatives.borrow_mut().set_context(Context::Primative);
 
@@ -83,25 +83,25 @@ pub fn make_global<'a, V, T>(map: ScopeMapRef<V, T>, builtins: &Vec<Builtin<'a>>
     global.borrow_mut().set_context(Context::Global);
 }
  
-pub fn register_builtins_vec<'a, V, T>(scope: ScopeRef<V, T>, tscope: ScopeRef<V, T>, entries: &Vec<Builtin<'a>>) where V: Clone + Debug, T: Clone + Debug {
+pub fn register_builtins_vec<'a, V, T>(scope: ScopeRef<V, T>, tscope: ScopeRef<V, T>, entries: &Vec<BuiltinDef<'a>>) where V: Clone + Debug, T: Clone + Debug {
     for node in entries {
         register_builtins_node(scope.clone(), tscope.clone(), node);
     }
 }
 
-pub fn register_builtins_node<'a, V, T>(scope: ScopeRef<V, T>, tscope: ScopeRef<V, T>, node: &Builtin<'a>) where V: Clone + Debug, T: Clone + Debug {
+pub fn register_builtins_node<'a, V, T>(scope: ScopeRef<V, T>, tscope: ScopeRef<V, T>, node: &BuiltinDef<'a>) where V: Clone + Debug, T: Clone + Debug {
     match *node {
-        Builtin::Type(ref name, ref ttype) => {
+        BuiltinDef::Type(ref name, ref ttype) => {
             let mut ttype = ttype.clone();
             declare_typevars(tscope.clone(), Some(&mut ttype), true).unwrap();
             scope.borrow_mut().define_type(String::from(*name), ttype.clone()).unwrap();
         },
-        Builtin::Func(ref name, ref ftype, _) => {
+        BuiltinDef::Func(ref name, ref ftype, _) => {
             let mut ftype = parse_type(ftype);
             declare_typevars(tscope.clone(), ftype.as_mut(), false).unwrap();
             Scope::define_func_variant(scope.clone(), String::from(*name), tscope.clone(), ftype.clone().unwrap()).unwrap();
         },
-        Builtin::Class(ref name, _, ref entries) => {
+        BuiltinDef::Class(ref name, _, ref entries) => {
             let name = String::from(*name);
             let classdef = Scope::new_ref(None);
             classdef.borrow_mut().set_basename(name.clone());
@@ -113,46 +113,51 @@ pub fn register_builtins_node<'a, V, T>(scope: ScopeRef<V, T>, tscope: ScopeRef<
     }
 }
 
-pub unsafe fn initialize_builtins<'a>(data: &mut LLVM<'a>, scope: ScopeRef<Value, TypeValue>, entries: &Vec<Builtin<'a>>) {
+pub unsafe fn initialize_builtins<'a>(data: &mut LLVM<'a>, scope: ScopeRef<Value, TypeValue>, entries: &Vec<BuiltinDef<'a>>) {
     let pscope = scope.borrow().get_parent().unwrap().clone();
     declare_builtins_vec(data, ptr::null_mut(), pscope.clone(), scope.clone(), entries);
     declare_irregular_functions(data, pscope.clone());
 }
 
-pub unsafe fn declare_builtins_vec<'a>(data: &mut LLVM<'a>, objtype: LLVMTypeRef, scope: ScopeRef<Value, TypeValue>, tscope: ScopeRef<Value, TypeValue>, entries: &Vec<Builtin<'a>>) {
+pub unsafe fn declare_builtins_vec<'a>(data: &mut LLVM<'a>, objtype: LLVMTypeRef, scope: ScopeRef<Value, TypeValue>, tscope: ScopeRef<Value, TypeValue>, entries: &Vec<BuiltinDef<'a>>) {
     for node in entries {
         declare_builtins_node(data, objtype, scope.clone(), tscope.clone(), node);
     }
 }
 
-pub unsafe fn declare_builtins_node<'a>(data: &mut LLVM<'a>, objtype: LLVMTypeRef, scope: ScopeRef<Value, TypeValue>, tscope: ScopeRef<Value, TypeValue>, node: &Builtin<'a>) {
+pub unsafe fn declare_builtins_node<'a>(data: &mut LLVM<'a>, objtype: LLVMTypeRef, scope: ScopeRef<Value, TypeValue>, tscope: ScopeRef<Value, TypeValue>, node: &BuiltinDef<'a>) {
     match *node {
-        Builtin::Type(ref name, ref ttype) => { },
-        Builtin::Func(ref sname, ref types, ref func) => {
+        BuiltinDef::Type(ref name, ref ttype) => { },
+        BuiltinDef::Func(ref sname, ref types, ref func) => {
             let mut name = String::from(*sname);
             let ftype = parse_type(types).unwrap();
             match *func {
                 Func::External => {
-                    let func = LLVMAddFunction(data.module, label(name.as_str()), get_type(data, scope.clone(), ftype, false));
+                    let func = LLVMAddFunction(data.module, label(name.as_str()), get_type(data, scope.clone(), ftype.clone(), false));
                     if scope.borrow().contains(&name) {
-                        scope.borrow_mut().assign(&name, func);
+                        scope.borrow_mut().assign(&name, from_abi(&ftype.get_abi().unwrap(), func));
                     }
                 },
                 Func::Runtime(func) => {
                     if scope.borrow().get_variable_type(&name).unwrap().is_overloaded() {
                         name = scope::mangle_name(&name, ftype.get_argtypes().unwrap());
-                        scope.borrow_mut().define(name.clone(), Some(ftype)).unwrap();
+                        scope.borrow_mut().define(name.clone(), Some(ftype.clone())).unwrap();
                     }
                     let fname = scope.borrow().get_full_name(&Some(name.clone()), UniqueID(0));
-                    scope.borrow_mut().assign(&name, func(data, fname.as_str(), objtype));
+                    scope.borrow_mut().assign(&name, from_type(&ftype, func(data, fname.as_str(), objtype)));
                 },
                 Func::Comptime(func) => {
-                    data.builtins.add(sname, func, ftype);
+                    data.builtins.add(sname, func, ftype.clone());
+                    if scope.borrow().get_variable_type(&name).unwrap().is_overloaded() {
+                        name = scope::mangle_name(&name, ftype.get_argtypes().unwrap());
+                        scope.borrow_mut().define(name.clone(), Some(ftype.clone())).unwrap();
+                    }
+                    scope.borrow_mut().assign(&name, Box::new(Builtin(BuiltinFunction(func), ftype)));
                 },
                 _ => { },
             }
         },
-        Builtin::Class(ref name, ref structdef, ref entries) => {
+        BuiltinDef::Class(ref name, ref structdef, ref entries) => {
             let name = String::from(*name);
             let classdef = scope.borrow().get_class_def(&name);
 
@@ -171,12 +176,12 @@ pub unsafe fn declare_builtins_node<'a>(data: &mut LLVM<'a>, objtype: LLVMTypeRe
 }
 
 
-pub unsafe fn declare_function(module: LLVMModuleRef, scope: ScopeRef<Value, TypeValue>, name: &str, args: &mut [LLVMTypeRef], ret_type: LLVMTypeRef, vargs: bool) {
+pub unsafe fn declare_c_function(module: LLVMModuleRef, scope: ScopeRef<Value, TypeValue>, name: &str, args: &mut [LLVMTypeRef], ret_type: LLVMTypeRef, vargs: bool) {
     let ftype = LLVMFunctionType(ret_type, args.as_mut_ptr(), args.len() as u32, vargs as i32);
     let func = LLVMAddFunction(module, label(name), ftype);
     let name = &String::from(name);
     if scope.borrow().contains(name) {
-        scope.borrow_mut().assign(name, func);
+        scope.borrow_mut().assign(name, Box::new(CFunction(func)));
     }
 }
 
@@ -193,113 +198,113 @@ unsafe fn declare_irregular_functions(data: &LLVM, scope: ScopeRef<Value, TypeVa
     //declare_function(data.module, scope.clone(), "memcpy", &mut [bytestr_type, bytestr_type, cint_type], bytestr_type, false);
 
     //declare_function(data.module, scope.clone(), "puts", &mut [bytestr_type], cint_type, false);
-    declare_function(data.module, scope.clone(), "sprintf", &mut [bytestr_type, bytestr_type], cint_type, true);
+    declare_c_function(data.module, scope.clone(), "sprintf", &mut [bytestr_type, bytestr_type], cint_type, true);
 
-    declare_function(data.module, scope.clone(), "llvm.pow.f64", &mut [real_type(data), real_type(data)], real_type(data), false);
+    declare_c_function(data.module, scope.clone(), "llvm.pow.f64", &mut [real_type(data), real_type(data)], real_type(data), false);
 
     //declare_function(data.module, scope.clone(), "__gxx_personality_v0", &mut [bytestr_type, bytestr_type], cint_type, true);
 }
 
 
-pub fn get_builtins<'a>() -> Vec<Builtin<'a>> {
+pub fn get_builtins<'a>() -> Vec<BuiltinDef<'a>> {
     vec!(
-        Builtin::Func("malloc",     "(Int) -> 'ptr",                Func::External),
-        Builtin::Func("realloc",    "('ptr, Int) -> 'ptr",          Func::External),
-        Builtin::Func("free",       "('ptr) -> Nil",                Func::External),
-        Builtin::Func("memcpy",     "('ptr, 'ptr, Int) -> 'ptr",    Func::External),
-        Builtin::Func("strcmp",     "(String, String) -> Int",      Func::External),
-        Builtin::Func("puts",       "(String) -> Nil",              Func::External),
-        Builtin::Func("gets",       "(String) -> String",           Func::External),
-        Builtin::Func("strlen",     "(String) -> Int",              Func::External),
-        Builtin::Func("sprintf",    "'tmp",                         Func::Undefined),
+        BuiltinDef::Func("malloc",     "(Int) -> 'ptr / C",             Func::External),
+        BuiltinDef::Func("realloc",    "('ptr, Int) -> 'ptr / C",       Func::External),
+        BuiltinDef::Func("free",       "('ptr) -> Nil / C",             Func::External),
+        BuiltinDef::Func("memcpy",     "('ptr, 'ptr, Int) -> 'ptr / C", Func::External),
+        BuiltinDef::Func("strcmp",     "(String, String) -> Int / C",   Func::External),
+        BuiltinDef::Func("puts",       "(String) -> Nil / C",           Func::External),
+        BuiltinDef::Func("gets",       "(String) -> String / C",        Func::External),
+        BuiltinDef::Func("strlen",     "(String) -> Int / C",           Func::External),
+        BuiltinDef::Func("sprintf",    "'tmp",                          Func::Undefined),
 
-        Builtin::Func("println",    "(String) -> Nil",              Func::Runtime(build_lib_println)),
-        Builtin::Func("readline",   "() -> String",                 Func::Runtime(build_lib_readline)),
+        BuiltinDef::Func("println",    "(String) -> Nil",               Func::Runtime(build_lib_println)),
+        BuiltinDef::Func("readline",   "() -> String",                  Func::Runtime(build_lib_readline)),
 
 
-        Builtin::Type("Nil",    Type::Object(String::from("Nil"), vec!())),
-        Builtin::Type("Bool",   Type::Object(String::from("Bool"), vec!())),
-        Builtin::Type("Byte",   Type::Object(String::from("Byte"), vec!())),
-        Builtin::Type("Int",    Type::Object(String::from("Int"), vec!())),
-        Builtin::Type("Real",   Type::Object(String::from("Real"), vec!())),
-        Builtin::Type("String", Type::Object(String::from("String"), vec!())),
-        //Builtin::Type("Class",  Type::Object(String::from("Class"), vec!())),
-        Builtin::Type("Buffer", Type::Object(String::from("Buffer"), vec!(Type::Variable(String::from("item"), UniqueID(0))))),
-        Builtin::Type("List",   Type::Object(String::from("List"), vec!(Type::Variable(String::from("item"), UniqueID(0))))),
+        BuiltinDef::Type("Nil",    Type::Object(String::from("Nil"), vec!())),
+        BuiltinDef::Type("Bool",   Type::Object(String::from("Bool"), vec!())),
+        BuiltinDef::Type("Byte",   Type::Object(String::from("Byte"), vec!())),
+        BuiltinDef::Type("Int",    Type::Object(String::from("Int"), vec!())),
+        BuiltinDef::Type("Real",   Type::Object(String::from("Real"), vec!())),
+        BuiltinDef::Type("String", Type::Object(String::from("String"), vec!())),
+        //BuiltinDef::Type("Class",  Type::Object(String::from("Class"), vec!())),
+        BuiltinDef::Type("Buffer", Type::Object(String::from("Buffer"), vec!(Type::Variable(String::from("item"), UniqueID(0))))),
+        BuiltinDef::Type("List",   Type::Object(String::from("List"), vec!(Type::Variable(String::from("item"), UniqueID(0))))),
 
-        Builtin::Class("Int", vec!(), vec!(
-            Builtin::Func("+",   "(Int, Int) -> Int", Func::Comptime(add_int)),
-            Builtin::Func("add", "(Int, Int) -> Int", Func::Runtime(build_lib_add)),
+        BuiltinDef::Class("Int", vec!(), vec!(
+            BuiltinDef::Func("+",   "(Int, Int) -> Int", Func::Comptime(add_int)),
+            BuiltinDef::Func("add", "(Int, Int) -> Int", Func::Runtime(build_lib_add)),
         )),
 
         /*
-        Builtin::Class("String", vec!(), vec!(
-            //Builtin::Func("push", "(String, String) -> String", Func::Comptime(add_int)),
-            Builtin::Func("[]",   "(String, Int) -> Int",       Func::Runtime(build_string_get)),
+        BuiltinDef::Class("String", vec!(), vec!(
+            //BuiltinDef::Func("push", "(String, String) -> String", Func::Comptime(add_int)),
+            BuiltinDef::Func("[]",   "(String, Int) -> Int",       Func::Runtime(build_string_get)),
         )),
         */
-        Builtin::Func("getindex",   "(String, Int) -> Int",       Func::Runtime(build_string_get)),
+        BuiltinDef::Func("getindex",   "(String, Int) -> Int",       Func::Runtime(build_string_get)),
 
-        Builtin::Class("Buffer", vec!(), vec!(
-            Builtin::Func("__alloc__",  "() -> Buffer<'item>",                      Func::Runtime(build_buffer_allocator)),
-            Builtin::Func("new",        "(Buffer<'item>, Int) -> Buffer<'item>",    Func::Runtime(build_buffer_constructor)),
-            Builtin::Func("resize",     "(Buffer<'item>, Int) -> Buffer<'item>",    Func::Runtime(build_buffer_resize)),
-            Builtin::Func("[]",         "(Buffer<'item>, Int) -> 'item",            Func::Runtime(build_buffer_get)),
-            Builtin::Func("[]",         "(Buffer<'item>, Int, 'item) -> 'item",     Func::Runtime(build_buffer_set)),
+        BuiltinDef::Class("Buffer", vec!(), vec!(
+            BuiltinDef::Func("__alloc__",  "() -> Buffer<'item>",                      Func::Runtime(build_buffer_allocator)),
+            BuiltinDef::Func("new",        "(Buffer<'item>, Int) -> Buffer<'item>",    Func::Runtime(build_buffer_constructor)),
+            BuiltinDef::Func("resize",     "(Buffer<'item>, Int) -> Buffer<'item>",    Func::Runtime(build_buffer_resize)),
+            BuiltinDef::Func("[]",         "(Buffer<'item>, Int) -> 'item",            Func::Runtime(build_buffer_get)),
+            BuiltinDef::Func("[]",         "(Buffer<'item>, Int, 'item) -> 'item",     Func::Runtime(build_buffer_set)),
         )),
 
         /*
-        Builtin::Class("List", vec!(
+        BuiltinDef::Class("List", vec!(
             (String::from("items"), parse_type("'item").unwrap()),
             (String::from("size"), parse_type("Int").unwrap()),
             (String::from("capacity"), parse_type("Int").unwrap()),
         ), vec!(
-            Builtin::Func("new",  "(List<'item>) -> List<'item>",       Func::Runtime(build_list_constructor)),
-            Builtin::Func("push", "(List<'item>, 'item) -> Int",        Func::Runtime(build_list_push)),
-            Builtin::Func("[]",   "(List<'item>, Int) -> 'item",        Func::Runtime(build_list_get)),
-            Builtin::Func("[]",   "(List<'item>, Int, 'item) -> 'item", Func::Runtime(build_list_set)),
+            BuiltinDef::Func("new",  "(List<'item>) -> List<'item>",       Func::Runtime(build_list_constructor)),
+            BuiltinDef::Func("push", "(List<'item>, 'item) -> Int",        Func::Runtime(build_list_push)),
+            BuiltinDef::Func("[]",   "(List<'item>, Int) -> 'item",        Func::Runtime(build_list_get)),
+            BuiltinDef::Func("[]",   "(List<'item>, Int, 'item) -> 'item", Func::Runtime(build_list_set)),
         )),
         */
 
 
-        Builtin::Func("+",   "(Int, Int) -> Int",  Func::Comptime(add_int)),
-        Builtin::Func("-",   "(Int, Int) -> Int",  Func::Comptime(sub_int)),
-        Builtin::Func("*",   "(Int, Int) -> Int",  Func::Comptime(mul_int)),
-        Builtin::Func("/",   "(Int, Int) -> Int",  Func::Comptime(div_int)),
-        Builtin::Func("%",   "(Int, Int) -> Int",  Func::Comptime(mod_int)),
-        //Builtin::Func("^",   "(Int, Int) -> Int",  Func::Comptime(pow_int)),
-        //Builtin::Func("<<",  "(Int, Int) -> Int",  Func::Comptime(shl_int)),
-        //Builtin::Func(">>",  "(Int, Int) -> Int",  Func::Comptime(shr_int)),
-        Builtin::Func("&",   "(Int, Int) -> Int",  Func::Comptime(and_int)),
-        Builtin::Func("|",   "(Int, Int) -> Int",  Func::Comptime(or_int)),
-        Builtin::Func("<",   "(Int, Int) -> Bool", Func::Comptime(lt_int)),
-        Builtin::Func(">",   "(Int, Int) -> Bool", Func::Comptime(gt_int)),
-        Builtin::Func("<=",  "(Int, Int) -> Bool", Func::Comptime(lte_int)),
-        Builtin::Func(">=",  "(Int, Int) -> Bool", Func::Comptime(gte_int)),
-        Builtin::Func("==",  "(Int, Int) -> Bool", Func::Comptime(eq_int)),
-        Builtin::Func("!=",  "(Int, Int) -> Bool", Func::Comptime(ne_int)),
-        Builtin::Func("~",   "(Int) -> Int",       Func::Comptime(com_int)),
-        Builtin::Func("not", "(Int) -> Bool",      Func::Comptime(not_int)),
+        BuiltinDef::Func("+",   "(Int, Int) -> Int",  Func::Comptime(add_int)),
+        BuiltinDef::Func("-",   "(Int, Int) -> Int",  Func::Comptime(sub_int)),
+        BuiltinDef::Func("*",   "(Int, Int) -> Int",  Func::Comptime(mul_int)),
+        BuiltinDef::Func("/",   "(Int, Int) -> Int",  Func::Comptime(div_int)),
+        BuiltinDef::Func("%",   "(Int, Int) -> Int",  Func::Comptime(mod_int)),
+        //BuiltinDef::Func("^",   "(Int, Int) -> Int",  Func::Comptime(pow_int)),
+        //BuiltinDef::Func("<<",  "(Int, Int) -> Int",  Func::Comptime(shl_int)),
+        //BuiltinDef::Func(">>",  "(Int, Int) -> Int",  Func::Comptime(shr_int)),
+        BuiltinDef::Func("&",   "(Int, Int) -> Int",  Func::Comptime(and_int)),
+        BuiltinDef::Func("|",   "(Int, Int) -> Int",  Func::Comptime(or_int)),
+        BuiltinDef::Func("<",   "(Int, Int) -> Bool", Func::Comptime(lt_int)),
+        BuiltinDef::Func(">",   "(Int, Int) -> Bool", Func::Comptime(gt_int)),
+        BuiltinDef::Func("<=",  "(Int, Int) -> Bool", Func::Comptime(lte_int)),
+        BuiltinDef::Func(">=",  "(Int, Int) -> Bool", Func::Comptime(gte_int)),
+        BuiltinDef::Func("==",  "(Int, Int) -> Bool", Func::Comptime(eq_int)),
+        BuiltinDef::Func("!=",  "(Int, Int) -> Bool", Func::Comptime(ne_int)),
+        BuiltinDef::Func("~",   "(Int) -> Int",       Func::Comptime(com_int)),
+        BuiltinDef::Func("not", "(Int) -> Bool",      Func::Comptime(not_int)),
 
 
-        Builtin::Func("+",   "(Real, Real) -> Real",  Func::Comptime(add_real)),
-        Builtin::Func("-",   "(Real, Real) -> Real",  Func::Comptime(sub_real)),
-        Builtin::Func("*",   "(Real, Real) -> Real",  Func::Comptime(mul_real)),
-        Builtin::Func("/",   "(Real, Real) -> Real",  Func::Comptime(div_real)),
-        Builtin::Func("%",   "(Real, Real) -> Real",  Func::Comptime(mod_real)),
-        Builtin::Func("^",   "(Real, Real) -> Real",  Func::Comptime(pow_real)),
-        Builtin::Func("<",   "(Real, Real) -> Bool",  Func::Comptime(lt_real)),
-        Builtin::Func(">",   "(Real, Real) -> Bool",  Func::Comptime(gt_real)),
-        Builtin::Func("<=",  "(Real, Real) -> Bool",  Func::Comptime(lte_real)),
-        Builtin::Func(">=",  "(Real, Real) -> Bool",  Func::Comptime(gte_real)),
-        Builtin::Func("==",  "(Real, Real) -> Bool",  Func::Comptime(eq_real)),
-        Builtin::Func("!=",  "(Real, Real) -> Bool",  Func::Comptime(ne_real)),
-        Builtin::Func("not", "(Real) -> Bool",        Func::Comptime(not_real)),
+        BuiltinDef::Func("+",   "(Real, Real) -> Real",  Func::Comptime(add_real)),
+        BuiltinDef::Func("-",   "(Real, Real) -> Real",  Func::Comptime(sub_real)),
+        BuiltinDef::Func("*",   "(Real, Real) -> Real",  Func::Comptime(mul_real)),
+        BuiltinDef::Func("/",   "(Real, Real) -> Real",  Func::Comptime(div_real)),
+        BuiltinDef::Func("%",   "(Real, Real) -> Real",  Func::Comptime(mod_real)),
+        BuiltinDef::Func("^",   "(Real, Real) -> Real",  Func::Comptime(pow_real)),
+        BuiltinDef::Func("<",   "(Real, Real) -> Bool",  Func::Comptime(lt_real)),
+        BuiltinDef::Func(">",   "(Real, Real) -> Bool",  Func::Comptime(gt_real)),
+        BuiltinDef::Func("<=",  "(Real, Real) -> Bool",  Func::Comptime(lte_real)),
+        BuiltinDef::Func(">=",  "(Real, Real) -> Bool",  Func::Comptime(gte_real)),
+        BuiltinDef::Func("==",  "(Real, Real) -> Bool",  Func::Comptime(eq_real)),
+        BuiltinDef::Func("!=",  "(Real, Real) -> Bool",  Func::Comptime(ne_real)),
+        BuiltinDef::Func("not", "(Real) -> Bool",        Func::Comptime(not_real)),
 
 
-        Builtin::Func("==",  "(Bool, Bool) -> Bool",  Func::Comptime(eq_bool)),
-        Builtin::Func("!=",  "(Bool, Bool) -> Bool",  Func::Comptime(ne_bool)),
-        Builtin::Func("not", "(Bool) -> Bool",        Func::Comptime(not_bool)),
+        BuiltinDef::Func("==",  "(Bool, Bool) -> Bool",  Func::Comptime(eq_bool)),
+        BuiltinDef::Func("!=",  "(Bool, Bool) -> Bool",  Func::Comptime(ne_bool)),
+        BuiltinDef::Func("not", "(Bool) -> Bool",        Func::Comptime(not_bool)),
     )
 }
 

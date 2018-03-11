@@ -1,12 +1,12 @@
 
+* you need a way to temporarily store compiler results for use shortly after, for method calls and list creating; so that they can be fully desugared up front
+* you need to desugar list creation up front to avoid the specific calls (we can convert them, but why bother if we can reguarlize it; we just need a temp variable...
+* method conversion with a simple tempvar might mess with the handling of fexpr in function processing...
+* there's an issue with calling a function that's a struct member of a class, because method calls are converted into Resolves, which doesn't work because you need the object to get the struct member
+
 * the buffer bool issue is becaues parse_type probably creates a new unique variable now for each field in the builtin decl...
 * the issue with the list bool is because the compiling of libcore fails to use the same variable for function returns as for inputs
 
-* make a trait to wrap LLVMValueRef such that you can tag metainfo along with the value itself, returned by the recurvise function in compiler_llvm, including the abi
-  info, extern, any other additional properties
-* do you need to make special types for abi function calls, distict from normal functions, such that you can't assign a c function pointer to a molten function variable, since they
-  will be called in different ways...  I suppose this can't be too internalized, since programmers will need to figure out there's a problem from the error messages...
-* there's an issue with calling a function that's a struct member of a class, because method calls are converted into Resolves, which doesn't work because you need the object to get the struct member
 
 * make sure to redo the escaped string parsing
 * "match" only works with integers... maybe call ==, but it would have to mangle correctly
