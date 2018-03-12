@@ -1,4 +1,4 @@
  
-pub mod lib_llvm;
-pub mod compiler_llvm;
+pub mod lib;
+pub mod compiler;
 

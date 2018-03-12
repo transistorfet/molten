@@ -16,7 +16,7 @@ use session::Session;
 use ast::{ AST, Pos };
 use scope::{ Scope, ScopeRef, ScopeMapRef };
 
-use llvm::lib_llvm::{ BuiltinDef, BuiltinMap, initialize_builtins };
+use llvm::lib::{ BuiltinDef, initialize_builtins };
 
 
 pub type Value = Box<Compilable>;
@@ -184,7 +184,7 @@ pub struct LLVM<'a> {
     pub session: &'a Session<Value, TypeValue>,
     pub map: ScopeMapRef<Value, TypeValue>,
     //pub builtins: TypeFunctionMap,
-    pub builtins: BuiltinMap<'a>,
+    //pub builtins: BuiltinMap<'a>,
     pub functions: Vec<&'a AST>,
     pub classes: Vec<&'a AST>,
     pub context: LLVMContextRef,
@@ -209,7 +209,7 @@ unsafe fn compile_module(builtins: &Vec<BuiltinDef>, session: &Session<Value, Ty
     let data = &mut LLVM {
         session: session,
         map: session.map.clone(),
-        builtins: BuiltinMap::new(),
+        //builtins: BuiltinMap::new(),
         functions: Vec::new(),
         classes: Vec::new(),
         context: context,

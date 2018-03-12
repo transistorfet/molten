@@ -15,7 +15,7 @@ use binding::{ declare_typevars };
 use types::{ Type, check_type, Check };
 use utils::UniqueID;
 
-use llvm::compiler_llvm::*;
+use llvm::compiler::*;
 
 
 pub type RuntimeFunction = unsafe fn(&LLVM, &str, LLVMTypeRef) -> LLVMValueRef;
@@ -36,6 +36,7 @@ pub enum BuiltinDef<'a> {
     Class(&'a str, Vec<(String, Type)>, Vec<BuiltinDef<'a>>),
 }
 
+/*
 #[derive(Clone)]
 pub struct BuiltinMap<'a> (HashMap<&'a str, Vec<(ComptimeFunction, Type)>>);
 
@@ -72,6 +73,7 @@ impl<'a> BuiltinMap<'a> {
         }
     }
 }
+*/
 
 pub fn make_global<'a, V, T>(map: ScopeMapRef<V, T>, builtins: &Vec<BuiltinDef<'a>>) where V: Clone + Debug, T: Clone + Debug {
     let primatives = map.add(ScopeMapRef::<V, T>::PRIMATIVE, None);
@@ -147,7 +149,7 @@ pub unsafe fn declare_builtins_node<'a>(data: &mut LLVM<'a>, objtype: LLVMTypeRe
                     scope.borrow_mut().assign(&name, from_type(&ftype, func(data, fname.as_str(), objtype)));
                 },
                 Func::Comptime(func) => {
-                    data.builtins.add(sname, func, ftype.clone());
+                    //data.builtins.add(sname, func, ftype.clone());
                     if scope.borrow().get_variable_type(&name).unwrap().is_overloaded() {
                         name = scope::mangle_name(&name, ftype.get_argtypes().unwrap());
                         scope.borrow_mut().define(name.clone(), Some(ftype.clone())).unwrap();

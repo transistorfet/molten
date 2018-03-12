@@ -31,8 +31,8 @@ mod export;
 mod llvm;
 
 use config::Options;
-use llvm::compiler_llvm;
-use llvm::lib_llvm;
+use llvm::compiler;
+use llvm::lib;
 
 fn main() {
     let matches =
@@ -77,8 +77,8 @@ fn compile_file(input: &str, output: Option<&str>) {
     let name = input.rsplitn(2, '.').collect::<Vec<&str>>()[1];
     session.target = output.map(|s| String::from(s)).unwrap_or_else(|| format!("{}.ll", name));
 
-    let builtins = lib_llvm::get_builtins();
-    lib_llvm::make_global(session.map.clone(), &builtins);
+    let builtins = lib::get_builtins();
+    lib::make_global(session.map.clone(), &builtins);
 
     let mut code = session.parse_file(input, false);
     //code = refinery::refine(code);
@@ -95,7 +95,7 @@ fn compile_file(input: &str, output: Option<&str>) {
 
     code = precompiler::precompile(&session, code);
 
-    compiler_llvm::compile(&builtins, &session, name, &mut code);
+    compiler::compile(&builtins, &session, name, &mut code);
 }
 
 

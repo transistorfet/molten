@@ -89,6 +89,7 @@ pub fn refine_node(node: AST) -> AST {
                     Box::new(AST::Accessor(pos.clone(), Box::new(AST::Identifier(pos.clone(), id.clone())), String::from("push"), None)),
                     vec!(item), None));
             }
+            block.push(AST::Identifier(pos.clone(), id.clone()));
             AST::Block(pos.clone(), refine_vec(block))
         },
         */
