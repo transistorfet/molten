@@ -76,12 +76,14 @@ pub fn check_types_node_or_error<V, T>(session: &Session<V, T>, scope: ScopeRef<
             if name.is_some() {
                 let dscope = Scope::target(scope.clone());
                 let dname = name.clone().unwrap();
-                if dscope.borrow().is_overloaded(&dname) {
-                    let fname = scope::mangle_name(&dname, &argtypes);
-                    dscope.borrow_mut().define(fname.clone(), Some(nftype.clone()))?;
-                    *name = Some(fname);
-                }
-                Scope::add_func_variant(dscope.clone(), &dname, scope.clone(), nftype.clone());
+                //if dscope.borrow().is_overloaded(&dname) {
+                    let fname = abi.mangle_name(dname.as_str(), &argtypes, dscope.borrow().num_funcdefs(&dname));
+                    if !dscope.borrow().contains(&fname) {
+                        dscope.borrow_mut().define(fname.clone(), Some(nftype.clone()))?;
+                        *name = Some(fname);
+                    }
+                //}
+                Scope::add_func_variant(dscope.clone(), &dname, scope.clone(), nftype.clone())?;
             }
 
             //debug!("RAISING: {:?} {:?} {:?}", scope.borrow().get_basename(), fscope.borrow().get_basename(), nftype);
@@ -96,21 +98,27 @@ pub fn check_types_node_or_error<V, T>(session: &Session<V, T>, scope: ScopeRef<
             }
 
             let tscope = Scope::new_ref(Some(scope.clone()));
-            let mut etype = check_types_node(session, scope.clone(), fexpr, None);
-            etype = tscope.borrow_mut().map_all_typevars(etype.clone());
-
-            if let Type::Overload(_) = etype {
-                etype = find_variant(tscope.clone(), etype, atypes.clone())?;
-                match **fexpr {
-                    AST::Resolver(_, _, ref mut name) |
-                    AST::Accessor(_, _, ref mut name, _) |
-                    AST::Identifier(_, ref mut name) => *name = scope::mangle_name(name, etype.get_argtypes()?),
-                    _ => return Err(Error::new(format!("OverloadError: calling an overloaded function must be by name: not {:?}", fexpr))),
-                }
-            }
+            let dtype = check_types_node(session, scope.clone(), fexpr, None);
+            let mut etype = tscope.borrow_mut().map_all_typevars(dtype.clone());
+            let etype = match etype.is_overloaded() {
+                true => find_variant(tscope.clone(), etype, atypes.clone())?,
+                false => etype,
+            };
 
             let ftype = match etype {
-                Type::Function(_, _, ref abi) => {
+                Type::Function(ref args, _, ref abi) => {
+                    /*
+                    match **fexpr {
+                        AST::Resolver(_, _, ref mut name) |
+                        AST::Accessor(_, _, ref mut name, _) |
+                        AST::Identifier(_, ref mut name) => {
+                            *name = etype.get_abi().unwrap_or(ABI::Molten).mangle_name(name, args, dtype.num_funcdefs());
+                        },
+                        _ =>  { } //return Err(Error::new(format!("OverloadError: calling an overloaded function must be by name: not {:?}", fexpr))),
+                    }
+                    */
+                    get_accessor_name(tscope.clone(), fexpr.as_mut(), &etype)?;
+
                     let ftype = expect_type(tscope.clone(), Some(etype.clone()), Some(Type::Function(atypes, Box::new(etype.get_rettype()?.clone()), abi.clone())), Check::Def)?;
                     // TODO should this actually be another expect, so type resolutions that occur in later args affect earlier args?  Might not be needed unless you add typevar constraints
                     let ftype = resolve_type(tscope.clone(), ftype);        // NOTE This ensures the early arguments are resolved despite typevars not being assigned until later in the signature
@@ -157,6 +165,7 @@ pub fn check_types_node_or_error<V, T>(session: &Session<V, T>, scope: ScopeRef<
             ttype.clone()
         },
 
+        AST::Recall(_, ref name) |
         AST::Identifier(_, ref name) => {
             let mut bscope = scope.borrow_mut();
             bscope.get_variable_type(name).unwrap_or_else(|| expected.unwrap_or_else(|| bscope.new_typevar()))
@@ -283,6 +292,43 @@ pub fn check_types_node_or_error<V, T>(session: &Session<V, T>, scope: ScopeRef<
     Ok(rtype)
 }
 
+pub fn get_accessor_name<V, T>(scope: ScopeRef<V, T>, fexpr: &mut AST, etype: &Type) -> Result<i32, Error> where V: Clone, T: Clone {
+    let funcdefs = match *fexpr {
+        AST::Resolver(_, ref left, ref mut name) => {
+            let ltype = match **left {
+                // TODO this caused an issue with types that have typevars that aren't declared (ie. Buffer['item])
+                //AST::Identifier(_, ref name) => resolve_type(scope.clone(), scope.borrow().find_type(name).unwrap().clone()),
+                AST::Identifier(_, ref name) => scope.borrow().find_type(name).unwrap().clone(),
+                _ => return Err(Error::new(format!("SyntaxError: left-hand side of scope resolver must be identifier")))
+            };
+
+            let classdef = scope.borrow().get_class_def(&ltype.get_name()?);
+            let funcdefs = classdef.borrow().num_funcdefs(name);
+            funcdefs
+        },
+        AST::Accessor(_, _, ref mut name, ref ltype) => {
+            let classdef = scope.borrow().get_class_def(&ltype.as_ref().unwrap().get_name()?);
+            let funcdefs = classdef.borrow().num_funcdefs(name);
+            funcdefs
+        },
+        AST::Identifier(_, ref mut name) => {
+            scope.borrow().num_funcdefs(name)
+        },
+        _ =>  { 0 } //return Err(Error::new(format!("OverloadError: calling an overloaded function must be by name: not {:?}", fexpr))),
+    };
+
+    match *fexpr {
+        AST::Resolver(_, _, ref mut name) |
+        AST::Accessor(_, _, ref mut name, _) |
+        AST::Identifier(_, ref mut name) => {
+            *name = etype.get_abi().unwrap_or(ABI::Molten).mangle_name(name, etype.get_argtypes()?, funcdefs);
+            debug!("^^^^^^^^^^ MANGLE NAME {:?} {:?} {:?}", name, funcdefs, etype);
+        },
+        _ =>  { } //return Err(Error::new(format!("OverloadError: calling an overloaded function must be by name: not {:?}", fexpr))),
+    }
+
+    Ok(funcdefs)
+}
 
 pub fn update_scope_variable_types<V, T>(scope: ScopeRef<V, T>) where V: Clone, T: Clone {
     let dscope = Scope::target(scope.clone());

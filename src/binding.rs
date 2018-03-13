@@ -2,6 +2,7 @@
 
 use std::fmt::Debug;
 
+use abi::ABI;
 use ast::AST;
 use types::Type;
 use session::{ Session, Error };
@@ -65,7 +66,7 @@ fn bind_names_node_or_error<V, T>(session: &Session<V, T>, scope: ScopeRef<V, T>
             declare_typevars(scope.clone(), Some(ttype), false)?;
             let dscope = Scope::target(scope.clone());
             dscope.borrow_mut().define_func(name.clone(), Some(ttype.clone()), true)?;
-            if let Some(ref mname) = scope::unmangle_name(name) {
+            if let Some(ref mname) = ttype.get_abi().unwrap_or(ABI::Molten).unmangle_name(name.as_str()) {
                 dscope.borrow_mut().define_func(mname.clone(), None, true)?;
                 let mut stype = dscope.borrow().get_variable_type(mname).unwrap_or(Type::Overload(vec!()));
                 stype = stype.add_variant(scope.clone(), ttype.clone())?;
@@ -73,6 +74,7 @@ fn bind_names_node_or_error<V, T>(session: &Session<V, T>, scope: ScopeRef<V, T>
             }
         },
 
+        AST::Recall(_, ref name) |
         AST::Identifier(_, ref name) => {
             if !scope.borrow().contains(name) {
                 return Err(Error::new(format!("NameError: undefined identifier {:?}", name)));

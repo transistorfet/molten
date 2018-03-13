@@ -3,9 +3,9 @@ use std::fmt::Debug;
 
 use ast::AST;
 use session::Session;
-use types::{ resolve_type };
-use typecheck::{ update_scope_variable_types };
-use scope::{ ScopeRef };
+use types::{ Type, resolve_type };
+use typecheck::{ self, update_scope_variable_types };
+use scope::{ Scope, ScopeRef };
 //use utils::UniqueID;
 
 
@@ -34,7 +34,7 @@ pub fn precompile_node<V, T>(session: &Session<V, T>, scope: ScopeRef<V, T>, nod
             AST::Declare(pos, name, resolve_type(scope.clone(), ttype))
         },
 
-        AST::Function(pos, name, mut args, ret, body, id, abi) => {
+        AST::Function(pos, mut name, mut args, ret, body, id, abi) => {
             let fscope = session.map.get(&id);
             update_scope_variable_types(fscope.clone());
             /*
@@ -86,18 +86,47 @@ pub fn precompile_node<V, T>(session: &Session<V, T>, scope: ScopeRef<V, T>, nod
             } else {
             */
                 // TODO resolve types of args
-                AST::Function(pos, name, args, Some(resolve_type(fscope.clone(), ret.unwrap())), Box::new(precompile_node(session, fscope.clone(), *body)), id, abi)
+                //AST::Function(pos, name, args, Some(resolve_type(fscope.clone(), ret.unwrap())), Box::new(precompile_node(session, fscope.clone(), *body)), id, abi)
             //}
+
+            // Mangle names of overloaded functions
+            /*
+            if let Some(sname) = name.clone() {
+                let dscope = Scope::target(scope.clone());
+                /*
+                let mut ftype = dscope.borrow().get_variable_type(&sname).unwrap();
+                if ftype.is_overloaded() {
+                    ftype = types::find_variant(scope.clone(), ftype, args.iter().map(|t| t.1.clone().unwrap()).collect()).unwrap();
+                }
+                debug!("***: {:?} {:?}", sname, ftype);
+                let argtypes = ftype.get_argtypes().unwrap();
+                let abi = ftype.get_abi().unwrap();
+                */
+                let argtypes = args.iter().map(|t| t.1.clone().unwrap()).collect();
+                let fname = abi.mangle_name(sname.as_str(), &argtypes, dscope.borrow().num_funcdefs(&sname));
+                if !dscope.borrow().contains(&fname) {
+                    dscope.borrow_mut().define(fname.clone(), Some(Type::Function(argtypes.clone(), Box::new(ret.clone().unwrap()), abi.clone()))).unwrap();
+                    name = Some(fname);
+                }
+            }
+            */
+
+            AST::Function(pos, name, args, Some(resolve_type(fscope.clone(), ret.unwrap())), Box::new(precompile_node(session, fscope.clone(), *body)), id, abi)
         },
 
-        AST::Invoke(pos, fexpr, args, stype) => {
+        AST::Invoke(pos, mut fexpr, args, stype) => {
             // TODO you could detect a closure with an explicit tag on variable??? no you'de have to process fexpr
             //if something {
             //args.insert(0, precompile_node(session, scope.clone(), *fexpr));
             //}
+
+            // Mangle names of overloaded functions
+            //typecheck::get_accessor_name(scope.clone(), &mut fexpr.as_mut(), stype.as_ref().unwrap()).unwrap();
+
             AST::Invoke(pos, Box::new(precompile_node(session, scope.clone(), *fexpr)), precompile_vec(session, scope.clone(), args), Some(resolve_type(scope.clone(), stype.unwrap())))
         },
 
+        AST::Recall(_, _) => node,
         AST::Identifier(pos, name) => {
             /*
             if scope.borrow().is_closure_var(&name) {

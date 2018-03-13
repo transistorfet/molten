@@ -1,6 +1,13 @@
  
 
 use std::fmt;
+use std::str;
+
+extern crate nom;
+use nom::{ digit };
+
+use parser;
+use types::Type;
 
 //pub struct ABI(i32)
 
@@ -38,6 +45,22 @@ impl ABI {
             ABI::Rust => "rust",
         }
     }
+
+    pub fn mangle_name(&self, name: &str, argtypes: &Vec<Type>, funcdefs: i32) -> String {
+        match *self {
+            ABI::Molten => molten_mangle_name(name, argtypes, funcdefs),
+            // TODO C++, etc
+            _ => String::from(name),
+        }
+    }
+
+    pub fn unmangle_name(&self, name: &str) -> Option<String> {
+        match *self {
+            ABI::Molten => molten_unmangle_name(name),
+            // TODO C++, etc
+            _ => None,
+        }
+    }
 }
 
 impl fmt::Display for ABI {
@@ -48,4 +71,36 @@ impl fmt::Display for ABI {
         }
     }
 }
+
+
+pub fn molten_mangle_name(name: &str, argtypes: &Vec<Type>, funcdefs: i32) -> String {
+    if funcdefs >= 2 {
+        let mut args = String::from("");
+        for ttype in argtypes {
+            args = args + &match *ttype {
+                // TODO add type paramaters into name
+                Type::Variable(_, _) => format!("V"),
+                Type::Object(ref name, ref types) => format!("N{}{}", name.len(), name),
+                // TODO this isn't complete, you have to deal with other types
+                _ => String::from(""),
+            };
+        }
+        format!("_Z{}{}{}", name.len(), name, args)
+    } else {
+        String::from(name)
+    }
+}
+
+pub fn molten_unmangle_name(name: &str) -> Option<String> {
+    named!(unmangle(parser::Span) -> String,
+        preceded!(tag!("_Z"),
+            map_str!(length_bytes!(map!(digit, |s| usize::from_str_radix(str::from_utf8(s.fragment).unwrap(), 10).unwrap())))
+        )
+    );
+    match unmangle(parser::Span::new(name.as_bytes())) {
+        nom::IResult::Done(_, value) => Some(value),
+        _ => None,
+    }
+}
+
 

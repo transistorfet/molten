@@ -61,6 +61,13 @@ impl Type {
         }
     }
 
+    pub fn is_function(&self) -> bool {
+        match *self {
+            Type::Function(_, _, _) => true,
+            _ => false
+        }
+    }
+
     pub fn is_variable(&self) -> bool {
         match *self {
             Type::Variable(_, _) => true,
@@ -79,6 +86,14 @@ impl Type {
         match self {
             &Type::Overload(ref variants) => variants.clone(),
             _ => vec!(self.clone()),
+        }
+    }
+
+    pub fn num_funcdefs(&self) -> i32 {
+        match *self {
+            Type::Overload(ref variants) => variants.len() as i32,
+            Type::Function(_, _, _) => 1,
+            _ => 0
         }
     }
 
@@ -164,10 +179,11 @@ impl fmt::Display for Type {
 //}
 
 
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Check {
     Def,
     List,
+    Variant,
 }
 
 pub fn expect_type<V, T>(scope: ScopeRef<V, T>, odtype: Option<Type>, octype: Option<Type>, mode: Check) -> Result<Type, Error> where V: Clone, T: Clone {
@@ -197,6 +213,7 @@ pub fn check_type<V, T>(scope: ScopeRef<V, T>, odtype: Option<Type>, octype: Opt
         let ctype = resolve_type(scope.clone(), octype.unwrap());
 
         if let Type::Variable(_, ref id) = ctype {
+            //if mode == Check::Variant && !dtype.is_variable() { return Err(Error::new(format!("TypeError: variant expected {:?}, but found {:?}", dtype, ctype))) }
             //if update { scope.borrow_mut().update_type(&id.to_string(), dtype.clone()); }
             if update { Type::update_type(scope.clone(), &id.to_string(), dtype.clone()); }
             Ok(dtype)
@@ -331,7 +348,7 @@ pub fn find_variant<V, T>(scope: ScopeRef<V, T>, otype: Type, atypes: Vec<Type>)
                     }
                     for (otype, atype) in otypes.iter().zip(atypes.iter()) {
                         debug!("**CHECKING VARIANT: {:?} {:?}", otype, atype);
-                        if check_type(scope.clone(), Some(otype.clone()), Some(atype.clone()), Check::Def, false).is_err() {
+                        if check_type(scope.clone(), Some(otype.clone()), Some(atype.clone()), Check::Variant, false).is_err() {
                             continue 'outer;
                         }
                     }

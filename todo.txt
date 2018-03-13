@@ -1,4 +1,11 @@
 
+* currently, it's doing name mangling during the precompile stage, and name mangling all functions, not just functions with two defs... now the issues are
+  - recursion for named methods/functions seems to be broken, because invoked undefs have abi set to Unknown, but sprintf defs are just a variable... so can't assume abi
+  - definition and invokation of buffer methods because they don't mangle properly
+  - invokation of List methods, again not mangled properly
+
+* add a check to see that a function *can* be overloaded, before it is
+
 * you need a way to temporarily store compiler results for use shortly after, for method calls and list creating; so that they can be fully desugared up front
 * you need to desugar list creation up front to avoid the specific calls (we can convert them, but why bother if we can reguarlize it; we just need a temp variable...
 * method conversion with a simple tempvar might mess with the handling of fexpr in function processing...

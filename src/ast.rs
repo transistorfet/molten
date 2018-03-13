@@ -62,6 +62,7 @@ pub enum AST {
     Nil(Option<Type>),
     List(Pos, Vec<AST>),
 
+    Recall(Pos, String),
     Identifier(Pos, String),
     Index(Pos, Box<AST>, Box<AST>, Option<Type>),
     Resolver(Pos, Box<AST>, String),
@@ -92,6 +93,7 @@ impl AST {
     pub fn get_pos(&self) -> Pos {
         match *self {
             AST::List(ref pos, _) |
+            AST::Recall(ref pos, _) |
             AST::Identifier(ref pos, _) |
             AST::Index(ref pos, _, _, _) |
             AST::Resolver(ref pos, _, _) |

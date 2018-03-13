@@ -174,6 +174,7 @@ pub fn refine_node(node: AST) -> AST {
         AST::String(_) => { node },
         AST::Nil(_) => { node },
         AST::Identifier(_, _) => { node },
+        AST::Recall(_, _) => { node },
         AST::New(_, _) => { node },
         AST::Type(_, _, _) => { node },
 

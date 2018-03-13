@@ -115,6 +115,7 @@ class List<'item> {
         self[index]
     }
 
+    /*
     fn insert(self, index: Int, item: 'item) {
         self.move_right(index, item)
     }
@@ -126,6 +127,17 @@ class List<'item> {
             let cur = self.data[index]
             self.data[index] = item
             self.move_right(index + 1, cur)
+        }
+    }
+    */
+
+    fn insert(self, index: Int, item: 'item) {
+        if index >= self.length then {
+            self.push(item)
+        } else {
+            let cur = self.data[index]
+            self.data[index] = item
+            self.insert(index + 1, cur)
         }
     }
 }

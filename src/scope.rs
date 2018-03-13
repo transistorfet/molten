@@ -5,9 +5,6 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::collections::hash_map::Entry;
 
-extern crate nom;
-use nom::{ digit };
-
 use parser;
 use types::Type;
 use session::Error;
@@ -132,8 +129,7 @@ impl<V, T> Scope<V, T> where V: Clone, T: Clone {
     #[must_use]
     pub fn define_func_variant(dscope: ScopeRef<V, T>, name: String, tscope: ScopeRef<V, T>, ftype: Type) -> Result<(), Error> {
         dscope.borrow_mut().define_func(name.clone(), None, false)?;
-        // TODO add error handling to add_func_variant
-        Scope::add_func_variant(dscope, &name, tscope, ftype);
+        Scope::add_func_variant(dscope, &name, tscope, ftype)?;
         Ok(())
     }
 
@@ -181,10 +177,6 @@ impl<V, T> Scope<V, T> where V: Clone, T: Clone {
     }
 
 
-    pub fn is_overloaded(&self, name: &String) -> bool {
-        self.search(name, |sym| Some(sym.funcdefs >= 2)).unwrap()
-    }
-
     pub fn assign(&mut self, name: &String, value: V) {
         self.modify_local(name, move |sym| sym.value = Some(value.clone()))
     }
@@ -227,11 +219,21 @@ impl<V, T> Scope<V, T> where V: Clone, T: Clone {
         variants
     }
 
-    pub fn add_func_variant(dscope: ScopeRef<V, T>, name: &String, tscope: ScopeRef<V, T>, ftype: Type) {
+    #[must_use]
+    pub fn add_func_variant(dscope: ScopeRef<V, T>, name: &String, tscope: ScopeRef<V, T>, ftype: Type) -> Result<(), Error> {
         let otype = dscope.borrow().get_variable_type_full(name, true);
-        let ftype = otype.map(|ttype| ttype.add_variant(tscope.clone(), ftype.clone()).unwrap()).unwrap_or(ftype);
+        let ftype = match otype {
+            Some(ttype) => ttype.add_variant(tscope.clone(), ftype.clone())?,
+            None => ftype,
+        };
         dscope.borrow_mut().set_variable_type(name, ftype.clone());
+        Ok(())
     }
+
+    pub fn num_funcdefs(&self, name: &String) -> i32 {
+        self.search(name, |sym| Some(sym.funcdefs)).unwrap_or(0)
+    }
+
 
     pub fn is_closure_var(&self, name: &String) -> bool {
         if self.names.contains_key(name) {
@@ -621,31 +623,4 @@ impl<V, T> ScopeMapRef<V, T> where V: Clone, T: Clone {
     //    }
     //}
 }
-
-pub fn mangle_name(name: &String, argtypes: &Vec<Type>) -> String {
-    let mut args = String::from("");
-    for ttype in argtypes {
-        args = args + &match *ttype {
-            // TODO add type paramaters into name
-            Type::Variable(_, _) => format!("V"),
-            Type::Object(ref name, ref types) => format!("N{}{}", name.len(), name),
-            // TODO this isn't complete, you have to deal with other types
-            _ => String::from(""),
-        };
-    }
-    format!("_Z{}{}{}", name.len(), name, args)
-}
-
-pub fn unmangle_name(name: &String) -> Option<String> {
-    named!(unmangle(parser::Span) -> String,
-        preceded!(tag!("_Z"),
-            map_str!(length_bytes!(map!(digit, |s| usize::from_str_radix(str::from_utf8(s.fragment).unwrap(), 10).unwrap())))
-        )
-    );
-    match unmangle(parser::Span::new(name.as_bytes())) {
-        nom::IResult::Done(_, value) => Some(value),
-        _ => None,
-    }
-}
-
 
