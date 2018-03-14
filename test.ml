@@ -25,7 +25,7 @@
 
         let testy = fn x => x + 1
         let fac = fn (x : Int, y = 5 * 3, z: String = "hey") => if not x then 1 else x - -123
-        let fac2 = fn x, y, z => if not x then 1 else x - -123
+        //let fac2 = fn x, y, z => if not x then 1 else x - -123
         testy(3)
 
         // TODO this were causing trouble, but seem to compile now...
@@ -96,7 +96,7 @@
         class TestClass extends Stuff {
             fn new(self) { }
 
-            let bar = fn self, x => {
+            let bar = fn self, x: Int => {
                 self.foo2(x)
             }
 

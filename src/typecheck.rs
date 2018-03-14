@@ -28,7 +28,8 @@ pub fn check_types_node<V, T>(session: &Session<V, T>, scope: ScopeRef<V, T>, no
         Ok(ttype) => ttype,
         Err(err) => {
             session.print_error(err.add_pos(&node.get_pos()));
-            Type::Object(String::from("Nil"), vec!())
+            //Type::Object(String::from("Nil"), vec!())
+            scope.borrow_mut().new_typevar()
         }
     }
 }
@@ -69,8 +70,6 @@ pub fn check_types_node_or_error<V, T>(session: &Session<V, T>, scope: ScopeRef<
                 args[i].1 = Some(argtypes[i].clone());
             }
             update_scope_variable_types(fscope.clone());
-            // TODO this fixes the type error, but makes a ton of stupid typevars
-            //scope.borrow_mut().raise_types(fscope.clone());
 
             let mut nftype = Type::Function(argtypes.clone(), Box::new(rettype), abi.clone());
             if name.is_some() {
@@ -85,9 +84,6 @@ pub fn check_types_node_or_error<V, T>(session: &Session<V, T>, scope: ScopeRef<
                 //}
                 Scope::add_func_variant(dscope.clone(), &dname, scope.clone(), nftype.clone())?;
             }
-
-            //debug!("RAISING: {:?} {:?} {:?}", scope.borrow().get_basename(), fscope.borrow().get_basename(), nftype);
-            //scope.borrow_mut().raise_type(fscope.clone(), nftype.clone());
             nftype
         },
 
@@ -139,7 +135,6 @@ pub fn check_types_node_or_error<V, T>(session: &Session<V, T>, scope: ScopeRef<
                 _ => return Err(Error::new(format!("NotAFunction: {:?}", fexpr))),
             };
 
-            //scope.borrow_mut().raise_types(tscope.clone());
             *stype = Some(ftype.clone());
             ftype.get_rettype()?.clone()
         },

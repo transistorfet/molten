@@ -148,6 +148,10 @@ impl Type {
             //}
         }
     }
+
+    pub fn display_vec(list: &Vec<Type>) -> String {
+        list.iter().map(|t| format!("{}", t)).collect::<Vec<String>>().join(", ")
+    }
 }
 
 impl fmt::Display for Type {
@@ -183,7 +187,6 @@ impl fmt::Display for Type {
 pub enum Check {
     Def,
     List,
-    Variant,
 }
 
 pub fn expect_type<V, T>(scope: ScopeRef<V, T>, odtype: Option<Type>, octype: Option<Type>, mode: Check) -> Result<Type, Error> where V: Clone, T: Clone {
@@ -213,12 +216,9 @@ pub fn check_type<V, T>(scope: ScopeRef<V, T>, odtype: Option<Type>, octype: Opt
         let ctype = resolve_type(scope.clone(), octype.unwrap());
 
         if let Type::Variable(_, ref id) = ctype {
-            //if mode == Check::Variant && !dtype.is_variable() { return Err(Error::new(format!("TypeError: variant expected {:?}, but found {:?}", dtype, ctype))) }
-            //if update { scope.borrow_mut().update_type(&id.to_string(), dtype.clone()); }
             if update { Type::update_type(scope.clone(), &id.to_string(), dtype.clone()); }
             Ok(dtype)
         } else if let Type::Variable(_, ref id) = dtype {
-            //if update { scope.borrow_mut().update_type(&id.to_string(), ctype.clone()); }
             if update { Type::update_type(scope.clone(), &id.to_string(), ctype.clone()); }
             Ok(ctype)
         } else {
@@ -272,9 +272,6 @@ fn is_subclass_of<V, T>(scope: ScopeRef<V, T>, adef: (&String, &Vec<Type>), bdef
         if *bdef.0 == adef.0 {
             if bdef.1.len() > 0 || adef.1.len() > 0 {
                 let ptypes = check_type_params(tscope.clone(), &adef.1, bdef.1, mode.clone(), true)?;
-                //if update {
-                //    scope.borrow_mut().raise_types(tscope.clone());
-                //}
                 return Ok(Type::Object(adef.0, ptypes));
             } else {
                 return Ok(Type::Object(adef.0, vec!()));
@@ -293,7 +290,7 @@ fn is_subclass_of<V, T>(scope: ScopeRef<V, T>, adef: (&String, &Vec<Type>), bdef
 
 pub fn check_type_params<V, T>(scope: ScopeRef<V, T>, dtypes: &Vec<Type>, ctypes: &Vec<Type>, mode: Check, update: bool) -> Result<Vec<Type>, Error> where V: Clone, T: Clone {
     if dtypes.len() != ctypes.len() {
-        Err(Error::new(format!("TypeError: number of type parameters don't match: expected {:?} but found {:?}", dtypes, ctypes)))
+        Err(Error::new(format!("TypeError: number of type parameters don't match: expected {} but found {}", Type::display_vec(dtypes), Type::display_vec(ctypes))))
     } else {
         let mut ptypes = vec!();
         for (dtype, ctype) in dtypes.iter().zip(ctypes.iter()) {
@@ -340,25 +337,49 @@ pub fn resolve_type<V, T>(scope: ScopeRef<V, T>, ttype: Type) -> Type where V: C
 
 pub fn find_variant<V, T>(scope: ScopeRef<V, T>, otype: Type, atypes: Vec<Type>) -> Result<Type, Error> where V: Clone, T: Clone {
     match otype {
-        Type::Overload(ref variants) => {
-            'outer: for variant in variants {
+        Type::Overload(variants) => {
+            let variants = remove_duplicates(scope.clone(), variants);
+            let mut found = vec!();
+            'outer: for variant in &variants {
                 if let Type::Function(ref otypes, _, _) = *variant {
                     if otypes.len() != atypes.len() {
                         continue 'outer;
                     }
                     for (otype, atype) in otypes.iter().zip(atypes.iter()) {
                         debug!("**CHECKING VARIANT: {:?} {:?}", otype, atype);
-                        if check_type(scope.clone(), Some(otype.clone()), Some(atype.clone()), Check::Variant, false).is_err() {
+                        if check_type(scope.clone(), Some(otype.clone()), Some(atype.clone()), Check::Def, false).is_err() {
                             continue 'outer;
                         }
                     }
-                    return Ok(variant.clone());
+                    found.push(variant);
                 }
             }
-            return Err(Error::new(format!("OverloadError: No valid variant found for {:?}\n\t out of {:?}", atypes, variants)));
+
+            match found.len() {
+                0 => Err(Error::new(format!("OverloadError: No valid variant found for ({})\n\tout of {}", Type::display_vec(&atypes), Type::display_vec(&variants)))),
+                1 => Ok(found[0].clone()),
+                _ => Err(Error::new(format!("OverloadError: Ambiguous ({})\n\tvariants found {}", Type::display_vec(&atypes), found.iter().map(|t| format!("{}", t)).collect::<Vec<String>>().join(", ")))),
+            }
         },
         _ => Ok(otype.clone()),
     }
+}
+
+// TODO this is sort of a hack that can maybe be integrated into get_variable_type instead
+pub fn remove_duplicates<V, T>(scope: ScopeRef<V, T>, mut variants: Vec<Type>) -> Vec<Type> where V: Clone, T: Clone {
+    let mut i = 1;
+
+    while i < variants.len() {
+        for j in 0 .. i {
+            if check_type(scope.clone(), Some(variants[i].clone()), Some(variants[j].clone()), Check::List, false).is_ok() {
+                variants.remove(i);
+                i -= 1;
+                break;
+            }
+        }
+        i += 1;
+    }
+    return variants;
 }
 
 

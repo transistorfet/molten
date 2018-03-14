@@ -73,7 +73,7 @@ impl<V, T> Session<V, T> where V: Clone, T: Clone {
         if let Some(ref pos) = err.pos {
             let filename = &fborrow[pos.filenum as usize].0;
             let exerpt = pos.exerpt(fborrow[pos.filenum as usize].1.as_bytes());
-            println!("\x1B[1;31m{}:{:?}: {}\n        at {}\x1B[0m", filename, pos, err.msg, exerpt);
+            println!("\x1B[1;31m{}:{:?}: {}\n\tat {}\x1B[0m", filename, pos, err.msg, exerpt);
         } else {
             println!("\x1B[1;31m{}\n\x1B[0m", err.msg);
         }

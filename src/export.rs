@@ -94,7 +94,6 @@ pub fn unparse_type<V, T>(scope: ScopeRef<V, T>, ttype: Type) -> String where V:
             format!("'v{}", id)
         }
         Type::Function(args, ret, abi) => {
-            // TODO incorporate abi specifier
             let argstr: Vec<String> = args.iter().map(|t| unparse_type(scope.clone(), t.clone())).collect();
             format!("({}) -> {}{}", argstr.join(", "), unparse_type(scope.clone(), *ret), abi)
         }

@@ -219,6 +219,25 @@ impl<V, T> Scope<V, T> where V: Clone, T: Clone {
         variants
     }
 
+    /*
+    pub fn get_all_variants(&self, name: &String, local: bool) -> Vec<Type> {
+        let mut variants = self.names.get(name).as_ref().map(|sym| sym.ttype.as_ref().map(|ttype| ttype.get_variants()).unwrap_or(vec!())).unwrap_or(vec!());
+        if !local && self.parent.is_some() {
+            let parent = self.parent.clone().unwrap();
+            //variants.extend(self.parent.as_ref().map(|parent| parent.borrow().get_all_variants(name, local)).unwrap_or(vec!()));
+            'outer: for variant in parent.borrow().get_all_variants(name, local) {
+                for existing in &variants {
+                    if check_type(parent.clone(), Some(existing.clone()), Some(variant.clone()), Check::Def, false).is_ok() {
+                        continue 'outer;
+                    }
+                }
+                variants.push(variant);
+            }
+        }
+        variants
+    }
+    */
+
     #[must_use]
     pub fn add_func_variant(dscope: ScopeRef<V, T>, name: &String, tscope: ScopeRef<V, T>, ftype: Type) -> Result<(), Error> {
         let otype = dscope.borrow().get_variable_type_full(name, true);
@@ -456,67 +475,6 @@ impl<V, T> Scope<V, T> where V: Clone, T: Clone {
         types.into_iter().map(|vtype| self.map_typevars(varmap, vtype)).collect()
     }
 
-/*
-    pub fn raise_types(&mut self, fscope: ScopeRef<V, T>) {
-        //debug!("RAISING");
-        let mut names = vec!();
-        for (name, info) in &mut fscope.borrow_mut().types {
-            match info.ttype {
-                Type::Variable(_, ref id) => {
-                    //if name == vname {
-                        debug!("RAISE TYPEVAR: {:?} {:?}", self.get_full_name(&Some(String::from("")), UniqueID(0)), info.ttype);
-                        // TODO this is probably wrong because we might be unifying different type vars
-                        //if !self.types.contains_key(name) {
-                            self.define_type(name.clone(), info.ttype.clone());
-                        //}
-                        names.push(name.clone());
-                    //}
-                },
-                _ => { },
-            }
-        }
-
-        for name in names {
-            fscope.borrow_mut().types.remove(&name);
-        }
-    }
-
-    pub fn raise_type(&mut self, fscope: ScopeRef<V, T>, ttype: Type) {
-        let mut names = vec!();
-        Scope::<V, T>::collect_typevars(&mut names, ttype.clone());
-        for name in names {
-            if fscope.borrow().contains_type_local(&name) {
-                debug!("RAISE TYPEVAR: {:?} {:?}", name, ttype);
-                let otype = fscope.borrow().find_type(&name).unwrap();
-                fscope.borrow_mut().types.remove(&name);
-                self.define_type(name.clone(), otype);
-            }
-        }
-    }
-
-    pub fn collect_typevars(names: &mut Vec<String>, ttype: Type) {
-        match ttype {
-            Type::Variable(name) => {
-                if !names.contains(&name) {
-                    names.push(name);
-                }
-            },
-            Type::Function(args, ret) => {
-                for arg in args {
-                    Scope::<V, T>::collect_typevars(names, arg);
-                }
-                Scope::<V, T>::collect_typevars(names, *ret);
-            },
-            Type::Overload(list) |
-            Type::Object(_, list) => {
-                for item in list {
-                    Scope::<V, T>::collect_typevars(names, item)
-                }
-            },
-        }
-    }
-*/
-
     pub fn new_typevar(&mut self) -> Type {
         let id = UniqueID::generate();
         let name = self.new_typevar_name();
@@ -531,27 +489,6 @@ impl<V, T> Scope<V, T> where V: Clone, T: Clone {
         }
         debug!("NEW TYPEVAR: {:?} {:?}", self.get_basename(), ttype);
         ttype
-
-/*
-        let f = |gborrow: &mut Scope<V, T>| {
-            let id = UniqueID::generate();
-            let name = gborrow.new_typevar_name();
-            let ttype = Type::Variable(name.clone(), id.clone());
-            //let ttype = Type::Variable(String::from("blank"), id.clone());
-
-            gborrow.define_type(name, ttype.clone()).unwrap();
-            gborrow.define_type(id.to_string(), ttype.clone()).unwrap();
-            debug!("NEW TYPEVAR: {:?}", ttype);
-            ttype
-        };
-
-        let gscope = Scope::global(self.parent.clone().unwrap());
-        if self.is_global() {
-            f(self)
-        } else {
-            f(gscope.borrow_mut().deref_mut())
-        }
-*/
     }
 
     pub fn new_typevar_name(&mut self) -> String {
