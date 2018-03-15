@@ -120,7 +120,7 @@ pub fn refine_node(node: AST) -> AST {
                 }
             }).collect();
             if !has_new {
-                body.insert(0, AST::Function(pos.clone(), Some(String::from("new")), vec!((String::from("self"), None, None)), None, Box::new(AST::Identifier(pos.clone(), String::from("self"))), UniqueID::generate(), ABI::Molten));
+                //body.insert(0, AST::Function(pos.clone(), Some(String::from("new")), vec!((String::from("self"), None, None)), None, Box::new(AST::Identifier(pos.clone(), String::from("self"))), UniqueID::generate(), ABI::Molten));
                 //panic!("SyntaxError: you must declare a \"new\" method on a class");
             }
             AST::Class(pos, pair, parent, refine_vec(body), id)
@@ -173,8 +173,9 @@ pub fn refine_node(node: AST) -> AST {
         AST::Real(_) => { node },
         AST::String(_) => { node },
         AST::Nil(_) => { node },
-        AST::Identifier(_, _) => { node },
+        AST::PtrCast(_, _) => { node },
         AST::Recall(_, _) => { node },
+        AST::Identifier(_, _) => { node },
         AST::New(_, _) => { node },
         AST::Type(_, _, _) => { node },
 

@@ -326,7 +326,7 @@ named!(newclass(Span) -> AST,
             delimited!(tag!("("), expression_list, tag!(")")),
             |mut a| { a.insert(0, AST::New(Pos::new(pos), i.clone())); a }
         ) >>
-        (AST::Invoke(Pos::new(pos), Box::new(AST::Resolver(Pos::new(pos), Box::new(AST::Identifier(Pos::new(pos), i.0)), String::from("new"))), a, None))
+        (AST::PtrCast(Type::Object(i.0.clone(), i.1), Box::new(AST::Invoke(Pos::new(pos), Box::new(AST::Resolver(Pos::new(pos), Box::new(AST::Identifier(Pos::new(pos), i.0)), String::from("new"))), a, None))))
     )
 );
 

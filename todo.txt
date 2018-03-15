@@ -1,19 +1,12 @@
 
-* add a check to see that a function *can* be overloaded, before it is; like check the abi 
-
 * currently, it's doing name mangling during the precompile stage, and name mangling all functions, not just functions with two defs... now the issues are
   - recursion for named methods/functions seems to be broken, because invoked undefs have abi set to Unknown, but sprintf defs are just a variable... so can't assume abi
   - definition and invokation of buffer methods because they don't mangle properly
   - invokation of List methods, again not mangled properly
 
 
-* you need a way to temporarily store compiler results for use shortly after, for method calls and list creating; so that they can be fully desugared up front
 * you need to desugar list creation up front to avoid the specific calls (we can convert them, but why bother if we can reguarlize it; we just need a temp variable...
 * method conversion with a simple tempvar might mess with the handling of fexpr in function processing...
-* there's an issue with calling a function that's a struct member of a class, because method calls are converted into Resolves, which doesn't work because you need the object to get the struct member
-
-* the buffer bool issue is becaues parse_type probably creates a new unique variable now for each field in the builtin decl...
-* the issue with the list bool is because the compiling of libcore fails to use the same variable for function returns as for inputs
 
 
 * make sure to redo the escaped string parsing
@@ -25,6 +18,7 @@
 * there's still a problem with typevars not resolving fully, where a function that should return a concrete returns a free typevar....
 * either add in the initialization of class variables, possibly limited to constant expressions only, or else raise an error if an initializer is provided
 * fix the issues where you need nil to make it work.... i think parser parsing ";" into noop/nil might work, if i can get the parser working
+* the issue with the list bool is because the compiling of libcore fails to use the same variable for function returns as for inputs
 
 
 * if you had a tuple type, you could use a typevar to represent a tuple of the arguments to a function: Type::Function(Type::Variable(..), Type::Variable(..)) or 'a -> 'b where 'a = ('c, 'd, 'e)

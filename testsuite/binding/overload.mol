@@ -1,0 +1,18 @@
+
+//! Here
+//! There 37
+
+import lib.libcore
+
+fn test() {
+    println("Here")
+}
+
+fn test(a: Int) {
+    println("There " + str(a))
+}
+
+test()
+test(37)
+
+

@@ -222,6 +222,14 @@ pub fn check_types_node_or_error<V, T>(session: &Session<V, T>, scope: ScopeRef<
             Type::Object(String::from("List"), vec!(ltype.unwrap_or_else(|| expected.unwrap_or_else(|| scope.borrow_mut().new_typevar()))))
         },
 
+        AST::PtrCast(ref ttype, ref mut code) => {
+            let ctype = check_types_node(session, scope.clone(), code, Some(ttype.clone()));
+            debug!("PTRCAST: {:?} <- {:?}", ttype, ctype);
+            // TODO is this quite right?
+            expect_type(scope.clone(), Some(ttype.clone()), Some(ctype), Check::List)?;
+            ttype.clone()
+        },
+
         AST::New(_, (ref name, ref types)) => {
             let odtype = scope.borrow().find_type(name);
             match odtype {
@@ -298,6 +306,7 @@ pub fn get_accessor_name<V, T>(scope: ScopeRef<V, T>, fexpr: &mut AST, etype: &T
             };
 
             let classdef = scope.borrow().get_class_def(&ltype.get_name()?);
+debug!("!!!: {:?}", classdef.borrow().get_variable_type(name));
             let funcdefs = classdef.borrow().num_funcdefs(name);
             funcdefs
         },

@@ -60,6 +60,7 @@ pub enum AST {
     Real(f64),
     String(String),
     Nil(Option<Type>),
+    PtrCast(Type, Box<AST>),
     List(Pos, Vec<AST>),
 
     Recall(Pos, String),

@@ -667,6 +667,15 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
             Box::new(Data(list))
         },
 
+        AST::PtrCast(ref ttype, ref code) => {
+            let mut value = compile_node(data, func, unwind, scope.clone(), code).get_ref();
+            let ltype = get_type(data, scope.clone(), ttype.clone(), true);
+            if ltype != LLVMTypeOf(value) {
+                //value = build_generic_cast(data, value, ltype);
+                value = LLVMBuildPointerCast(data.builder, value, ltype, label("ptr"));
+            }
+            from_type(ttype, value)
+        },
 
         AST::New(_, (ref name, ref types)) => {
             let classdef = scope.borrow().get_class_def(name);
@@ -876,6 +885,10 @@ unsafe fn collect_functions_node<'a>(data: &mut LLVM<'a>, scope: ScopeRef<Value,
         AST::While(_, ref cond, ref body) => {
             collect_functions_node(data, scope.clone(), cond);
             collect_functions_node(data, scope.clone(), body);
+        },
+
+        AST::PtrCast(_, ref code) => {
+            collect_functions_node(data, scope.clone(), code);
         },
 
         AST::New(_, _) => { },

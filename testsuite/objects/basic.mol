@@ -6,6 +6,8 @@ import lib.libcore
 class Object {
     let a: Int
 
+    fn new(self) { }
+
     fn test(self, x) {
         self.a = x
     }

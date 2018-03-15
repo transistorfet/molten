@@ -6,6 +6,7 @@ use std::collections::HashMap;
 use std::collections::hash_map::Entry;
 
 use parser;
+use abi::ABI;
 use types::Type;
 use session::Error;
 use utils::UniqueID;
@@ -24,7 +25,7 @@ pub struct Symbol<V> {
     pub ttype: Option<Type>,
     pub value: Option<V>,
     pub funcdefs: i32,
-    pub external: bool,
+    pub abi: Option<ABI>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -107,28 +108,36 @@ impl<V, T> Scope<V, T> where V: Clone, T: Clone {
         match self.names.contains_key(&name) {
             true => Err(Error::new(format!("NameError: variable is already defined; {:?}", name))),
             false => {
-                self.names.insert(name, Symbol { ttype: ttype, value: None, funcdefs: 0, external: false });
+                self.names.insert(name, Symbol { ttype: ttype, value: None, funcdefs: 0, abi: None });
                 Ok(())
             },
         }
     }
 
     #[must_use]
-    pub fn define_func(&mut self, name: String, ttype: Option<Type>, external: bool) -> Result<(), Error> {
+    pub fn define_func(&mut self, name: String, ttype: Option<Type>, abi: ABI) -> Result<(), Error> {
         let funcs = self.search(&name, |sym| Some(sym.funcdefs)).unwrap_or(0);
         match self.names.entry(name.clone()) {
-            Entry::Vacant(entry) => { entry.insert(Symbol { ttype: ttype, value: None, funcdefs: funcs + 1, external: external }); Ok(()) },
+            Entry::Vacant(entry) => { entry.insert(Symbol { ttype: ttype, value: None, funcdefs: funcs + 1, abi: Some(abi) }); Ok(()) },
             Entry::Occupied(mut entry) => match entry.get().funcdefs {
                 0 => Err(Error::new(format!("NameError: variable is already defined as a non-function; {:?}", name))),
                 // TODO we don't really do the right this with type here, but we don't have a scoperef to pass to Type::add_variant
-                _ => { entry.get_mut().funcdefs += 1; Ok(()) },
+                _ => {
+                    if entry.get().abi.clone().unwrap_or(ABI::Unknown) != abi || !abi.can_overload() {
+                        Err(Error::new(format!("NameError: variable already defined with abi {:?} and can't be overloaded; {:?}", abi, name)))
+                    } else {
+                        entry.get_mut().funcdefs += 1;
+                        Ok(())
+                    }
+                },
             },
         }
     }
 
     #[must_use]
     pub fn define_func_variant(dscope: ScopeRef<V, T>, name: String, tscope: ScopeRef<V, T>, ftype: Type) -> Result<(), Error> {
-        dscope.borrow_mut().define_func(name.clone(), None, false)?;
+        let abi = ftype.get_abi().unwrap_or(ABI::Molten);
+        dscope.borrow_mut().define_func(name.clone(), None, abi)?;
         Scope::add_func_variant(dscope, &name, tscope, ftype)?;
         Ok(())
     }

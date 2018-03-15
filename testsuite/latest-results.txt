@@ -1,4 +1,4 @@
-Wed Mar 14 20:05:07 PDT 2018
+Thu Mar 15 15:03:54 PDT 2018
 basic/abi-across-exprs.mol......................................[32msuccess[0m
 basic/conditionals-bool.mol.....................................[32msuccess[0m
 basic/conditionals-ints.mol.....................................[32msuccess[0m
@@ -18,10 +18,13 @@ basic/recursion.mol.............................................[32msuccess[0m
 binding/definition-fail.mol.....................................[32msuccess[0m
 binding/function-fail.mol.......................................[32msuccess[0m
 binding/method-fail.mol.........................................[32msuccess[0m
+binding/overload-c-fail.mol.....................................[32msuccess[0m
+binding/overload.mol............................................[32msuccess[0m
 objects/basic.mol...............................................[32msuccess[0m
 objects/constructors.mol........................................[32msuccess[0m
 objects/funcptr-member.mol......................................[32msuccess[0m
 objects/funcptr-uninitialized-issue.mol.........................[1;31mFAIL[0m
+objects/inheritence-super.mol...................................[1;31mFAIL[0m
 objects/inheritence-third.mol...................................[32msuccess[0m
 objects/inheritence-vtable.mol..................................[1;31mFAIL[0m
 objects/inheritence.mol.........................................[32msuccess[0m
@@ -30,4 +33,4 @@ typecheck/basic.mol.............................................[32msuccess[0m
 typecheck/definition-fail.mol...................................[32msuccess[0m
 typecheck/infer-arg-as-typevar.mol..............................[1;31mFAIL[0m
 typecheck/infer-forward-method.mol..............................[1;31mFAIL[0m
-[32m25[0m tests passed, [1;31m6[0m tests failed, 31 total
+[32m27[0m tests passed, [1;31m7[0m tests failed, 34 total

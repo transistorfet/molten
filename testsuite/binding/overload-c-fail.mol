@@ -1,0 +1,19 @@
+
+//!should_fail
+//!err .*NameError: variable already defined with abi.*
+//!err .*
+
+import lib.libcore
+
+fn test() / C {
+    println("Here")
+}
+
+fn test(a: Int) / C {
+    println("There " + str(a))
+}
+
+test()
+test(37)
+
+

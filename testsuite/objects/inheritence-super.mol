@@ -1,0 +1,17 @@
+ 
+class Object {
+    let a: Int
+
+    fn new(self, a: Int) {
+        self.a = a
+    }
+}
+
+class Test extends Object {
+    fn new(self, a: Int) {
+        Super::new(self, a)
+    }
+}
+
+let thing = new Test(1)
+

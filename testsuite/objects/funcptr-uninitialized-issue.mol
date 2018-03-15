@@ -1,14 +1,16 @@
 
-	import lib.libcore
+import lib.libcore
 
-        class TestClass {
-            let a = 1
+class TestClass {
+    let a = 1
 
-            let add = fn self, x => {
-                self.a = self.a + x
-            }
-        }
+    fn new(self) { }
 
-        let thingy = new TestClass()
-        thingy.add(124)
+    let add = fn self, x => {
+        self.a = self.a + x
+    }
+}
+
+let thingy = new TestClass()
+thingy.add(124)
 

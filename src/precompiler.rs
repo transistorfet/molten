@@ -174,6 +174,7 @@ pub fn precompile_node<V, T>(session: &Session<V, T>, scope: ScopeRef<V, T>, nod
 
         AST::List(pos, code) => { AST::List(pos, precompile_vec(session, scope.clone(), code)) },
 
+        AST::PtrCast(_, _) => { node },
         AST::New(_, _) => { node },
 
         AST::Class(pos, pair, parent, body, id) => {

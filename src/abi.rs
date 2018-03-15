@@ -46,6 +46,16 @@ impl ABI {
         }
     }
 
+    pub fn can_overload(&self) -> bool {
+        match *self {
+            ABI::Cpp |
+            ABI::Molten => true,
+            ABI::C |
+            ABI::Rust |
+            ABI::Unknown => false,
+        }
+    }
+
     pub fn mangle_name(&self, name: &str, argtypes: &Vec<Type>, funcdefs: i32) -> String {
         match *self {
             ABI::Molten => molten_mangle_name(name, argtypes, funcdefs),

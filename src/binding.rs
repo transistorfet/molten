@@ -32,13 +32,13 @@ pub fn bind_names_node<V, T>(session: &Session<V, T>, scope: ScopeRef<V, T>, nod
 
 fn bind_names_node_or_error<V, T>(session: &Session<V, T>, scope: ScopeRef<V, T>, node: &mut AST) -> Result<(), Error> where V: Clone + Debug, T: Clone + Debug {
     match *node {
-        AST::Function(_, ref name, ref mut args, ref mut ret, ref mut body, ref id, _) => {
+        AST::Function(_, ref name, ref mut args, ref mut ret, ref mut body, ref id, ref abi) => {
             let fscope = session.map.add(id.clone(), Some(scope.clone()));
             fscope.borrow_mut().set_basename(name.as_ref().map_or(format!("anon{}", id), |name| name.clone()));
 
             if let Some(ref name) = *name {
                 let dscope = Scope::target(scope.clone());
-                dscope.borrow_mut().define_func(name.clone(), None, false)?;
+                dscope.borrow_mut().define_func(name.clone(), None, abi.clone())?;
             }
 
             for ref mut arg in &mut args.iter_mut() {
@@ -65,9 +65,10 @@ fn bind_names_node_or_error<V, T>(session: &Session<V, T>, scope: ScopeRef<V, T>
         AST::Declare(_, ref name, ref mut ttype) => {
             declare_typevars(scope.clone(), Some(ttype), false)?;
             let dscope = Scope::target(scope.clone());
-            dscope.borrow_mut().define_func(name.clone(), Some(ttype.clone()), true)?;
-            if let Some(ref mname) = ttype.get_abi().unwrap_or(ABI::Molten).unmangle_name(name.as_str()) {
-                dscope.borrow_mut().define_func(mname.clone(), None, true)?;
+            let abi = ttype.get_abi().unwrap_or(ABI::Molten);
+            dscope.borrow_mut().define_func(name.clone(), Some(ttype.clone()), abi.clone())?;
+            if let Some(ref mname) = abi.unmangle_name(name.as_str()) {
+                dscope.borrow_mut().define_func(mname.clone(), None, abi.clone())?;
                 let mut stype = dscope.borrow().get_variable_type(mname).unwrap_or(Type::Overload(vec!()));
                 stype = stype.add_variant(scope.clone(), ttype.clone())?;
                 dscope.borrow_mut().set_variable_type(mname, stype);
@@ -125,6 +126,11 @@ fn bind_names_node_or_error<V, T>(session: &Session<V, T>, scope: ScopeRef<V, T>
             bind_names_node(session, scope.clone(), index);
         },
 
+
+        AST::PtrCast(ref mut ttype, ref mut code) => {
+            declare_typevars(scope.clone(), Some(ttype), false)?;
+            bind_names_node(session, scope.clone(), code)
+        },
 
         AST::New(_, (ref name, ref mut types)) => {
             types.iter_mut().map(|ref mut ttype| declare_typevars(scope.clone(), Some(ttype), false).unwrap()).count();
