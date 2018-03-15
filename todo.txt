@@ -37,7 +37,6 @@
 * better support for generics; right now it just forces everything to/from a pointer type
 
 * fill in string and list type functions, and finish hashmap (rename to dict?)
-* make many tests
 
 
 

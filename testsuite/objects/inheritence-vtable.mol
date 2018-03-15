@@ -13,7 +13,7 @@ class Object {
     }
 
     fn test(self, x) {
-        self.a = x
+        println(str(self.a))
     }
 }
 
@@ -34,7 +34,7 @@ let obj1 = new Child1(235)
 let obj2 = new Child2(235)
 
 obj0.test(235)
-println(str(obj0.a))
+obj0.a
 
 obj1.test(35)
 obj2.test(35)

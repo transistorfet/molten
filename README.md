@@ -185,14 +185,26 @@ Operands are not limited to Bool values, although that may change in future.
 import libcore
 ```
 
+### External Functions
+A function can be declared without being implemented, and functions can
+also be defined with an ABI specifier so that they are accessible to
+other languages.  Only C support is currently implemented.
+```
+decl foo : (Int) -> Int
+decl cfoo : (Int) -> Int / C
+
+fn cfoo(i: Int) / C {
+
+}
+```
+
+
 Yet To Complete
 ---------------
 
 - Closure conversion is not yet fully implemented.  I haven't decided yet
-  whether to make all functions be closures (and to add a way to declare a
-  function as an external C or C++ function, which might be a good idea
-  regardless), or to add a distinct type for closures vs non-closure functions
-  (like Closure<(Int) -> Int>, or perhaps something shorter)
+  whether to make all functions be closures, or to add a distinct type for
+  closures vs non-closure functions
 
 - Exceptions haven't been implemented yet.  This somewhat relates to the
   above issue of making all functions support throwing exceptions, which
@@ -205,12 +217,9 @@ Yet To Complete
   with inherited members too, I haven't gotten it working yet.  The simple
   solution is to just disallow initial values in class members
 
-- Dynamic dispatch for class methods is not yet implemented.  At the moment,
-  it's possible to declare a class member that holds a function-typed value,
-  with each object storing a reference to the correct subclass method in the
-  class member.  It's a hack, but it works for now.
-
 - Garbage collection is not yet implemented
+
+- Dynamic Dispatch/vtables works now!
 
 
 I'd be happy to hear of any additional features ideas or suggestions, if
