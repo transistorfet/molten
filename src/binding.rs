@@ -216,7 +216,7 @@ pub fn declare_typevars<V, T>(scope: ScopeRef<V, T>, ttype: Option<&mut Type>, a
                         *id = UniqueID::generate();
                         let gscope = Scope::global(scope.clone());
                         gscope.borrow_mut().define_type(id.to_string(), Type::Variable(name.clone(), id.clone()))?;
-                        if !scope.borrow().contains_type_local(name) {
+                        if !scope.borrow().contains_type_local(name) && !scope.borrow().is_primative() {
                             scope.borrow_mut().define_type(name.clone(), Type::Variable(name.clone(), id.clone()))?;
                         }
                     }

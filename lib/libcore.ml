@@ -96,14 +96,14 @@ class List<'item> {
         self.length = self.length + 1
     }
 
-    fn [](self, index: Int) {
+    fn [](self, index: Int) -> 'item {
         if index >= self.length then
             nil //raise -1
         else
             self.data[index]
     }
 
-    fn [](self, index: Int, item: 'item) {
+    fn [](self, index: Int, item: 'item) -> 'item {
         if index >= self.length then
             nil //raise "IndexError: array index is out of bounds"
         else {

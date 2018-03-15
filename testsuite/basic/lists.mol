@@ -18,5 +18,5 @@
 
     let list2: List<'thing> = [ "ONE", "TWO", "THREE" ]
     list2[1] = "FIVE"
-    println(str(list2[1]))
+    println(list2[1])
 

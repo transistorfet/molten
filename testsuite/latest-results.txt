@@ -1,4 +1,4 @@
-Wed Mar 14 16:33:34 PDT 2018
+Wed Mar 14 20:05:07 PDT 2018
 basic/abi-across-exprs.mol......................................[32msuccess[0m
 basic/conditionals-bool.mol.....................................[32msuccess[0m
 basic/conditionals-ints.mol.....................................[32msuccess[0m
@@ -10,7 +10,7 @@ basic/funcs-lambda-variable.mol.................................[32msuccess[0m
 basic/funcs-named.mol...........................................[32msuccess[0m
 basic/if-exprs.mol..............................................[32msuccess[0m
 basic/invoke-before-define.mol..................................[32msuccess[0m
-basic/lists.mol.................................................[1;31mFAIL[0m
+basic/lists.mol.................................................[32msuccess[0m
 basic/match-ints.mol............................................[32msuccess[0m
 basic/match-strings.mol.........................................[1;31mFAIL[0m
 basic/operators.mol.............................................[32msuccess[0m
@@ -30,4 +30,4 @@ typecheck/basic.mol.............................................[32msuccess[0m
 typecheck/definition-fail.mol...................................[32msuccess[0m
 typecheck/infer-arg-as-typevar.mol..............................[1;31mFAIL[0m
 typecheck/infer-forward-method.mol..............................[1;31mFAIL[0m
-[32m24[0m tests passed, [1;31m7[0m tests failed, 31 total
+[32m25[0m tests passed, [1;31m6[0m tests failed, 31 total
