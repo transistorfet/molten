@@ -46,6 +46,16 @@ impl ABI {
         }
     }
 
+    pub fn compare(&self, other: &ABI) -> Option<ABI> {
+        if self == &ABI::Unknown {
+            Some(other.clone())
+        } else if other == &ABI::Unknown || self == other {
+            Some(self.clone())
+        } else {
+            None
+        }
+    }
+
     pub fn can_overload(&self) -> bool {
         match *self {
             ABI::Cpp |

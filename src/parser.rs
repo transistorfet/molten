@@ -678,7 +678,6 @@ named!(boolean(Span) -> AST,
     )
 );
 
-/*
 named!(string_contents(&[u8]) -> AST,
     map!(
         escaped_transform!(is_not!("\"\\"), '\\',
@@ -690,29 +689,49 @@ named!(string_contents(&[u8]) -> AST,
                 tag!("t")  => { |_| &b"\t"[..] }
             )
         ),
-        //|s| AST::String(String::from_utf8_lossy(&s).into_owned())
+        |s| AST::String(String::from_utf8_lossy(&s).into_owned())
         //|s| AST::String(span_to_string(s))
-        |s| { println!("{:?}", s); AST::Noop }
+        //|s| { println!("{:?}", s); AST::Noop }
     )
 );
 
-fn string_contents_middle(span: Span) -> IResult<Span, AST> {
+fn string_contents_middle(mut span: Span) -> IResult<Span, AST> {
     match string_contents(span.fragment) {
-        IResult::Done(rem, res) => IResult::Done(span, res),
-        IResult::Error(Err(e)) => IResult::Error(span),
+        IResult::Done(rem, res) => {
+            span.fragment = rem;
+            IResult::Done(span, res)
+        },
+        /*
+        IResult::Error(e) => {
+            use nom::Err;
+            //use nom::verbose_errors::Context;
+            let e = match e {
+                nom::Err::Incomplete(n) => nom::Err::Incomplete(n),
+                nom::Err::Failure(c) => nom::Err::Failure(Context::convert(c)),
+                nom::Err::Error(c) => nom::Err::Error(Context::convert(c)),
+            };
+            IResult::Error(e)
+        },
+        */
+        //IResult::Error(nom::Err(e)) => IResult::Error(nom::Err(span)),
+        // TODO this is totally not right
+        _ => panic!(""),
     }
 }
 
 named!(string(Span) -> AST,
     delimited!(
         tag!("\""),
-        string_contents_middle,
+        alt!(
+            string_contents_middle |
+            value!(AST::String(String::new()), tag!(""))
+        ),
         tag!("\"")
     )
 );
-*/
 
 
+/*
 named!(string(Span) -> AST,
     map!(
         delimited!(
@@ -723,6 +742,7 @@ named!(string(Span) -> AST,
         |s| AST::String(span_to_string(s))
     )
 );
+*/
 
 
 named!(number(Span) -> AST,

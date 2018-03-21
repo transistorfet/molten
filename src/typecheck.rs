@@ -97,7 +97,7 @@ pub fn check_types_node_or_error<V, T>(session: &Session<V, T>, scope: ScopeRef<
             let dtype = check_types_node(session, scope.clone(), fexpr, None);
             let mut etype = tscope.borrow_mut().map_all_typevars(dtype.clone());
             let etype = match etype.is_overloaded() {
-                true => find_variant(tscope.clone(), etype, atypes.clone())?,
+                true => find_variant(tscope.clone(), etype, atypes.clone(), Check::Def)?,
                 false => etype,
             };
 

@@ -96,7 +96,7 @@ pub fn precompile_node<V, T>(session: &Session<V, T>, scope: ScopeRef<V, T>, nod
                 /*
                 let mut ftype = dscope.borrow().get_variable_type(&sname).unwrap();
                 if ftype.is_overloaded() {
-                    ftype = types::find_variant(scope.clone(), ftype, args.iter().map(|t| t.1.clone().unwrap()).collect()).unwrap();
+                    ftype = types::find_variant(scope.clone(), ftype, args.iter().map(|t| t.1.clone().unwrap()).collect(), Check::Def).unwrap();
                 }
                 debug!("***: {:?} {:?}", sname, ftype);
                 let argtypes = ftype.get_argtypes().unwrap();

@@ -221,7 +221,8 @@ pub fn get_builtins<'a>() -> Vec<BuiltinDef<'a>> {
         BuiltinDef::Func("puts",       "(String) -> Nil / C",           Func::External),
         BuiltinDef::Func("gets",       "(String) -> String / C",        Func::External),
         BuiltinDef::Func("strlen",     "(String) -> Int / C",           Func::External),
-        BuiltinDef::Func("sprintf",    "'tmp",                          Func::Undefined),
+        //BuiltinDef::Func("sprintf",    "'tmp",                          Func::Undefined),
+        BuiltinDef::Func("sprintf",    "(String, String, 'a1, 'a2) -> Nil / C", Func::Undefined),
 
         BuiltinDef::Func("println",    "(String) -> Nil / C",           Func::Runtime(build_lib_println)),
         BuiltinDef::Func("readline",   "() -> String / C",              Func::Runtime(build_lib_readline)),

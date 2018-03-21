@@ -14,9 +14,9 @@
         else
             e
 
-        //(12).add(3)
-        //e.add(3)
-        //fn test(x: Int) => x.add(2)
+        (12).add(3)
+        e.add(3)
+        fn test(x: Int) => x.add(2)
 
         let a = 5 * 5
         let b : Real = 123.24
@@ -115,12 +115,12 @@
 
         let thingy = new TestClass()
         thingy.a = 1337
-        ////thingy.add(124)
+        ////thingy.add(124)     // this method is not initialized
         println(str(thingy.a))
         thingy.virtfun()
 
-        //let stuffy: Stuff = thingy
-        //stuffy.virtfun()
+        let stuffy: Stuff = thingy
+        stuffy.virtfun()
         fn vtest(s: Stuff) {
             s.virtfun()
         }
@@ -158,13 +158,13 @@
 
         fn strnum(num: Int) -> String {
             let buffer: String = malloc(22)
-            sprintf(buffer, "%d", num)
+            sprintf(buffer, "%d", num, nil)
             buffer
         }
 
         fn strnum(num: Real) -> String {
             let buffer: String = malloc(22)
-            sprintf(buffer, "%f", num)
+            sprintf(buffer, "%f", num, nil)
             buffer
         }
 
@@ -172,14 +172,14 @@
             let test = "Thing"
             println(test)
 
-            // TODO we don't allow recursion in overloaded functions, although I don't know that that can be fixed without constrained types
-            //fn strnum(num: Int, suffix: String) -> String {
-            //    strnum(num)
-            //}
+            fn strnum(num: Int, suffix: String) -> String {
+                strnum(num) + suffix
+            }
 
-            //strnum(1, "px")
-            //strnum(1.0)
+            println(strnum(1, "px"))
+            println(strnum(1.0))
         }
+        overload()
 
 	println("thing" + "stuff\n")
         println("STUFF".push(" things"))
@@ -228,13 +228,12 @@
             let bar: 'it = nil
 
             fn test2(self) {
-                //Super::test(self)
+                Super::test(self)
             }
         }
 
         let c = new B<Real, Int>()
-        // TODO compiles but can't run because the real isn't cast to varpointer
-        //c.bar = 3.2
+        c.bar = 3.2
 
         class Thing {
             fn new(self) {
@@ -269,16 +268,14 @@
         thing.arr[1]
         get_thing().arr[2]
 
-        // TODO casting issues, now appears to be type checking issue
         thing.baz(521)
         get_thing().baz(985)
-        //thing.bar()[1]
-        //(thing.bar())[1]
-        //get_thing().bar()[1]
+        thing.bar()[1]
+        (thing.bar())[1]
+        get_thing().bar()[1]
 
-        // TODO causes segfault
-        //thing.foobar[2](123)
-        //get_thing().foobar[2](123)
+        thing.foobar[1](123)
+        get_thing().foobar[1](123)
 
         Thing::foo(a)
 

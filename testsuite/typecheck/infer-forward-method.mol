@@ -1,7 +1,6 @@
 
 
 //!dec class Test {
-//!dec     decl new : \(Test\) -> Test
 //!dec     decl test : \(Test, Int\) -> Int
 //!dec     decl test2 : \(Test, Int\) -> Int
 //!dec }

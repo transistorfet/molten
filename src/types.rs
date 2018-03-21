@@ -131,14 +131,20 @@ impl Type {
         }
     }
 
-    pub fn update_type<V, T>(scope: ScopeRef<V, T>, name: &String, ttype: Type) where V: Clone, T: Clone {
-        let pscope = Scope::locate_type(scope.clone(), name).unwrap();
-        let otype = pscope.borrow().find_type(name).clone();
+    pub fn update_type<V, T>(scope: ScopeRef<V, T>, idname: &String, ttype: Type) where V: Clone, T: Clone {
+        let pscope = Scope::locate_type(scope.clone(), idname).unwrap();
+        let otype = pscope.borrow().find_type(idname).clone();
         if !pscope.borrow().is_primative() {
-            let ntype = check_type(scope.clone(), otype.clone(), Some(ttype.clone()), Check::Def, false);
-            match ntype {
-                Ok(utype) => pscope.borrow_mut().update_type(name, utype),
-                Err(err) => panic!("while updating type {:?}:\n{:?}", name, err),
+            let entype = check_type(scope.clone(), otype.clone(), Some(ttype.clone()), Check::Def, false);
+            match entype {
+                Ok(ntype) => {
+                    pscope.borrow_mut().update_type(idname, ntype.clone());
+                    match otype {
+                        Some(Type::Variable(ref name, ref id)) if &id.to_string() != idname => Type::update_type(scope.clone(), &id.to_string(), ntype),
+                        _ => { },
+                    }
+                },
+                Err(err) => panic!("while updating type {:?}:\n{:?}", idname, err),
             }
 
             //if !Rc::ptr_eq(&pscope, &scope) {
@@ -148,6 +154,27 @@ impl Type {
             //}
         }
     }
+
+    /*
+    pub fn move_typevars<V, T>(scope: ScopeRef<V, T>, fscope: ScopeRef<V, T>, ttype: Type) -> Type where V: Clone, T: Clone {
+        match ttype {
+            Type::Variable(name, id) => {
+                if !scope.borrow().contains(&name) {
+                    let vtype = scope.borrow_mut().new_typevar();
+                    //fscope.borrow_mut().types.remove(&name);
+                    let pscope = Scope::locate_type(fscope.clone(), &id.to_string()).unwrap();
+                    Type::update_type(pscope.clone(), &id.to_string(), vtype.clone());
+                    vtype
+                } else {
+                    Type::Variable(name, id)
+                }
+            },
+            Type::Function(args, ret, abi) => Type::Function(args.into_iter().map(|ttype| Type::move_typevars(scope.clone(), fscope.clone(), ttype)).collect(), Box::new(Type::move_typevars(scope.clone(), fscope.clone(), *ret)), abi),
+            Type::Overload(variants) => Type::Overload(variants.into_iter().map(|ttype| Type::move_typevars(scope.clone(), fscope.clone(), ttype)).collect()),
+            Type::Object(name, types) => Type::Object(name, types.into_iter().map(|ttype| Type::move_typevars(scope.clone(), fscope.clone(), ttype)).collect()),
+        }
+    }
+    */
 
     pub fn display_vec(list: &Vec<Type>) -> String {
         list.iter().map(|t| format!("{}", t)).collect::<Vec<String>>().join(", ")
@@ -225,12 +252,13 @@ pub fn check_type<V, T>(scope: ScopeRef<V, T>, odtype: Option<Type>, octype: Opt
             match (dtype.clone(), ctype.clone()) {
                 //(Type::List(ref a), Type::List(ref b)) => Ok(Type::List(Box::new(check_type(scope.clone(), Some(*a.clone()), Some(*b.clone()), mode, update)?))),
                 (Type::Function(ref aargs, ref aret, ref aabi), Type::Function(ref bargs, ref bret, ref babi)) => {
-                    if aargs.len() == bargs.len() || aabi != babi {
+                    let oabi = aabi.compare(babi);
+                    if aargs.len() == bargs.len() && oabi.is_some() {
                         let mut argtypes = vec!();
                         for (atype, btype) in aargs.iter().zip(bargs.iter()) {
                             argtypes.push(check_type(scope.clone(), Some(atype.clone()), Some(btype.clone()), mode.clone(), update)?);
                         }
-                        Ok(Type::Function(argtypes, Box::new(check_type(scope.clone(), Some(*aret.clone()), Some(*bret.clone()), mode, update)?), aabi.clone()))
+                        Ok(Type::Function(argtypes, Box::new(check_type(scope.clone(), Some(*aret.clone()), Some(*bret.clone()), mode, update)?), oabi.unwrap()))
                     } else {
                         Err(Error::new(format!("TypeError: type mismatch, expected {} but found {}", dtype, ctype)))
                     }
@@ -260,6 +288,7 @@ pub fn check_type<V, T>(scope: ScopeRef<V, T>, odtype: Option<Type>, octype: Opt
 
 
 fn is_subclass_of<V, T>(scope: ScopeRef<V, T>, adef: (&String, &Vec<Type>), bdef: (&String, &Vec<Type>), mode: Check, update: bool) -> Result<Type, Error> where V: Clone, T: Clone {
+    debug!("IS SUBCLASS: {:?} of {:?}", adef, bdef);
     let tscope = Scope::new_ref(Some(scope.clone()));
     let mut names = Scope::<V, T>::map_new();
     let mut adef = (adef.0.clone(), adef.1.clone());
@@ -335,7 +364,7 @@ pub fn resolve_type<V, T>(scope: ScopeRef<V, T>, ttype: Type) -> Type where V: C
     }
 }
 
-pub fn find_variant<V, T>(scope: ScopeRef<V, T>, otype: Type, atypes: Vec<Type>) -> Result<Type, Error> where V: Clone, T: Clone {
+pub fn find_variant<V, T>(scope: ScopeRef<V, T>, otype: Type, atypes: Vec<Type>, mode: Check) -> Result<Type, Error> where V: Clone, T: Clone {
     match otype {
         Type::Overload(variants) => {
             let variants = remove_duplicates(scope.clone(), variants);
@@ -347,7 +376,7 @@ pub fn find_variant<V, T>(scope: ScopeRef<V, T>, otype: Type, atypes: Vec<Type>)
                     }
                     for (otype, atype) in otypes.iter().zip(atypes.iter()) {
                         debug!("**CHECKING VARIANT: {:?} {:?}", otype, atype);
-                        if check_type(scope.clone(), Some(otype.clone()), Some(atype.clone()), Check::Def, false).is_err() {
+                        if check_type(scope.clone(), Some(otype.clone()), Some(atype.clone()), mode.clone(), false).is_err() {
                             continue 'outer;
                         }
                     }

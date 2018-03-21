@@ -6,11 +6,12 @@ use ast::AST;
 use types::Type;
 use utils::UniqueID;
 use config::Options;
-use scope::{ ScopeRef, ScopeMapRef };
+use session::Session;
+use scope::{ Scope, ScopeRef, ScopeMapRef };
 
 
-pub fn write_exports<V, T>(map: ScopeMapRef<V, T>, scope: ScopeRef<V, T>, filename: &str, code: &Vec<AST>) where V: Clone, T: Clone {
-    let index_text = build_index(map, scope, code);
+pub fn write_exports<V, T>(session: &Session<V, T>, scope: ScopeRef<V, T>, filename: &str, code: &Vec<AST>) where V: Clone, T: Clone {
+    let index_text = build_index(session, scope, code);
     let mut index_file = File::create(filename).expect("Error creating index file");
     index_file.write_all(index_text.as_bytes()).unwrap();
     if Options::as_ref().debug {
@@ -18,15 +19,15 @@ pub fn write_exports<V, T>(map: ScopeMapRef<V, T>, scope: ScopeRef<V, T>, filena
     }
 }
 
-pub fn build_index<V, T>(map: ScopeMapRef<V, T>, scope: ScopeRef<V, T>, code: &Vec<AST>) -> String where V: Clone, T: Clone {
+pub fn build_index<V, T>(session: &Session<V, T>, scope: ScopeRef<V, T>, code: &Vec<AST>) -> String where V: Clone, T: Clone {
     let mut index = String::new();
     for node in code {
-        build_index_node(&mut index, map.clone(), scope.clone(), node);
+        build_index_node(&mut index, session, scope.clone(), node);
     }
     index
 }
 
-fn build_index_node<V, T>(index: &mut String, map: ScopeMapRef<V, T>, scope: ScopeRef<V, T>, node: &AST) where V: Clone, T: Clone {
+fn build_index_node<V, T>(index: &mut String, session: &Session<V, T>, scope: ScopeRef<V, T>, node: &AST) where V: Clone, T: Clone {
     match *node {
         AST::Function(_, ref name, _, _, _, _, _) => {
             if let Some(ref name) = *name {
@@ -36,12 +37,12 @@ fn build_index_node<V, T>(index: &mut String, map: ScopeMapRef<V, T>, scope: Sco
         },
 
         AST::Definition(_, (_, _), ref body) => match **body {
-            ref node @ AST::Class(_, _, _, _, _) => build_index_node(index, map, scope, node),
+            ref node @ AST::Class(_, _, _, _, _) => build_index_node(index, session, scope, node),
             _ => { },
         },
 
         AST::Class(_, (ref name, ref types), ref parent, ref body, ref id) => {
-            let tscope = map.get(&id);
+            let tscope = session.map.get(&id);
             let classdef = scope.borrow().get_class_def(name);
             let namespec = unparse_type(tscope.clone(), Type::Object(name.clone(), types.clone()));
             let fullspec = if parent.is_some() {
@@ -82,16 +83,15 @@ pub fn unparse_type<V, T>(scope: ScopeRef<V, T>, ttype: Type) -> String where V:
             let params = if types.len() > 0 { format!("<{}>", types.iter().map(|p| unparse_type(scope.clone(), p.clone())).collect::<Vec<String>>().join(", ")) } else { String::from("") };
             name.clone() + &params
         },
-        // TODO should you possibly create a non-conflicting name if required here
         Type::Variable(mut name, id) => {
             let var = scope.borrow().find_type(&name);
             if var.is_none() || var.unwrap().get_varid().unwrap_or(UniqueID(0)) != id {
-                name = scope.borrow_mut().new_typevar_name();
-                scope.borrow_mut().define_type(name.clone(), Type::Variable(name.clone(), id.clone())).unwrap();
+                let gscope = Scope::global(scope.clone());
+                name = gscope.borrow_mut().new_typevar_name();
+                gscope.borrow_mut().define_type(name.clone(), Type::Variable(name.clone(), id.clone())).unwrap();
             }
-            // TODO i'd really like to use the name...
-            //format!("'{}", name)
-            format!("'v{}", id)
+            //format!("'v{}", id)
+            format!("'{}", name)
         }
         Type::Function(args, ret, abi) => {
             let argstr: Vec<String> = args.iter().map(|t| unparse_type(scope.clone(), t.clone())).collect();

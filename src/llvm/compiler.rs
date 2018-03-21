@@ -9,7 +9,7 @@ use self::llvm::core::*;
 
 use export;
 use abi::ABI;
-use types::Type;
+use types::{ self, Type };
 use utils::UniqueID;
 use config::Options;
 use session::Session;
@@ -235,7 +235,7 @@ unsafe fn compile_module(builtins: &Vec<BuiltinDef>, session: &Session<Value, Ty
     LLVMPositionBuilderAtEnd(builder, LLVMAppendBasicBlockInContext(context, function, label("entry")));
     compile_vec(data, function, None, scope.clone(), code);
     LLVMBuildRet(builder, LLVMConstInt(bool_type(data), 1, 0));
-    scope.borrow_mut().define(module_init_name.clone(), Some(ftype));
+    scope.borrow_mut().define(module_init_name.clone(), Some(ftype)).unwrap();
     scope.borrow_mut().assign(&module_init_name, Box::new(Function(function)));
 
 
@@ -258,7 +258,7 @@ unsafe fn compile_module(builtins: &Vec<BuiltinDef>, session: &Session<Value, Ty
     }
 
     let name = session.target.rsplitn(2, '.').collect::<Vec<&str>>()[1];
-    export::write_exports(data.map.clone(), data.map.get_global(), format!("{}.dec", name).as_str(), code);
+    export::write_exports(session, session.map.get_global(), format!("{}.dec", name).as_str(), code);
 
     LLVMDisposeBuilder(builder);
     LLVMDisposeModule(module);
@@ -266,28 +266,6 @@ unsafe fn compile_module(builtins: &Vec<BuiltinDef>, session: &Session<Value, Ty
 }
 
 unsafe fn declare_globals(data: &LLVM, scope: ScopeRef<Value, TypeValue>) {
-    for node in &data.classes {
-        if let AST::Class(_, (ref name, _), _, _, ref id) = **node {
-            let tscope = data.map.get(id);
-            let classdef = scope.borrow().get_class_def(name);
-            let value = scope.borrow().get_type_value(name).unwrap();
-
-            if value.vtable.len() > 0 {
-                let mut methods = vec!();
-                for (index, &(ref name, _)) in value.vtable.iter().enumerate() {
-                    methods.push(classdef.borrow().get_variable_value(&name).unwrap().get_ref());
-                }
-
-                let vtype = value.vttype.unwrap();
-                let name = format!("__{}_vtable", name);
-                let global = LLVMAddGlobal(data.module, LLVMGetElementType(vtype), label(name.as_str()));
-                LLVMSetInitializer(global, LLVMConstNamedStruct(vtype, methods.as_mut_ptr(), methods.len() as u32));
-                LLVMSetLinkage(global, llvm::LLVMLinkage::LLVMLinkOnceAnyLinkage);
-                scope.borrow_mut().assign(&name, Box::new(Global(global)));
-            }
-        }
-    }
-
     let mut globals = vec!();
     for (name, sym) in &scope.borrow().names {
         if LLVMGetNamedFunction(data.module, label(name.as_str())).is_null() && !sym.ttype.as_ref().unwrap().is_overloaded() {
@@ -300,6 +278,36 @@ unsafe fn declare_globals(data: &LLVM, scope: ScopeRef<Value, TypeValue>) {
 
     for (name, global) in globals {
         scope.borrow_mut().assign(&name, Box::new(Global(global)));
+    }
+
+    for node in &data.classes {
+        if let AST::Class(_, (ref name, _), _, _, ref id) = **node {
+            let tscope = data.map.get(id);
+            let classdef = scope.borrow().get_class_def(name);
+            let value = scope.borrow().get_type_value(name).unwrap();
+
+            if value.vtable.len() > 0 {
+                let mut methods = vec!();
+                for (index, &(ref name, ref ttype)) in value.vtable.iter().enumerate() {
+                    let dtype = classdef.borrow().get_variable_type(&name).unwrap();
+                    let name = if dtype.is_overloaded() {
+                        let variant = types::find_variant(tscope.clone(), dtype, ttype.get_argtypes().unwrap().clone(), types::Check::List).unwrap();
+                        ttype.get_abi().unwrap().mangle_name(name, variant.get_argtypes().unwrap(), classdef.borrow().num_funcdefs(&name))
+                    } else {
+                        name.clone()
+                    };
+                    methods.push(build_generic_cast(data, classdef.borrow().get_variable_value(&name).unwrap().get_ref(), get_type(data, tscope.clone(), ttype.clone(), true)));
+                }
+
+                let vtype = value.vttype.unwrap();
+                let name = format!("__{}_vtable", name);
+                let global = LLVMAddGlobal(data.module, LLVMGetElementType(vtype), label(name.as_str()));
+                LLVMSetInitializer(global, LLVMConstNamedStruct(vtype, methods.as_mut_ptr(), methods.len() as u32));
+                LLVMSetLinkage(global, llvm::LLVMLinkage::LLVMLinkOnceAnyLinkage);
+                scope.borrow_mut().define(name.clone(), Some(Type::Object(name.clone(), vec!())));
+                scope.borrow_mut().assign(&name, Box::new(Global(global)));
+            }
+        }
     }
 }
 
@@ -344,7 +352,7 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
             let function = match **fexpr {
                 AST::Accessor(ref pos, ref left, ref name, ref otype) => {
                     let tname = format!("{}", UniqueID::generate());
-                    scope.borrow_mut().define(tname.clone(), otype.clone());
+                    scope.borrow_mut().define(tname.clone(), otype.clone()).unwrap();
                     scope.borrow_mut().assign(&tname, from_type(otype.as_ref().unwrap(), largs[0]));
                     compile_node(data, func, unwind, scope.clone(), &AST::Accessor(pos.clone(), Box::new(AST::Recall(pos.clone(), tname)), name.clone(), otype.clone()))
                 },
@@ -362,10 +370,7 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
                 ltypes.set_len(LLVMCountParamTypes(lftype) as usize);
                 LLVMGetParamTypes(lftype, ltypes.as_mut_ptr());
                 for i in 0 .. ltypes.len() {
-                    if ltypes[i] != LLVMTypeOf(largs[i]) {
-                        debug!("{:?} -> {:?}", LLVMGetTypeKind(LLVMTypeOf(largs[i])), LLVMGetTypeKind(ltypes[i]));
-                        largs[i] = build_generic_cast(data, largs[i], ltypes[i]);
-                    }
+                    largs[i] = build_generic_cast(data, largs[i], ltypes[i]);
                 }
             }
 
@@ -381,10 +386,7 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
 
             if !function.get_ref().is_null() {
                 let lrtype = get_type(data, scope.clone(), rtype.clone(), true);
-                if lrtype != LLVMTypeOf(value) {
-                    debug!("RETURN {:?} -> {:?}", LLVMGetTypeKind(LLVMTypeOf(value)), LLVMGetTypeKind(lrtype));
-                    value = build_generic_cast(data, value, lrtype);
-                }
+                value = build_generic_cast(data, value, lrtype);
             }
             from_type(&rtype, value)
         },
@@ -440,7 +442,7 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
             };
             scope.borrow_mut().assign(name, pointer.clone());
             let value = compile_node(data, func, unwind, scope, value);
-            LLVMBuildStore(data.builder, value.get_ref(), pointer.get_ref());
+            LLVMBuildStore(data.builder, build_generic_cast(data, value.get_ref(), ltype), pointer.get_ref());
             value
         },
 
@@ -670,10 +672,7 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
         AST::PtrCast(ref ttype, ref code) => {
             let mut value = compile_node(data, func, unwind, scope.clone(), code).get_ref();
             let ltype = get_type(data, scope.clone(), ttype.clone(), true);
-            if ltype != LLVMTypeOf(value) {
-                //value = build_generic_cast(data, value, ltype);
-                value = LLVMBuildPointerCast(data.builder, value, ltype, label("ptr"));
-            }
+            value = build_generic_cast(data, value, ltype);
             from_type(ttype, value)
         },
 
@@ -774,7 +773,7 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
             if LLVMGetNamedFunction(data.module, label(module_init_name.as_str())).is_null() {
                 let lftype = LLVMFunctionType(bool_type(data), &mut [].as_mut_ptr(), 0, false as i32);
                 let function = LLVMAddFunction(data.module, label(module_init_name.as_str()), lftype);
-                scope.borrow_mut().define(module_init_name.clone(), Some(ftype.clone()));
+                scope.borrow_mut().define(module_init_name.clone(), Some(ftype.clone())).unwrap();
                 scope.borrow_mut().assign(&module_init_name, Box::new(Function(function)));
             }
             compile_node(data, func, None, scope.clone(), &AST::Invoke(pos.clone(), Box::new(AST::Identifier(pos.clone(), String::from(module_init_name))), vec!(), Some(ftype)));
@@ -834,7 +833,10 @@ unsafe fn collect_functions_node<'a>(data: &mut LLVM<'a>, scope: ScopeRef<Value,
 
         AST::List(_, ref items) => { collect_functions_vec(data, scope, items); },
 
-        AST::Invoke(_, _, ref args, _) => { collect_functions_vec(data, scope, args); },
+        AST::Invoke(_, ref fexpr, ref args, _) => {
+            collect_functions_node(data, scope.clone(), fexpr);
+            collect_functions_vec(data, scope, args);
+        },
 
         AST::SideEffect(_, _, ref args) => { collect_functions_vec(data, scope, args); },
 
@@ -910,22 +912,23 @@ if name.as_str() != "String" {
             for ref node in body.iter() {
                 match **node {
                     AST::Function(_, ref fname, ref args, ref rtype, _, _, ref abi) => {
-//if fname.clone().unwrap().as_str() != "new" {
-                        if fname.is_some() && parent.borrow().contains(fname.as_ref().unwrap()) {
-                            debug!("***************: {:?}:{:?}", name, fname);
-                            vtable.push((fname.clone().unwrap(), Type::Function(args.iter().map(|t| t.1.clone().unwrap()).collect(), Box::new(rtype.clone().unwrap()), abi.clone())));
+                        if fname.is_some() {
+                            let fname = fname.as_ref().unwrap();
+                            let uname = abi.unmangle_name(fname).unwrap_or(fname.clone());
+                            //if parent.borrow().contains(&uname) {
+                                debug!("***************: {:?}:{:?}", name, uname);
+                                vtable.push((uname, Type::Function(args.iter().map(|t| t.1.clone().unwrap()).collect(), Box::new(rtype.clone().unwrap()), abi.clone())));
+                            //}
                         }
-//}
                     },
                     AST::Declare(_, ref fname, ref ttype) => {
                         match *ttype {
-                            Type::Function(_, _, _) => {
-//if fname.as_str() != "new" {
-                                if parent.borrow().contains(fname) {
-                                    debug!("+++++++++++++++: {:?}:{:?}", name, fname);
-                                    vtable.push((fname.clone(), ttype.clone()))
-                                }
-//}
+                            Type::Function(_, _, ref abi) => {
+                                let uname = abi.unmangle_name(fname).unwrap_or(fname.clone());
+                                //if parent.borrow().contains(&uname) {
+                                    debug!("+++++++++++++++: {:?}:{:?}", name, uname);
+                                    vtable.push((uname.clone(), ttype.clone()))
+                                //}
                             },
                             _ => { },
                         }
@@ -1048,18 +1051,23 @@ pub unsafe fn int_value(data: &LLVM, num: usize) -> LLVMValueRef {
 //}
 
 pub unsafe fn build_generic_cast(data: &LLVM, value: LLVMValueRef, ltype: LLVMTypeRef) -> LLVMValueRef {
-    if LLVMGetTypeKind(LLVMTypeOf(value)) == llvm::LLVMTypeKind::LLVMPointerTypeKind {
-        if LLVMGetTypeKind(ltype) == llvm::LLVMTypeKind::LLVMPointerTypeKind {
-            LLVMBuildPointerCast(data.builder, value, ltype, label("ptr"))
+    if ltype != LLVMTypeOf(value) {
+        debug!("{:?} -> {:?}", LLVMGetTypeKind(LLVMTypeOf(value)), LLVMGetTypeKind(ltype));
+        if LLVMGetTypeKind(LLVMTypeOf(value)) == llvm::LLVMTypeKind::LLVMPointerTypeKind {
+            if LLVMGetTypeKind(ltype) == llvm::LLVMTypeKind::LLVMPointerTypeKind {
+                LLVMBuildPointerCast(data.builder, value, ltype, label("ptr"))
+            } else {
+                LLVMBuildPtrToInt(data.builder, value, ltype, label("ptr"))
+            }
         } else {
-            LLVMBuildPtrToInt(data.builder, value, ltype, label("ptr"))
+            if LLVMGetTypeKind(ltype) == llvm::LLVMTypeKind::LLVMPointerTypeKind {
+                LLVMBuildIntToPtr(data.builder, value, ltype, label("ptr"))
+            } else {
+                panic!("I HAVEN'T DONE THIS");
+            }
         }
     } else {
-        if LLVMGetTypeKind(ltype) == llvm::LLVMTypeKind::LLVMPointerTypeKind {
-            LLVMBuildIntToPtr(data.builder, value, ltype, label("ptr"))
-        } else {
-            panic!("I HAVEN'T DONE THIS");
-        }
+        value
     }
 }
 
@@ -1121,6 +1129,12 @@ unsafe fn build_function_body(data: &LLVM, node: &AST) {
     }
 }
 
+//pub unsafe fn build_invoke(data: &LLVM, scope: ScopeRef<Value, TypeValue>, name: &str, unwind: Unwind, ) -> LLVMValueRef {
+//    let (ttype, funcdefs, value) = scope.borrow().search(name, |sym| (sym.ttype.clone(), sym.funcdefs, sym.value.clone()));
+//    let name = ABI::Molten.mangle_name(name, argtypes, funcdefs);
+//    build_cast_from_vartype(data, value.invoke(data, unwind, vec!(list_value, cond_value)), itype);
+//}
+
 pub unsafe fn build_c_call(data: &LLVM, name: &str, largs: &mut Vec<LLVMValueRef>) -> LLVMValueRef {
     let function = LLVMGetNamedFunction(data.module, label(name));
     LLVMBuildCall(data.builder, function, largs.as_mut_ptr(), largs.len() as u32, label("tmp"))
@@ -1157,7 +1171,7 @@ pub unsafe fn build_class_type(data: &LLVM, scope: ScopeRef<Value, TypeValue>, n
         let vtname = format!("{}_vtable", name);
         let vttype = LLVMStructCreateNamed(data.context, label(vtname.as_str()));
         let pvttype = LLVMPointerType(vttype, 0);
-        scope.borrow_mut().define_type(vtname.clone(), Type::Object(vtname.clone(), vec!()));
+        scope.borrow_mut().define_type(vtname.clone(), Type::Object(vtname.clone(), vec!())).unwrap();
         scope.borrow_mut().set_type_value(&vtname, TypeValue { structdef: vtable.clone(), value: pvttype, vtable: vec!(), vttype: None });
         (Some(vttype), Some(pvttype))
     } else {

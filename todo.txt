@@ -1,24 +1,16 @@
 
-* currently, it's doing name mangling during the precompile stage, and name mangling all functions, not just functions with two defs... now the issues are
-  - recursion for named methods/functions seems to be broken, because invoked undefs have abi set to Unknown, but sprintf defs are just a variable... so can't assume abi
-  - definition and invokation of buffer methods because they don't mangle properly
-  - invokation of List methods, again not mangled properly
+* issue with mangling currently is held up by forward definitions/recursive definitions, which make the ABI Unknown, which then cannot resolve... but I can't make it
+  assume molten abi because sprintf is defined as a typevar because no support for vargs... maybe that can be added to C abi somehow?
+* fix error handling of string parser; also is the span adjusting broken too?
 
 
-* you need to desugar list creation up front to avoid the specific calls (we can convert them, but why bother if we can reguarlize it; we just need a temp variable...
-* method conversion with a simple tempvar might mess with the handling of fexpr in function processing...
-
-
-* make sure to redo the escaped string parsing
+* fix invoke anonymous function inline issue in parser
 * "match" only works with integers... maybe call ==, but it would have to mangle correctly
-* add an external specifier to decls
 
-* issue with self and super type defs; they don't contain the type info; maybe add an aliasing type?
-* there is one last issue with typevar names, such that building the index/decls uses either overlapping names when it shouldn't, or now using different names when it shouldn't
-* there's still a problem with typevars not resolving fully, where a function that should return a concrete returns a free typevar....
+* there's still a problem with typevars not resolving fully, where a function that should return a concrete returns a free typevar.... (recursion or forward definition)
 * either add in the initialization of class variables, possibly limited to constant expressions only, or else raise an error if an initializer is provided
-* fix the issues where you need nil to make it work.... i think parser parsing ";" into noop/nil might work, if i can get the parser working
-* the issue with the list bool is because the compiling of libcore fails to use the same variable for function returns as for inputs
+* fix the parser issues where you need nil to make it work.... i think parser parsing ";" into noop/nil might work, if i can get the parser working
+* you need to desugar list creation up front to avoid the specific calls (we can convert them, but why bother if we can reguarlize it; we just need a temp variable...
 
 
 * if you had a tuple type, you could use a typevar to represent a tuple of the arguments to a function: Type::Function(Type::Variable(..), Type::Variable(..)) or 'a -> 'b where 'a = ('c, 'd, 'e)
@@ -27,15 +19,14 @@
 * put intermediate files somewhere else, at least as controlled by the molten script, so as not to clutter source directories
 
 
+* add compiler directives?
 * get llvm closures working
-* add vtables for classes
 * implement exceptions
 * implement garbage collection
 * add patterns and matching of patterns
 * implement type definition ast element (enum type?)
-* add compiler directives?
-* better support for generics; right now it just forces everything to/from a pointer type
 
+* better support for generics; right now it just forces everything to/from a pointer type
 * fill in string and list type functions, and finish hashmap (rename to dict?)
 
 
@@ -46,6 +37,7 @@
 * what if you a 'context' passed to the node visitors that would allow "if" to know if its' return is used or not, and so whether typechecking must match
 * if you make ops methods, then everything has to be type annotated, with the type system as it is; you'd need constrained types, or multiple paths, or bidirectional or something
 * make typed functions for all math operations, with the inlinealways attribute, if you decide to make operators methods
+
 * is it even possible to add a special "constrained" type, which has &AST that must type check correctly in order to match (checks done in check_type)
 * you might need to integrate type restrictions which have to get resolved later; like 'a where 'a is object with add(Int) method; not sure how you could be so specific without complexity
 * what if you generalize overloaded types, such that they're checked in check_type, and options are eliminated, or resolved to one type over the course of checking

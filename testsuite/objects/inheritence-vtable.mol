@@ -2,6 +2,9 @@
 //! 235
 //! 270
 //! 8225
+//! 235
+//! 270
+//! 8225
 
 import lib.libcore
 
@@ -38,4 +41,8 @@ obj0.a
 
 obj1.test(35)
 obj2.test(35)
+
+let list = [ obj0, obj1, obj2 ]
+for obj in list
+    obj.test(35)
 

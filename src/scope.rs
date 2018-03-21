@@ -326,7 +326,10 @@ impl<V, T> Scope<V, T> where V: Clone, T: Clone {
 
     pub fn search_type<F, U>(&self, name: &String, f: F) -> Option<U> where F: Fn(&TypeInfo<V, T>) -> Option<U> {
         if let Some(ref info) = self.types.get(name) {
-            f(info)
+            match info.ttype {
+                Type::Object(ref sname, _) if sname != name => self.search_type(sname, f),
+                _ => f(info),
+            }
         } else if let Some(ref parent) = self.parent {
             parent.borrow().search_type(name, f)
         } else {
@@ -337,6 +340,10 @@ impl<V, T> Scope<V, T> where V: Clone, T: Clone {
 
     pub fn find_type(&self, name: &String) -> Option<Type> {
         self.search_type(name, |info| Some(info.ttype.clone()))
+    }
+
+    pub fn find_type_local(&self, name: &String) -> Option<Type> {
+        self.types.get(name).map(|info| info.ttype.clone())
     }
 
     pub fn update_type(&mut self, name: &String, ttype: Type) {

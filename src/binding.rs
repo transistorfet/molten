@@ -215,9 +215,12 @@ pub fn declare_typevars<V, T>(scope: ScopeRef<V, T>, ttype: Option<&mut Type>, a
                 declare_typevars(scope.clone(), Some(ret.as_mut()), always_new)?;
             },
             &mut Type::Variable(ref name, ref mut id) => {
-                let vtype = scope.borrow().find_type(name);
+                let vtype = match always_new {
+                    true => scope.borrow().find_type_local(name),
+                    false => scope.borrow().find_type(name),
+                };
                 match vtype {
-                    Some(Type::Variable(_, ref eid)) if !always_new => *id = eid.clone(),
+                    Some(Type::Variable(_, ref eid)) => *id = eid.clone(),
                     _ => {
                         *id = UniqueID::generate();
                         let gscope = Scope::global(scope.clone());

@@ -49,19 +49,19 @@ fn str(num: Bool) -> String {
 
 fn str(num: Int) -> String {
     let buffer: String = malloc(22)
-    sprintf(buffer, "%ld", num)
+    sprintf(buffer, "%ld", num, nil)
     buffer
 }
 
 fn hex(num: Int) -> String {
     let buffer: String = malloc(22)
-    sprintf(buffer, "0x%lX", num)
+    sprintf(buffer, "0x%lX", num, nil)
     buffer
 }
 
 fn str(num: Real) -> String {
     let buffer: String = malloc(22)
-    sprintf(buffer, "%f", num)
+    sprintf(buffer, "%f", num, nil)
     buffer
 }
 
