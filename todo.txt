@@ -1,7 +1,9 @@
 
+* tests for: empty string, string escapes, exceptions, while loops, iterators, generic/typevars funcs, obscure mixes like block as value of assignment, maybe block who's return is directly called
+* either fix parser to directly call function without brackets or comment out that condition from the direct-function test
+
 * issue with mangling currently is held up by forward definitions/recursive definitions, which make the ABI Unknown, which then cannot resolve... but I can't make it
   assume molten abi because sprintf is defined as a typevar because no support for vargs... maybe that can be added to C abi somehow?
-* fix error handling of string parser; also is the span adjusting broken too?
 
 
 * fix invoke anonymous function inline issue in parser

@@ -281,31 +281,30 @@ unsafe fn declare_globals(data: &LLVM, scope: ScopeRef<Value, TypeValue>) {
     }
 
     for node in &data.classes {
-        if let AST::Class(_, (ref name, _), _, _, ref id) = **node {
+        if let AST::Class(_, (ref cname, _), _, _, ref id) = **node {
             let tscope = data.map.get(id);
-            let classdef = scope.borrow().get_class_def(name);
-            let value = scope.borrow().get_type_value(name).unwrap();
+            let classdef = scope.borrow().get_class_def(cname);
+            let value = scope.borrow().get_type_value(cname).unwrap();
 
             if value.vtable.len() > 0 {
                 let mut methods = vec!();
                 for (index, &(ref name, ref ttype)) in value.vtable.iter().enumerate() {
-                    let dtype = classdef.borrow().get_variable_type(&name).unwrap();
-                    let name = if dtype.is_overloaded() {
-                        let variant = types::find_variant(tscope.clone(), dtype, ttype.get_argtypes().unwrap().clone(), types::Check::List).unwrap();
-                        ttype.get_abi().unwrap().mangle_name(name, variant.get_argtypes().unwrap(), classdef.borrow().num_funcdefs(&name))
-                    } else {
-                        name.clone()
-                    };
+                    let mut dtype = classdef.borrow().get_variable_type(&name).unwrap();
+                    if dtype.is_overloaded() {
+                        dtype = types::find_variant(tscope.clone(), dtype, ttype.get_argtypes().unwrap().clone(), types::Check::List).unwrap();
+                    }
+                    let name = ttype.get_abi().unwrap().mangle_name(name, dtype.get_argtypes().unwrap(), classdef.borrow().num_funcdefs(&name));
+                    debug!("VTABLE INIT: {:?} {:?} {:?}", cname, name, index);
                     methods.push(build_generic_cast(data, classdef.borrow().get_variable_value(&name).unwrap().get_ref(), get_type(data, tscope.clone(), ttype.clone(), true)));
                 }
 
                 let vtype = value.vttype.unwrap();
-                let name = format!("__{}_vtable", name);
-                let global = LLVMAddGlobal(data.module, LLVMGetElementType(vtype), label(name.as_str()));
+                let vname = format!("__{}_vtable", cname);
+                let global = LLVMAddGlobal(data.module, LLVMGetElementType(vtype), label(vname.as_str()));
                 LLVMSetInitializer(global, LLVMConstNamedStruct(vtype, methods.as_mut_ptr(), methods.len() as u32));
                 LLVMSetLinkage(global, llvm::LLVMLinkage::LLVMLinkOnceAnyLinkage);
-                scope.borrow_mut().define(name.clone(), Some(Type::Object(name.clone(), vec!())));
-                scope.borrow_mut().assign(&name, Box::new(Global(global)));
+                scope.borrow_mut().define(vname.clone(), Some(Type::Object(format!("{}_vtable", cname), vec!())));
+                scope.borrow_mut().assign(&vname, Box::new(Global(global)));
             }
         }
     }
@@ -573,6 +572,7 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
                 LLVMPositionBuilderAtEnd(data.builder, do_blocks[i]);
                 values.push(compile_node(data, func, unwind, scope.clone(), expr).get_ref());
                 LLVMBuildBr(data.builder, merge_block);
+                do_blocks[i] = LLVMGetInsertBlock(data.builder);
             }
 
             LLVMPositionBuilderAtEnd(data.builder, merge_block);
@@ -689,7 +689,8 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
                 let mem = LLVMBuildMalloc(data.builder, LLVMGetElementType(value.value), label("ptr"));
                 let object = LLVMBuildPointerCast(data.builder, mem, value.value, label("ptr"));
                 if let Some(index) = value.structdef.iter().position(|ref r| r.0.as_str() == "__vtable__") {
-                    let vtable = LLVMGetNamedGlobal(data.module, label(format!("__{}_vtable", name).as_str()));
+                    //let vtable = LLVMGetNamedGlobal(data.module, label(format!("__{}_vtable", name).as_str()));
+                    let vtable = scope.borrow().get_variable_value(&format!("__{}_vtable", name)).unwrap().get_ref();
                     let mut indices = vec!(i32_value(data, 0), i32_value(data, index));
                     let pointer = LLVMBuildGEP(data.builder, object, indices.as_mut_ptr(), indices.len() as u32, label("tmp"));
                     LLVMBuildStore(data.builder, vtable, pointer);

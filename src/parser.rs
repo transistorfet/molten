@@ -89,6 +89,15 @@ macro_rules! map_str (
     )
 );
 
+fn convert_err<P, E>(e: nom::Err<P, E>, span: Span) -> nom::Err<Span, E> {
+    match e {
+        nom::Err::Code(c) => nom::Err::Code(c),
+        nom::Err::Node(c, b) => nom::Err::Node(c, b.into_iter().map(|e| convert_err(e, span)).collect()),
+        nom::Err::Position(c, p) => nom::Err::Position(c, span),
+        nom::Err::NodePosition(c, p, b) => nom::Err::NodePosition(c, span, b.into_iter().map(|e| convert_err(e, span)).collect()),
+    }
+}
+
 
 ///// Parser /////
 
@@ -97,7 +106,7 @@ pub fn parse_or_error(name: &str, text: &[u8]) -> Vec<AST> {
     match parse(span) {
         IResult::Done(rem, _) if rem.fragment != [] => panic!("InternalError: unparsed input remaining: {:?}", rem),
         IResult::Done(_, code) => code,
-        res @ IResult::Error(_) => { /*print_error(name, span, nom::prepare_errors(text, res).unwrap());*/ panic!("{:?}", res); },
+        res @ IResult::Error(_) => { /* print_error(name, span, e); */ panic!("{:?}", res) },
         res @ _ => panic!("UnknownError: the parser returned an unknown result; {:?}", res),
     }
 }
@@ -535,17 +544,21 @@ impl AST {
 named!(subatomic(Span) -> AST,
     alt_complete!(
         literal |
-        do_parse!(
-            pos: position!() >>
-            i: identifier >>
-            (AST::Identifier(Pos::new(pos), i))
-        ) |
+        identifier_node |
         delimited!(tag!("("), wscom!(expression), tag!(")"))
     )
 );
 
 named!(expression_list(Span) -> Vec<AST>,
     separated_list_complete!(tag!(","), expression)
+);
+
+named!(identifier_node(Span) -> AST,
+    do_parse!(
+        pos: position!() >>
+        i: identifier >>
+        (AST::Identifier(Pos::new(pos), i))
+    )
 );
 
 named!(identifier(Span) -> String,
@@ -698,24 +711,12 @@ named!(string_contents(&[u8]) -> AST,
 fn string_contents_middle(mut span: Span) -> IResult<Span, AST> {
     match string_contents(span.fragment) {
         IResult::Done(rem, res) => {
+            span.offset += rem.as_ptr() as usize - span.fragment.as_ptr() as usize;
             span.fragment = rem;
             IResult::Done(span, res)
         },
-        /*
-        IResult::Error(e) => {
-            use nom::Err;
-            //use nom::verbose_errors::Context;
-            let e = match e {
-                nom::Err::Incomplete(n) => nom::Err::Incomplete(n),
-                nom::Err::Failure(c) => nom::Err::Failure(Context::convert(c)),
-                nom::Err::Error(c) => nom::Err::Error(Context::convert(c)),
-            };
-            IResult::Error(e)
-        },
-        */
-        //IResult::Error(nom::Err(e)) => IResult::Error(nom::Err(span)),
-        // TODO this is totally not right
-        _ => panic!(""),
+        IResult::Incomplete(n) => IResult::Incomplete(n),
+        IResult::Error(e) => IResult::Error(convert_err(e, span)),
     }
 }
 
@@ -885,10 +886,18 @@ pub fn position() -> Position {
 */
 
 
-pub fn print_error(name: &str, span: Span, errors: Vec<(nom::ErrorKind, usize, usize)>) {
+pub fn print_error<E>(name: &str, span: Span, errors: nom::Err<Span, E>) {
+/*
+    match e {
+        nom::Err::Code(c) => nom::Err::Code(c),
+        nom::Err::Node(c, b) => nom::Err::Node(c, b.into_iter().map(|e| convert_err(e, span)).collect()),
+        nom::Err::Position(c, p) => nom::Err::Position(c, span),
+        nom::Err::NodePosition(c, p, b) => nom::Err::NodePosition(c, span, b.into_iter().map(|e| convert_err(e, span)).collect()),
+    }
     for error in errors {
         print_error_info(name, span, error);
     }
+*/
 }
 
 pub fn print_error_info(name: &str, span: Span, err: (nom::ErrorKind, usize, usize)) {
