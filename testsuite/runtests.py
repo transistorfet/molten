@@ -20,7 +20,7 @@ def main():
     os.chdir(rootdir)
 
     parser = argparse.ArgumentParser(prog='runtests.py', formatter_class=argparse.ArgumentDefaultsHelpFormatter, description='Run molten test suite')
-    parser.add_argument("directory", nargs='?', default=".")
+    parser.add_argument("directory", nargs='?', default=testdir)
     parser.add_argument('-f', '--force', action='store_true', help='Force a recompile of all files')
     parser.add_argument('-v', '--verbose', action='store_true', help='Print extended info on why a test fails')
     parser.add_argument('-n', '--no-color', action='store_true', help='Remove color codes from output')
@@ -31,14 +31,18 @@ def main():
         (CLEAR, RED, GREEN, YELLOW) = ('', '', '', '')
 
     if args.directory == "clean":
-        os.system("./molten cleanall {directory}".format(directory="tests"))
+        os.system("./molten cleanall {directory}".format(directory=testdir))
+    elif os.path.isfile(args.directory):
+        test = Test(args.directory, verbose=args.verbose)
+        test.run_test(args.force)
     else:
         os.system("date")
         run_all(args)
 
 
 def run_all(args):
-    dirname = os.path.join(testdir, args.directory)
+    #dirname = os.path.join(testdir, args.directory)
+    dirname = args.directory
 
     total = 0
     passed = 0
@@ -126,7 +130,7 @@ class Test (object):
         name = self.path[short:]
         print(name + ("." * (64 - len(name))), end="")
 
-    def run_test(self, force, short):
+    def run_test(self, force, short=0):
         (retcode, stdout, stderr) = runcmd("./molten {flags} run {file}".format(flags='-f' if force else '', file=self.path), shell=True)
         self.load_dec()
 

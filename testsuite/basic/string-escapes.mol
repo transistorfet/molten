@@ -1,0 +1,13 @@
+
+//! 
+//! before
+//! after
+//! before	after
+
+import lib.libcore
+
+
+println("")
+println("before\nafter")
+println("before\tafter")
+

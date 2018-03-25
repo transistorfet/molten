@@ -1,0 +1,12 @@
+
+//! 36
+
+import lib.libcore
+
+let a = {
+    let b = 6
+    b * b
+}
+
+println(str(a))
+

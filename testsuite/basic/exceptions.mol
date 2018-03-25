@@ -1,0 +1,16 @@
+
+//! 123
+//! Error
+
+import lib.libcore
+
+try println(str(123)) with
+    _ => println("Error")
+
+fn test() {
+    raise "error"
+}
+
+try test() with
+    _ => println("Error")
+

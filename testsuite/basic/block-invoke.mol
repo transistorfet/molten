@@ -1,0 +1,12 @@
+
+//! 42
+
+import lib.libcore
+
+// TODO this has brackets around it because that's necessary for calling things... but we could change the parser to make it possible without brackets
+let a = ({
+    fn x => 6 * x
+})(7)
+
+println(str(a))
+

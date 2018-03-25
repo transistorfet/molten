@@ -1,0 +1,11 @@
+
+//! 7
+
+import lib.libcore
+
+fn f(x) {
+    x() + 1
+}
+println(str(f(fn => 6)))
+
+
