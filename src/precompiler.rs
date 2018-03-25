@@ -149,14 +149,14 @@ pub fn precompile_node<V, T>(session: &Session<V, T>, scope: ScopeRef<V, T>, nod
             AST::If(pos, Box::new(precompile_node(session, scope.clone(), *cond)), Box::new(precompile_node(session, scope.clone(), *texpr)), Box::new(precompile_node(session, scope.clone(), *fexpr)))
         },
 
-        AST::Match(pos, cond, cases) => {
+        AST::Match(pos, cond, cases, condtype) => {
             let cases = cases.into_iter().map(|(case, body)| ( precompile_node(session, scope.clone(), case), precompile_node(session, scope.clone(), body) )).collect();
-            AST::Match(pos, Box::new(precompile_node(session, scope.clone(), *cond)), cases)
+            AST::Match(pos, Box::new(precompile_node(session, scope.clone(), *cond)), cases, condtype)
         },
 
-        AST::Try(pos, cond, cases) => {
+        AST::Try(pos, cond, cases, condtype) => {
             let cases = cases.into_iter().map(|(case, body)| ( precompile_node(session, scope.clone(), case), precompile_node(session, scope.clone(), body) )).collect();
-            AST::Try(pos, Box::new(precompile_node(session, scope.clone(), *cond)), cases)
+            AST::Try(pos, Box::new(precompile_node(session, scope.clone(), *cond)), cases, condtype)
         },
 
         AST::Raise(pos, expr) => {
@@ -172,7 +172,28 @@ pub fn precompile_node<V, T>(session: &Session<V, T>, scope: ScopeRef<V, T>, nod
             AST::For(pos, name, Box::new(precompile_node(session, lscope.clone(), *cond)), Box::new(precompile_node(session, lscope.clone(), *body)), id)
         },
 
-        AST::List(pos, code) => { AST::List(pos, precompile_vec(session, scope.clone(), code)) },
+        AST::List(pos, code, ttype) => { AST::List(pos, precompile_vec(session, scope.clone(), code), ttype) },
+        /*
+        AST::List(pos, code, stype) => {
+            use abi::ABI;
+            use utils::UniqueID;
+            let mut block = vec!();
+            let itype = stype.unwrap();
+            let ltype = Type::Object(format!("List"), vec!(itype.clone()));
+            let id = format!("{}", UniqueID::generate());
+            block.push(AST::Definition(pos.clone(), (id.clone(), Some(ltype.clone())),
+                Box::new(AST::Invoke(pos.clone(),
+                    Box::new(AST::Resolver(pos.clone(), Box::new(AST::Identifier(pos.clone(), format!("List"))), String::from("new"))),
+                    vec!(AST::New(pos.clone(), (format!("List"), vec!(itype.clone()))) /*, AST::Integer(code.len() as isize)*/), Some(Type::Function(vec!(ltype.clone()), Box::new(ltype.clone()), ABI::Molten))))));
+            for item in code {
+                block.push(AST::Invoke(pos.clone(),
+                    Box::new(AST::Accessor(pos.clone(), Box::new(AST::Identifier(pos.clone(), id.clone())), String::from("push"), Some(ltype.clone()))),
+                    vec!(AST::Identifier(pos.clone(), id.clone()), item), Some(Type::Function(vec!(ltype.clone()), Box::new(ltype.clone()), ABI::Molten))));
+            }
+            block.push(AST::Identifier(pos.clone(), id.clone()));
+            AST::Block(pos.clone(), precompile_vec(session, scope.clone(), block))
+        },
+        */
 
         AST::PtrCast(_, _) => { node },
         AST::New(_, _) => { node },

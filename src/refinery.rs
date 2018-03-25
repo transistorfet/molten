@@ -53,14 +53,14 @@ pub fn refine_node(node: AST) -> AST {
             AST::If(pos, Box::new(refine_node(*cond)), Box::new(refine_node(*texpr)), Box::new(refine_node(*fexpr)))
         },
 
-        AST::Match(pos, cond, cases) => {
+        AST::Match(pos, cond, cases, condtype) => {
             let cases = cases.into_iter().map(move |(case, body)| ( refine_node(case), refine_node(body) )).collect();
-            AST::Match(pos, Box::new(refine_node(*cond)), cases)
+            AST::Match(pos, Box::new(refine_node(*cond)), cases, condtype)
         },
 
-        AST::Try(pos, cond, cases) => {
+        AST::Try(pos, cond, cases, condtype) => {
             let cases = cases.into_iter().map(move |(case, body)| ( refine_node(case), refine_node(body) )).collect();
-            AST::Try(pos, Box::new(refine_node(*cond)), cases)
+            AST::Try(pos, Box::new(refine_node(*cond)), cases, condtype)
         },
 
         AST::Raise(pos, expr) => {
@@ -75,24 +75,7 @@ pub fn refine_node(node: AST) -> AST {
             AST::For(pos, name, Box::new(refine_node(*cond)), Box::new(refine_node(*body)), id)
         },
 
-        AST::List(pos, code) => { AST::List(pos, refine_vec(code)) },
-        /*
-        AST::List(pos, code) => {
-            let mut block = vec!();
-            let id = format!("{}", UniqueID::generate());
-            block.push(AST::Definition(pos.clone(), (id.clone(), None),
-                Box::new(AST::Invoke(pos.clone(),
-                    Box::new(AST::Resolver(pos.clone(), Box::new(AST::Identifier(pos.clone(), format!("List"))), String::from("new"))),
-                    vec!(AST::New(pos.clone(), (format!("List"), vec!(Type::Variable(String::from("item"), UniqueID(0))))) /*, AST::Integer(code.len() as isize)*/), None))));
-            for item in code {
-                block.push(AST::Invoke(pos.clone(),
-                    Box::new(AST::Accessor(pos.clone(), Box::new(AST::Identifier(pos.clone(), id.clone())), String::from("push"), None)),
-                    vec!(item), None));
-            }
-            block.push(AST::Identifier(pos.clone(), id.clone()));
-            AST::Block(pos.clone(), refine_vec(block))
-        },
-        */
+        AST::List(pos, code, ttype) => { AST::List(pos, refine_vec(code), ttype) },
 
         AST::Class(pos, pair, parent, body, id) => {
             // Make sure constructors take "self" as the first argument, and return "self" at the end

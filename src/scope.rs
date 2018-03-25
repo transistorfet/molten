@@ -451,6 +451,7 @@ impl<V, T> Scope<V, T> where V: Clone, T: Clone {
 
     pub fn map_all_typevars(&mut self, ttype: Type) -> Type {
         let mut varmap = Scope::<V, T>::map_new();
+        debug!("MAPPING ALL: {:?}", ttype);
         self.map_typevars(&mut varmap, ttype)
     }
 
@@ -491,12 +492,35 @@ impl<V, T> Scope<V, T> where V: Clone, T: Clone {
         types.into_iter().map(|vtype| self.map_typevars(varmap, vtype)).collect()
     }
 
+    pub fn unmap_typevars(&self, varmap: &mut HashMap<UniqueID, Type>, ttype: Type) -> Type {
+        match ttype {
+            Type::Variable(name, id) => {
+                for (oid, mtype) in varmap.iter() {
+                    match *mtype {
+                        Type::Variable(ref mname, ref mid) if *mid == id => { return Type::Variable(mname.clone(), oid.clone()); },
+                        _ => { },
+                    };
+                }
+                Type::Variable(name, id)
+            },
+            Type::Function(args, ret, abi) => Type::Function(self.unmap_typevars_vec(varmap, args), Box::new(self.unmap_typevars(varmap, *ret)), abi),
+            // TODO why did I do this?  Was it because of a bug or just to reduce typevars, because it caused another bug with constructors
+            //Type::Function(args, ret, abi) => Type::Function(self.map_typevars_vec(varmap, args), ret, abi),
+            Type::Overload(variants) => Type::Overload(self.unmap_typevars_vec(varmap, variants)),
+            Type::Object(name, types) => Type::Object(name.clone(), self.unmap_typevars_vec(varmap, types)),
+        }
+    }
+
+    pub fn unmap_typevars_vec(&self, varmap: &mut HashMap<UniqueID, Type>, types: Vec<Type>) -> Vec<Type> {
+        types.into_iter().map(|vtype| self.unmap_typevars(varmap, vtype)).collect()
+    }
+
     pub fn new_typevar(&mut self) -> Type {
         let id = UniqueID::generate();
         let name = self.new_typevar_name();
         let ttype = Type::Variable(name.clone(), id.clone());
 
-        self.define_type(name, ttype.clone()).unwrap();
+        //self.define_type(name, ttype.clone()).unwrap();
         if self.is_global() {
             self.define_type(id.to_string(), ttype.clone()).unwrap();
         } else {

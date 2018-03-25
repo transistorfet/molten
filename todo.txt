@@ -1,4 +1,6 @@
 
+* there is now an issue with typechecking of hashmap, which doesn't correctly tie the typevars together, and it's has something to do with mapping and the var's name
+
 * tests for: empty string, string escapes, exceptions, while loops, iterators, generic/typevars funcs, obscure mixes like block as value of assignment, maybe block who's return is directly called
 * either fix parser to directly call function without brackets or comment out that condition from the direct-function test
 

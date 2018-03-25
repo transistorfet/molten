@@ -276,7 +276,7 @@ named!(trywith(Span) -> AST,
         c: expression >>
         wscom!(tag_word!("with")) >>
         l: caselist >>
-        (AST::Try(Pos::new(pos), Box::new(c), l))
+        (AST::Try(Pos::new(pos), Box::new(c), l, None))
     )
 );
 
@@ -297,7 +297,7 @@ named!(matchcase(Span) -> AST,
         //wscom!(tag_word!("with")) >>
         //l: caselist >>
         l: delimited!(wscom!(tag!("{")), caselist, wscom!(tag!("}"))) >>
-        (AST::Match(Pos::new(pos), Box::new(c), l))
+        (AST::Match(Pos::new(pos), Box::new(c), l, None))
     )
 );
 
@@ -804,7 +804,7 @@ named!(list(Span) -> AST,
             separated_list_complete!(wscom!(tag!(",")), expression),
             wscom!(tag!("]"))
         ) >>
-        (AST::List(Pos::new(pos), l))
+        (AST::List(Pos::new(pos), l, None))
     )
 );
 

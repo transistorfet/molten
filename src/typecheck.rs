@@ -95,7 +95,10 @@ pub fn check_types_node_or_error<V, T>(session: &Session<V, T>, scope: ScopeRef<
 
             let tscope = Scope::new_ref(Some(scope.clone()));
             let dtype = check_types_node(session, scope.clone(), fexpr, None);
-            let mut etype = tscope.borrow_mut().map_all_typevars(dtype.clone());
+            let etype = match dtype {
+                Type::Variable(_, _) => dtype.clone(),
+                _ => tscope.borrow_mut().map_all_typevars(dtype.clone()),
+            };
             let etype = match etype.is_overloaded() {
                 true => find_variant(tscope.clone(), etype, atypes.clone(), Check::Def)?,
                 false => etype,
@@ -115,6 +118,7 @@ pub fn check_types_node_or_error<V, T>(session: &Session<V, T>, scope: ScopeRef<
                     */
                     get_accessor_name(tscope.clone(), fexpr.as_mut(), &etype)?;
 
+                    //let ftype = expect_type(tscope.clone(), Some(etype.clone()), Some(Type::Function(atypes, Box::new(expected.unwrap_or_else(|| tscope.borrow_mut().new_typevar())), abi.clone())), Check::Update)?;
                     let ftype = expect_type(tscope.clone(), Some(etype.clone()), Some(Type::Function(atypes, Box::new(etype.get_rettype()?.clone()), abi.clone())), Check::Def)?;
                     // TODO should this actually be another expect, so type resolutions that occur in later args affect earlier args?  Might not be needed unless you add typevar constraints
                     let ftype = resolve_type(tscope.clone(), ftype);        // NOTE This ensures the early arguments are resolved despite typevars not being assigned until later in the signature
@@ -176,14 +180,15 @@ pub fn check_types_node_or_error<V, T>(session: &Session<V, T>, scope: ScopeRef<
             expect_type(scope.clone(), Some(ttype), Some(ftype), Check::List)?
         },
 
-        AST::Try(_, ref mut cond, ref mut cases) |
-        AST::Match(_, ref mut cond, ref mut cases) => {
+        AST::Try(_, ref mut cond, ref mut cases, ref mut condtype) |
+        AST::Match(_, ref mut cond, ref mut cases, ref mut condtype) => {
             let mut ctype = Some(check_types_node(session, scope.clone(), cond, None));
             let mut rtype = None;
             for &mut (ref mut case, ref mut expr) in cases {
                 ctype = Some(expect_type(scope.clone(), ctype.clone(), Some(check_types_node(session, scope.clone(), case, ctype.clone())), Check::List)?);
                 rtype = Some(expect_type(scope.clone(), rtype.clone(), Some(check_types_node(session, scope.clone(), expr, rtype.clone())), Check::List)?);
             }
+            *condtype = ctype;
             rtype.unwrap()
         },
 
@@ -214,12 +219,14 @@ pub fn check_types_node_or_error<V, T>(session: &Session<V, T>, scope: ScopeRef<
             ttype.clone().unwrap()
         },
 
-        AST::List(_, ref mut items) => {
+        AST::List(_, ref mut items, ref mut stype) => {
             let mut ltype = None;
             for ref mut expr in items {
                 ltype = Some(expect_type(scope.clone(), ltype.clone(), Some(check_types_node(session, scope.clone(), expr, ltype.clone())), Check::List)?);
             }
-            Type::Object(String::from("List"), vec!(ltype.unwrap_or_else(|| expected.unwrap_or_else(|| scope.borrow_mut().new_typevar()))))
+            let ltype = ltype.unwrap_or_else(|| expected.unwrap_or_else(|| scope.borrow_mut().new_typevar()));
+            *stype = Some(ltype.clone());
+            Type::Object(String::from("List"), vec!(ltype))
         },
 
         AST::PtrCast(ref ttype, ref mut code) => {

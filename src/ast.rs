@@ -61,7 +61,7 @@ pub enum AST {
     String(String),
     Nil(Option<Type>),
     PtrCast(Type, Box<AST>),
-    List(Pos, Vec<AST>),
+    List(Pos, Vec<AST>, Option<Type>),
 
     Recall(Pos, String),
     Identifier(Pos, String),
@@ -75,8 +75,8 @@ pub enum AST {
     Block(Pos, Vec<AST>),
     If(Pos, Box<AST>, Box<AST>, Box<AST>),
     Raise(Pos, Box<AST>),
-    Try(Pos, Box<AST>, Vec<(AST, AST)>),
-    Match(Pos, Box<AST>, Vec<(AST, AST)>),
+    Try(Pos, Box<AST>, Vec<(AST, AST)>, Option<Type>),
+    Match(Pos, Box<AST>, Vec<(AST, AST)>, Option<Type>),
     For(Pos, String, Box<AST>, Box<AST>, UniqueID),
     Declare(Pos, String, Type),
     Function(Pos, Option<String>, Vec<(String, Option<Type>, Option<AST>)>, Option<Type>, Box<AST>, UniqueID, ABI),
@@ -93,7 +93,7 @@ pub enum AST {
 impl AST {
     pub fn get_pos(&self) -> Pos {
         match *self {
-            AST::List(ref pos, _) |
+            AST::List(ref pos, _, _) |
             AST::Recall(ref pos, _) |
             AST::Identifier(ref pos, _) |
             AST::Index(ref pos, _, _, _) |
@@ -104,8 +104,8 @@ impl AST {
             AST::Block(ref pos, _) |
             AST::If(ref pos, _, _, _) |
             AST::Raise(ref pos, _) |
-            AST::Try(ref pos, _, _) |
-            AST::Match(ref pos, _, _) |
+            AST::Try(ref pos, _, _, _) |
+            AST::Match(ref pos, _, _, _) |
             AST::For(ref pos, _, _, _, _) |
             AST::Declare(ref pos, _, _) |
             AST::Function(ref pos, _, _, _, _, _, _) |

@@ -412,7 +412,7 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
                 Err(_) => panic!("UnsetError:{:?}: use before assignment {:?}", pos, name),
             };
             let ttype = scope.borrow().get_variable_type(name).unwrap();
-            if !pointer.get_ref().is_null() { debug!("IDENT: {:?} {:?}", LLVMGetValueKind(pointer.get_ref()), LLVMGetTypeKind(LLVMTypeOf(pointer.get_ref()))); }
+            if !pointer.get_ref().is_null() { debug!("IDENT: {:?} {:?} {:?}", LLVMGetValueKind(pointer.get_ref()), LLVMGetTypeKind(LLVMTypeOf(pointer.get_ref())), ttype); }
             //if !pointer.get_ref().is_null() { LLVMDumpValue(pointer.get_ref()); }
             //if LLVMGetTypeKind(LLVMTypeOf(pointer)) == llvm::LLVMTypeKind::LLVMPointerTypeKind {
             if !pointer.get_ref().is_null() {
@@ -448,7 +448,7 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
         // TODO you might need to create a new function to hold the body, so that it can be resumed from, and there also
         // might be an issue when you call a function one level down, and pass it the same unwind locations... it might effect all
         // functions, all the way down
-        AST::Try(_, ref body, ref cases) => {
+        AST::Try(_, ref body, ref cases, ref condtype) => {
             /*
             // TODO need to add multiple cases, and also it doesn't work
             let try_block = LLVMAppendBasicBlockInContext(data.context, func, label("try"));
@@ -544,7 +544,7 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
             Box::new(Data(phi))
         },
 
-        AST::Match(_, ref cond, ref cases) => {
+        AST::Match(_, ref cond, ref cases, ref condtype) => {
             let mut cond_blocks = vec!();
             let mut do_blocks = vec!();
             for _ in 0 .. cases.len() {
@@ -557,6 +557,7 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
             let cond_value = compile_node(data, func, unwind, scope.clone(), cond).get_ref();
             LLVMBuildBr(data.builder, cond_blocks[0]);
 
+            let ctype = condtype.as_ref().unwrap();
             let mut values = vec!();
             for (i, &(ref case, ref expr)) in cases.iter().enumerate() {
                 LLVMPositionBuilderAtEnd(data.builder, cond_blocks[i]);
@@ -564,7 +565,9 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
                     AST::Underscore => { LLVMBuildBr(data.builder, do_blocks[i]); },
                     _ => {
                         let case_value = compile_node(data, func, unwind, scope.clone(), case).get_ref();
-                        let is_true = LLVMBuildICmp(data.builder, llvm::LLVMIntPredicate::LLVMIntEQ, cond_value, case_value, label("is_true"));
+                        //let is_true = LLVMBuildICmp(data.builder, llvm::LLVMIntPredicate::LLVMIntEQ, cond_value, case_value, label("is_true"));
+                        let eqfunc = get_method(scope.clone(), "", "==", vec!(ctype.clone(), ctype.clone()));
+                        let is_true = eqfunc.invoke(data, unwind, vec!(cond_value, case_value));
                         LLVMBuildCondBr(data.builder, is_true, do_blocks[i], cond_blocks[i + 1]);
                     }
                 }
@@ -658,13 +661,19 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
             Box::new(Data(body_value))
         },
 
-        AST::List(ref pos, ref items) => {
-            let listdef = scope.borrow().get_class_def(&String::from("List"));
+        AST::List(ref pos, ref items, ref stype) => {
+            let itype = stype.as_ref().unwrap();
+            let ltype = Type::Object(format!("List"), vec!(itype.clone()));
+            let newfunc = get_method(scope.clone(), "List", "new", vec!(ltype.clone()));
+            let pushfunc = get_method(scope.clone(), "List", "push", vec!(ltype.clone(), itype.clone()));
+            //let listdef = scope.borrow().get_class_def(&String::from("List"));
             // TODO this is kinda wrong, since you're passing it without type params
-            let list = listdef.borrow().get_variable_value(&String::from("new")).unwrap().invoke(data, unwind, vec!(compile_node(data, func, unwind, scope.clone(), &AST::New(pos.clone(), (String::from("List"), vec!()))).get_ref()));
+            //let list = listdef.borrow().get_variable_value(&String::from("new")).unwrap().invoke(data, unwind, vec!(compile_node(data, func, unwind, scope.clone(), &AST::New(pos.clone(), (String::from("List"), vec!()))).get_ref()));
+            let list = newfunc.invoke(data, unwind, vec!(compile_node(data, func, unwind, scope.clone(), &AST::New(pos.clone(), (String::from("List"), vec!(itype.clone())))).get_ref()));
             for item in items {
                 let value = build_cast_to_vartype(data, compile_node(data, func, unwind, scope.clone(), item).get_ref());
-                listdef.borrow().get_variable_value(&String::from("push")).unwrap().invoke(data, unwind, vec!(list, value));
+                //listdef.borrow().get_variable_value(&String::from("push")).unwrap().invoke(data, unwind, vec!(list, value));
+                pushfunc.invoke(data, unwind, vec!(list, value));
             }
             Box::new(Data(list))
         },
@@ -832,7 +841,7 @@ unsafe fn collect_functions_node<'a>(data: &mut LLVM<'a>, scope: ScopeRef<Value,
             return Some(from_abi(abi, function));
         },
 
-        AST::List(_, ref items) => { collect_functions_vec(data, scope, items); },
+        AST::List(_, ref items, _) => { collect_functions_vec(data, scope, items); },
 
         AST::Invoke(_, ref fexpr, ref args, _) => {
             collect_functions_node(data, scope.clone(), fexpr);
@@ -870,8 +879,8 @@ unsafe fn collect_functions_node<'a>(data: &mut LLVM<'a>, scope: ScopeRef<Value,
 
         AST::Raise(_, ref expr) => { collect_functions_node(data, scope, expr); },
 
-        AST::Try(_, ref cond, ref cases) |
-        AST::Match(_, ref cond, ref cases) => {
+        AST::Try(_, ref cond, ref cases, _) |
+        AST::Match(_, ref cond, ref cases, _) => {
             collect_functions_node(data, scope.clone(), cond);
             for case in cases {
                 collect_functions_node(data, scope.clone(), &case.0);
@@ -1130,11 +1139,36 @@ unsafe fn build_function_body(data: &LLVM, node: &AST) {
     }
 }
 
-//pub unsafe fn build_invoke(data: &LLVM, scope: ScopeRef<Value, TypeValue>, name: &str, unwind: Unwind, ) -> LLVMValueRef {
-//    let (ttype, funcdefs, value) = scope.borrow().search(name, |sym| (sym.ttype.clone(), sym.funcdefs, sym.value.clone()));
-//    let name = ABI::Molten.mangle_name(name, argtypes, funcdefs);
-//    build_cast_from_vartype(data, value.invoke(data, unwind, vec!(list_value, cond_value)), itype);
-//}
+pub fn get_method(scope: ScopeRef<Value, TypeValue>, class: &str, method: &str, argtypes: Vec<Type>) -> Box<Compilable> {
+    use types::{ find_variant, Check };
+    let classdef = if class == "" {
+        scope.clone()
+    } else {
+        scope.borrow().get_class_def(&String::from(class))
+    };
+    let name = String::from(method);
+    let ftype = find_variant(scope.clone(), classdef.borrow().get_variable_type(&name).unwrap(), argtypes, Check::Def).unwrap();
+    let funcdefs = classdef.borrow().num_funcdefs(&name);
+    let mname = ABI::Molten.mangle_name(&name, ftype.get_argtypes().unwrap(), funcdefs);
+    let function = classdef.borrow().get_variable_value(&String::from(mname)).unwrap();
+    function
+}
+
+/*
+pub unsafe fn build_invoke(data: &LLVM, scope: ScopeRef<Value, TypeValue>, unwind: Unwind, classdef: ScopeRef<Value, TypeValue>, name: &str, args: Vec<LLVMValueRef>) -> LLVMValueRef {
+    let mut dtype = classdef.borrow().get_variable_type(&name).unwrap();
+    if dtype.is_overloaded() {
+        dtype = types::find_variant(scope.clone(), dtype, ttype.get_argtypes().unwrap().clone(), types::Check::List).unwrap();
+    }
+    let name = ttype.get_abi().unwrap().mangle_name(name, dtype.get_argtypes().unwrap(), classdef.borrow().num_funcdefs(&name));
+    let function = classdef.borrow().get_variable_value(&name).unwrap();
+    debug!("INVOKE: {:?} {:?} {:?}", cname, name, index);
+
+    //let (ttype, funcdefs, function) = scope.borrow().search(name, |sym| (sym.ttype.clone(), sym.funcdefs, sym.value.clone()));
+    //let name = ABI::Molten.mangle_name(name, argtypes, funcdefs);
+    build_cast_from_vartype(data, function.invoke(data, unwind, vec!(list_value, cond_value)), itype);
+}
+*/
 
 pub unsafe fn build_c_call(data: &LLVM, name: &str, largs: &mut Vec<LLVMValueRef>) -> LLVMValueRef {
     let function = LLVMGetNamedFunction(data.module, label(name));

@@ -179,3 +179,28 @@ class HashMap<'item> {
     }
 }
 
+/*
+class Iter<'item> {
+    fn next(self) -> 'item {
+        //raise error notimplemented?
+    }
+}
+
+
+class ListIter<'item> extends Iter<'item> {
+    let list: List<'item>
+    let index: Int
+
+    fn new(self, list) {
+        self.list = list
+        self.index = 0
+    }
+
+    fn next(self) -> 'item {
+        let item = self.list[self.index]
+        self.index = self.index + 1
+        item
+    }
+}
+*/
+

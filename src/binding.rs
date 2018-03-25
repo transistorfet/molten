@@ -92,8 +92,8 @@ fn bind_names_node_or_error<V, T>(session: &Session<V, T>, scope: ScopeRef<V, T>
             bind_names_node(session, scope.clone(), fexpr);
         },
 
-        AST::Try(_, ref mut cond, ref mut cases) |
-        AST::Match(_, ref mut cond, ref mut cases) => {
+        AST::Try(_, ref mut cond, ref mut cases, _) |
+        AST::Match(_, ref mut cond, ref mut cases, _) => {
             bind_names_node(session, scope.clone(), cond);
             // TODO check to make sure AST::Underscore only occurs as the last case, if at all
             for &mut (ref mut case, ref mut body) in cases {
@@ -118,7 +118,7 @@ fn bind_names_node_or_error<V, T>(session: &Session<V, T>, scope: ScopeRef<V, T>
             bind_names_node(session, lscope.clone(), body);
         },
 
-        AST::List(_, ref mut code) |
+        AST::List(_, ref mut code, _) |
         AST::Block(_, ref mut code) => { bind_names_vec(session, scope, code); },
 
         AST::Index(_, ref mut base, ref mut index, _) => {
