@@ -1,15 +1,7 @@
 
 * there is now an issue with typechecking of hashmap, which doesn't correctly tie the typevars together, and it's has something to do with mapping and the var's name
-
-* tests for: empty string, string escapes, exceptions, while loops, iterators, generic/typevars funcs, obscure mixes like block as value of assignment, maybe block who's return is directly called
-* either fix parser to directly call function without brackets or comment out that condition from the direct-function test
-
-* issue with mangling currently is held up by forward definitions/recursive definitions, which make the ABI Unknown, which then cannot resolve... but I can't make it
-  assume molten abi because sprintf is defined as a typevar because no support for vargs... maybe that can be added to C abi somehow?
-
-
 * fix invoke anonymous function inline issue in parser
-* "match" only works with integers... maybe call ==, but it would have to mangle correctly
+
 
 * there's still a problem with typevars not resolving fully, where a function that should return a concrete returns a free typevar.... (recursion or forward definition)
 * either add in the initialization of class variables, possibly limited to constant expressions only, or else raise an error if an initializer is provided

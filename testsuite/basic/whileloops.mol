@@ -1,0 +1,23 @@
+
+//! 0
+//! 1
+//! 2
+//! 3
+//! 4
+
+import lib.libcore
+
+class Test {
+    let i: Int
+
+    fn new(self) {
+        self.i = 0
+    }
+}
+
+let t = new Test()
+while t.i < 5 {
+    println(str(t.i))
+    t.i = t.i + 1
+}
+
