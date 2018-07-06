@@ -283,8 +283,8 @@ unsafe fn declare_globals(data: &LLVM, scope: ScopeRef<Value, TypeValue>) {
     for node in &data.classes {
         if let AST::Class(_, (ref cname, _), _, _, ref id) = **node {
             let tscope = data.map.get(id);
-            let classdef = scope.borrow().get_class_def(cname);
-            let value = scope.borrow().get_type_value(cname).unwrap();
+            let classdef = tscope.borrow().get_class_def(cname);
+            let value = tscope.borrow().get_type_value(cname).unwrap();
 
             if value.vtable.len() > 0 {
                 let mut methods = vec!();
@@ -918,7 +918,7 @@ unsafe fn collect_functions_node<'a>(data: &mut LLVM<'a>, scope: ScopeRef<Value,
             // Build vtable for class
             let classdef = scope.borrow().get_class_def(name);
             let parent = classdef.borrow().get_parent().unwrap_or(Scope::new_ref(None));
-if name.as_str() != "String" {
+if name.as_str() != "String" && !name.as_str().contains("closure") {
             for ref node in body.iter() {
                 match **node {
                     AST::Function(_, ref fname, ref args, ref rtype, _, _, ref abi) => {

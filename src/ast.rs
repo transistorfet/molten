@@ -20,7 +20,7 @@ impl Pos {
     pub fn new(span: Span) -> Pos {
         Pos {
             offset: span.offset,
-            column: span.get_column_utf8().unwrap(),
+            column: span.get_utf8_column(),
             line: span.line,
             filenum: 0,
         }

@@ -5,6 +5,7 @@ use std::str;
 
 extern crate nom;
 use nom::{ digit };
+use nom::types::CompleteByteSlice;
 
 use parser;
 use types::Type;
@@ -114,11 +115,11 @@ pub fn molten_mangle_name(name: &str, argtypes: &Vec<Type>, funcdefs: i32) -> St
 pub fn molten_unmangle_name(name: &str) -> Option<String> {
     named!(unmangle(parser::Span) -> String,
         preceded!(tag!("_Z"),
-            map_str!(length_bytes!(map!(digit, |s| usize::from_str_radix(str::from_utf8(s.fragment).unwrap(), 10).unwrap())))
+            map_str!(length_bytes!(map!(digit, |s| usize::from_str_radix(str::from_utf8(&s.fragment).unwrap(), 10).unwrap())))
         )
     );
-    match unmangle(parser::Span::new(name.as_bytes())) {
-        nom::IResult::Done(_, value) => Some(value),
+    match unmangle(parser::Span::new(CompleteByteSlice(name.as_bytes()))) {
+        Ok((_, value)) => Some(value),
         _ => None,
     }
 }

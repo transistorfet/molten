@@ -271,7 +271,7 @@ impl<V, T> Scope<V, T> where V: Clone, T: Clone {
         let mut parent = self.parent.clone();
         while parent.is_some() {
             let scope = parent.unwrap();
-            if scope.borrow().context == Context::Global {
+            if scope.borrow().is_global() {
                 return false;
             }
             if scope.borrow().contains_local(name) {

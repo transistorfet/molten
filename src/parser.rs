@@ -1,7 +1,8 @@
 
 
 extern crate nom;
-use nom::{ digit, hex_digit, oct_digit, line_ending, not_line_ending, space, multispace, is_alphanumeric, is_alphabetic, is_space, IResult };
+use nom::{ digit, hex_digit, oct_digit, line_ending, not_line_ending, space, multispace, is_alphanumeric, is_alphabetic, is_space, Needed };
+use nom::types::CompleteByteSlice;
 
 extern crate nom_locate;
 use nom_locate::LocatedSpan;
@@ -19,11 +20,12 @@ use ast::{ AST, Pos };
 
 ///// Parsing Macros /////
 
-pub type Span<'a> = LocatedSpan<&'a [u8]>;
+//pub type Span<'a> = LocatedSpan<&'a [u8]>;
+pub type Span<'a> = LocatedSpan<CompleteByteSlice<'a>>;
 
 #[inline]
 pub fn span_to_string(s: Span) -> String {
-    String::from(str::from_utf8(s.fragment).unwrap())
+    String::from(str::from_utf8(&s.fragment).unwrap())
 }
 
 //named!(sp, eat_separator!(&b" \t"[..]));
@@ -89,6 +91,7 @@ macro_rules! map_str (
     )
 );
 
+/*
 fn convert_err<P, E>(e: nom::Err<P, E>, span: Span) -> nom::Err<Span, E> {
     match e {
         nom::Err::Code(c) => nom::Err::Code(c),
@@ -97,16 +100,16 @@ fn convert_err<P, E>(e: nom::Err<P, E>, span: Span) -> nom::Err<Span, E> {
         nom::Err::NodePosition(c, p, b) => nom::Err::NodePosition(c, span, b.into_iter().map(|e| convert_err(e, span)).collect()),
     }
 }
-
+*/
 
 ///// Parser /////
 
 pub fn parse_or_error(name: &str, text: &[u8]) -> Vec<AST> {
-    let span = Span::new(text);
+    let span = Span::new(CompleteByteSlice(text));
     match parse(span) {
-        IResult::Done(rem, _) if rem.fragment != [] => panic!("InternalError: unparsed input remaining: {:?}", rem),
-        IResult::Done(_, code) => code,
-        res @ IResult::Error(_) => { /* print_error(name, span, e); */ panic!("{:?}", res) },
+        Ok((rem, _)) if rem.fragment != CompleteByteSlice(&[]) => panic!("InternalError: unparsed input remaining: {:?}", rem),
+        Ok((_, code)) => code,
+        res @ Err(nom::Err::Error(_)) => { /* print_error(name, span, e); */ panic!("{:?}", res) },
         res @ _ => panic!("UnknownError: the parser returned an unknown result; {:?}", res),
     }
 }
@@ -601,9 +604,9 @@ named!(any_op(Span) -> String,
 );
 
 pub fn parse_type(s: &str) -> Option<Type> {
-    match type_description(Span::new(s.as_bytes())) {
-        IResult::Done(_, t) => Some(t),
-        _ => panic!("Error Parsing Type: {:?}", s)
+    match type_description(Span::new(CompleteByteSlice(s.as_bytes()))) {
+        Ok((_, t)) => Some(t),
+        e => panic!("Error Parsing Type: {:?}   [{:?}]", s, e)
     }
 }
 
@@ -692,7 +695,7 @@ named!(boolean(Span) -> AST,
     )
 );
 
-named!(string_contents(&[u8]) -> AST,
+named!(string_contents(Span) -> AST,
     map!(
         escaped_transform!(is_not!("\"\\"), '\\',
             alt!(
@@ -709,23 +712,25 @@ named!(string_contents(&[u8]) -> AST,
     )
 );
 
+/*
 fn string_contents_middle(mut span: Span) -> IResult<Span, AST> {
     match string_contents(span.fragment) {
-        IResult::Done(rem, res) => {
+        Ok((rem, res)) => {
             span.offset += rem.as_ptr() as usize - span.fragment.as_ptr() as usize;
             span.fragment = rem;
-            IResult::Done(span, res)
+            Ok((span, res))
         },
         IResult::Incomplete(n) => IResult::Incomplete(n),
-        IResult::Error(e) => IResult::Error(convert_err(e, span)),
+        Err(nom::Err::Error(e)) => Err(nom::Err::Error(convert_err(e, span))),
     }
 }
+*/
 
 named!(string(Span) -> AST,
     delimited!(
         tag!("\""),
         alt!(
-            string_contents_middle |
+            string_contents |
             value!(AST::String(String::new()), tag!(""))
         ),
         tag!("\"")
@@ -761,14 +766,14 @@ named!(number(Span) -> AST,
 named!(hex_number(Span) -> AST,
     map!(
         preceded!(tag!("0x"), hex_digit),
-        |s| AST::Integer(isize::from_str_radix(str::from_utf8(s.fragment).unwrap(), 16).unwrap())
+        |s| AST::Integer(isize::from_str_radix(str::from_utf8(&s.fragment).unwrap(), 16).unwrap())
     )
 );
 
 named!(oct_number(Span) -> AST,
     map!(
         preceded!(tag!("0"), oct_digit),
-        |s| AST::Integer(isize::from_str_radix(str::from_utf8(s.fragment).unwrap(), 8).unwrap())
+        |s| AST::Integer(isize::from_str_radix(str::from_utf8(&s.fragment).unwrap(), 8).unwrap())
     )
 );
 
@@ -782,7 +787,7 @@ named!(int_or_float_number(Span) -> AST,
                //opt!(complete!(float_exponent))
             )
         ),
-        |s| AST::number_from_utf8(s.fragment)
+        |s| AST::number_from_utf8(&s.fragment)
     )
 );
 
@@ -923,7 +928,7 @@ pub fn print_error_info(name: &str, span: Span, err: (nom::ErrorKind, usize, usi
     println!("{}:{}:{}: ParseError: error with \"{:?}\" near {:?}", name, lines, err.1 - start, err.0, String::from(str::from_utf8(&text[start .. end]).unwrap()));
 */
 
-    println!("{}:{}:{}: ParseError: error with \"{:?}\" near {:?}", name, span.line, span.get_column_utf8().unwrap(), err.0, span_to_string(span).truncate(20));
+    println!("{}:{}:{}: ParseError: error with \"{:?}\" near {:?}", name, span.line, span.get_utf8_column(), err.0, span_to_string(span).truncate(20));
 }
 
 
@@ -937,12 +942,12 @@ mod tests {
             parse("
                 5 * 3 + 8 / 100
             ".as_bytes()),
-            IResult::Done(&b""[..], vec!(
+            Ok((&b""[..], vec!(
                 AST::Invoke(Box::new(AST::Identifier(String::from("+"))), vec!(
                     AST::Invoke(Box::new(AST::Identifier(String::from("*"))), vec!(AST::Integer(5), AST::Integer(3)), None),
                     AST::Invoke(Box::new(AST::Identifier(String::from("/"))), vec!(AST::Integer(8), AST::Integer(100)), None)
                 ), None)
-            ))
+            )))
         );
     }
 }
