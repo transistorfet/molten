@@ -1,12 +1,12 @@
 
-//! 4
+////! 4
 //! 8
 
 import lib.libcore
 
-fn x: Int {
-    println(str(x))
-}(4)
+//fn x: Int {
+//    println(str(x))
+//}(4)
 
 (fn x: Int {
     println(str(x))

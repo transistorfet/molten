@@ -221,7 +221,7 @@ named!(expression(Span) -> AST,
     alt_complete!(
         noop |
         underscore |
-        block |
+        //block |
         ifexpr |
         trywith |
         raise |
@@ -543,6 +543,7 @@ impl AST {
 
 named!(subatomic(Span) -> AST,
     alt_complete!(
+        block |
         literal |
         identifier_node |
         delimited!(tag!("("), wscom!(expression), tag!(")"))

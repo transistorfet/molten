@@ -1,12 +1,12 @@
 
+* add ast element like Struct... which does the same as class build type, but without the vtable stuff, and we can bypass some of the complexity...
+  but!!!! could we also/instead factor out the vtables somehow... so that it's more modular/selectable
 * there is now an issue with typechecking of hashmap, which doesn't correctly tie the typevars together, and it's has something to do with mapping and the var's name
-* fix invoke anonymous function inline issue in parser
 
 
 * there's still a problem with typevars not resolving fully, where a function that should return a concrete returns a free typevar.... (recursion or forward definition)
 * either add in the initialization of class variables, possibly limited to constant expressions only, or else raise an error if an initializer is provided
 * fix the parser issues where you need nil to make it work.... i think parser parsing ";" into noop/nil might work, if i can get the parser working
-* you need to desugar list creation up front to avoid the specific calls (we can convert them, but why bother if we can reguarlize it; we just need a temp variable...
 
 
 * if you had a tuple type, you could use a typevar to represent a tuple of the arguments to a function: Type::Function(Type::Variable(..), Type::Variable(..)) or 'a -> 'b where 'a = ('c, 'd, 'e)
@@ -30,25 +30,25 @@
 
 * if even the global/module scope was a closure, then you could make a module be equivallent to an implicit function that is called when the module is imported, which could have the name of the
   module; so a module called main would become the main() function
-* what if you a 'context' passed to the node visitors that would allow "if" to know if its' return is used or not, and so whether typechecking must match
+* what if you have a 'context' passed to the node visitors that would allow "if" to know if its' return is used or not, and so whether typechecking must match
 * if you make ops methods, then everything has to be type annotated, with the type system as it is; you'd need constrained types, or multiple paths, or bidirectional or something
-* make typed functions for all math operations, with the inlinealways attribute, if you decide to make operators methods
+  make typed functions for all math operations, with the inlinealways attribute, if you decide to make operators methods
 
 * is it even possible to add a special "constrained" type, which has &AST that must type check correctly in order to match (checks done in check_type)
 * you might need to integrate type restrictions which have to get resolved later; like 'a where 'a is object with add(Int) method; not sure how you could be so specific without complexity
 * what if you generalize overloaded types, such that they're checked in check_type, and options are eliminated, or resolved to one type over the course of checking
 
 
+* should you add access modifiers to classes, and maybe functions; public, private, protected
+* should you add break/continue statements for loops
 * should you change Real to Float?  also should you change them to lower case names, which is in line with sml, ocmal, f#
+* should you allow keyword arguments in invoke; foo(a=10, b=20)
+* should you allow arguments with a default value to be omitted from a function call?, that would require a bunch of changes to typechecking
 * should you fix scope resolution to also work on objects, so that you can have static methods from the object without explicitly referencing its type
 * should exports also list all the modules that the file imports, so that class definitions in other imports can be found, if needed for arguments
 * should variables be writable... maybe only with compiler directive, or only without one; if so, add a const expression
-* should you add access modifiers to classes, and maybe functions; public, private, protected
 * should you add a return statement?  It's not functional, but it's practial
-* should you add break/continue statements for loops
 * should you require an override keyword when masking definitions in lower scopes? like class definitions
-* should you allow keyword arguments in invoke; foo(a=10, b=20)
-* should you allow arguments with a default value to be omitted from a function call?, that would require a bunch of changes to typechecking
 
 
 
