@@ -1,7 +1,7 @@
 
 use std::fmt;
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct UniqueID(pub usize);
 
 static mut _NEXT_ID: usize = 10;

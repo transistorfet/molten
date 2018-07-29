@@ -22,18 +22,22 @@ pub enum Context {
 }
 
 
+pub type VarID = UniqueID;
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct VarInfo<V> {
-    pub id: UniqueID,
+    pub id: VarID,
     pub ttype: Option<Type>,
     pub value: Option<V>,
     pub funcdefs: i32,
     pub abi: Option<ABI>,
 }
 
+pub type TypeID = UniqueID;
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct TypeInfo<V, T> {
-    pub id: UniqueID,
+    pub id: TypeID,
     pub ttype: Type,
     pub classdef: Option<ScopeRef<V, T>>,
     pub parent: Option<(String, Vec<Type>)>,
@@ -108,21 +112,38 @@ impl<V, T> Scope<V, T> where V: Clone, T: Clone {
     ///// Variable Functions /////
 
     #[must_use]
-    pub fn define(&mut self, name: String, ttype: Option<Type>) -> Result<(), Error> {
+    pub fn define(&mut self, name: String, ttype: Option<Type>) -> Result<VarID, Error> {
         match self.names.contains_key(&name) {
             true => Err(Error::new(format!("NameError: variable is already defined; {:?}", name))),
             false => {
-                self.names.insert(name, VarInfo { id: UniqueID::generate(), ttype: ttype, value: None, funcdefs: 0, abi: None });
-                Ok(())
+                let id = VarID::generate();
+                self.names.insert(name, VarInfo {
+                    id: id,
+                    ttype: ttype,
+                    value: None,
+                    funcdefs: 0,
+                    abi: None
+                });
+                Ok(id)
             },
         }
     }
 
     #[must_use]
-    pub fn define_func(&mut self, name: String, ttype: Option<Type>, abi: ABI) -> Result<(), Error> {
+    pub fn define_func(&mut self, name: String, ttype: Option<Type>, abi: ABI) -> Result<VarID, Error> {
         let funcs = self.search(&name, |sym| Some(sym.funcdefs)).unwrap_or(0);
         match self.names.entry(name.clone()) {
-            Entry::Vacant(entry) => { entry.insert(VarInfo { id: UniqueID::generate(), ttype: ttype, value: None, funcdefs: funcs + 1, abi: Some(abi) }); Ok(()) },
+            Entry::Vacant(entry) => {
+                let id = VarID::generate();
+                entry.insert(VarInfo {
+                    id: id,
+                    ttype: ttype,
+                    value: None,
+                    funcdefs: funcs + 1,
+                    abi: Some(abi)
+                });
+                Ok(id)
+            },
             Entry::Occupied(mut entry) => match entry.get().funcdefs {
                 0 => Err(Error::new(format!("NameError: variable is already defined as a non-function; {:?}", name))),
                 // TODO we don't really do the right this with type here, but we don't have a scoperef to pass to Type::add_variant
@@ -131,7 +152,7 @@ impl<V, T> Scope<V, T> where V: Clone, T: Clone {
                         Err(Error::new(format!("NameError: variable already defined with abi {:?} and can't be overloaded; {:?}", abi, name)))
                     } else {
                         entry.get_mut().funcdefs += 1;
-                        Ok(())
+                        Ok(entry.get().id)
                     }
                 },
             },
@@ -139,11 +160,11 @@ impl<V, T> Scope<V, T> where V: Clone, T: Clone {
     }
 
     #[must_use]
-    pub fn define_func_variant(dscope: ScopeRef<V, T>, name: String, tscope: ScopeRef<V, T>, ftype: Type) -> Result<(), Error> {
+    pub fn define_func_variant(dscope: ScopeRef<V, T>, name: String, tscope: ScopeRef<V, T>, ftype: Type) -> Result<VarID, Error> {
         let abi = ftype.get_abi().unwrap_or(ABI::Molten);
-        dscope.borrow_mut().define_func(name.clone(), None, abi)?;
+        let id = dscope.borrow_mut().define_func(name.clone(), None, abi)?;
         Scope::add_func_variant(dscope, &name, tscope, ftype)?;
-        Ok(())
+        Ok(id)
     }
 
     pub fn modify_local<F>(&mut self, name: &String, mut f: F) -> () where F: FnMut(&mut VarInfo<V>) -> () {
@@ -189,7 +210,14 @@ impl<V, T> Scope<V, T> where V: Clone, T: Clone {
         self.names.contains_key(name)
     }
 
+    pub fn variable_id(&self, name: &String) -> Result<VarID, Error> {
+        match self.search(name, |sym| Some(sym.id)) {
+            Some(id) => Ok(id),
+            None => Err(Error::new(format!("NameError: variable is undefined; {:?}", name))),
+        }
+    }
 
+    /*
     pub fn assign(&mut self, name: &String, value: V) {
         self.modify_local(name, move |sym| sym.value = Some(value.clone()))
     }
@@ -201,6 +229,7 @@ impl<V, T> Scope<V, T> where V: Clone, T: Clone {
             None => Err(Error::new(format!("NameError: variable is undefined; {:?}", name))),
         }
     }
+    */
 
     pub fn set_variable_type(&mut self, name: &String, ttype: Type) {
         self.modify_local(name, move |sym| sym.ttype = Some(ttype.clone()))
@@ -290,18 +319,19 @@ impl<V, T> Scope<V, T> where V: Clone, T: Clone {
     ///// Type Functions /////
 
     #[must_use]
-    pub fn define_type(&mut self, name: String, ttype: Type) -> Result<(), Error> {
+    pub fn define_type(&mut self, name: String, ttype: Type) -> Result<TypeID, Error> {
         match self.types.contains_key(&name) {
             true => Err(Error::new(format!("NameError: type is already defined; {:?}", name))),
             false => {
+                let id = TypeID::generate();
                 self.types.insert(name, TypeInfo {
-                    id: UniqueID::generate(),
+                    id: id,
                     ttype: ttype,
                     classdef: None,
                     parent: None,
                     value: None
                 });
-                Ok(())
+                Ok(id)
             },
         }
     }
@@ -411,6 +441,14 @@ impl<V, T> Scope<V, T> where V: Clone, T: Clone {
         self.search_type(&self.basename, |info| info.classdef.clone())
     }
 
+    pub fn type_id(&self, name: &String) -> Result<TypeID, Error> {
+        match self.search_type(name, |info| Some(info.id)) {
+            Some(id) => Ok(id),
+            None => Err(Error::new(format!("NameError: type is undefined; {:?}", name))),
+        }
+    }
+
+    /*
     pub fn set_type_value(&mut self, name: &String, value: T) {
         self.modify_type(name, |info| info.value = Some(value.clone()))
     }
@@ -418,6 +456,7 @@ impl<V, T> Scope<V, T> where V: Clone, T: Clone {
     pub fn get_type_value(&self, name: &String) -> Option<T> {
         self.search_type(name, |info| info.value.clone())
     }
+    */
 
     pub fn locate_variable(scope: ScopeRef<V, T>, name: &String) -> Option<ScopeRef<V, T>> {
         if let Some(_) = scope.borrow().names.get(name) {
@@ -476,7 +515,7 @@ impl<V, T> Scope<V, T> where V: Clone, T: Clone {
                             Some(Type::Variable(_, ref eid)) if *eid == id => etype.clone().unwrap(),
                             None | Some(Type::Variable(_, _)) => {
                                 let v = self.new_typevar();
-                                varmap.insert(id.clone(), v.clone());
+                                varmap.insert(id, v.clone());
                                 debug!("MAPPED from {:?} to {:?}", Type::Variable(name.clone(), id), v);
                                 v
                             },
@@ -502,7 +541,7 @@ impl<V, T> Scope<V, T> where V: Clone, T: Clone {
             Type::Variable(name, id) => {
                 for (oid, mtype) in varmap.iter() {
                     match *mtype {
-                        Type::Variable(ref mname, ref mid) if *mid == id => { return Type::Variable(mname.clone(), oid.clone()); },
+                        Type::Variable(ref mname, ref mid) if *mid == id => { return Type::Variable(mname.clone(), *oid); },
                         _ => { },
                     };
                 }
@@ -523,7 +562,7 @@ impl<V, T> Scope<V, T> where V: Clone, T: Clone {
     pub fn new_typevar(&mut self) -> Type {
         let id = UniqueID::generate();
         let name = self.new_typevar_name();
-        let ttype = Type::Variable(name.clone(), id.clone());
+        let ttype = Type::Variable(name.clone(), id);
 
         //self.define_type(name, ttype.clone()).unwrap();
         if self.is_global() {

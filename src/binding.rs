@@ -33,7 +33,7 @@ pub fn bind_names_node<V, T>(session: &Session<V, T>, scope: ScopeRef<V, T>, nod
 fn bind_names_node_or_error<V, T>(session: &Session<V, T>, scope: ScopeRef<V, T>, node: &mut AST) -> Result<(), Error> where V: Clone + Debug, T: Clone + Debug {
     match *node {
         AST::Function(_, ref name, ref mut args, ref mut ret, ref mut body, ref id, ref abi) => {
-            let fscope = session.map.add(id.clone(), Some(scope.clone()));
+            let fscope = session.map.add(*id, Some(scope.clone()));
             fscope.borrow_mut().set_basename(name.as_ref().map_or(format!("anon{}", id), |name| name.clone()));
 
             if let Some(ref name) = *name {
@@ -112,7 +112,7 @@ fn bind_names_node_or_error<V, T>(session: &Session<V, T>, scope: ScopeRef<V, T>
         },
 
         AST::For(_, ref name, ref mut cond, ref mut body, ref id) => {
-            let lscope = session.map.add(id.clone(), Some(scope.clone()));
+            let lscope = session.map.add(*id, Some(scope.clone()));
             lscope.borrow_mut().define(name.clone(), None)?;
             bind_names_node(session, lscope.clone(), cond);
             bind_names_node(session, lscope.clone(), body);
@@ -143,7 +143,7 @@ fn bind_names_node_or_error<V, T>(session: &Session<V, T>, scope: ScopeRef<V, T>
             let &mut (ref pos, ref name, ref mut types) = pair;
 
             // Create a temporary invisible scope to name check the class body
-            let tscope = session.map.add(id.clone(), Some(scope.clone()));
+            let tscope = session.map.add(*id, Some(scope.clone()));
             tscope.borrow_mut().set_class(true);
             tscope.borrow_mut().set_basename(name.clone());
 
@@ -220,13 +220,13 @@ pub fn declare_typevars<V, T>(scope: ScopeRef<V, T>, ttype: Option<&mut Type>, a
                     false => scope.borrow().find_type(name),
                 };
                 match vtype {
-                    Some(Type::Variable(_, ref eid)) => *id = eid.clone(),
+                    Some(Type::Variable(_, ref eid)) => *id = *eid,
                     _ => {
                         *id = UniqueID::generate();
                         let gscope = Scope::global(scope.clone());
-                        gscope.borrow_mut().define_type(id.to_string(), Type::Variable(name.clone(), id.clone()))?;
+                        gscope.borrow_mut().define_type(id.to_string(), Type::Variable(name.clone(), *id))?;
                         if !scope.borrow().contains_type_local(name) && !scope.borrow().is_primative() {
-                            scope.borrow_mut().define_type(name.clone(), Type::Variable(name.clone(), id.clone()))?;
+                            scope.borrow_mut().define_type(name.clone(), Type::Variable(name.clone(), *id))?;
                         }
                     }
                 }

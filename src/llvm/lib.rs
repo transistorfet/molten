@@ -138,7 +138,7 @@ pub unsafe fn declare_builtins_node<'a>(data: &mut LLVM<'a>, objtype: LLVMTypeRe
                 Func::External => {
                     let func = LLVMAddFunction(data.module, label(name.as_str()), get_type(data, scope.clone(), ftype.clone(), false));
                     if scope.borrow().contains(&name) {
-                        scope.borrow_mut().assign(&name, from_abi(&ftype.get_abi().unwrap(), func));
+                        data.set_value(scope.borrow().variable_id(&name).unwrap(), from_abi(&ftype.get_abi().unwrap(), func));
                     }
                 },
                 Func::Runtime(func) => {
@@ -148,7 +148,7 @@ pub unsafe fn declare_builtins_node<'a>(data: &mut LLVM<'a>, objtype: LLVMTypeRe
                         scope.borrow_mut().define(name.clone(), Some(ftype.clone())).unwrap();
                     }
                     let fname = scope.borrow().get_full_name(&Some(name.clone()), UniqueID(0));
-                    scope.borrow_mut().assign(&name, from_type(&ftype, func(data, fname.as_str(), objtype)));
+                    data.set_value(scope.borrow().variable_id(&name).unwrap(), from_type(&ftype, func(data, fname.as_str(), objtype)));
                 },
                 Func::Comptime(func) => {
                     //data.builtins.add(sname, func, ftype.clone());
@@ -157,7 +157,7 @@ pub unsafe fn declare_builtins_node<'a>(data: &mut LLVM<'a>, objtype: LLVMTypeRe
                     if !scope.borrow().contains(&name) {
                         scope.borrow_mut().define(name.clone(), Some(ftype.clone())).unwrap();
                     }
-                    scope.borrow_mut().assign(&name, Box::new(Builtin(BuiltinFunction(func), ftype)));
+                    data.set_value(scope.borrow().variable_id(&name).unwrap(), Box::new(Builtin(BuiltinFunction(func), ftype)));
                 },
                 _ => { },
             }
@@ -171,7 +171,7 @@ pub unsafe fn declare_builtins_node<'a>(data: &mut LLVM<'a>, objtype: LLVMTypeRe
                 build_class_type(data, scope.clone(), &name, structdef.clone(), vec!())
             } else {
                 let lltype = get_type(data, scope.clone(), scope.borrow().find_type(&name).unwrap(), true);
-                scope.borrow_mut().set_type_value(&name, TypeValue { structdef: vec!(), value: lltype, vtable: vec!(), vttype: None });
+                data.set_type(scope.borrow().type_id(&name).unwrap(), TypeValue { structdef: vec!(), value: lltype, vtable: vec!(), vttype: None });
                 lltype
             };
 
@@ -181,12 +181,12 @@ pub unsafe fn declare_builtins_node<'a>(data: &mut LLVM<'a>, objtype: LLVMTypeRe
 }
 
 
-pub unsafe fn declare_c_function(module: LLVMModuleRef, scope: ScopeRef<Value, TypeValue>, name: &str, args: &mut [LLVMTypeRef], ret_type: LLVMTypeRef, vargs: bool) {
+pub unsafe fn declare_c_function(data: &LLVM, scope: ScopeRef<Value, TypeValue>, name: &str, args: &mut [LLVMTypeRef], ret_type: LLVMTypeRef, vargs: bool) {
     let ftype = LLVMFunctionType(ret_type, args.as_mut_ptr(), args.len() as u32, vargs as i32);
-    let func = LLVMAddFunction(module, label(name), ftype);
+    let func = LLVMAddFunction(data.module, label(name), ftype);
     let name = &String::from(name);
     if scope.borrow().contains(name) {
-        scope.borrow_mut().assign(name, Box::new(CFunction(func)));
+        data.set_value(scope.borrow().variable_id(name).unwrap(), Box::new(CFunction(func)));
     }
 }
 
@@ -195,19 +195,19 @@ unsafe fn declare_irregular_functions(data: &LLVM, scope: ScopeRef<Value, TypeVa
     //let cint_type = LLVMInt32TypeInContext(data.context);
     let cint_type = int_type(data);
 
-    //declare_function(data.module, scope.clone(), "malloc", &mut [cint_type], bytestr_type, false);
-    //declare_function(data.module, scope.clone(), "realloc", &mut [bytestr_type, cint_type], bytestr_type, false);
-    //declare_function(data.module, scope.clone(), "free", &mut [bytestr_type], LLVMVoidType(), false);
+    //declare_function(data, scope.clone(), "malloc", &mut [cint_type], bytestr_type, false);
+    //declare_function(data, scope.clone(), "realloc", &mut [bytestr_type, cint_type], bytestr_type, false);
+    //declare_function(data, scope.clone(), "free", &mut [bytestr_type], LLVMVoidType(), false);
 
-    //declare_function(data.module, scope.clone(), "strlen", &mut [bytestr_type], cint_type, false);
-    //declare_function(data.module, scope.clone(), "memcpy", &mut [bytestr_type, bytestr_type, cint_type], bytestr_type, false);
+    //declare_function(data, scope.clone(), "strlen", &mut [bytestr_type], cint_type, false);
+    //declare_function(data, scope.clone(), "memcpy", &mut [bytestr_type, bytestr_type, cint_type], bytestr_type, false);
 
-    //declare_function(data.module, scope.clone(), "puts", &mut [bytestr_type], cint_type, false);
-    declare_c_function(data.module, scope.clone(), "sprintf", &mut [bytestr_type, bytestr_type], cint_type, true);
+    //declare_function(data, scope.clone(), "puts", &mut [bytestr_type], cint_type, false);
+    declare_c_function(data, scope.clone(), "sprintf", &mut [bytestr_type, bytestr_type], cint_type, true);
 
-    declare_c_function(data.module, scope.clone(), "llvm.pow.f64", &mut [real_type(data), real_type(data)], real_type(data), false);
+    declare_c_function(data, scope.clone(), "llvm.pow.f64", &mut [real_type(data), real_type(data)], real_type(data), false);
 
-    //declare_function(data.module, scope.clone(), "__gxx_personality_v0", &mut [bytestr_type, bytestr_type], cint_type, true);
+    //declare_function(data, scope.clone(), "__gxx_personality_v0", &mut [bytestr_type, bytestr_type], cint_type, true);
 }
 
 

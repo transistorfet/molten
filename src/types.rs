@@ -64,7 +64,7 @@ impl Type {
 
     pub fn get_varid(&self) -> Result<UniqueID, Error> {
         match self {
-            &Type::Variable(_, ref id) => Ok(id.clone()),
+            &Type::Variable(_, ref id) => Ok(*id),
             _ => Err(Error::new(format!("TypeError: expected variable type, found {:?}", self))),
         }
     }
