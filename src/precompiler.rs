@@ -10,12 +10,12 @@ use scope::{ Scope, ScopeRef };
 use utils::UniqueID;
 
 
-pub fn precompile<V, T>(session: &Session<V, T>, code: Vec<AST>) -> Vec<AST> where V: Clone + Debug, T: Clone + Debug {
+pub fn precompile(session: &Session, code: Vec<AST>) -> Vec<AST> {
     update_scope_variable_types(session.map.get_global());
     precompile_vec(session, session.map.get_global(), code)
 }
 
-pub fn precompile_vec<V, T>(session: &Session<V, T>, scope: ScopeRef<V, T>, code: Vec<AST>) -> Vec<AST> where V: Clone + Debug, T: Clone + Debug {
+pub fn precompile_vec(session: &Session, scope: ScopeRef, code: Vec<AST>) -> Vec<AST> {
     let mut block = vec!();
     for node in code {
         block.push(precompile_node(session, scope.clone(), node));
@@ -23,7 +23,7 @@ pub fn precompile_vec<V, T>(session: &Session<V, T>, scope: ScopeRef<V, T>, code
     block
 }
 
-pub fn precompile_node<V, T>(session: &Session<V, T>, scope: ScopeRef<V, T>, node: AST) -> AST where V: Clone + Debug, T: Clone + Debug {
+pub fn precompile_node(session: &Session, scope: ScopeRef, node: AST) -> AST {
     match node {
         AST::Block(pos, code) => { AST::Block(pos, precompile_vec(session, scope.clone(), code)) },
 
@@ -274,7 +274,7 @@ pub fn precompile_node<V, T>(session: &Session<V, T>, scope: ScopeRef<V, T>, nod
 }
 
 /*
-pub fn register_function<V, T>(session: &Session<V, T>, scope: ScopeRef<V, T>, function: &AST) where V: Clone + Debug, T: Clone + Debug {
+pub fn register_function(session: &Session, scope: ScopeRef, function: &AST) {
     if let &AST::Function(ref name, ref args, ref ret, ref body, ref id) = function {
         let name = name.clone().unwrap();
         let fscope = session.map.add(id, Some(scope.clone()));

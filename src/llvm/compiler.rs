@@ -188,8 +188,8 @@ pub struct TypeValue {
 
 
 pub struct LLVM<'a> {
-    pub session: &'a Session<Value, TypeValue>,
-    pub map: ScopeMapRef<Value, TypeValue>,
+    pub session: &'a Session,
+    pub map: ScopeMapRef,
     //pub builtins: TypeFunctionMap,
     //pub builtins: BuiltinMap<'a>,
     pub functions: Vec<&'a AST>,
@@ -224,13 +224,13 @@ impl<'a> LLVM<'a> {
 type Unwind = Option<(LLVMBasicBlockRef, LLVMBasicBlockRef)>;
 
 
-pub fn compile(builtins: &Vec<BuiltinDef>, session: &Session<Value, TypeValue>, module_name: &str, code: &Vec<AST>) {
+pub fn compile(builtins: &Vec<BuiltinDef>, session: &Session, module_name: &str, code: &Vec<AST>) {
     unsafe {
         compile_module(builtins, session, session.map.get_global(), module_name, code)
     }
 }
 
-unsafe fn compile_module(builtins: &Vec<BuiltinDef>, session: &Session<Value, TypeValue>, scope: ScopeRef<Value, TypeValue>, module_name: &str, code: &Vec<AST>) {
+unsafe fn compile_module(builtins: &Vec<BuiltinDef>, session: &Session, scope: ScopeRef, module_name: &str, code: &Vec<AST>) {
     let context = LLVMContextCreate();
     let module = LLVMModuleCreateWithName(label(module_name));
     let builder = LLVMCreateBuilderInContext(context);
@@ -354,7 +354,7 @@ unsafe fn write_module(data: &LLVM, filename: &str) {
 
 }
 
-unsafe fn declare_globals(data: &LLVM, scope: ScopeRef<Value, TypeValue>) {
+unsafe fn declare_globals(data: &LLVM, scope: ScopeRef) {
     let mut globals = vec!();
     for (name, sym) in &scope.borrow().names {
         if LLVMGetNamedFunction(data.module, label(name.as_str())).is_null() && !sym.ttype.as_ref().unwrap().is_overloaded() {
@@ -399,7 +399,7 @@ unsafe fn declare_globals(data: &LLVM, scope: ScopeRef<Value, TypeValue>) {
     }
 }
 
-unsafe fn compile_vec(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: ScopeRef<Value, TypeValue>, code: &Vec<AST>) -> Value {
+unsafe fn compile_vec(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: ScopeRef, code: &Vec<AST>) -> Value {
     let mut last: Value = Box::new(Data(zero_int(data)));
     for node in code {
         last = compile_node(data, func, unwind, scope.clone(), node);
@@ -407,7 +407,7 @@ unsafe fn compile_vec(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: Sc
     last
 }
 
-unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: ScopeRef<Value, TypeValue>, node: &AST) -> Value {
+unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: ScopeRef, node: &AST) -> Value {
     debug!("COMPILE: {:?}", node);
     match *node {
         AST::Noop => Box::new(Data(ptr::null_mut())),
@@ -888,7 +888,7 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
 }
 
 
-unsafe fn collect_functions_vec<'a>(data: &mut LLVM<'a>, scope: ScopeRef<Value, TypeValue>, items: &'a Vec<AST>) -> Option<Value> {
+unsafe fn collect_functions_vec<'a>(data: &mut LLVM<'a>, scope: ScopeRef, items: &'a Vec<AST>) -> Option<Value> {
     let mut last = None;
     for item in items {
         last = collect_functions_node(data, scope.clone(), item);
@@ -896,7 +896,7 @@ unsafe fn collect_functions_vec<'a>(data: &mut LLVM<'a>, scope: ScopeRef<Value, 
     last
 }
 
-unsafe fn collect_functions_node<'a>(data: &mut LLVM<'a>, scope: ScopeRef<Value, TypeValue>, node: &'a AST) -> Option<Value> {
+unsafe fn collect_functions_node<'a>(data: &mut LLVM<'a>, scope: ScopeRef, node: &'a AST) -> Option<Value> {
     match *node {
         AST::Function(ref pos, ref name, ref args, ref rtype, ref body, ref id, ref abi) => {
             let fscope = data.map.get(id);
@@ -1227,7 +1227,7 @@ unsafe fn build_function_body(data: &LLVM, node: &AST) {
     }
 }
 
-pub fn get_method(data: &LLVM, scope: ScopeRef<Value, TypeValue>, class: &str, method: &str, argtypes: Vec<Type>) -> Box<Compilable> {
+pub fn get_method(data: &LLVM, scope: ScopeRef, class: &str, method: &str, argtypes: Vec<Type>) -> Box<Compilable> {
     use types::{ find_variant, Check };
     let classdef = if class == "" {
         scope.clone()
@@ -1243,7 +1243,7 @@ pub fn get_method(data: &LLVM, scope: ScopeRef<Value, TypeValue>, class: &str, m
 }
 
 /*
-pub unsafe fn build_invoke(data: &LLVM, scope: ScopeRef<Value, TypeValue>, unwind: Unwind, classdef: ScopeRef<Value, TypeValue>, name: &str, args: Vec<LLVMValueRef>) -> LLVMValueRef {
+pub unsafe fn build_invoke(data: &LLVM, scope: ScopeRef, unwind: Unwind, classdef: ScopeRef, name: &str, args: Vec<LLVMValueRef>) -> LLVMValueRef {
     let mut dtype = classdef.borrow().get_variable_type(&name).unwrap();
     if dtype.is_overloaded() {
         dtype = types::find_variant(scope.clone(), dtype, ttype.get_argtypes().unwrap().clone(), types::Check::List).unwrap();
@@ -1264,7 +1264,7 @@ pub unsafe fn build_c_call(data: &LLVM, name: &str, largs: &mut Vec<LLVMValueRef
 }
 
 /*
-pub unsafe fn build_allocator(data: &LLVM, scope: ScopeRef<Value, TypeValue>, cname: &String, fname: &str, lltype: LLVMTypeRef) -> LLVMValueRef {
+pub unsafe fn build_allocator(data: &LLVM, scope: ScopeRef, cname: &String, fname: &str, lltype: LLVMTypeRef) -> LLVMValueRef {
     let function = build_function_start(data, fname, vec!(), lltype);
     //let obj = build_malloc(data, LLVMSizeOf(LLVMGetElementType(lltype)));
     let mem = LLVMBuildMalloc(data.builder, LLVMGetElementType(lltype), label("ptr"));
@@ -1282,14 +1282,14 @@ pub unsafe fn build_allocator(data: &LLVM, scope: ScopeRef<Value, TypeValue>, cn
 }
 */
 
-pub unsafe fn build_struct_access(data: &LLVM, scope: ScopeRef<Value, TypeValue>, object: LLVMValueRef, typename: &String, field: &String) -> LLVMValueRef {
+pub unsafe fn build_struct_access(data: &LLVM, scope: ScopeRef, object: LLVMValueRef, typename: &String, field: &String) -> LLVMValueRef {
     let structdef = data.get_type(scope.borrow().type_id(&typename).unwrap()).unwrap().structdef;
     let index = structdef.iter().position(|ref r| r.0 == *field).unwrap();
     let mut indices = vec!(i32_value(data, 0), i32_value(data, index));
     LLVMBuildGEP(data.builder, object, indices.as_mut_ptr(), indices.len() as u32, label("tmp"))
 }
 
-pub unsafe fn build_class_type(data: &LLVM, scope: ScopeRef<Value, TypeValue>, name: &String, structdef: Vec<(String, Type)>, vtable: Vec<(String, Type)>) -> LLVMTypeRef {
+pub unsafe fn build_class_type(data: &LLVM, scope: ScopeRef, name: &String, structdef: Vec<(String, Type)>, vtable: Vec<(String, Type)>) -> LLVMTypeRef {
     let (vttype, pvttype) = if vtable.len() > 0 {
         let vtname = format!("{}_vtable", name);
         let vttype = LLVMStructCreateNamed(data.context, label(vtname.as_str()));
@@ -1321,7 +1321,7 @@ pub unsafe fn build_class_type(data: &LLVM, scope: ScopeRef<Value, TypeValue>, n
     pltype
 }
 
-pub unsafe fn get_type(data: &LLVM, scope: ScopeRef<Value, TypeValue>, ttype: Type, use_fptrs: bool) -> LLVMTypeRef {
+pub unsafe fn get_type(data: &LLVM, scope: ScopeRef, ttype: Type, use_fptrs: bool) -> LLVMTypeRef {
     match ttype {
         Type::Object(ref tname, ref ptypes) => match tname.as_str() {
             "Nil" => str_type(data),

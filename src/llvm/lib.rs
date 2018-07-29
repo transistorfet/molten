@@ -53,7 +53,7 @@ impl<'a> BuiltinMap<'a> {
         }
     }
 
-    pub unsafe fn compile_builtin(data: &LLVM, scope: ScopeRef<Value, TypeValue>, name: &String, largs: &Vec<LLVMValueRef>, stype: Type) -> Option<LLVMValueRef> {
+    pub unsafe fn compile_builtin(data: &LLVM, scope: ScopeRef, name: &String, largs: &Vec<LLVMValueRef>, stype: Type) -> Option<LLVMValueRef> {
         let name = if let Some(uname) = scope::unmangle_name(name) {
             uname
         } else {
@@ -76,23 +76,23 @@ impl<'a> BuiltinMap<'a> {
 }
 */
 
-pub fn make_global<'a, V, T>(map: &ScopeMapRef<V, T>, builtins: &Vec<BuiltinDef<'a>>) where V: Clone + Debug, T: Clone + Debug {
-    let primatives = map.add(ScopeMapRef::<V, T>::PRIMATIVE, None);
+pub fn make_global<'a>(map: &ScopeMapRef, builtins: &Vec<BuiltinDef<'a>>) {
+    let primatives = map.add(ScopeMapRef::PRIMATIVE, None);
     primatives.borrow_mut().set_context(Context::Primative);
 
     register_builtins_vec(primatives.clone(), primatives.clone(), builtins);
 
-    let global = map.add(ScopeMapRef::<V, T>::GLOBAL, Some(primatives));
+    let global = map.add(ScopeMapRef::GLOBAL, Some(primatives));
     global.borrow_mut().set_context(Context::Global);
 }
  
-pub fn register_builtins_vec<'a, V, T>(scope: ScopeRef<V, T>, tscope: ScopeRef<V, T>, entries: &Vec<BuiltinDef<'a>>) where V: Clone + Debug, T: Clone + Debug {
+pub fn register_builtins_vec<'a>(scope: ScopeRef, tscope: ScopeRef, entries: &Vec<BuiltinDef<'a>>) {
     for node in entries {
         register_builtins_node(scope.clone(), tscope.clone(), node);
     }
 }
 
-pub fn register_builtins_node<'a, V, T>(scope: ScopeRef<V, T>, tscope: ScopeRef<V, T>, node: &BuiltinDef<'a>) where V: Clone + Debug, T: Clone + Debug {
+pub fn register_builtins_node<'a>(scope: ScopeRef, tscope: ScopeRef, node: &BuiltinDef<'a>) {
     match *node {
         BuiltinDef::Type(ref name, ref ttype) => {
             let mut ttype = ttype.clone();
@@ -116,19 +116,19 @@ pub fn register_builtins_node<'a, V, T>(scope: ScopeRef<V, T>, tscope: ScopeRef<
     }
 }
 
-pub unsafe fn initialize_builtins<'a>(data: &mut LLVM<'a>, scope: ScopeRef<Value, TypeValue>, entries: &Vec<BuiltinDef<'a>>) {
+pub unsafe fn initialize_builtins<'a>(data: &mut LLVM<'a>, scope: ScopeRef, entries: &Vec<BuiltinDef<'a>>) {
     let pscope = scope.borrow().get_parent().unwrap().clone();
     declare_builtins_vec(data, ptr::null_mut(), pscope.clone(), scope.clone(), entries);
     declare_irregular_functions(data, pscope.clone());
 }
 
-pub unsafe fn declare_builtins_vec<'a>(data: &mut LLVM<'a>, objtype: LLVMTypeRef, scope: ScopeRef<Value, TypeValue>, tscope: ScopeRef<Value, TypeValue>, entries: &Vec<BuiltinDef<'a>>) {
+pub unsafe fn declare_builtins_vec<'a>(data: &mut LLVM<'a>, objtype: LLVMTypeRef, scope: ScopeRef, tscope: ScopeRef, entries: &Vec<BuiltinDef<'a>>) {
     for node in entries {
         declare_builtins_node(data, objtype, scope.clone(), tscope.clone(), node);
     }
 }
 
-pub unsafe fn declare_builtins_node<'a>(data: &mut LLVM<'a>, objtype: LLVMTypeRef, scope: ScopeRef<Value, TypeValue>, tscope: ScopeRef<Value, TypeValue>, node: &BuiltinDef<'a>) {
+pub unsafe fn declare_builtins_node<'a>(data: &mut LLVM<'a>, objtype: LLVMTypeRef, scope: ScopeRef, tscope: ScopeRef, node: &BuiltinDef<'a>) {
     match *node {
         BuiltinDef::Type(ref name, ref ttype) => { },
         BuiltinDef::Func(ref sname, ref types, ref func) => {
@@ -181,7 +181,7 @@ pub unsafe fn declare_builtins_node<'a>(data: &mut LLVM<'a>, objtype: LLVMTypeRe
 }
 
 
-pub unsafe fn declare_c_function(data: &LLVM, scope: ScopeRef<Value, TypeValue>, name: &str, args: &mut [LLVMTypeRef], ret_type: LLVMTypeRef, vargs: bool) {
+pub unsafe fn declare_c_function(data: &LLVM, scope: ScopeRef, name: &str, args: &mut [LLVMTypeRef], ret_type: LLVMTypeRef, vargs: bool) {
     let ftype = LLVMFunctionType(ret_type, args.as_mut_ptr(), args.len() as u32, vargs as i32);
     let func = LLVMAddFunction(data.module, label(name), ftype);
     let name = &String::from(name);
@@ -190,7 +190,7 @@ pub unsafe fn declare_c_function(data: &LLVM, scope: ScopeRef<Value, TypeValue>,
     }
 }
 
-unsafe fn declare_irregular_functions(data: &LLVM, scope: ScopeRef<Value, TypeValue>) {
+unsafe fn declare_irregular_functions(data: &LLVM, scope: ScopeRef) {
     let bytestr_type = LLVMPointerType(LLVMInt8Type(), 0);
     //let cint_type = LLVMInt32TypeInContext(data.context);
     let cint_type = int_type(data);

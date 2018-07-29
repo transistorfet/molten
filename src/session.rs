@@ -15,17 +15,17 @@ use scope::{ ScopeMapRef };
 
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct Session<V, T> {
+pub struct Session {
     pub name: String,
-    pub map: ScopeMapRef<V, T>,
+    pub map: ScopeMapRef,
     pub files: RefCell<Vec<(String, String)>>,
     pub target: String,
     pub errors: Cell<u32>,
 }
 
 
-impl<V, T> Session<V, T> where V: Clone, T: Clone {
-    pub fn new() -> Session<V, T> {
+impl Session {
+    pub fn new() -> Self {
         Session {
             name: String::from(""),
             //builtins: builtins,
@@ -59,7 +59,7 @@ impl<V, T> Session<V, T> where V: Clone, T: Clone {
     }
 
     pub fn parse_file(&self, filename: &str, search: bool) -> Vec<AST> {
-        let mut f = Session::<V, T>::find_file(filename, search);
+        let mut f = Session::find_file(filename, search);
         let mut contents = String::new();
         f.read_to_string(&mut contents).expect("Error reading file contents");
         self.parse_string(filename, contents)

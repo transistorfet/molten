@@ -10,7 +10,7 @@ use session::Session;
 use scope::{ Scope, ScopeRef, ScopeMapRef };
 
 
-pub fn write_exports<V, T>(session: &Session<V, T>, scope: ScopeRef<V, T>, filename: &str, code: &Vec<AST>) where V: Clone, T: Clone {
+pub fn write_exports(session: &Session, scope: ScopeRef, filename: &str, code: &Vec<AST>) {
     let index_text = build_index(session, scope, code);
     let mut index_file = File::create(filename).expect("Error creating index file");
     index_file.write_all(index_text.as_bytes()).unwrap();
@@ -19,7 +19,7 @@ pub fn write_exports<V, T>(session: &Session<V, T>, scope: ScopeRef<V, T>, filen
     }
 }
 
-pub fn build_index<V, T>(session: &Session<V, T>, scope: ScopeRef<V, T>, code: &Vec<AST>) -> String where V: Clone, T: Clone {
+pub fn build_index(session: &Session, scope: ScopeRef, code: &Vec<AST>) -> String {
     let mut index = String::new();
     for node in code {
         build_index_node(&mut index, session, scope.clone(), node);
@@ -27,7 +27,7 @@ pub fn build_index<V, T>(session: &Session<V, T>, scope: ScopeRef<V, T>, code: &
     index
 }
 
-fn build_index_node<V, T>(index: &mut String, session: &Session<V, T>, scope: ScopeRef<V, T>, node: &AST) where V: Clone, T: Clone {
+fn build_index_node(index: &mut String, session: &Session, scope: ScopeRef, node: &AST) {
     match *node {
         AST::Function(_, ref name, _, _, _, _, _) => {
             if let Some(ref name) = *name {
@@ -77,7 +77,7 @@ fn build_index_node<V, T>(index: &mut String, session: &Session<V, T>, scope: Sc
     }
 }
 
-pub fn unparse_type<V, T>(scope: ScopeRef<V, T>, ttype: Type) -> String where V: Clone, T: Clone {
+pub fn unparse_type(scope: ScopeRef, ttype: Type) -> String {
     match ttype {
         Type::Object(name, types) => {
             let params = if types.len() > 0 { format!("<{}>", types.iter().map(|p| unparse_type(scope.clone(), p.clone())).collect::<Vec<String>>().join(", ")) } else { String::from("") };

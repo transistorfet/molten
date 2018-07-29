@@ -10,27 +10,27 @@ use scope::{ self, Scope, ScopeRef };
 use utils::UniqueID;
 
 
-pub fn bind_names<V, T>(session: &Session<V, T>, code: &mut Vec<AST>) where V: Clone + Debug, T: Clone + Debug {
+pub fn bind_names(session: &Session, code: &mut Vec<AST>) {
     bind_names_vec(session, session.map.get_global().clone(), code);
     if session.errors.get() > 0 {
         panic!("Exiting due to previous errors");
     }
 }
 
-pub fn bind_names_vec<V, T>(session: &Session<V, T>, scope: ScopeRef<V, T>, code: &mut Vec<AST>) where V: Clone + Debug, T: Clone + Debug {
+pub fn bind_names_vec(session: &Session, scope: ScopeRef, code: &mut Vec<AST>) {
     for node in code {
         bind_names_node(session, scope.clone(), node);
     }
 }
 
-pub fn bind_names_node<V, T>(session: &Session<V, T>, scope: ScopeRef<V, T>, node: &mut AST) where V: Clone + Debug, T: Clone + Debug {
+pub fn bind_names_node(session: &Session, scope: ScopeRef, node: &mut AST) {
     match bind_names_node_or_error(session, scope.clone(), node) {
         Ok(_) => { },
         Err(err) => session.print_error(err.add_pos(&node.get_pos())),
     }
 }
 
-fn bind_names_node_or_error<V, T>(session: &Session<V, T>, scope: ScopeRef<V, T>, node: &mut AST) -> Result<(), Error> where V: Clone + Debug, T: Clone + Debug {
+fn bind_names_node_or_error(session: &Session, scope: ScopeRef, node: &mut AST) -> Result<(), Error> {
     match *node {
         AST::Function(_, ref name, ref mut args, ref mut ret, ref mut body, ref id, ref abi) => {
             let fscope = session.map.add(*id, Some(scope.clone()));
@@ -200,7 +200,7 @@ fn bind_names_node_or_error<V, T>(session: &Session<V, T>, scope: ScopeRef<V, T>
 }
 
 #[must_use]
-pub fn declare_typevars<V, T>(scope: ScopeRef<V, T>, ttype: Option<&mut Type>, always_new: bool) -> Result<(), Error> where V: Clone, T: Clone {
+pub fn declare_typevars(scope: ScopeRef, ttype: Option<&mut Type>, always_new: bool) -> Result<(), Error> {
     match ttype {
         Some(ttype) => match ttype {
             &mut Type::Object(_, ref mut types) => {

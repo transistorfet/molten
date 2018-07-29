@@ -105,7 +105,7 @@ impl Type {
         }
     }
 
-    pub fn add_variant<V, T>(self, scope: ScopeRef<V, T>, ntype: Type) -> Result<Type, Error> where V: Clone, T: Clone {
+    pub fn add_variant(self, scope: ScopeRef, ntype: Type) -> Result<Type, Error> {
         let rtype = match self {
             Type::Overload(ref variants) => {
                 for variant in variants {
@@ -126,7 +126,7 @@ impl Type {
         Type::Object(nametypes.1, nametypes.2)
     }
 
-    pub fn update_variable_type<V, T>(scope: ScopeRef<V, T>, name: &String, ttype: Type) where V: Clone, T: Clone {
+    pub fn update_variable_type(scope: ScopeRef, name: &String, ttype: Type) {
         let dscope = Scope::target(scope.clone());
         let pscope = Scope::locate_variable(dscope.clone(), name).unwrap();
         let otype = pscope.borrow().get_variable_type(name).clone();
@@ -139,7 +139,7 @@ impl Type {
         }
     }
 
-    pub fn update_type<V, T>(scope: ScopeRef<V, T>, idname: &String, ttype: Type) where V: Clone, T: Clone {
+    pub fn update_type(scope: ScopeRef, idname: &String, ttype: Type) {
         let ttype = resolve_type(scope.clone(), ttype);
         let pscope = Scope::locate_type(scope.clone(), idname).unwrap();
         let otype = pscope.borrow().find_type(idname).clone();
@@ -173,7 +173,7 @@ impl Type {
     }
 
     /*
-    pub fn move_typevars<V, T>(scope: ScopeRef<V, T>, fscope: ScopeRef<V, T>, ttype: Type) -> Type where V: Clone, T: Clone {
+    pub fn move_typevars(scope: ScopeRef, fscope: ScopeRef, ttype: Type) -> Type {
         match ttype {
             Type::Variable(name, id) => {
                 if !scope.borrow().contains(&name) {
@@ -234,7 +234,7 @@ pub enum Check {
     Update,
 }
 
-pub fn expect_type<V, T>(scope: ScopeRef<V, T>, odtype: Option<Type>, octype: Option<Type>, mode: Check) -> Result<Type, Error> where V: Clone, T: Clone {
+pub fn expect_type(scope: ScopeRef, odtype: Option<Type>, octype: Option<Type>, mode: Check) -> Result<Type, Error> {
     //match check_type(scope, odtype, octype, mode, true) {
     //    Ok(ttype) => ttype,
     //    Err(err) => panic!("{}", err),
@@ -246,7 +246,7 @@ pub fn expect_type<V, T>(scope: ScopeRef<V, T>, odtype: Option<Type>, octype: Op
 // Compare the defined type to the calculated type and return the common type, or error if they do not match
 // dtype < ctype: ie. ctype will be downcast to match dtype, but not the inverse
 //
-pub fn check_type<V, T>(scope: ScopeRef<V, T>, odtype: Option<Type>, octype: Option<Type>, mode: Check, update: bool) -> Result<Type, Error> where V: Clone, T: Clone {
+pub fn check_type(scope: ScopeRef, odtype: Option<Type>, octype: Option<Type>, mode: Check, update: bool) -> Result<Type, Error> {
     debug!("TYPECHECK: {:?} {:?}", odtype, octype);
     if odtype.is_none() {
         // TODO should the else case just be Nil... 
@@ -344,10 +344,10 @@ pub fn check_type<V, T>(scope: ScopeRef<V, T>, odtype: Option<Type>, octype: Opt
 }
 
 
-fn is_subclass_of<V, T>(scope: ScopeRef<V, T>, adef: (&String, &Vec<Type>), bdef: (&String, &Vec<Type>), mode: Check, update: bool) -> Result<Type, Error> where V: Clone, T: Clone {
+fn is_subclass_of(scope: ScopeRef, adef: (&String, &Vec<Type>), bdef: (&String, &Vec<Type>), mode: Check, update: bool) -> Result<Type, Error> {
     debug!("IS SUBCLASS: {:?} of {:?}", adef, bdef);
     let tscope = Scope::new_ref(Some(scope.clone()));
-    let mut names = Scope::<V, T>::map_new();
+    let mut names = Scope::map_new();
     let mut adef = (adef.0.clone(), adef.1.clone());
 
     loop {
@@ -379,7 +379,7 @@ fn is_subclass_of<V, T>(scope: ScopeRef<V, T>, adef: (&String, &Vec<Type>), bdef
     }
 }
 
-pub fn check_type_params<V, T>(scope: ScopeRef<V, T>, dtypes: &Vec<Type>, ctypes: &Vec<Type>, mode: Check, update: bool) -> Result<Vec<Type>, Error> where V: Clone, T: Clone {
+pub fn check_type_params(scope: ScopeRef, dtypes: &Vec<Type>, ctypes: &Vec<Type>, mode: Check, update: bool) -> Result<Vec<Type>, Error> {
     if dtypes.len() != ctypes.len() {
         Err(Error::new(format!("TypeError: number of type parameters don't match: expected {} but found {}", Type::display_vec(dtypes), Type::display_vec(ctypes))))
     } else {
@@ -391,7 +391,7 @@ pub fn check_type_params<V, T>(scope: ScopeRef<V, T>, dtypes: &Vec<Type>, ctypes
     }
 }
 
-pub fn resolve_type<V, T>(scope: ScopeRef<V, T>, ttype: Type) -> Type where V: Clone, T: Clone {
+pub fn resolve_type(scope: ScopeRef, ttype: Type) -> Type {
     match ttype {
         Type::Object(ref name, ref types) => {
             match scope.borrow().find_type(name) {
@@ -426,7 +426,7 @@ pub fn resolve_type<V, T>(scope: ScopeRef<V, T>, ttype: Type) -> Type where V: C
     }
 }
 
-pub fn find_variant<V, T>(scope: ScopeRef<V, T>, otype: Type, atypes: Vec<Type>, mode: Check) -> Result<Type, Error> where V: Clone, T: Clone {
+pub fn find_variant(scope: ScopeRef, otype: Type, atypes: Vec<Type>, mode: Check) -> Result<Type, Error> {
     match otype {
         Type::Overload(variants) => {
             let variants = remove_duplicates(scope.clone(), variants);
@@ -457,7 +457,7 @@ pub fn find_variant<V, T>(scope: ScopeRef<V, T>, otype: Type, atypes: Vec<Type>,
 }
 
 // TODO this is sort of a hack that can maybe be integrated into get_variable_type instead
-pub fn remove_duplicates<V, T>(scope: ScopeRef<V, T>, mut variants: Vec<Type>) -> Vec<Type> where V: Clone, T: Clone {
+pub fn remove_duplicates(scope: ScopeRef, mut variants: Vec<Type>) -> Vec<Type> {
     let mut i = 1;
 
     while i < variants.len() {

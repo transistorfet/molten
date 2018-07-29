@@ -7,7 +7,7 @@ use scope::{ self, Scope, ScopeRef };
 use types::{ Type, Check, ABI, expect_type, resolve_type, find_variant, check_type_params };
 
 
-pub fn check_types<V, T>(session: &Session<V, T>, scope: ScopeRef<V, T>, code: &mut Vec<AST>) -> Type where V: Clone + Debug, T: Clone + Debug {
+pub fn check_types(session: &Session, scope: ScopeRef, code: &mut Vec<AST>) -> Type {
     let ttype = check_types_vec(session, scope, code);
     if session.errors.get() > 0 {
         panic!("Exiting due to previous errors");
@@ -15,7 +15,7 @@ pub fn check_types<V, T>(session: &Session<V, T>, scope: ScopeRef<V, T>, code: &
     ttype
 }
 
-pub fn check_types_vec<V, T>(session: &Session<V, T>, scope: ScopeRef<V, T>, code: &mut Vec<AST>) -> Type where V: Clone + Debug, T: Clone + Debug {
+pub fn check_types_vec(session: &Session, scope: ScopeRef, code: &mut Vec<AST>) -> Type {
     let mut last: Type = Type::Object(String::from("Nil"), vec!());
     for node in code {
         last = check_types_node(session, scope.clone(), node, None);
@@ -23,7 +23,7 @@ pub fn check_types_vec<V, T>(session: &Session<V, T>, scope: ScopeRef<V, T>, cod
     last
 }
 
-pub fn check_types_node<V, T>(session: &Session<V, T>, scope: ScopeRef<V, T>, node: &mut AST, expected: Option<Type>) -> Type where V: Clone + Debug, T: Clone + Debug {
+pub fn check_types_node(session: &Session, scope: ScopeRef, node: &mut AST, expected: Option<Type>) -> Type {
     match check_types_node_or_error(session, scope.clone(), node, expected) {
         Ok(ttype) => ttype,
         Err(err) => {
@@ -34,7 +34,7 @@ pub fn check_types_node<V, T>(session: &Session<V, T>, scope: ScopeRef<V, T>, no
     }
 }
 
-pub fn check_types_node_or_error<V, T>(session: &Session<V, T>, scope: ScopeRef<V, T>, node: &mut AST, expected: Option<Type>) -> Result<Type, Error> where V: Clone + Debug, T: Clone + Debug {
+pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &mut AST, expected: Option<Type>) -> Result<Type, Error> {
     let rtype = match *node {
         AST::Boolean(_) => Type::Object(String::from("Bool"), vec!()),
         AST::Integer(_) => Type::Object(String::from("Int"), vec!()),
@@ -302,7 +302,7 @@ pub fn check_types_node_or_error<V, T>(session: &Session<V, T>, scope: ScopeRef<
     Ok(rtype)
 }
 
-pub fn get_accessor_name<V, T>(scope: ScopeRef<V, T>, fexpr: &mut AST, etype: &Type) -> Result<i32, Error> where V: Clone, T: Clone {
+pub fn get_accessor_name(scope: ScopeRef, fexpr: &mut AST, etype: &Type) -> Result<i32, Error> {
     let funcdefs = match *fexpr {
         AST::Resolver(_, ref left, ref mut name) => {
             let ltype = match **left {
@@ -341,7 +341,7 @@ debug!("!!!: {:?}", classdef.borrow().get_variable_type(name));
     Ok(funcdefs)
 }
 
-pub fn update_scope_variable_types<V, T>(scope: ScopeRef<V, T>) where V: Clone, T: Clone {
+pub fn update_scope_variable_types(scope: ScopeRef) {
     let dscope = Scope::target(scope.clone());
     let mut names = vec!();
     for name in dscope.borrow().names.keys() {

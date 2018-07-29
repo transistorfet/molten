@@ -15,13 +15,13 @@ macro_rules! debug {
     }
 }
 
-pub fn print_types<V, T>(map: &ScopeMapRef<V, T>, scope: ScopeRef<V, T>, code: &Vec<AST>) where V: Clone, T: Clone {
+pub fn print_types(map: &ScopeMapRef, scope: ScopeRef, code: &Vec<AST>) {
     for node in code {
         print_types_node(map, scope.clone(), node);
     }
 }
 
-pub fn print_types_node<V, T>(map: &ScopeMapRef<V, T>, scope: ScopeRef<V, T>, node: &AST) where V: Clone, T: Clone {
+pub fn print_types_node(map: &ScopeMapRef, scope: ScopeRef, node: &AST) {
     match *node {
         AST::Block(_, ref body) => print_types(map, scope, body),
         AST::Function(_, _, _, _, ref body, ref id, _) => {
@@ -37,7 +37,7 @@ pub fn print_types_node<V, T>(map: &ScopeMapRef<V, T>, scope: ScopeRef<V, T>, no
     }
 }
 
-pub fn print_types_scope<V, T>(scope: ScopeRef<V, T>) where V: Clone, T: Clone {
+pub fn print_types_scope(scope: ScopeRef) {
     println!("\nNames:");
     for (ref name, ref sym) in &scope.borrow_mut().names {
         println!("{:?} {:?} {:?}", name, sym.ttype, sym.funcdefs);
