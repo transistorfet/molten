@@ -78,7 +78,7 @@ fn compile_file(input: &str, output: Option<&str>) {
     session.target = output.map(|s| String::from(s)).unwrap_or_else(|| format!("{}.ll", name));
 
     let builtins = lib::get_builtins();
-    lib::make_global(session.map.clone(), &builtins);
+    lib::make_global(&session.map, &builtins);
 
     let mut code = session.parse_file(input, false);
     //code = refinery::refine(code);
@@ -89,7 +89,7 @@ fn compile_file(input: &str, output: Option<&str>) {
         let global = session.map.get_global();
         println!("\n{:?}\n", code);
         //println!("\n{:?}\n\n{:?}", &code, global.clone());
-        debug::print_types(session.map.clone(), global.clone(), &code);
+        debug::print_types(&session.map, global.clone(), &code);
         debug::print_types_scope(global);
     }
 

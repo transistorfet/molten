@@ -45,7 +45,7 @@ pub fn check_types_node_or_error<V, T>(session: &Session<V, T>, scope: ScopeRef<
             let fscope = session.map.get(id);
 
             let mut argtypes = vec!();
-            for &(ref name, ref ttype, ref value) in &*args {
+            for &(_, ref name, ref ttype, ref value) in &*args {
                 let vtype = value.clone().map(|ref mut vexpr| check_types_node(session, scope.clone(), vexpr, ttype.clone()));
                 let mut atype = expect_type(fscope.clone(), ttype.clone(), vtype, Check::Def)?;
                 if &name[..] == "self" {
@@ -66,8 +66,8 @@ pub fn check_types_node_or_error<V, T>(session: &Session<V, T>, scope: ScopeRef<
                 argtypes[i] = resolve_type(fscope.clone(), argtypes[i].clone());
                 // TODO this is still not checking for type compatibility
                 //fscope.borrow_mut().set_variable_type(&args[i].0, argtypes[i].clone());
-                Type::update_variable_type(fscope.clone(), &args[i].0, argtypes[i].clone());
-                args[i].1 = Some(argtypes[i].clone());
+                Type::update_variable_type(fscope.clone(), &args[i].1, argtypes[i].clone());
+                args[i].2 = Some(argtypes[i].clone());
             }
             update_scope_variable_types(fscope.clone());
 
@@ -151,7 +151,7 @@ pub fn check_types_node_or_error<V, T>(session: &Session<V, T>, scope: ScopeRef<
             ltype.unwrap()
         },
 
-        AST::Definition(_, (ref name, ref mut ttype), ref mut body) => {
+        AST::Definition(_, (_, ref name, ref mut ttype), ref mut body) => {
             //let dscope = Scope::target(scope.clone());
             let btype = expect_type(scope.clone(), ttype.clone(), Some(check_types_node(session, scope.clone(), body, ttype.clone())), Check::Def)?;
             //dscope.borrow_mut().set_variable_type(name, btype.clone());
@@ -237,7 +237,7 @@ pub fn check_types_node_or_error<V, T>(session: &Session<V, T>, scope: ScopeRef<
             ttype.clone()
         },
 
-        AST::New(_, (ref name, ref types)) => {
+        AST::New(_, (_, ref name, ref types)) => {
             let odtype = scope.borrow().find_type(name);
             match odtype {
                 Some(dtype) => {

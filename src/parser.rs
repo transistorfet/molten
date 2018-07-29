@@ -91,16 +91,6 @@ macro_rules! map_str (
     )
 );
 
-/*
-fn convert_err<P, E>(e: nom::Err<P, E>, span: Span) -> nom::Err<Span, E> {
-    match e {
-        nom::Err::Code(c) => nom::Err::Code(c),
-        nom::Err::Node(c, b) => nom::Err::Node(c, b.into_iter().map(|e| convert_err(e, span)).collect()),
-        nom::Err::Position(c, p) => nom::Err::Position(c, span),
-        nom::Err::NodePosition(c, p, b) => nom::Err::NodePosition(c, span, b.into_iter().map(|e| convert_err(e, span)).collect()),
-    }
-}
-*/
 
 ///// Parser /////
 
@@ -194,151 +184,151 @@ named!(class(Span) -> AST,
         p: opt!(preceded!(wscom!(tag_word!("extends")), class_identifier)) >>
         wscom!(tag!("{")) >>
         s: many0!(alt_complete!(
-            typedef |
-            definition |
-            declare |
-            function
-        )) >>
+                typedef |
+                definition |
+                declare |
+                function
+                )) >>
         wscom!(tag!("}")) >>
         (AST::Class(Pos::new(pos), i, p, s, UniqueID::generate()))
-    )
-);
+        )
+    );
 
 named!(typedef(Span) -> AST,
-    do_parse!(
-        pos: position!() >>
-        wscom!(tag_word!("type")) >>
-        i: identifier >>
-        wscom!(tag!("=")) >>
-        s: alt!(
-            map!(identifier_typed, |i| vec!(i)) |
-            delimited!(wscom!(tag!("{")), separated_list_complete!(wscom!(tag!(",")), identifier_typed), wscom!(tag!("}")))
-        ) >>
-        (AST::Type(Pos::new(pos), i, s))
-    )
-);
+        do_parse!(
+            pos: position!() >>
+            wscom!(tag_word!("type")) >>
+            i: identifier >>
+            wscom!(tag!("=")) >>
+            s: alt!(
+                map!(identifier_typed, |i| vec!(i)) |
+                delimited!(wscom!(tag!("{")), separated_list_complete!(wscom!(tag!(",")), identifier_typed), wscom!(tag!("}")))
+                ) >>
+            (AST::Type(Pos::new(pos), i, s))
+            )
+      );
 
 
 
 named!(expression(Span) -> AST,
-    alt_complete!(
-        noop |
-        underscore |
-        //block |
-        ifexpr |
-        trywith |
-        raise |
-        matchcase |
-        forloop |
-        newclass |
-        declare |
-        function |
-        infix
-    )
-);
+        alt_complete!(
+            noop |
+            underscore |
+            //block |
+            ifexpr |
+            trywith |
+            raise |
+            matchcase |
+            forloop |
+            newclass |
+            declare |
+            function |
+            infix
+            )
+      );
 
 named!(noop(Span) -> AST,
-    value!(AST::Noop, tag_word!("noop"))
-);
+        value!(AST::Noop, tag_word!("noop"))
+      );
 
 named!(underscore(Span) -> AST,
-    value!(AST::Underscore, tag!("_"))
-);
+        value!(AST::Underscore, tag!("_"))
+      );
 
 named!(block(Span) -> AST,
-    delimited!(
-        wscom!(alt!(tag_word!("begin") | tag!("{"))),
-        do_parse!(
-            pos: position!() >>
-            s: many0!(statement) >>
-            (AST::Block(Pos::new(pos), s))
-        ),
-        wscom!(alt!(tag_word!("end") | tag!("}")))
-    )
-);
+        delimited!(
+            wscom!(alt!(tag_word!("begin") | tag!("{"))),
+            do_parse!(
+                pos: position!() >>
+                s: many0!(statement) >>
+                (AST::Block(Pos::new(pos), s))
+                ),
+            wscom!(alt!(tag_word!("end") | tag!("}")))
+            )
+      );
 
 named!(ifexpr(Span) -> AST,
-    do_parse!(
-        pos: position!() >>
-        wscom!(tag_word!("if")) >>
-        c: expression >>
-        wscom!(tag_word!("then")) >>
-        t: expression >>
-        f: opt!(preceded!(
-            wscom!(tag_word!("else")),
-            expression
-        )) >>
-        (AST::If(Pos::new(pos), Box::new(c), Box::new(t), Box::new(if f.is_some() { f.unwrap() } else { AST::Nil(None) })))
-    )
-);
+        do_parse!(
+            pos: position!() >>
+            wscom!(tag_word!("if")) >>
+            c: expression >>
+            wscom!(tag_word!("then")) >>
+            t: expression >>
+            f: opt!(preceded!(
+                    wscom!(tag_word!("else")),
+                    expression
+                    )) >>
+            (AST::If(Pos::new(pos), Box::new(c), Box::new(t), Box::new(if f.is_some() { f.unwrap() } else { AST::Nil(None) })))
+            )
+      );
 
 named!(trywith(Span) -> AST,
-    do_parse!(
-        pos: position!() >>
-        wscom!(tag_word!("try")) >>
-        c: expression >>
-        wscom!(tag_word!("with")) >>
-        l: caselist >>
-        (AST::Try(Pos::new(pos), Box::new(c), l, None))
-    )
-);
+        do_parse!(
+            pos: position!() >>
+            wscom!(tag_word!("try")) >>
+            c: expression >>
+            wscom!(tag_word!("with")) >>
+            l: caselist >>
+            (AST::Try(Pos::new(pos), Box::new(c), l, None))
+            )
+      );
 
 named!(raise(Span) -> AST,
-    do_parse!(
-        pos: position!() >>
-        wscom!(tag_word!("raise")) >>
-        e: expression >>
-        (AST::Raise(Pos::new(pos), Box::new(e)))
-    )
-);
+        do_parse!(
+            pos: position!() >>
+            wscom!(tag_word!("raise")) >>
+            e: expression >>
+            (AST::Raise(Pos::new(pos), Box::new(e)))
+            )
+      );
 
 named!(matchcase(Span) -> AST,
-    do_parse!(
-        pos: position!() >>
-        wscom!(tag_word!("match")) >>
-        c: expression >>
-        //wscom!(tag_word!("with")) >>
-        //l: caselist >>
-        l: delimited!(wscom!(tag!("{")), caselist, wscom!(tag!("}"))) >>
-        (AST::Match(Pos::new(pos), Box::new(c), l, None))
-    )
-);
+        do_parse!(
+            pos: position!() >>
+            wscom!(tag_word!("match")) >>
+            c: expression >>
+            //wscom!(tag_word!("with")) >>
+            //l: caselist >>
+            l: delimited!(wscom!(tag!("{")), caselist, wscom!(tag!("}"))) >>
+            (AST::Match(Pos::new(pos), Box::new(c), l, None))
+            )
+      );
 
 named!(caselist(Span) -> Vec<(AST, AST)>,
-    //separated_list_complete!(wscom!(tag!(",")), do_parse!(
-    many1!(do_parse!(
-        //wscom!(tag!("|")) >>
-        c: alt_complete!(value!(AST::Underscore, tag!("_")) | literal) >>
-        wscom!(tag!("=>")) >>
-        e: expression >>
-        //wscom!(tag!(",")) >>
-        (c, e)
-    ))
-);
+        //separated_list_complete!(wscom!(tag!(",")), do_parse!(
+        many1!(do_parse!(
+                //wscom!(tag!("|")) >>
+                c: alt_complete!(value!(AST::Underscore, tag!("_")) | literal) >>
+                wscom!(tag!("=>")) >>
+                e: expression >>
+                //wscom!(tag!(",")) >>
+                (c, e)
+                ))
+      );
 
-named!(forloop(Span) -> AST,
-    do_parse!(
-        pos: position!() >>
-        wscom!(tag_word!("for")) >>
-        i: identifier >>
-        wscom!(tag_word!("in")) >>
-        l: expression >>
-        opt!(multispace_comment) >>
-        e: expression >>
-        (AST::For(Pos::new(pos), i, Box::new(l), Box::new(e), UniqueID::generate()))
-    )
-);
+      named!(forloop(Span) -> AST,
+          do_parse!(
+              pos: position!() >>
+              wscom!(tag_word!("for")) >>
+              i: identifier >>
+              wscom!(tag_word!("in")) >>
+              l: expression >>
+              opt!(multispace_comment) >>
+              e: expression >>
+              (AST::For(Pos::new(pos), i, Box::new(l), Box::new(e), UniqueID::generate()))
+              )
+          );
 
-named!(newclass(Span) -> AST,
-    do_parse!(
-        pos: position!() >>
-        wscom!(tag_word!("new")) >>
-        i: class_identifier >>
+      named!(newclass(Span) -> AST,
+              do_parse!(
+                  pos: position!() >>
+                  wscom!(tag_word!("new")) >>
+                  i: class_identifier >>
         a: map!(
             delimited!(tag!("("), expression_list, tag!(")")),
             |mut a| { a.insert(0, AST::New(Pos::new(pos), i.clone())); a }
         ) >>
-        (AST::PtrCast(Type::Object(i.0.clone(), i.1), Box::new(AST::Invoke(Pos::new(pos), Box::new(AST::Resolver(Pos::new(pos), Box::new(AST::Identifier(Pos::new(pos), i.0)), String::from("new"))), a, None))))
+        (AST::PtrCast(Type::Object(i.1.clone(), i.2), Box::new(AST::Invoke(Pos::new(pos), Box::new(AST::Resolver(Pos::new(pos), Box::new(AST::Identifier(Pos::new(pos), i.1)), String::from("new"))), a, None))))
     )
 );
 
@@ -374,16 +364,12 @@ named!(function(Span) -> AST,
     )
 );
 
-//named!(identifier_list<Vec<(String, Option<Type>)>>,
-//    separated_list_complete!(tag!(","), identifier_typed)
-//);
-
-named!(identifier_list_defaults(Span) -> Vec<(String, Option<Type>, Option<AST>)>,
+named!(identifier_list_defaults(Span) -> Vec<(Pos, String, Option<Type>, Option<AST>)>,
     separated_list_complete!(tag!(","),
         do_parse!(
             i: identifier_typed >>
             d: opt!(preceded!(tag!("="), expression)) >>
-            ((i.0, i.1, d))
+            ((i.0, i.1, i.2, d))
         )
     )
 );
@@ -578,19 +564,21 @@ named!(identifier(Span) -> String,
     )
 );
 
-named!(class_identifier(Span) -> (String, Vec<Type>),
+named!(class_identifier(Span) -> (Pos, String, Vec<Type>),
     do_parse!(
+        pos: position!() >>
         i: identifier >>
         p: opt!(complete!(delimited!(tag!("<"), separated_list_complete!(wscom!(tag!(",")), type_description), tag!(">")))) >>
-        ((i, p.unwrap_or(vec!())))
+        ((Pos::new(pos), i, p.unwrap_or(vec!())))
     )
 );
 
-named!(identifier_typed(Span) -> (String, Option<Type>),
+named!(identifier_typed(Span) -> (Pos, String, Option<Type>),
     wscom!(do_parse!(
+        pos: position!() >>
         i: identifier >>
         t: opt!(preceded!(wscom!(tag!(":")), type_description)) >>
-        (i, t)
+        (Pos::new(pos), i, t)
     ))
 );
 
@@ -621,7 +609,7 @@ named!(type_description(Span) -> Type,
 named!(type_object(Span) -> Type,
     do_parse!(
         c: class_identifier >>
-        (Type::Object(c.0, c.1))
+        (Type::Object(c.1, c.2))
     )
 );
 
@@ -707,24 +695,8 @@ named!(string_contents(Span) -> AST,
             )
         ),
         |s| AST::String(String::from_utf8_lossy(&s).into_owned())
-        //|s| AST::String(span_to_string(s))
-        //|s| { println!("{:?}", s); AST::Noop }
     )
 );
-
-/*
-fn string_contents_middle(mut span: Span) -> IResult<Span, AST> {
-    match string_contents(span.fragment) {
-        Ok((rem, res)) => {
-            span.offset += rem.as_ptr() as usize - span.fragment.as_ptr() as usize;
-            span.fragment = rem;
-            Ok((span, res))
-        },
-        IResult::Incomplete(n) => IResult::Incomplete(n),
-        Err(nom::Err::Error(e)) => Err(nom::Err::Error(convert_err(e, span))),
-    }
-}
-*/
 
 named!(string(Span) -> AST,
     delimited!(
@@ -736,20 +708,6 @@ named!(string(Span) -> AST,
         tag!("\"")
     )
 );
-
-
-/*
-named!(string(Span) -> AST,
-    map!(
-        delimited!(
-            tag!("\""),
-            take_until!("\""),
-            tag!("\"")
-        ),
-        |s| AST::String(span_to_string(s))
-    )
-);
-*/
 
 
 named!(number(Span) -> AST,

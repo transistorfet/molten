@@ -15,23 +15,23 @@ macro_rules! debug {
     }
 }
 
-pub fn print_types<V, T>(map: ScopeMapRef<V, T>, scope: ScopeRef<V, T>, code: &Vec<AST>) where V: Clone, T: Clone {
+pub fn print_types<V, T>(map: &ScopeMapRef<V, T>, scope: ScopeRef<V, T>, code: &Vec<AST>) where V: Clone, T: Clone {
     for node in code {
-        print_types_node(map.clone(), scope.clone(), node);
+        print_types_node(map, scope.clone(), node);
     }
 }
 
-pub fn print_types_node<V, T>(map: ScopeMapRef<V, T>, scope: ScopeRef<V, T>, node: &AST) where V: Clone, T: Clone {
+pub fn print_types_node<V, T>(map: &ScopeMapRef<V, T>, scope: ScopeRef<V, T>, node: &AST) where V: Clone, T: Clone {
     match *node {
-        AST::Block(_, ref body) => print_types(map.clone(), scope, body),
+        AST::Block(_, ref body) => print_types(map, scope, body),
         AST::Function(_, _, _, _, ref body, ref id, _) => {
             let fscope = map.get(id);
             print_types_scope(fscope.clone());
-            print_types_node(map.clone(), fscope.clone(), body);
+            print_types_node(map, fscope.clone(), body);
         },
-        AST::Definition(_, (ref name, ref ttype), ref body) => {
+        AST::Definition(_, (_, ref name, ref ttype), ref body) => {
             println!("\nDefining: {:?} {:?}", name, ttype);
-            print_types_node(map.clone(), scope, body);
+            print_types_node(map, scope, body);
         },
         _ => ()
     }

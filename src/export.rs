@@ -36,12 +36,12 @@ fn build_index_node<V, T>(index: &mut String, session: &Session<V, T>, scope: Sc
             }
         },
 
-        AST::Definition(_, (_, _), ref body) => match **body {
+        AST::Definition(_, (_, _, _), ref body) => match **body {
             ref node @ AST::Class(_, _, _, _, _) => build_index_node(index, session, scope, node),
             _ => { },
         },
 
-        AST::Class(_, (ref name, ref types), ref parent, ref body, ref id) => {
+        AST::Class(_, (_, ref name, ref types), ref parent, ref body, ref id) => {
             let tscope = session.map.get(&id);
             let classdef = scope.borrow().get_class_def(name);
             let namespec = unparse_type(tscope.clone(), Type::Object(name.clone(), types.clone()));
@@ -56,7 +56,7 @@ fn build_index_node<V, T>(index: &mut String, session: &Session<V, T>, scope: Sc
             //index.push_str(format!("    decl __init__ : ({}) -> Nil\n", namespec).as_str());
             for node in body {
                 match *node {
-                    AST::Definition(_, (ref name, ref ttype), _) => {
+                    AST::Definition(_, (_, ref name, ref ttype), _) => {
                         //let stype = classdef.borrow().get_variable_type(name).unwrap();
                         //println!("WHICH ONE??? {:?} {:?}", ttype, stype);
                         //index.push_str(format!("    decl {} : {}\n", name, unparse_type(tscope.clone(), ttype.clone().unwrap())).as_str());

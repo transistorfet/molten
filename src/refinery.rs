@@ -26,8 +26,8 @@ pub fn refine_node(node: AST) -> AST {
             AST::Block(pos, refine_vec(code))
         },
 
-        AST::Definition(pos, (name, ttype), code) => {
-            AST::Definition(pos, (name, ttype), Box::new(refine_node(*code)))
+        AST::Definition(pos, (dpos, name, ttype), code) => {
+            AST::Definition(pos, (dpos, name, ttype), Box::new(refine_node(*code)))
         },
 
         AST::Declare(pos, name, ttype) => {
@@ -85,7 +85,7 @@ pub fn refine_node(node: AST) -> AST {
                     AST::Function(pos, name, args, ret, mut body, id, abi) => {
                         if name == Some(String::from("new")) {
                             has_new = true;
-                            if args.len() > 0 && args[0].0 == String::from("self") {
+                            if args.len() > 0 && args[0].1 == String::from("self") {
                                 body = Box::new(AST::Block(pos.clone(), vec!(*body, AST::Identifier(pos.clone(), String::from("self")))));
                             } else {
                                 panic!("SyntaxError: the \"new\" method on a class must have \"self\" as its first parameter");

@@ -1,11 +1,13 @@
 
 use std::str;
 use std::rc::Rc;
+use std::cell::Cell;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::collections::hash_map::Entry;
 
 use parser;
+use ast::Pos;
 use abi::ABI;
 use types::Type;
 use session::Error;
@@ -21,7 +23,8 @@ pub enum Context {
 
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct Symbol<V> {
+pub struct VarInfo<V> {
+    pub id: UniqueID,
     pub ttype: Option<Type>,
     pub value: Option<V>,
     pub funcdefs: i32,
@@ -30,6 +33,7 @@ pub struct Symbol<V> {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct TypeInfo<V, T> {
+    pub id: UniqueID,
     pub ttype: Type,
     pub classdef: Option<ScopeRef<V, T>>,
     pub parent: Option<(String, Vec<Type>)>,
@@ -41,7 +45,7 @@ pub struct TypeInfo<V, T> {
 pub struct Scope<V, T> {
     pub basename: String,
     pub context: Context,
-    pub names: HashMap<String, Symbol<V>>,
+    pub names: HashMap<String, VarInfo<V>>,
     pub types: HashMap<String, TypeInfo<V, T>>,
     pub parent: Option<ScopeRef<V, T>>,
 }
@@ -108,7 +112,7 @@ impl<V, T> Scope<V, T> where V: Clone, T: Clone {
         match self.names.contains_key(&name) {
             true => Err(Error::new(format!("NameError: variable is already defined; {:?}", name))),
             false => {
-                self.names.insert(name, Symbol { ttype: ttype, value: None, funcdefs: 0, abi: None });
+                self.names.insert(name, VarInfo { id: UniqueID::generate(), ttype: ttype, value: None, funcdefs: 0, abi: None });
                 Ok(())
             },
         }
@@ -118,7 +122,7 @@ impl<V, T> Scope<V, T> where V: Clone, T: Clone {
     pub fn define_func(&mut self, name: String, ttype: Option<Type>, abi: ABI) -> Result<(), Error> {
         let funcs = self.search(&name, |sym| Some(sym.funcdefs)).unwrap_or(0);
         match self.names.entry(name.clone()) {
-            Entry::Vacant(entry) => { entry.insert(Symbol { ttype: ttype, value: None, funcdefs: funcs + 1, abi: Some(abi) }); Ok(()) },
+            Entry::Vacant(entry) => { entry.insert(VarInfo { id: UniqueID::generate(), ttype: ttype, value: None, funcdefs: funcs + 1, abi: Some(abi) }); Ok(()) },
             Entry::Occupied(mut entry) => match entry.get().funcdefs {
                 0 => Err(Error::new(format!("NameError: variable is already defined as a non-function; {:?}", name))),
                 // TODO we don't really do the right this with type here, but we don't have a scoperef to pass to Type::add_variant
@@ -142,7 +146,7 @@ impl<V, T> Scope<V, T> where V: Clone, T: Clone {
         Ok(())
     }
 
-    pub fn modify_local<F>(&mut self, name: &String, mut f: F) -> () where F: FnMut(&mut Symbol<V>) -> () {
+    pub fn modify_local<F>(&mut self, name: &String, mut f: F) -> () where F: FnMut(&mut VarInfo<V>) -> () {
         match self.names.entry(name.clone()) {
             Entry::Vacant(_) => panic!("NameError: variable is undefined in this scope; {:?}", name),
             Entry::Occupied(mut entry) => f(entry.get_mut()),
@@ -150,7 +154,7 @@ impl<V, T> Scope<V, T> where V: Clone, T: Clone {
     }
 
     /*
-    pub fn modify<F>(&mut self, name: &String, mut f: F) -> () where F: FnMut(&mut Symbol<V>) -> () {
+    pub fn modify<F>(&mut self, name: &String, mut f: F) -> () where F: FnMut(&mut VarInfo<V>) -> () {
         // TODO this might be an issue with overloaded functions; this was changed to make overloading work when in different scopes, which might cause a name/type error if something in a
         // more global scope tries to access an overloaded type specified in a more local scope... maybe the solution is to create a new entry with the new variant only accessible from the
         // more local scope... but will that cause a duplicate name error somewhere?
@@ -164,7 +168,7 @@ impl<V, T> Scope<V, T> where V: Clone, T: Clone {
     }
     */
 
-    pub fn search<F, U>(&self, name: &String, f: F) -> Option<U> where F: Fn(&Symbol<V>) -> Option<U> {
+    pub fn search<F, U>(&self, name: &String, f: F) -> Option<U> where F: Fn(&VarInfo<V>) -> Option<U> {
         if let Some(sym) = self.names.get(name) {
             f(sym)
         } else if let Some(ref parent) = self.parent {
@@ -291,6 +295,7 @@ impl<V, T> Scope<V, T> where V: Clone, T: Clone {
             true => Err(Error::new(format!("NameError: type is already defined; {:?}", name))),
             false => {
                 self.types.insert(name, TypeInfo {
+                    id: UniqueID::generate(),
                     ttype: ttype,
                     classdef: None,
                     parent: None,
@@ -353,15 +358,15 @@ impl<V, T> Scope<V, T> where V: Clone, T: Clone {
         })
     }
 
-    pub fn create_class_def(&mut self, pair: &(String, Vec<Type>), parent: Option<(String, Vec<Type>)>) -> Result<ScopeRef<V, T>, Error> {
+    pub fn create_class_def(&mut self, pair: &(Pos, String, Vec<Type>), parent: Option<(Pos, String, Vec<Type>)>) -> Result<ScopeRef<V, T>, Error> {
         // Create class name bindings for checking ast::accessors
-        let &(ref name, ref types) = pair;
+        let &(_, ref name, ref types) = pair;
         let classdef = Scope::new_ref(None);
         classdef.borrow_mut().set_basename(name.clone());
 
         // Find the parent class definitions, which the new class will inherit from
         match parent {
-             Some((ref pname, ref _types)) => match self.search_type(&pname, |info| info.classdef.clone()) {
+             Some((_, ref pname, ref _types)) => match self.search_type(&pname, |info| info.classdef.clone()) {
                 Some(ref parentdef) => classdef.borrow_mut().set_parent(parentdef.clone()),
                 None => return Err(Error::new(format!("NameError: undefined parent class {:?} for {:?}", pname, name))),
             },
@@ -376,9 +381,9 @@ impl<V, T> Scope<V, T> where V: Clone, T: Clone {
         Ok(classdef)
     }
 
-    pub fn set_class_def(&mut self, name: &String, parentclass: Option<(String, Vec<Type>)>, classdef: ScopeRef<V, T>) {
+    pub fn set_class_def(&mut self, name: &String, parentclass: Option<(Pos, String, Vec<Type>)>, classdef: ScopeRef<V, T>) {
         self.modify_type(name, |info| {
-            info.parent = parentclass.clone();
+            info.parent = parentclass.clone().map(|c| (c.1, c.2));
             info.classdef = Some(classdef.clone());
         })
     }
@@ -570,14 +575,14 @@ impl<V, T> Scope<V, T> where V: Clone, T: Clone {
 
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct ScopeMapRef<V, T>(Rc<RefCell<HashMap<UniqueID, ScopeRef<V, T>>>>);
+pub struct ScopeMapRef<V, T>(RefCell<HashMap<UniqueID, ScopeRef<V, T>>>);
 
 impl<V, T> ScopeMapRef<V, T> where V: Clone, T: Clone {
     pub const PRIMATIVE: UniqueID = UniqueID(0);
     pub const GLOBAL: UniqueID = UniqueID(1);
 
     pub fn new() -> ScopeMapRef<V, T> {
-        ScopeMapRef(Rc::new(RefCell::new(HashMap::new())))
+        ScopeMapRef(RefCell::new(HashMap::new()))
     }
 
     pub fn add(&self, id: UniqueID, parent: Option<ScopeRef<V, T>>) -> ScopeRef<V, T> {

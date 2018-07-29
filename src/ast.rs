@@ -8,46 +8,37 @@ use parser::Span;
 use utils::UniqueID;
 
 
+pub type NodeID = UniqueID;
+
 #[derive(Clone, PartialEq)]
 pub struct Pos {
+    pub id: NodeID,
     pub offset: usize,
     pub column: usize,
     pub line: u32,
     pub filenum: u16,
 }
 
-impl Pos {
-    pub fn new(span: Span) -> Pos {
-        Pos {
-            offset: span.offset,
-            column: span.get_utf8_column(),
-            line: span.line,
-            filenum: 0,
-        }
-    }
-
-    pub fn empty() -> Pos {
-        Pos { offset: 0, column: 0, line: 0, filenum: 0 }
-    }
-
-    pub fn exerpt(&self, text: &[u8]) -> String {
-        let mut end = self.offset + 1;
-        for i in self.offset .. text.len() {
-            if text[i] == b'\n' {
-                end = i;
-                break;
-            }
-        }
-        String::from(str::from_utf8(&text[self.offset .. end]).unwrap())
-    }
+#[derive(Clone, Debug, PartialEq)]
+pub struct Ident {
+    pub pos: Pos,
+    pub name: String,
 }
 
-impl fmt::Debug for Pos {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}:{}", self.line, self.column)
-    }
+#[derive(Clone, Debug, PartialEq)]
+pub struct ClassRef {
+    pub pos: Pos,
+    pub name: String,
+    pub types: Vec<Type>,
 }
 
+#[derive(Clone, Debug, PartialEq)]
+pub struct Argument {
+    pub pos: Pos,
+    pub name: String,
+    pub ttype: Option<Type>,
+    pub default: Option<AST>
+}
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum AST {
@@ -79,16 +70,53 @@ pub enum AST {
     Match(Pos, Box<AST>, Vec<(AST, AST)>, Option<Type>),
     For(Pos, String, Box<AST>, Box<AST>, UniqueID),
     Declare(Pos, String, Type),
-    Function(Pos, Option<String>, Vec<(String, Option<Type>, Option<AST>)>, Option<Type>, Box<AST>, UniqueID, ABI),
-    New(Pos, (String, Vec<Type>)),
-    Class(Pos, (String, Vec<Type>), Option<(String, Vec<Type>)>, Vec<AST>, UniqueID),
+    Function(Pos, Option<String>, Vec<(Pos, String, Option<Type>, Option<AST>)>, Option<Type>, Box<AST>, UniqueID, ABI),
+    New(Pos, (Pos, String, Vec<Type>)),
+    Class(Pos, (Pos, String, Vec<Type>), Option<(Pos, String, Vec<Type>)>, Vec<AST>, UniqueID),
 
     Import(Pos, String, Vec<AST>),
-    Definition(Pos, (String, Option<Type>), Box<AST>),
+    Definition(Pos, (Pos, String, Option<Type>), Box<AST>),
     Assignment(Pos, Box<AST>, Box<AST>),
     While(Pos, Box<AST>, Box<AST>),
-    Type(Pos, String, Vec<(String, Option<Type>)>),
+    Type(Pos, String, Vec<(Pos, String, Option<Type>)>),
 }
+
+
+
+impl Pos {
+    pub fn new(span: Span) -> Pos {
+        Pos {
+            id: UniqueID::generate(),
+            offset: span.offset,
+            column: span.get_utf8_column(),
+            line: span.line,
+            filenum: 0,
+        }
+    }
+
+    pub fn empty() -> Pos {
+        Pos { id: UniqueID::generate(), offset: 0, column: 0, line: 0, filenum: 0 }
+    }
+
+    pub fn exerpt(&self, text: &[u8]) -> String {
+        let mut end = self.offset + 1;
+        for i in self.offset .. text.len() {
+            if text[i] == b'\n' {
+                end = i;
+                break;
+            }
+        }
+        String::from(str::from_utf8(&text[self.offset .. end]).unwrap())
+    }
+}
+
+impl fmt::Debug for Pos {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}:{}", self.line, self.column)
+    }
+}
+
+
 
 impl AST {
     pub fn get_pos(&self) -> Pos {

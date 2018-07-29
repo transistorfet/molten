@@ -1,12 +1,13 @@
 
 use std::fmt::Debug;
 
+use abi::ABI;
 use ast::AST;
 use session::Session;
 use types::{ Type, resolve_type };
 use typecheck::{ self, update_scope_variable_types };
 use scope::{ Scope, ScopeRef };
-//use utils::UniqueID;
+use utils::UniqueID;
 
 
 pub fn precompile<V, T>(session: &Session<V, T>, code: Vec<AST>) -> Vec<AST> where V: Clone + Debug, T: Clone + Debug {
@@ -26,8 +27,8 @@ pub fn precompile_node<V, T>(session: &Session<V, T>, scope: ScopeRef<V, T>, nod
     match node {
         AST::Block(pos, code) => { AST::Block(pos, precompile_vec(session, scope.clone(), code)) },
 
-        AST::Definition(pos, (name, ttype), code) => {
-            AST::Definition(pos, (name, Some(resolve_type(scope.clone(), ttype.unwrap()))), Box::new(precompile_node(session, scope.clone(), *code)))
+        AST::Definition(pos, (dpos, name, ttype), code) => {
+            AST::Definition(pos, (dpos, name, Some(resolve_type(scope.clone(), ttype.unwrap()))), Box::new(precompile_node(session, scope.clone(), *code)))
         },
 
         AST::Declare(pos, name, ttype) => {
@@ -37,57 +38,6 @@ pub fn precompile_node<V, T>(session: &Session<V, T>, scope: ScopeRef<V, T>, nod
         AST::Function(pos, mut name, mut args, ret, body, id, abi) => {
             let fscope = session.map.get(&id);
             update_scope_variable_types(fscope.clone());
-            /*
-            if scope.borrow().is_local() {
-                let mut code = vec!();
-
-                let cid = UniqueID::generate();
-                let tscope = session.map.add(cid.clone(), Some(scope.clone()));
-                tscope.borrow_mut().set_class(true);
-                tscope.borrow_mut().set_basename(format!("closure{}", cid));
-
-                // Create class type named __closure__
-                let cpair = (String::from(format!("__closure{}__", cid)), vec!());
-                let classdef = scope.borrow_mut().create_class_def(&cpair, None).unwrap();
-                let ctype = Type::make_object(cpair.clone());
-                tscope.borrow_mut().define_type(String::from("Self"), ctype.clone());
-
-                // Add closure context argument to function definition
-                args.push((String::from("__context__"), Some(ctype.clone()), None));
-                let ftype = Type::Function(args.iter().map(|t| t.1.clone().unwrap()).collect(), Box::new(ret.clone().unwrap()));
-                fscope.borrow_mut().define(String::from("__context__"), Some(ctype.clone()));
-                let body = precompile_node(session, fscope.clone(), *body);
-
-                // Create the definition of the closure context class
-                let mut classbody = vec!();
-                classbody.push(AST::Definition((String::from("__func__"), Some(ftype.clone())), Box::new(AST::Underscore)));
-                for (name, sym) in &classdef.borrow().names {
-                    classbody.push(AST::Definition((name.clone(), sym.ttype.clone()), Box::new(AST::Underscore)));
-                }
-                code.push(AST::Class(cpair.clone(), None, classbody, cid.clone()));
-
-                // Create an instance of the class and assign the current values to its members
-                let cref = format!("__closure{}__", cid);
-                scope.borrow_mut().define(cref.clone(), Some(ctype.clone()));
-                code.push(AST::Definition((cref.clone(), Some(ctype.clone())), Box::new(AST::New(cpair.clone()))));
-                for (name, sym) in &classdef.borrow().names {
-                    code.push(AST::Assignment(Box::new(AST::Accessor(Box::new(AST::Identifier(cref.clone())), name.clone(), Some(ctype.clone()))), Box::new(AST::Identifier(name.clone()))));
-                }
-
-                // Assign the function itself to the context class
-                code.push(AST::Assignment(
-                    Box::new(AST::Accessor(Box::new(AST::Identifier(cref.clone())), String::from("__func__"), Some(ctype.clone()))),
-                    Box::new(AST::Function(name, args, ret, Box::new(body), id))
-                ));
-                code.push(AST::Identifier(cref.clone()));
-
-                // Return the whole block of AST in place of the original function definition
-                AST::Block(code)
-            } else {
-            */
-                // TODO resolve types of args
-                //AST::Function(pos, name, args, Some(resolve_type(fscope.clone(), ret.unwrap())), Box::new(precompile_node(session, fscope.clone(), *body)), id, abi)
-            //}
 
             // Mangle names of overloaded functions
             /*
@@ -111,13 +61,62 @@ pub fn precompile_node<V, T>(session: &Session<V, T>, scope: ScopeRef<V, T>, nod
             }
             */
 
+            /*
+            if abi == ABI::Molten {
+                let mut code = vec!();
+
+                let cid = UniqueID::generate();
+                let tscope = session.map.add(cid.clone(), Some(scope.clone()));
+                tscope.borrow_mut().set_class(true);
+                tscope.borrow_mut().set_basename(format!("closure{}", cid));
+
+                // Create class type named __closure__
+                let cpair = (String::from(format!("__closure{}__", cid)), vec!());
+                let classdef = scope.borrow_mut().create_class_def(&cpair, None).unwrap();
+                let ctype = Type::make_object(cpair.clone());
+                tscope.borrow_mut().define_type(String::from("Self"), ctype.clone());
+
+                // Add closure context argument to function definition
+                args.push((String::from("__context__"), Some(ctype.clone()), None));
+                let ftype = Type::Function(args.iter().map(|t| t.1.clone().unwrap()).collect(), Box::new(ret.clone().unwrap()), abi.clone());
+                fscope.borrow_mut().define(String::from("__context__"), Some(ctype.clone()));
+                let body = precompile_node(session, fscope.clone(), *body);
+
+                // Create the definition of the closure context class
+                let mut classbody = vec!();
+                classbody.push(AST::Definition(pos.clone(), (String::from("__func__"), Some(ftype.clone())), Box::new(AST::Underscore)));
+                for (name, sym) in &classdef.borrow().names {
+                    classbody.push(AST::Definition(pos.clone(), (name.clone(), sym.ttype.clone()), Box::new(AST::Underscore)));
+                }
+                code.push(AST::Class(pos.clone(), cpair.clone(), None, classbody, cid.clone()));
+
+                // Create an instance of the class and assign the current values to its members
+                let cref = format!("__closure{}__", cid);
+                scope.borrow_mut().define(cref.clone(), Some(ctype.clone()));
+                code.push(AST::Definition(pos.clone(), (cref.clone(), Some(ctype.clone())), Box::new(AST::New(pos.clone(), cpair.clone()))));
+                for (name, sym) in &classdef.borrow().names {
+                    code.push(AST::Assignment(pos.clone(), Box::new(AST::Accessor(pos.clone(), Box::new(AST::Identifier(pos.clone(), cref.clone())), name.clone(), Some(ctype.clone()))), Box::new(AST::Identifier(pos.clone(), name.clone()))));
+                }
+
+                // Assign the function itself to the context class
+                code.push(AST::Assignment(pos.clone(),
+                    Box::new(AST::Accessor(pos.clone(), Box::new(AST::Identifier(pos.clone(), cref.clone())), String::from("__func__"), Some(ctype.clone()))),
+                    Box::new(AST::Function(pos.clone(), name, args, ret, Box::new(body), id, abi.clone()))
+                ));
+                code.push(AST::Identifier(pos.clone(), cref.clone()));
+
+                // Return the whole block of AST in place of the original function definition
+                AST::Block(pos.clone(), code)
+            } else {
+            */
+            let args = args.into_iter().map(|(pos, name, atype, default)| (pos, name, atype.map(|atype| resolve_type(fscope.clone(), atype)), default)).collect();
             AST::Function(pos, name, args, Some(resolve_type(fscope.clone(), ret.unwrap())), Box::new(precompile_node(session, fscope.clone(), *body)), id, abi)
+            //}
         },
 
         AST::Invoke(pos, mut fexpr, args, stype) => {
-            // TODO you could detect a closure with an explicit tag on variable??? no you'de have to process fexpr
-            //if something {
-            //args.insert(0, precompile_node(session, scope.clone(), *fexpr));
+            //if stype.as_ref().unwrap().get_abi().unwrap() == ABI::Molten {
+            //    args.insert(0, precompile_node(session, scope.clone(), *fexpr));
             //}
 
             // Mangle names of overloaded functions
@@ -127,18 +126,20 @@ pub fn precompile_node<V, T>(session: &Session<V, T>, scope: ScopeRef<V, T>, nod
         },
 
         AST::Recall(_, _) => node,
+
         AST::Identifier(pos, name) => {
             /*
-            if scope.borrow().is_closure_var(&name) {
+            if scope.borrow().is_closure_var(&name) && scope.borrow().contains(&String::from("__context__")) {
                 let ctype = scope.borrow().get_variable_type(&String::from("__context__")).unwrap();
-                let classdef = scope.borrow().get_class_def(&ctype.get_name());
+                let classdef = scope.borrow().get_class_def(&ctype.get_name().unwrap());
                 let ttype = scope.borrow().get_variable_type(&name);
                 classdef.borrow_mut().define(name.clone(), ttype);
-                AST::Accessor(Box::new(AST::Identifier(String::from("__context__"))), name, scope.borrow().get_variable_type(&String::from("__context__")))
+                AST::Accessor(pos.clone(), Box::new(AST::Identifier(pos.clone(), String::from("__context__"))), name, scope.borrow().get_variable_type(&String::from("__context__")))
             } else {
-            */
                 AST::Identifier(pos, name)
-            //}
+            }
+            */
+            AST::Identifier(pos, name)
         },
 
         AST::SideEffect(pos, op, args) => {

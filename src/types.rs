@@ -1,6 +1,7 @@
 
 use std::fmt;
 
+use ast::Pos;
 use utils::UniqueID;
 use scope::{ Scope, ScopeRef };
 use session::{ Error };
@@ -121,8 +122,8 @@ impl Type {
         Ok(rtype)
     }
 
-    pub fn make_object(nametypes: (String, Vec<Type>)) -> Type {
-        Type::Object(nametypes.0, nametypes.1)
+    pub fn make_object(nametypes: (Pos, String, Vec<Type>)) -> Type {
+        Type::Object(nametypes.1, nametypes.2)
     }
 
     pub fn update_variable_type<V, T>(scope: ScopeRef<V, T>, name: &String, ttype: Type) where V: Clone, T: Clone {

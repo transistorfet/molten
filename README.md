@@ -19,13 +19,20 @@ Installing
 
 You will need `rustc` and `cargo` installed.  It's recommended that you use
 `rustup` to install these.  I've only tested it with rustc version 1.23.
-You will also need LLVM 5.0 installed.  On Debian/Ubuntu, the packages are
-`llvm-5.0`, `llvm-5.0-runtime`, and `llvm-5.0-dev`
+You will also need LLVM 5.0 installed.
+
+On Debian/Ubuntu, run:
+`sudo apt-get install llvm-5.0 llvm-5.0-runtime llvm-5.0-dev`
 
 You may need to run the following before the rust llvm package will compile:
 ```
 sudo ln -s /usr/bin/llvm-config-5.0 /usr/bin/llvm-config
 ```
+
+On macOS, run:
+`brew install llvm@5`
+
+You may need to add /usr/local/opt/llvm@5/bin to your path
 
 Running
 -------

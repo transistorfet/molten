@@ -76,7 +76,7 @@ impl<'a> BuiltinMap<'a> {
 }
 */
 
-pub fn make_global<'a, V, T>(map: ScopeMapRef<V, T>, builtins: &Vec<BuiltinDef<'a>>) where V: Clone + Debug, T: Clone + Debug {
+pub fn make_global<'a, V, T>(map: &ScopeMapRef<V, T>, builtins: &Vec<BuiltinDef<'a>>) where V: Clone + Debug, T: Clone + Debug {
     let primatives = map.add(ScopeMapRef::<V, T>::PRIMATIVE, None);
     primatives.borrow_mut().set_context(Context::Primative);
 
