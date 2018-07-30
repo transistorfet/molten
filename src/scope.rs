@@ -13,7 +13,7 @@ use types::Type;
 use session::Error;
 use utils::UniqueID;
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub enum Context {
     Primative,
     Global,
@@ -32,90 +32,92 @@ pub struct VarInfo {
     pub abi: Option<ABI>,
 }
 
+
 pub type TypeID = UniqueID;
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct TypeInfo {
+pub struct TypeInfo<'sess> {
     pub id: TypeID,
     pub ttype: Type,
-    pub classdef: Option<ScopeRef>,
+    pub classdef: Option<ClassDef<'sess>>,
     pub parent: Option<(String, Vec<Type>)>,
 }
 
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct Scope {
-    pub basename: String,
-    pub context: Context,
-    pub names: HashMap<String, VarInfo>,
-    pub types: HashMap<String, TypeInfo>,
-    pub parent: Option<ScopeRef>,
+pub struct Scope<'sess> {
+    pub context: Cell<Context>,
+    pub basename: RefCell<String>,
+    pub names: RefCell<HashMap<String, VarInfo>>,
+    pub types: RefCell<HashMap<String, TypeInfo<'sess>>>,
+    pub parent: Option<ScopeRef<'sess>>,
 }
 
-pub type ScopeRef = Rc<RefCell<Scope>>;
+pub type ScopeRef<'sess> = &'sess Scope<'sess>;
+//pub type ScopeRef = Rc<RefCell<Scope>>;
 //#[derive(Clone, Debug, PartialEq)]
 //pub struct ScopeRef(Rc<RefCell<Scope>>);
+//pub struct ScopeRef<'sess>(&'sess ScopeMapRef, UniqueID);
+
+pub type ClassDef<'sess> = Rc<Scope<'sess>>;
 
 
-impl Scope {
+impl<'sess> Scope<'sess> {
     pub fn new(parent: Option<ScopeRef>) -> Scope {
         Scope {
-            basename: String::from(""),
-            context: Context::Local,
-            names: HashMap::new(),
-            types: HashMap::new(),
+            context: Cell::new(Context::Local),
+            basename: RefCell::new(String::from("")),
+            names: RefCell::new(HashMap::new()),
+            types: RefCell::new(HashMap::new()),
             parent: parent,
         }
     }
 
-    pub fn new_ref(parent: Option<ScopeRef>) -> ScopeRef {
-        Rc::new(RefCell::new(Scope::new(parent)))
+    pub fn set_context(&self, context: Context) {
+        self.context.set(context);
     }
 
-    pub fn set_context(&mut self, context: Context) {
-        self.context = context;
-    }
-
-    pub fn set_class(&mut self, value: bool) {
-        self.context = if value { Context::Class } else { Context::Local };
+    pub fn set_class(&self, value: bool) {
+        self.context.set(if value { Context::Class } else { Context::Local });
     }
 
     pub fn is_primative(&self) -> bool {
-        self.context == Context::Primative
+        self.context.get() == Context::Primative
     }
 
     pub fn is_global(&self) -> bool {
-        self.context == Context::Global || self.context == Context::Primative
+        self.context.get() == Context::Global || self.context.get() == Context::Primative
     }
 
     pub fn is_local(&self) -> bool {
-        self.context == Context::Local
+        self.context.get() == Context::Local
     }
 
-    pub fn set_parent(&mut self, parent: ScopeRef) {
-        self.parent = Some(parent);
+    //pub fn set_parent(&mut self, parent: ScopeRef<'sess>) {
+    //    self.parent = Some(parent);
+    //}
+
+    pub fn get_parent(&self) -> Option<ScopeRef<'sess>> {
+        self.parent
     }
 
-    pub fn get_parent(&self) -> Option<ScopeRef> {
-        self.parent.clone()
-    }
-
-    pub fn target(scope: ScopeRef) -> ScopeRef {
-        match scope.borrow().context {
-            Context::Class => scope.borrow().get_self_class_def().unwrap(),
-            _ => scope.clone(),
+    pub fn target(scope: ScopeRef<'sess>) -> ScopeRef<'sess> {
+        match scope.context.get() {
+            Context::Class => scope.get_self_class_def().unwrap().as_ref(),
+            _ => scope,
         }
     }
 
     ///// Variable Functions /////
 
     #[must_use]
-    pub fn define(&mut self, name: String, ttype: Option<Type>) -> Result<VarID, Error> {
-        match self.names.contains_key(&name) {
+    pub fn define(&self, name: String, ttype: Option<Type>) -> Result<VarID, Error> {
+        let mut names = self.names.borrow_mut();
+        match names.contains_key(&name) {
             true => Err(Error::new(format!("NameError: variable is already defined; {:?}", name))),
             false => {
                 let id = VarID::generate();
-                self.names.insert(name, VarInfo {
+                names.insert(name, VarInfo {
                     id: id,
                     ttype: ttype,
                     funcdefs: 0,
@@ -127,9 +129,9 @@ impl Scope {
     }
 
     #[must_use]
-    pub fn define_func(&mut self, name: String, ttype: Option<Type>, abi: ABI) -> Result<VarID, Error> {
+    pub fn define_func(&self, name: String, ttype: Option<Type>, abi: ABI) -> Result<VarID, Error> {
         let funcs = self.search(&name, |sym| Some(sym.funcdefs)).unwrap_or(0);
-        match self.names.entry(name.clone()) {
+        match self.names.borrow_mut().entry(name.clone()) {
             Entry::Vacant(entry) => {
                 let id = VarID::generate();
                 entry.insert(VarInfo {
@@ -156,15 +158,15 @@ impl Scope {
     }
 
     #[must_use]
-    pub fn define_func_variant(dscope: ScopeRef, name: String, tscope: ScopeRef, ftype: Type) -> Result<VarID, Error> {
+    pub fn define_func_variant(dscope: ScopeRef<'sess>, name: String, tscope: ScopeRef<'sess>, ftype: Type) -> Result<VarID, Error> {
         let abi = ftype.get_abi().unwrap_or(ABI::Molten);
-        let id = dscope.borrow_mut().define_func(name.clone(), None, abi)?;
+        let id = dscope.define_func(name.clone(), None, abi)?;
         Scope::add_func_variant(dscope, &name, tscope, ftype)?;
         Ok(id)
     }
 
-    pub fn modify_local<F>(&mut self, name: &String, mut f: F) -> () where F: FnMut(&mut VarInfo) -> () {
-        match self.names.entry(name.clone()) {
+    pub fn modify_local<F>(&self, name: &String, mut f: F) -> () where F: FnMut(&mut VarInfo) -> () {
+        match self.names.borrow_mut().entry(name.clone()) {
             Entry::Vacant(_) => panic!("NameError: variable is undefined in this scope; {:?}", name),
             Entry::Occupied(mut entry) => f(entry.get_mut()),
         }
@@ -178,7 +180,7 @@ impl Scope {
         match self.names.entry(name.clone()) {
             Entry::Occupied(mut entry) => f(entry.get_mut()),
             _ => match self.parent {
-                Some(ref parent) => parent.borrow_mut().modify(name, f),
+                Some(ref parent) => parent.modify(name, f),
                 _ => panic!("NameError: type is undefined; {:?}", name),
             },
         }
@@ -186,10 +188,10 @@ impl Scope {
     */
 
     pub fn search<F, U>(&self, name: &String, f: F) -> Option<U> where F: Fn(&VarInfo) -> Option<U> {
-        if let Some(sym) = self.names.get(name) {
+        if let Some(sym) = self.names.borrow().get(name) {
             f(sym)
         } else if let Some(ref parent) = self.parent {
-            parent.borrow().search(name, f)
+            parent.search(name, f)
         } else {
             None
         }
@@ -203,7 +205,7 @@ impl Scope {
     }
 
     pub fn contains_local(&self, name: &String) -> bool {
-        self.names.contains_key(name)
+        self.names.borrow().contains_key(name)
     }
 
     pub fn variable_id(&self, name: &String) -> Result<VarID, Error> {
@@ -213,7 +215,7 @@ impl Scope {
         }
     }
 
-    pub fn set_variable_type(&mut self, name: &String, ttype: Type) {
+    pub fn set_variable_type(&self, name: &String, ttype: Type) {
         self.modify_local(name, move |sym| sym.ttype = Some(ttype.clone()))
     }
 
@@ -236,9 +238,9 @@ impl Scope {
     }
 
     pub fn get_all_variants(&self, name: &String, local: bool) -> Vec<Type> {
-        let mut variants = self.names.get(name).as_ref().map(|sym| sym.ttype.as_ref().map(|ttype| ttype.get_variants()).unwrap_or(vec!())).unwrap_or(vec!());
+        let mut variants = self.names.borrow().get(name).as_ref().map(|sym| sym.ttype.as_ref().map(|ttype| ttype.get_variants()).unwrap_or(vec!())).unwrap_or(vec!());
         if !local {
-            variants.extend(self.parent.as_ref().map(|parent| parent.borrow().get_all_variants(name, local)).unwrap_or(vec!()));
+            variants.extend(self.parent.as_ref().map(|parent| parent.get_all_variants(name, local)).unwrap_or(vec!()));
         }
         variants
     }
@@ -263,13 +265,13 @@ impl Scope {
     */
 
     #[must_use]
-    pub fn add_func_variant(dscope: ScopeRef, name: &String, tscope: ScopeRef, ftype: Type) -> Result<(), Error> {
-        let otype = dscope.borrow().get_variable_type_full(name, true);
+    pub fn add_func_variant(dscope: ScopeRef<'sess>, name: &String, tscope: ScopeRef<'sess>, ftype: Type) -> Result<(), Error> {
+        let otype = dscope.get_variable_type_full(name, true);
         let ftype = match otype {
-            Some(ttype) => ttype.add_variant(tscope.clone(), ftype.clone())?,
+            Some(ttype) => ttype.add_variant(tscope, ftype.clone())?,
             None => ftype,
         };
-        dscope.borrow_mut().set_variable_type(name, ftype.clone());
+        dscope.set_variable_type(name, ftype.clone());
         Ok(())
     }
 
@@ -279,20 +281,20 @@ impl Scope {
 
 
     pub fn is_closure_var(&self, name: &String) -> bool {
-        if self.names.contains_key(name) {
+        if self.names.borrow().contains_key(name) {
             return false;
         }
 
-        let mut parent = self.parent.clone();
+        let mut parent = self.parent;
         while parent.is_some() {
             let scope = parent.unwrap();
-            if scope.borrow().is_global() {
+            if scope.is_global() {
                 return false;
             }
-            if scope.borrow().contains_local(name) {
+            if scope.contains_local(name) {
                 return true;
             }
-            parent = scope.borrow().parent.clone();
+            parent = scope.parent;
         }
         false
     }
@@ -301,12 +303,13 @@ impl Scope {
     ///// Type Functions /////
 
     #[must_use]
-    pub fn define_type(&mut self, name: String, ttype: Type) -> Result<TypeID, Error> {
-        match self.types.contains_key(&name) {
+    pub fn define_type(&self, name: String, ttype: Type) -> Result<TypeID, Error> {
+        let types = self.types.borrow_mut();
+        match types.contains_key(&name) {
             true => Err(Error::new(format!("NameError: type is already defined; {:?}", name))),
             false => {
                 let id = TypeID::generate();
-                self.types.insert(name, TypeInfo {
+                types.insert(name, TypeInfo {
                     id: id,
                     ttype: ttype,
                     classdef: None,
@@ -317,37 +320,37 @@ impl Scope {
         }
     }
 
-    pub fn contains_type(&self, name: &String) -> bool {
-        match self.search_type(name, |_info| Some(true)) {
+    pub fn contains_type(&'sess self, name: &String) -> bool {
+        match self._search_type(name, |_info| Some(true)) {
             Some(true) => true,
             _ => false,
         }
     }
 
     pub fn contains_type_local(&self, name: &String) -> bool {
-        self.types.contains_key(name)
+        self.types.borrow().contains_key(name)
     }
 
-    pub fn modify_type<F>(&mut self, name: &String, f: F) where F: Fn(&mut TypeInfo) -> () {
-        match self.types.entry(name.clone()) {
+    pub fn modify_type<'a, F>(&'a self, name: &String, f: F) where F: Fn(&'a mut TypeInfo<'sess>) -> () {
+        match self.types.borrow_mut().entry(name.clone()) {
             Entry::Occupied(mut entry) => f(entry.get_mut()),
             _ => match self.parent {
                 Some(ref parent) => {
-                    parent.borrow_mut().modify_type(name, f);
+                    parent.modify_type(name, f);
                 },
                 _ => panic!("NameError: type is undefined; {:?}", name),
             },
         }
     }
 
-    pub fn search_type<F, U>(&self, name: &String, f: F) -> Option<U> where F: Fn(&TypeInfo) -> Option<U> {
-        if let Some(ref info) = self.types.get(name) {
+    fn _search_type<'a, F, U>(&'a self, name: &String, f: F) -> Option<U> where F: Fn(&'a TypeInfo<'sess>) -> Option<U> {
+        if let Some(ref info) = self.types.borrow().get(name) {
             match info.ttype {
-                Type::Object(ref sname, _) if sname != name => self.search_type(sname, f),
+                Type::Object(ref sname, _) if sname != name => self._search_type(sname, f),
                 _ => f(info),
             }
         } else if let Some(ref parent) = self.parent {
-            parent.borrow().search_type(name, f)
+            parent._search_type(name, f)
         } else {
             None
         }
@@ -355,116 +358,117 @@ impl Scope {
 
 
     pub fn find_type(&self, name: &String) -> Option<Type> {
-        self.search_type(name, |info| Some(info.ttype.clone()))
+        self._search_type(name, |info| Some(info.ttype.clone()))
     }
 
     pub fn find_type_local(&self, name: &String) -> Option<Type> {
-        self.types.get(name).map(|info| info.ttype.clone())
+        self.types.borrow().get(name).map(|info| info.ttype.clone())
     }
 
-    pub fn update_type(&mut self, name: &String, ttype: Type) {
+    pub fn update_type(&self, name: &String, ttype: Type) {
         self.modify_type(name, |info| {
             debug!("CHANGE: {:?} from {:?} to {:?}", name, info.ttype, ttype);
             info.ttype = ttype.clone()
         })
     }
 
-    pub fn create_class_def(&mut self, pair: &(Pos, String, Vec<Type>), parent: Option<(Pos, String, Vec<Type>)>) -> Result<ScopeRef, Error> {
-        // Create class name bindings for checking ast::accessors
+    pub fn create_class_def(&'sess self, pair: &(Pos, String, Vec<Type>), parent: Option<(Pos, String, Vec<Type>)>) -> Result<ClassDef<'sess>, Error> {
         let &(_, ref name, ref types) = pair;
-        let classdef = Scope::new_ref(None);
-        classdef.borrow_mut().set_basename(name.clone());
 
         // Find the parent class definitions, which the new class will inherit from
-        match parent {
-             Some((_, ref pname, ref _types)) => match self.search_type(&pname, |info| info.classdef.clone()) {
-                Some(ref parentdef) => classdef.borrow_mut().set_parent(parentdef.clone()),
+        let parentclass: Option<ScopeRef<'sess>> = match parent {
+             Some((_, ref pname, ref _types)) => match self._search_type(&pname, |info| info.classdef) {
+                Some(ref parentdef) => Some(parentdef),
                 None => return Err(Error::new(format!("NameError: undefined parent class {:?} for {:?}", pname, name))),
             },
-            None => { }
+            None => None
         };
+
+        // Create class name bindings for checking ast::accessors
+        let classdef = Rc::new(Scope::new(parentclass));
+        classdef.set_basename(name.clone());
 
         // Define the class in the local scope
         self.define_type(name.clone(), Type::Object(name.clone(), types.clone()))?;
-        self.set_class_def(name, parent.clone(), classdef.clone());
+        self.set_class_def(name, parent.clone(), classdef);
         // TODO i don't like this type == Class thing, but i don't know how i'll do struct types yet either
         //self.define(name.clone(), Some(Type::Object(name.clone(), vec!())))?;
-        Ok(classdef)
+        Ok(classdef.clone())
     }
 
-    pub fn set_class_def(&mut self, name: &String, parentclass: Option<(Pos, String, Vec<Type>)>, classdef: ScopeRef) {
-        self.modify_type(name, |info| {
+    pub fn set_class_def(&'sess self, name: &String, parentclass: Option<(Pos, String, Vec<Type>)>, classdef: ClassDef<'sess>) {
+        self.modify_type(name, move |info| {
             info.parent = parentclass.clone().map(|c| (c.1, c.2));
-            info.classdef = Some(classdef.clone());
+            info.classdef = Some(classdef);
         })
     }
 
-    pub fn get_class_def(&self, name: &String) -> ScopeRef {
-        let classdef = self.search_type(name, |info| {
-            match info.classdef {
-                Some(ref classdef) => Some(classdef.clone()),
+    pub fn get_class_def(&'sess self, name: &String) -> ClassDef<'sess> {
+        let classdef = self._search_type(name, |info| {
+            match info.classdef.as_ref() {
+                Some(classdef) => Some(classdef.clone()),
                 None => panic!("TypeError: class definition not set for {:?}", name),
             }
         });
         match classdef {
-            Some(classdef) => classdef,
+            Some(classdef) => classdef.clone(),
             None => panic!("NameError: type is undefined; {:?}", name),
         }
     }
 
     pub fn get_class_info(&self, name: &String) -> Option<(Type, Option<Type>)> {
-        self.search_type(name, |info| {
+        self._search_type(name, |info| {
             Some((info.ttype.clone(), info.parent.clone().map(|(name, params)| Type::Object(name, params))))
         })
     }
 
-    pub fn get_self_class_def(&self) -> Option<ScopeRef> {
-        self.search_type(&self.basename, |info| info.classdef.clone())
+    pub fn get_self_class_def(&'sess self) -> Option<ClassDef<'sess>> {
+        self._search_type(&self.basename.borrow(), |info| info.classdef.clone())
     }
 
     pub fn type_id(&self, name: &String) -> Result<TypeID, Error> {
-        match self.search_type(name, |info| Some(info.id)) {
+        match self._search_type(name, |info| Some(info.id)) {
             Some(id) => Ok(id),
             None => Err(Error::new(format!("NameError: type is undefined; {:?}", name))),
         }
     }
 
-    pub fn locate_variable(scope: ScopeRef, name: &String) -> Option<ScopeRef> {
-        if let Some(_) = scope.borrow().names.get(name) {
-            return Some(scope.clone());
+    pub fn locate_variable(scope: ScopeRef<'sess>, name: &String) -> Option<ScopeRef<'sess>> {
+        if let Some(_) = scope.names.borrow().get(name) {
+            return Some(scope);
         }
 
-        let parent = scope.borrow().parent.clone();
+        let parent = scope.parent;
         match parent {
             Some(parent) => Scope::locate_variable(parent, name),
             _ => None
         }
     }
 
-    pub fn locate_type(scope: ScopeRef, name: &String) -> Option<ScopeRef> {
-        if let Some(_) = scope.borrow().types.get(name) {
-            return Some(scope.clone());
+    pub fn locate_type(scope: ScopeRef<'sess>, name: &String) -> Option<ScopeRef<'sess>> {
+        if let Some(_) = scope.types.borrow().get(name) {
+            return Some(scope);
         }
 
-        let parent = scope.borrow().parent.clone();
+        let parent = scope.parent.clone();
         match parent {
             Some(parent) => Scope::locate_type(parent, name),
             _ => None
         }
     }
 
-    pub fn global(scope: ScopeRef) -> ScopeRef {
-        if scope.borrow().is_global() {
+    pub fn global(scope: ScopeRef<'sess>) -> ScopeRef<'sess> {
+        if scope.is_global() {
             scope
         } else {
-            Scope::global(scope.borrow().parent.clone().unwrap())
+            Scope::global(scope.parent.clone().unwrap())
         }
     }
 
 
     ////// Type Variable Functions //////
 
-    pub fn map_all_typevars(&mut self, ttype: Type) -> Type {
+    pub fn map_all_typevars(&self, ttype: Type) -> Type {
         let mut varmap = Scope::map_new();
         debug!("MAPPING ALL: {:?}", ttype);
         self.map_typevars(&mut varmap, ttype)
@@ -474,7 +478,7 @@ impl Scope {
         HashMap::new()
     }
 
-    pub fn map_typevars(&mut self, varmap: &mut HashMap<UniqueID, Type>, ttype: Type) -> Type {
+    pub fn map_typevars<'a>(&'a self, varmap: &mut HashMap<UniqueID, Type>, ttype: Type) -> Type {
         match ttype {
             Type::Variable(name, id) => {
                 match varmap.get(&id).map(|x| x.clone()) {
@@ -503,7 +507,7 @@ impl Scope {
         }
     }
 
-    pub fn map_typevars_vec(&mut self, varmap: &mut HashMap<UniqueID, Type>, types: Vec<Type>) -> Vec<Type> {
+    pub fn map_typevars_vec<'a>(&'a self, varmap: &mut HashMap<UniqueID, Type>, types: Vec<Type>) -> Vec<Type> {
         types.into_iter().map(|vtype| self.map_typevars(varmap, vtype)).collect()
     }
 
@@ -530,7 +534,7 @@ impl Scope {
         types.into_iter().map(|vtype| self.unmap_typevars(varmap, vtype)).collect()
     }
 
-    pub fn new_typevar(&mut self) -> Type {
+    pub fn new_typevar<'a>(&'a self) -> Type {
         let id = UniqueID::generate();
         let name = self.new_typevar_name();
         let ttype = Type::Variable(name.clone(), id);
@@ -540,13 +544,13 @@ impl Scope {
             self.define_type(id.to_string(), ttype.clone()).unwrap();
         } else {
             let gscope = Scope::global(self.parent.clone().unwrap());
-            gscope.borrow_mut().define_type(id.to_string(), ttype.clone()).unwrap();
+            gscope.define_type(id.to_string(), ttype.clone()).unwrap();
         }
         debug!("NEW TYPEVAR: {:?} {:?}", self.get_basename(), ttype);
         ttype
     }
 
-    pub fn new_typevar_name(&mut self) -> String {
+    pub fn new_typevar_name<'a>(&'a self) -> String {
         for mut ch1 in b'`' .. b'z' {
             let name = if ch1 == b'`' { String::from("") } else { (ch1 as char).to_string() };
             for ch2 in b'a' .. b'z' + 1 {
@@ -561,8 +565,8 @@ impl Scope {
 
     ///// Name Functions /////
 
-    pub fn set_basename(&mut self, name: String) {
-        self.basename = name;
+    pub fn set_basename(&self, name: String) {
+        *self.basename.borrow_mut() = name;
     }
 
     pub fn get_full_name(&self, name: &Option<String>, id: UniqueID) -> String {
@@ -574,44 +578,44 @@ impl Scope {
     }
 
     pub fn get_basename(&self) -> String {
-        let name = self.parent.as_ref().map_or(String::from(""), |parent| parent.borrow().get_basename());
+        let name = self.parent.as_ref().map_or(String::from(""), |parent| parent.get_basename());
         if name.as_str() != "" {
-            name +  &"_" + &self.basename
+            name +  &"_" + &self.basename.borrow()
         } else {
-            self.basename.clone()
+            self.basename.borrow().clone()
         }
     }
 }
 
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct ScopeMapRef(RefCell<HashMap<UniqueID, ScopeRef>>);
+pub struct ScopeMapRef<'sess>(RefCell<HashMap<UniqueID, Scope<'sess>>>);
 
-impl ScopeMapRef {
+impl<'sess> ScopeMapRef<'sess> {
     pub const PRIMATIVE: UniqueID = UniqueID(0);
     pub const GLOBAL: UniqueID = UniqueID(1);
 
-    pub fn new() -> ScopeMapRef {
+    pub fn new() -> Self {
         ScopeMapRef(RefCell::new(HashMap::new()))
     }
 
-    pub fn add(&self, id: UniqueID, parent: Option<ScopeRef>) -> ScopeRef {
-        let scope = Scope::new_ref(parent);
-        self.0.borrow_mut().insert(id, scope.clone());
-        scope
+    pub fn add(&'sess self, id: UniqueID, parent: Option<ScopeRef<'sess>>) -> ScopeRef<'sess> {
+        let scope = Scope::new(parent);
+        self.0.borrow_mut().insert(id, scope);
+        &scope
     }
 
-    pub fn get(&self, id: &UniqueID) -> ScopeRef {
-        self.0.borrow().get(id).unwrap().clone()
+    pub fn get(&'sess self, id: &UniqueID) -> ScopeRef<'sess> {
+        &self.0.borrow().get(id).unwrap()
     }
 
-    pub fn get_global(&self) -> ScopeRef {
+    pub fn get_global(&'sess self) -> ScopeRef<'sess> {
         self.get(&ScopeMapRef::GLOBAL)
     }
 
-    //pub fn foreach<F>(&self, f: F) where F: Fn(ScopeRef) -> () {
+    //pub fn foreach<F>(&self, f: F) where F: Fn(ScopeRef<'sess>) -> () {
     //    for (_, scope) in self.0.borrow().iter() {
-    //        f(scope.clone());
+    //        f(scope);
     //    }
     //}
 }

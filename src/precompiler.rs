@@ -10,52 +10,52 @@ use scope::{ Scope, ScopeRef };
 use utils::UniqueID;
 
 
-pub fn precompile(session: &Session, code: Vec<AST>) -> Vec<AST> {
+pub fn precompile<'sess>(session: &'sess Session<'sess>, code: Vec<AST>) -> Vec<AST> {
     update_scope_variable_types(session.map.get_global());
     precompile_vec(session, session.map.get_global(), code)
 }
 
-pub fn precompile_vec(session: &Session, scope: ScopeRef, code: Vec<AST>) -> Vec<AST> {
+pub fn precompile_vec<'sess>(session: &'sess Session<'sess>, scope: ScopeRef<'sess>, code: Vec<AST>) -> Vec<AST> {
     let mut block = vec!();
     for node in code {
-        block.push(precompile_node(session, scope.clone(), node));
+        block.push(precompile_node(session, scope, node));
     }
     block
 }
 
-pub fn precompile_node(session: &Session, scope: ScopeRef, node: AST) -> AST {
+pub fn precompile_node<'sess>(session: &'sess Session<'sess>, scope: ScopeRef<'sess>, node: AST) -> AST {
     match node {
-        AST::Block(pos, code) => { AST::Block(pos, precompile_vec(session, scope.clone(), code)) },
+        AST::Block(pos, code) => { AST::Block(pos, precompile_vec(session, scope, code)) },
 
         AST::Definition(pos, (dpos, name, ttype), code) => {
-            AST::Definition(pos, (dpos, name, Some(resolve_type(scope.clone(), ttype.unwrap()))), Box::new(precompile_node(session, scope.clone(), *code)))
+            AST::Definition(pos, (dpos, name, Some(resolve_type(scope, ttype.unwrap()))), Box::new(precompile_node(session, scope, *code)))
         },
 
         AST::Declare(pos, name, ttype) => {
-            AST::Declare(pos, name, resolve_type(scope.clone(), ttype))
+            AST::Declare(pos, name, resolve_type(scope, ttype))
         },
 
         AST::Function(pos, mut name, mut args, ret, body, id, abi) => {
             let fscope = session.map.get(&id);
-            update_scope_variable_types(fscope.clone());
+            update_scope_variable_types(fscope);
 
             // Mangle names of overloaded functions
             /*
             if let Some(sname) = name.clone() {
-                let dscope = Scope::target(scope.clone());
+                let dscope = Scope::target(scope);
                 /*
-                let mut ftype = dscope.borrow().get_variable_type(&sname).unwrap();
+                let mut ftype = dscope.get_variable_type(&sname).unwrap();
                 if ftype.is_overloaded() {
-                    ftype = types::find_variant(scope.clone(), ftype, args.iter().map(|t| t.1.clone().unwrap()).collect(), Check::Def).unwrap();
+                    ftype = types::find_variant(scope, ftype, args.iter().map(|t| t.1.clone().unwrap()).collect(), Check::Def).unwrap();
                 }
                 debug!("***: {:?} {:?}", sname, ftype);
                 let argtypes = ftype.get_argtypes().unwrap();
                 let abi = ftype.get_abi().unwrap();
                 */
                 let argtypes = args.iter().map(|t| t.1.clone().unwrap()).collect();
-                let fname = abi.mangle_name(sname.as_str(), &argtypes, dscope.borrow().num_funcdefs(&sname));
-                if !dscope.borrow().contains(&fname) {
-                    dscope.borrow_mut().define(fname.clone(), Some(Type::Function(argtypes.clone(), Box::new(ret.clone().unwrap()), abi.clone()))).unwrap();
+                let fname = abi.mangle_name(sname.as_str(), &argtypes, dscope.num_funcdefs(&sname));
+                if !dscope.contains(&fname) {
+                    dscope.define(fname.clone(), Some(Type::Function(argtypes.clone(), Box::new(ret.clone().unwrap()), abi.clone()))).unwrap();
                     name = Some(fname);
                 }
             }
@@ -66,35 +66,35 @@ pub fn precompile_node(session: &Session, scope: ScopeRef, node: AST) -> AST {
                 let mut code = vec!();
 
                 let cid = UniqueID::generate();
-                let tscope = session.map.add(cid, Some(scope.clone()));
-                tscope.borrow_mut().set_class(true);
-                tscope.borrow_mut().set_basename(format!("closure{}", cid));
+                let tscope = session.map.add(cid, Some(scope));
+                tscope.set_class(true);
+                tscope.set_basename(format!("closure{}", cid));
 
                 // Create class type named __closure__
                 let cpair = (String::from(format!("__closure{}__", cid)), vec!());
-                let classdef = scope.borrow_mut().create_class_def(&cpair, None).unwrap();
+                let classdef = scope.create_class_def(&cpair, None).unwrap();
                 let ctype = Type::make_object(cpair.clone());
-                tscope.borrow_mut().define_type(String::from("Self"), ctype.clone());
+                tscope.define_type(String::from("Self"), ctype.clone());
 
                 // Add closure context argument to function definition
                 args.push((String::from("__context__"), Some(ctype.clone()), None));
                 let ftype = Type::Function(args.iter().map(|t| t.1.clone().unwrap()).collect(), Box::new(ret.clone().unwrap()), abi.clone());
-                fscope.borrow_mut().define(String::from("__context__"), Some(ctype.clone()));
-                let body = precompile_node(session, fscope.clone(), *body);
+                fscope.define(String::from("__context__"), Some(ctype.clone()));
+                let body = precompile_node(session, fscope, *body);
 
                 // Create the definition of the closure context class
                 let mut classbody = vec!();
                 classbody.push(AST::Definition(pos.clone(), (String::from("__func__"), Some(ftype.clone())), Box::new(AST::Underscore)));
-                for (name, sym) in &classdef.borrow().names {
+                for (name, sym) in classdef.names.borrow() {
                     classbody.push(AST::Definition(pos.clone(), (name.clone(), sym.ttype.clone()), Box::new(AST::Underscore)));
                 }
                 code.push(AST::Class(pos.clone(), cpair.clone(), None, classbody, cid));
 
                 // Create an instance of the class and assign the current values to its members
                 let cref = format!("__closure{}__", cid);
-                scope.borrow_mut().define(cref.clone(), Some(ctype.clone()));
+                scope.define(cref.clone(), Some(ctype.clone()));
                 code.push(AST::Definition(pos.clone(), (cref.clone(), Some(ctype.clone())), Box::new(AST::New(pos.clone(), cpair.clone()))));
-                for (name, sym) in &classdef.borrow().names {
+                for (name, sym) in classdef.names.borrow() {
                     code.push(AST::Assignment(pos.clone(), Box::new(AST::Accessor(pos.clone(), Box::new(AST::Identifier(pos.clone(), cref.clone())), name.clone(), Some(ctype.clone()))), Box::new(AST::Identifier(pos.clone(), name.clone()))));
                 }
 
@@ -109,32 +109,32 @@ pub fn precompile_node(session: &Session, scope: ScopeRef, node: AST) -> AST {
                 AST::Block(pos.clone(), code)
             } else {
             */
-            let args = args.into_iter().map(|(pos, name, atype, default)| (pos, name, atype.map(|atype| resolve_type(fscope.clone(), atype)), default)).collect();
-            AST::Function(pos, name, args, Some(resolve_type(fscope.clone(), ret.unwrap())), Box::new(precompile_node(session, fscope.clone(), *body)), id, abi)
+            let args = args.into_iter().map(|(pos, name, atype, default)| (pos, name, atype.map(|atype| resolve_type(fscope, atype)), default)).collect();
+            AST::Function(pos, name, args, Some(resolve_type(fscope, ret.unwrap())), Box::new(precompile_node(session, fscope, *body)), id, abi)
             //}
         },
 
         AST::Invoke(pos, mut fexpr, args, stype) => {
             //if stype.as_ref().unwrap().get_abi().unwrap() == ABI::Molten {
-            //    args.insert(0, precompile_node(session, scope.clone(), *fexpr));
+            //    args.insert(0, precompile_node(session, scope, *fexpr));
             //}
 
             // Mangle names of overloaded functions
-            //typecheck::get_accessor_name(scope.clone(), &mut fexpr.as_mut(), stype.as_ref().unwrap()).unwrap();
+            //typecheck::get_accessor_name(scope, &mut fexpr.as_mut(), stype.as_ref().unwrap()).unwrap();
 
-            AST::Invoke(pos, Box::new(precompile_node(session, scope.clone(), *fexpr)), precompile_vec(session, scope.clone(), args), Some(resolve_type(scope.clone(), stype.unwrap())))
+            AST::Invoke(pos, Box::new(precompile_node(session, scope, *fexpr)), precompile_vec(session, scope, args), Some(resolve_type(scope, stype.unwrap())))
         },
 
         AST::Recall(_, _) => node,
 
         AST::Identifier(pos, name) => {
             /*
-            if scope.borrow().is_closure_var(&name) && scope.borrow().contains(&String::from("__context__")) {
-                let ctype = scope.borrow().get_variable_type(&String::from("__context__")).unwrap();
-                let classdef = scope.borrow().get_class_def(&ctype.get_name().unwrap());
-                let ttype = scope.borrow().get_variable_type(&name);
-                classdef.borrow_mut().define(name.clone(), ttype);
-                AST::Accessor(pos.clone(), Box::new(AST::Identifier(pos.clone(), String::from("__context__"))), name, scope.borrow().get_variable_type(&String::from("__context__")))
+            if scope.is_closure_var(&name) && scope.contains(&String::from("__context__")) {
+                let ctype = scope.get_variable_type(&String::from("__context__")).unwrap();
+                let classdef = scope.get_class_def(&ctype.get_name().unwrap());
+                let ttype = scope.get_variable_type(&name);
+                classdef.define(name.clone(), ttype);
+                AST::Accessor(pos.clone(), Box::new(AST::Identifier(pos.clone(), String::from("__context__"))), name, scope.get_variable_type(&String::from("__context__")))
             } else {
                 AST::Identifier(pos, name)
             }
@@ -143,37 +143,37 @@ pub fn precompile_node(session: &Session, scope: ScopeRef, node: AST) -> AST {
         },
 
         AST::SideEffect(pos, op, args) => {
-            AST::SideEffect(pos, op, precompile_vec(session, scope.clone(), args))
+            AST::SideEffect(pos, op, precompile_vec(session, scope, args))
         },
 
         AST::If(pos, cond, texpr, fexpr) => {
-            AST::If(pos, Box::new(precompile_node(session, scope.clone(), *cond)), Box::new(precompile_node(session, scope.clone(), *texpr)), Box::new(precompile_node(session, scope.clone(), *fexpr)))
+            AST::If(pos, Box::new(precompile_node(session, scope, *cond)), Box::new(precompile_node(session, scope, *texpr)), Box::new(precompile_node(session, scope, *fexpr)))
         },
 
         AST::Match(pos, cond, cases, condtype) => {
-            let cases = cases.into_iter().map(|(case, body)| ( precompile_node(session, scope.clone(), case), precompile_node(session, scope.clone(), body) )).collect();
-            AST::Match(pos, Box::new(precompile_node(session, scope.clone(), *cond)), cases, condtype)
+            let cases = cases.into_iter().map(|(case, body)| ( precompile_node(session, scope, case), precompile_node(session, scope, body) )).collect();
+            AST::Match(pos, Box::new(precompile_node(session, scope, *cond)), cases, condtype)
         },
 
         AST::Try(pos, cond, cases, condtype) => {
-            let cases = cases.into_iter().map(|(case, body)| ( precompile_node(session, scope.clone(), case), precompile_node(session, scope.clone(), body) )).collect();
-            AST::Try(pos, Box::new(precompile_node(session, scope.clone(), *cond)), cases, condtype)
+            let cases = cases.into_iter().map(|(case, body)| ( precompile_node(session, scope, case), precompile_node(session, scope, body) )).collect();
+            AST::Try(pos, Box::new(precompile_node(session, scope, *cond)), cases, condtype)
         },
 
         AST::Raise(pos, expr) => {
-            AST::Raise(pos, Box::new(precompile_node(session, scope.clone(), *expr)))
+            AST::Raise(pos, Box::new(precompile_node(session, scope, *expr)))
         },
 
         AST::While(pos, cond, body) => {
-            AST::While(pos, Box::new(precompile_node(session, scope.clone(), *cond)), Box::new(precompile_node(session, scope.clone(), *body)))
+            AST::While(pos, Box::new(precompile_node(session, scope, *cond)), Box::new(precompile_node(session, scope, *body)))
         },
 
         AST::For(pos, name, cond, body, id) => {
             let lscope = session.map.get(&id);
-            AST::For(pos, name, Box::new(precompile_node(session, lscope.clone(), *cond)), Box::new(precompile_node(session, lscope.clone(), *body)), id)
+            AST::For(pos, name, Box::new(precompile_node(session, lscope, *cond)), Box::new(precompile_node(session, lscope, *body)), id)
         },
 
-        AST::List(pos, code, ttype) => { AST::List(pos, precompile_vec(session, scope.clone(), code), ttype) },
+        AST::List(pos, code, ttype) => { AST::List(pos, precompile_vec(session, scope, code), ttype) },
         /*
         AST::List(pos, code, stype) => {
             use abi::ABI;
@@ -192,7 +192,7 @@ pub fn precompile_node(session: &Session, scope: ScopeRef, node: AST) -> AST {
                     vec!(AST::Identifier(pos.clone(), id), item), Some(Type::Function(vec!(ltype.clone()), Box::new(ltype.clone()), ABI::Molten))));
             }
             block.push(AST::Identifier(pos.clone(), id));
-            AST::Block(pos.clone(), precompile_vec(session, scope.clone(), block))
+            AST::Block(pos.clone(), precompile_vec(session, scope, block))
         },
         */
 
@@ -201,15 +201,15 @@ pub fn precompile_node(session: &Session, scope: ScopeRef, node: AST) -> AST {
 
         AST::Class(pos, pair, parent, body, id) => {
             let tscope = session.map.get(&id);
-            //update_scope_variable_types(tscope.clone());
-            //let classdef = scope.borrow().get_class_def(&pair.0);
+            //update_scope_variable_types(tscope);
+            //let classdef = scope.get_class_def(&pair.0);
             //update_scope_variable_types(classdef.clone());
-            let mut body = precompile_vec(session, tscope.clone(), body);
+            let mut body = precompile_vec(session, tscope, body);
 
             /*
             let initname = String::from("__init__");
             let objtype = Type::make_object(pair.clone());
-            if !classdef.borrow().contains_local(&initname) {
+            if !classdef.contains_local(&initname) {
                 let initid = UniqueID::generate();
 
                 let mut initbody = vec!();
@@ -234,7 +234,7 @@ pub fn precompile_node(session: &Session, scope: ScopeRef, node: AST) -> AST {
                     initid
                 );
 
-                register_function(session, tscope.clone(), &init);
+                register_function(session, tscope, &init);
                 body.insert(0, init);
             }
             */
@@ -244,22 +244,22 @@ pub fn precompile_node(session: &Session, scope: ScopeRef, node: AST) -> AST {
 
 
         AST::Resolver(pos, left, right) => {
-            AST::Resolver(pos, Box::new(precompile_node(session, scope.clone(), *left)), right)
+            AST::Resolver(pos, Box::new(precompile_node(session, scope, *left)), right)
         },
 
         AST::Accessor(pos, left, right, stype) => {
-            AST::Accessor(pos, Box::new(precompile_node(session, scope.clone(), *left)), right, Some(resolve_type(scope.clone(), stype.unwrap())))
+            AST::Accessor(pos, Box::new(precompile_node(session, scope, *left)), right, Some(resolve_type(scope, stype.unwrap())))
         },
 
         AST::Assignment(pos, left, right) => {
-            AST::Assignment(pos, Box::new(precompile_node(session, scope.clone(), *left)), Box::new(precompile_node(session, scope.clone(), *right)))
+            AST::Assignment(pos, Box::new(precompile_node(session, scope, *left)), Box::new(precompile_node(session, scope, *right)))
         },
 
         AST::Import(pos, name, decls) => {
-            AST::Import(pos, name, precompile_vec(session, scope.clone(), decls))
+            AST::Import(pos, name, precompile_vec(session, scope, decls))
         },
 
-        AST::Nil(stype) => { AST::Nil(Some(resolve_type(scope.clone(), stype.unwrap()))) },
+        AST::Nil(stype) => { AST::Nil(Some(resolve_type(scope, stype.unwrap()))) },
 
         AST::Noop => { node },
         AST::Underscore => { node },
@@ -277,16 +277,16 @@ pub fn precompile_node(session: &Session, scope: ScopeRef, node: AST) -> AST {
 pub fn register_function(session: &Session, scope: ScopeRef, function: &AST) {
     if let &AST::Function(ref name, ref args, ref ret, ref body, ref id) = function {
         let name = name.clone().unwrap();
-        let fscope = session.map.add(id, Some(scope.clone()));
-        fscope.borrow_mut().set_basename(name.clone());
+        let fscope = session.map.add(id, Some(scope));
+        fscope.set_basename(name.clone());
 
         for arg in args {
-            fscope.borrow_mut().define(arg.0.clone(), arg.1.clone());
+            fscope.define(arg.0.clone(), arg.1.clone());
         }
 
         let ftype = Type::Function(args.iter().map(|t| t.1.clone().unwrap()).collect(), Box::new(ret.clone().unwrap()));
-        let dscope = Scope::target(scope.clone());
-        dscope.borrow_mut().define(name, Some(ftype.clone()));
+        let dscope = Scope::target(scope);
+        dscope.define(name, Some(ftype.clone()));
     }
 }
 */
