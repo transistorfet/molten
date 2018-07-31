@@ -8,6 +8,7 @@ use nom::{ digit };
 use nom::types::CompleteByteSlice;
 
 use parser;
+use ast::Ident;
 use types::Type;
 
 //pub struct ABI(i32)
@@ -23,10 +24,10 @@ pub enum ABI {
 
 
 impl ABI {
-    pub fn get(name: &Option<String>) -> ABI {
+    pub fn from_ident(name: &Option<Ident>) -> ABI {
         match *name {
             None => ABI::Molten,
-            Some(ref name) =>  match name.as_str() {
+            Some(ref name) => match name.as_str() {
                 "" | "molten" => ABI::Molten,
                 "C" => ABI::C,
                 "C++" => ABI::Cpp,
@@ -115,7 +116,10 @@ pub fn molten_mangle_name(name: &str, argtypes: &Vec<Type>, funcdefs: i32) -> St
 pub fn molten_unmangle_name(name: &str) -> Option<String> {
     named!(unmangle(parser::Span) -> String,
         preceded!(tag!("_Z"),
-            map_str!(length_bytes!(map!(digit, |s| usize::from_str_radix(str::from_utf8(&s.fragment).unwrap(), 10).unwrap())))
+            map!(
+                length_bytes!(map!(digit, |s| usize::from_str_radix(str::from_utf8(&s.fragment).unwrap(), 10).unwrap())),
+                |s| parser::span_to_string(s)
+            )
         )
     );
     match unmangle(parser::Span::new(CompleteByteSlice(name.as_bytes()))) {

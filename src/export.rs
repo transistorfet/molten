@@ -29,10 +29,10 @@ pub fn build_index<'sess>(session: &'sess Session, scope: ScopeRef, code: &Vec<A
 
 fn build_index_node<'sess>(index: &mut String, session: &'sess Session, scope: ScopeRef, node: &AST) {
     match *node {
-        AST::Function(_, ref name, _, _, _, _, _) => {
-            if let Some(ref name) = *name {
-                let ttype = scope.get_variable_type(name).unwrap();
-                index.push_str(format!("decl {} : {}\n", name, unparse_type(scope.clone(), ttype)).as_str());
+        AST::Function(_, ref ident, _, _, _, _, _) => {
+            if let Some(ref ident) = *ident {
+                let ttype = scope.get_variable_type(&ident.name).unwrap();
+                index.push_str(format!("decl {} : {}\n", ident.name, unparse_type(scope.clone(), ttype)).as_str());
             }
         },
 
@@ -41,10 +41,10 @@ fn build_index_node<'sess>(index: &mut String, session: &'sess Session, scope: S
             _ => { },
         },
 
-        AST::Class(_, (_, ref name, ref types), ref parent, ref body, ref id) => {
+        AST::Class(_, (_, ref ident, ref types), ref parent, ref body, ref id) => {
             let tscope = session.map.get(&id);
-            let classdef = scope.get_class_def(name);
-            let namespec = unparse_type(tscope.clone(), Type::Object(name.clone(), types.clone()));
+            let classdef = scope.get_class_def(&ident.name);
+            let namespec = unparse_type(tscope.clone(), Type::Object(ident.name.clone(), types.clone()));
             let fullspec = if parent.is_some() {
                 format!("{} extends {}", namespec, unparse_type(tscope.clone(), Type::make_object(parent.clone().unwrap())))
             } else {
@@ -56,16 +56,16 @@ fn build_index_node<'sess>(index: &mut String, session: &'sess Session, scope: S
             //index.push_str(format!("    decl __init__ : ({}) -> Nil\n", namespec).as_str());
             for node in body {
                 match *node {
-                    AST::Definition(_, (_, ref name, ref ttype), _) => {
+                    AST::Definition(_, (_, ref ident, ref ttype), _) => {
                         //let stype = classdef.get_variable_type(name).unwrap();
                         //println!("WHICH ONE??? {:?} {:?}", ttype, stype);
-                        //index.push_str(format!("    decl {} : {}\n", name, unparse_type(tscope.clone(), ttype.clone().unwrap())).as_str());
-                        index.push_str(format!("    let {} : {}\n", name, unparse_type(tscope.clone(), ttype.clone().unwrap())).as_str());
+                        //index.push_str(format!("    decl {} : {}\n", ident.name, unparse_type(tscope.clone(), ttype.clone().unwrap())).as_str());
+                        index.push_str(format!("    let {} : {}\n", ident.name, unparse_type(tscope.clone(), ttype.clone().unwrap())).as_str());
                     },
-                    AST::Function(_, ref name, _, _, _, _, _) => {
-                        if let Some(ref name) = *name {
-                            let ttype = classdef.get_variable_type(name).unwrap();
-                            index.push_str(format!("    decl {} : {}\n", name, unparse_type(tscope.clone(), ttype)).as_str());
+                    AST::Function(_, ref ident, _, _, _, _, _) => {
+                        if let Some(ref ident) = *ident {
+                            let ttype = classdef.get_variable_type(&ident.name).unwrap();
+                            index.push_str(format!("    decl {} : {}\n", ident.name, unparse_type(tscope.clone(), ttype)).as_str());
                         }
                     },
                     _ => {  },

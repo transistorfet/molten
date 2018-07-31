@@ -54,31 +54,31 @@ pub enum AST {
     PtrCast(Type, Box<AST>),
     List(Pos, Vec<AST>, Option<Type>),
 
-    Recall(Pos, String),
-    Identifier(Pos, String),
+    Recall(Pos, Ident),
+    Identifier(Pos, Ident),
     Index(Pos, Box<AST>, Box<AST>, Option<Type>),
-    Resolver(Pos, Box<AST>, String),
-    Accessor(Pos, Box<AST>, String, Option<Type>),
+    Resolver(Pos, Box<AST>, Ident),
+    Accessor(Pos, Box<AST>, Ident, Option<Type>),
     Invoke(Pos, Box<AST>, Vec<AST>, Option<Type>),
-    SideEffect(Pos, String, Vec<AST>),
-    //Prefix(Pos, String, Box<AST>),
-    //Infix(Pos, String, Box<AST>, Box<AST>),
+    SideEffect(Pos, Ident, Vec<AST>),
+    //Prefix(Pos, Ident, Box<AST>),
+    //Infix(Pos, Ident, Box<AST>, Box<AST>),
     Block(Pos, Vec<AST>),
     If(Pos, Box<AST>, Box<AST>, Box<AST>),
     Raise(Pos, Box<AST>),
     Try(Pos, Box<AST>, Vec<(AST, AST)>, Option<Type>),
     Match(Pos, Box<AST>, Vec<(AST, AST)>, Option<Type>),
-    For(Pos, String, Box<AST>, Box<AST>, UniqueID),
-    Declare(Pos, String, Type),
-    Function(Pos, Option<String>, Vec<(Pos, String, Option<Type>, Option<AST>)>, Option<Type>, Box<AST>, UniqueID, ABI),
-    New(Pos, (Pos, String, Vec<Type>)),
-    Class(Pos, (Pos, String, Vec<Type>), Option<(Pos, String, Vec<Type>)>, Vec<AST>, UniqueID),
+    For(Pos, Ident, Box<AST>, Box<AST>, UniqueID),
+    Declare(Pos, Ident, Type),
+    Function(Pos, Option<Ident>, Vec<(Pos, Ident, Option<Type>, Option<AST>)>, Option<Type>, Box<AST>, UniqueID, ABI),
+    New(Pos, (Pos, Ident, Vec<Type>)),
+    Class(Pos, (Pos, Ident, Vec<Type>), Option<(Pos, Ident, Vec<Type>)>, Vec<AST>, UniqueID),
 
-    Import(Pos, String, Vec<AST>),
-    Definition(Pos, (Pos, String, Option<Type>), Box<AST>),
+    Import(Pos, Ident, Vec<AST>),
+    Definition(Pos, (Pos, Ident, Option<Type>), Box<AST>),
     Assignment(Pos, Box<AST>, Box<AST>),
     While(Pos, Box<AST>, Box<AST>),
-    Type(Pos, String, Vec<(Pos, String, Option<Type>)>),
+    Type(Pos, Ident, Vec<(Pos, Ident, Option<Type>)>),
 }
 
 
@@ -117,6 +117,32 @@ impl fmt::Debug for Pos {
 }
 
 
+impl Ident {
+    pub fn new(pos: Pos, name: String) -> Ident {
+        Ident {
+            pos: pos,
+            name: name,
+        }
+    }
+
+    pub fn from_str(span: Span, name: &str) -> Ident {
+        Ident {
+            pos: Pos::new(span),
+            name: String::from(name),
+        }
+    }
+
+    pub fn from_span(span: Span) -> Ident {
+        Ident {
+            pos: Pos::new(span),
+            name: String::from(str::from_utf8(&span.fragment).unwrap()),
+        }
+    }
+
+    pub fn as_str(&self) -> &str {
+        self.name.as_str()
+    }
+}
 
 impl AST {
     pub fn get_pos(&self) -> Pos {

@@ -41,20 +41,20 @@ pub fn check_types_node_or_error<'sess>(session: &'sess Session, scope: ScopeRef
         AST::Real(_) => Type::Object(String::from("Real"), vec!()),
         AST::String(_) => Type::Object(String::from("String"), vec!()),
 
-        AST::Function(_, ref mut name, ref mut args, ref mut rtype, ref mut body, ref id, ref abi) => {
+        AST::Function(_, ref mut ident, ref mut args, ref mut rtype, ref mut body, ref id, ref abi) => {
             let fscope = session.map.get(id);
 
             let mut argtypes = vec!();
-            for &(_, ref name, ref ttype, ref value) in &*args {
+            for &(_, ref ident, ref ttype, ref value) in &*args {
                 let vtype = value.clone().map(|ref mut vexpr| check_types_node(session, scope.clone(), vexpr, ttype.clone()));
                 let mut atype = expect_type(fscope.clone(), ttype.clone(), vtype, Check::Def)?;
-                if &name[..] == "self" {
+                if &ident.name[..] == "self" {
                     let mut stype = fscope.find_type(&String::from("Self")).unwrap();
                     stype = fscope.map_all_typevars(stype);
                     atype = expect_type(fscope.clone(), Some(atype), Some(stype), Check::Def)?;
                 }
-                //fscope.set_variable_type(name, atype.clone());
-                Type::update_variable_type(fscope.clone(), name, atype.clone());
+                //fscope.set_variable_type(&ident.name, atype.clone());
+                Type::update_variable_type(fscope.clone(), &ident.name, atype.clone());
                 argtypes.push(atype);
             }
 
@@ -66,20 +66,20 @@ pub fn check_types_node_or_error<'sess>(session: &'sess Session, scope: ScopeRef
                 argtypes[i] = resolve_type(fscope.clone(), argtypes[i].clone());
                 // TODO this is still not checking for type compatibility
                 //fscope.set_variable_type(&args[i].0, argtypes[i].clone());
-                Type::update_variable_type(fscope.clone(), &args[i].1, argtypes[i].clone());
+                Type::update_variable_type(fscope.clone(), &args[i].1.name, argtypes[i].clone());
                 args[i].2 = Some(argtypes[i].clone());
             }
             update_scope_variable_types(fscope.clone());
 
             let mut nftype = Type::Function(argtypes.clone(), Box::new(rettype), *abi);
-            if name.is_some() {
+            if ident.is_some() {
                 let dscope = Scope::target(scope.clone());
-                let dname = name.clone().unwrap();
+                let dname = ident.as_ref().unwrap().name.clone();
                 //if dscope.is_overloaded(&dname) {
                     let fname = abi.mangle_name(dname.as_str(), &argtypes, dscope.num_funcdefs(&dname));
                     if !dscope.contains(&fname) {
                         dscope.define(fname.clone(), Some(nftype.clone()))?;
-                        *name = Some(fname);
+                        ident.as_mut().unwrap().name = fname;
                     }
                 //}
                 Scope::add_func_variant(dscope, &dname, scope, nftype.clone())?;
@@ -151,22 +151,22 @@ pub fn check_types_node_or_error<'sess>(session: &'sess Session, scope: ScopeRef
             ltype.unwrap()
         },
 
-        AST::Definition(_, (_, ref name, ref mut ttype), ref mut body) => {
+        AST::Definition(_, (_, ref ident, ref mut ttype), ref mut body) => {
             //let dscope = Scope::target(scope);
             let btype = expect_type(scope.clone(), ttype.clone(), Some(check_types_node(session, scope.clone(), body, ttype.clone())), Check::Def)?;
-            //dscope.set_variable_type(name, btype.clone());
-            Type::update_variable_type(scope, name, btype.clone());
+            //dscope.set_variable_type(&ident.name, btype.clone());
+            Type::update_variable_type(scope, &ident.name, btype.clone());
             *ttype = Some(btype.clone());
             btype
         },
 
-        AST::Declare(_, ref _name, ref ttype) => {
+        AST::Declare(_, ref _ident, ref ttype) => {
             ttype.clone()
         },
 
-        AST::Recall(_, ref name) |
-        AST::Identifier(_, ref name) => {
-            scope.get_variable_type(name).unwrap_or_else(|| expected.unwrap_or_else(|| scope.new_typevar()))
+        AST::Recall(_, ref ident) |
+        AST::Identifier(_, ref ident) => {
+            scope.get_variable_type(&ident.name).unwrap_or_else(|| expected.unwrap_or_else(|| scope.new_typevar()))
         },
 
         AST::Block(_, ref mut body) => check_types_vec(session, scope, body),
@@ -203,13 +203,13 @@ pub fn check_types_node_or_error<'sess>(session: &'sess Session, scope: ScopeRef
             Type::Object(String::from("Nil"), vec!())
         },
 
-        AST::For(_, ref name, ref mut list, ref mut body, ref id) => {
+        AST::For(_, ref ident, ref mut list, ref mut body, ref id) => {
             let lscope = session.map.get(id);
-            let itype = lscope.get_variable_type(name).unwrap_or_else(|| expected.unwrap_or_else(|| scope.new_typevar()));
+            let itype = lscope.get_variable_type(&ident.name).unwrap_or_else(|| expected.unwrap_or_else(|| scope.new_typevar()));
             let etype = Some(Type::Object(String::from("List"), vec!(itype)));
             let ltype = expect_type(lscope.clone(), etype.clone(), Some(check_types_node(session, lscope.clone(), list, etype.clone())), Check::Def)?;
-            //lscope.set_variable_type(name, ltype.get_params()[0].clone());
-            Type::update_variable_type(lscope.clone(), name, ltype.get_params()?[0].clone());
+            //lscope.set_variable_type(&ident.name, ltype.get_params()[0].clone());
+            Type::update_variable_type(lscope.clone(), &ident.name, ltype.get_params()?[0].clone());
             check_types_node(session, lscope, body, None)
         },
 
@@ -236,17 +236,17 @@ pub fn check_types_node_or_error<'sess>(session: &'sess Session, scope: ScopeRef
             ttype.clone()
         },
 
-        AST::New(_, (_, ref name, ref types)) => {
-            let odtype = scope.find_type(name);
+        AST::New(_, (_, ref ident, ref types)) => {
+            let odtype = scope.find_type(&ident.name);
             match odtype {
                 Some(dtype) => {
                     let tscope = Scope::new_ref(Some(scope.clone()));
                     let mtype = tscope.map_all_typevars(dtype.clone());
                     check_type_params(scope, &mtype.get_params()?, types, Check::Def, false)?;
                 },
-                None => return Err(Error::new(format!("TypeError: undefined type {:?}", name))),
+                None => return Err(Error::new(format!("TypeError: undefined type {:?}", ident.name))),
             };
-            Type::Object(name.clone(), types.clone())
+            Type::Object(ident.name.clone(), types.clone())
         },
 
         AST::Class(_, _, _, ref mut body, ref id) => {
@@ -258,13 +258,13 @@ pub fn check_types_node_or_error<'sess>(session: &'sess Session, scope: ScopeRef
         AST::Resolver(_, ref mut left, ref mut field) => {
             let ltype = match **left {
                 // TODO this caused an issue with types that have typevars that aren't declared (ie. Buffer['item])
-                //AST::Identifier(_, ref name) => resolve_type(scope.clone(), scope.find_type(name).unwrap().clone()),
-                AST::Identifier(_, ref name) => scope.find_type(name).unwrap().clone(),
+                //AST::Identifier(_, ref ident) => resolve_type(scope.clone(), scope.find_type(&ident.name).unwrap().clone()),
+                AST::Identifier(_, ref ident) => scope.find_type(&ident.name).unwrap().clone(),
                 _ => return Err(Error::new(format!("SyntaxError: left-hand side of scope resolver must be identifier")))
             };
 
             let classdef = scope.get_class_def(&ltype.get_name()?);
-            classdef.get_variable_type(field).unwrap_or_else(|| expected.unwrap_or_else(|| scope.new_typevar()))
+            classdef.get_variable_type(&field.name).unwrap_or_else(|| expected.unwrap_or_else(|| scope.new_typevar()))
         },
 
         AST::Accessor(_, ref mut left, ref mut field, ref mut stype) => {
@@ -272,7 +272,7 @@ pub fn check_types_node_or_error<'sess>(session: &'sess Session, scope: ScopeRef
             *stype = Some(ltype.clone());
 
             let classdef = scope.get_class_def(&ltype.get_name()?);
-            classdef.get_variable_type(field).unwrap_or_else(|| expected.unwrap_or_else(|| scope.new_typevar()))
+            classdef.get_variable_type(&field.name).unwrap_or_else(|| expected.unwrap_or_else(|| scope.new_typevar()))
         },
 
         AST::Assignment(_, ref mut left, ref mut right) => {
@@ -301,38 +301,38 @@ pub fn check_types_node_or_error<'sess>(session: &'sess Session, scope: ScopeRef
 
 pub fn get_accessor_name(scope: ScopeRef, fexpr: &mut AST, etype: &Type) -> Result<i32, Error> {
     let funcdefs = match *fexpr {
-        AST::Resolver(_, ref left, ref mut name) => {
+        AST::Resolver(_, ref left, ref mut ident) => {
             let ltype = match **left {
                 // TODO this caused an issue with types that have typevars that aren't declared (ie. Buffer['item])
-                //AST::Identifier(_, ref name) => resolve_type(scope.clone(), scope.find_type(name).unwrap().clone()),
-                AST::Identifier(_, ref name) => scope.find_type(name).unwrap().clone(),
+                //AST::Identifier(_, ref ident) => resolve_type(scope.clone(), scope.find_type(&ident.name).unwrap().clone()),
+                AST::Identifier(_, ref ident) => scope.find_type(&ident.name).unwrap().clone(),
                 _ => return Err(Error::new(format!("SyntaxError: left-hand side of scope resolver must be identifier")))
             };
 
             let classdef = scope.get_class_def(&ltype.get_name()?);
-debug!("!!!: {:?}", classdef.get_variable_type(name));
-            let funcdefs = classdef.num_funcdefs(name);
+debug!("!!!: {:?}", classdef.get_variable_type(&ident.name));
+            let funcdefs = classdef.num_funcdefs(&ident.name);
             funcdefs
         },
-        AST::Accessor(_, _, ref mut name, ref ltype) => {
+        AST::Accessor(_, _, ref mut ident, ref ltype) => {
             let classdef = scope.get_class_def(&ltype.as_ref().unwrap().get_name()?);
-            let funcdefs = classdef.num_funcdefs(name);
+            let funcdefs = classdef.num_funcdefs(&ident.name);
             funcdefs
         },
-        AST::Identifier(_, ref mut name) => {
-            scope.num_funcdefs(name)
+        AST::Identifier(_, ref mut ident) => {
+            scope.num_funcdefs(&ident.name)
         },
-        _ =>  { 0 } //return Err(Error::new(format!("OverloadError: calling an overloaded function must be by name: not {:?}", fexpr))),
+        _ =>  { 0 } //return Err(Error::new(format!("OverloadError: calling an overloaded function must be by &ident.name: not {:?}", fexpr))),
     };
 
     match *fexpr {
-        AST::Resolver(_, _, ref mut name) |
-        AST::Accessor(_, _, ref mut name, _) |
-        AST::Identifier(_, ref mut name) => {
-            *name = etype.get_abi().unwrap_or(ABI::Molten).mangle_name(name, etype.get_argtypes()?, funcdefs);
-            debug!("^^^^^^^^^^ MANGLE NAME {:?} {:?} {:?}", name, funcdefs, etype);
+        AST::Resolver(_, _, ref mut ident) |
+        AST::Accessor(_, _, ref mut ident, _) |
+        AST::Identifier(_, ref mut ident) => {
+            ident.name = etype.get_abi().unwrap_or(ABI::Molten).mangle_name(&ident.name, etype.get_argtypes()?, funcdefs);
+            debug!("^^^^^^^^^^ MANGLE NAME {:?} {:?} {:?}", &ident.name, funcdefs, etype);
         },
-        _ =>  { } //return Err(Error::new(format!("OverloadError: calling an overloaded function must be by name: not {:?}", fexpr))),
+        _ =>  { } //return Err(Error::new(format!("OverloadError: calling an overloaded function must be by &ident.name: not {:?}", fexpr))),
     }
 
     Ok(funcdefs)

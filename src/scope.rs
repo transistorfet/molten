@@ -7,11 +7,11 @@ use std::collections::HashMap;
 use std::collections::hash_map::Entry;
 
 use parser;
-use ast::Pos;
 use abi::ABI;
 use types::Type;
 use session::Error;
 use utils::UniqueID;
+use ast::{ Pos, Ident };
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum Context {
@@ -376,33 +376,33 @@ impl Scope {
         })
     }
 
-    pub fn create_class_def(&self, pair: &(Pos, String, Vec<Type>), parent: Option<(Pos, String, Vec<Type>)>) -> Result<ClassDef, Error> {
-        let &(_, ref name, ref types) = pair;
+    pub fn create_class_def(&self, pair: &(Pos, Ident, Vec<Type>), parent: Option<(Pos, Ident, Vec<Type>)>) -> Result<ClassDef, Error> {
+        let &(_, ref ident, ref types) = pair;
 
         // Find the parent class definitions, which the new class will inherit from
         let parentclass: Option<ScopeRef> = match parent {
-             Some((_, ref pname, ref _types)) => match self._search_type(&pname, |ref info| info.classdef.clone()) {
+             Some((_, ref pident, ref _types)) => match self._search_type(&pident.name, |ref info| info.classdef.clone()) {
                 Some(ref parentdef) => Some(parentdef.clone()),
-                None => return Err(Error::new(format!("NameError: undefined parent class {:?} for {:?}", pname, name))),
+                None => return Err(Error::new(format!("NameError: undefined parent class {:?} for {:?}", pident.name, ident.name))),
             },
             None => None
         };
 
         // Create class name bindings for checking ast::accessors
         let classdef = Rc::new(Scope::new(parentclass));
-        classdef.set_basename(name.clone());
+        classdef.set_basename(ident.name.clone());
 
         // Define the class in the local scope
-        self.define_type(name.clone(), Type::Object(name.clone(), types.clone()))?;
-        self.set_class_def(name, parent.clone(), classdef.clone());
+        self.define_type(ident.name.clone(), Type::Object(ident.name.clone(), types.clone()))?;
+        self.set_class_def(&ident.name, parent.clone(), classdef.clone());
         // TODO i don't like this type == Class thing, but i don't know how i'll do struct types yet either
         //self.define(name.clone(), Some(Type::Object(name.clone(), vec!())))?;
         Ok(classdef)
     }
 
-    pub fn set_class_def(&self, name: &String, parentclass: Option<(Pos, String, Vec<Type>)>, classdef: ClassDef) {
+    pub fn set_class_def(&self, name: &String, parentclass: Option<(Pos, Ident, Vec<Type>)>, classdef: ClassDef) {
         self.modify_type(name, move |info| {
-            info.parent = parentclass.clone().map(|c| (c.1, c.2));
+            info.parent = parentclass.clone().map(|c| (c.1.name, c.2));
             info.classdef = Some(classdef.clone());
         })
     }
@@ -573,12 +573,12 @@ impl Scope {
         *self.basename.borrow_mut() = name;
     }
 
-    pub fn get_full_name(&self, name: &Option<String>, id: UniqueID) -> String {
+    pub fn get_full_name(&self, ident: &Option<Ident>, id: UniqueID) -> String {
         let mut base = self.get_basename();
         if base.as_str() != "" {
             base = base + &"_";
         }
-        base + &name.as_ref().map_or_else(|| format!("anon{}", id), |name| name.clone())
+        base + &ident.as_ref().map_or_else(|| format!("anon{}", id), |ident| ident.name.clone())
     }
 
     pub fn get_basename(&self) -> String {

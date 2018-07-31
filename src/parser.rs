@@ -15,7 +15,7 @@ use std::str::FromStr;
 use abi::ABI;
 use types::Type;
 use utils::UniqueID;
-use ast::{ AST, Pos };
+use ast::{ AST, Pos, Ident };
 
 
 ///// Parsing Macros /////
@@ -81,12 +81,12 @@ macro_rules! tag_word (
 );
 
 #[macro_export]
-macro_rules! map_str (
+macro_rules! map_ident (
     ($i:expr, $($args:tt)*) => (
         {
             use parser::span_to_string;
             //map!($i, $($args)*, |s| String::from(str::from_utf8(s).unwrap()))
-            map!($i, $($args)*, |s| span_to_string(s))
+            map!($i, $($args)*, |s| Ident::from_span(s))
         }
     )
 );
@@ -137,8 +137,8 @@ named!(import(Span) -> AST,
     do_parse!(
         pos: position!() >>
         wscom!(tag_word!("import")) >>
-        e: map_str!(recognize!(separated_list_complete!(tag!("."), identifier))) >>
-        (AST::Import(Pos::new(pos), e, vec!()))
+        e: recognize!(separated_list_complete!(tag!("."), identifier)) >>
+        (AST::Import(Pos::new(pos), Ident::from_span(e), vec!()))
     )
 );
 
@@ -328,7 +328,7 @@ named!(caselist(Span) -> Vec<(AST, AST)>,
             delimited!(tag!("("), expression_list, tag!(")")),
             |mut a| { a.insert(0, AST::New(Pos::new(pos), i.clone())); a }
         ) >>
-        (AST::PtrCast(Type::Object(i.1.clone(), i.2), Box::new(AST::Invoke(Pos::new(pos), Box::new(AST::Resolver(Pos::new(pos), Box::new(AST::Identifier(Pos::new(pos), i.1)), String::from("new"))), a, None))))
+        (AST::PtrCast(Type::Object(i.1.name.clone(), i.2), Box::new(AST::Invoke(Pos::new(pos), Box::new(AST::Resolver(Pos::new(pos), Box::new(AST::Identifier(Pos::new(pos), i.1)), Ident::from_str(pos, "new"))), a, None))))
     )
 );
 
@@ -364,7 +364,7 @@ named!(function(Span) -> AST,
     )
 );
 
-named!(identifier_list_defaults(Span) -> Vec<(Pos, String, Option<Type>, Option<AST>)>,
+named!(identifier_list_defaults(Span) -> Vec<(Pos, Ident, Option<Type>, Option<AST>)>,
     separated_list_complete!(tag!(","),
         do_parse!(
             i: identifier_typed >>
@@ -375,8 +375,8 @@ named!(identifier_list_defaults(Span) -> Vec<(Pos, String, Option<Type>, Option<
 );
 
 
-named!(infix_op(Span) -> String,
-    map_str!(
+named!(infix_op(Span) -> Ident,
+    map_ident!(
         alt!(
             tag!("*") |
             tag!("/") |
@@ -418,9 +418,9 @@ impl AST {
         }
     }
 
-    fn fold_op(left: AST, operations: Vec<(Span, String, AST)>) -> Self {
+    fn fold_op(left: AST, operations: Vec<(Span, Ident, AST)>) -> Self {
         let mut operands: Vec<AST> = vec!();
-        let mut operators: Vec<(Pos, String, i32)> = vec!();
+        let mut operators: Vec<(Pos, Ident, i32)> = vec!();
         operands.push(left);
 
         for (span, next_op, next_ast) in operations {
@@ -450,7 +450,7 @@ impl AST {
         operands.pop().unwrap()
     }
 
-    fn make_op(pos: Pos, op: String, r1: AST, r2: AST) -> AST {
+    fn make_op(pos: Pos, op: Ident, r1: AST, r2: AST) -> AST {
         match op.as_str() {
             "and" | "or" => AST::SideEffect(pos, op, vec!(r1, r2)),
             _ => 
@@ -477,8 +477,8 @@ named!(atomic(Span) -> AST,
     ))
 );
 
-named!(prefix_op(Span) -> String,
-    map_str!(alt!(
+named!(prefix_op(Span) -> Ident,
+    map_ident!(alt!(
         tag_word!("not") |
         tag!("~")
     ))
@@ -511,8 +511,8 @@ named!(subatomic_operation(Span) -> AST,
 enum SubOP {
     Index(Pos, AST),
     Invoke(Pos, Vec<AST>),
-    Accessor(Pos, String),
-    Resolver(Pos, String),
+    Accessor(Pos, Ident),
+    Resolver(Pos, Ident),
 }
 
 impl AST {
@@ -551,20 +551,18 @@ named!(identifier_node(Span) -> AST,
     )
 );
 
-named!(identifier(Span) -> String,
-    map_str!(
-        do_parse!(
-            not!(reserved) >>
-            s: recognize!(preceded!(
-                take_while1!(is_alpha_underscore),
-                take_while!(is_alphanumeric_underscore)
-            )) >>
-            (s)
-        )
+named!(identifier(Span) -> Ident,
+    do_parse!(
+        not!(reserved) >>
+        s: recognize!(preceded!(
+            take_while1!(is_alpha_underscore),
+            take_while!(is_alphanumeric_underscore)
+        )) >>
+        (Ident::from_span(s))
     )
 );
 
-named!(class_identifier(Span) -> (Pos, String, Vec<Type>),
+named!(class_identifier(Span) -> (Pos, Ident, Vec<Type>),
     do_parse!(
         pos: position!() >>
         i: identifier >>
@@ -573,7 +571,7 @@ named!(class_identifier(Span) -> (Pos, String, Vec<Type>),
     )
 );
 
-named!(identifier_typed(Span) -> (Pos, String, Option<Type>),
+named!(identifier_typed(Span) -> (Pos, Ident, Option<Type>),
     wscom!(do_parse!(
         pos: position!() >>
         i: identifier >>
@@ -582,13 +580,16 @@ named!(identifier_typed(Span) -> (Pos, String, Option<Type>),
     ))
 );
 
-named!(symbol_name(Span) -> String,
-    map_str!(recognize!(take_while!(is_not_colon)))
+named!(symbol_name(Span) -> Ident,
+    wscom!(do_parse!(
+        s: recognize!(take_while!(is_not_colon)) >>
+        (Ident::from_span(s))
+    ))
 );
 
 
-named!(any_op(Span) -> String,
-    alt!(infix_op | prefix_op | map_str!(alt!(tag!("[]") | tag!("::"))))
+named!(any_op(Span) -> Ident,
+    alt!(infix_op | prefix_op | map_ident!(alt!(tag!("[]") | tag!("::"))))
 );
 
 pub fn parse_type(s: &str) -> Option<Type> {
@@ -609,12 +610,12 @@ named!(type_description(Span) -> Type,
 named!(type_object(Span) -> Type,
     do_parse!(
         c: class_identifier >>
-        (Type::Object(c.1, c.2))
+        (Type::Object(c.1.name, c.2))
     )
 );
 
 named!(type_variable(Span) -> Type,
-    map!(preceded!(tag!("'"), identifier), |s| Type::Variable(s, UniqueID(0)))
+    map!(preceded!(tag!("'"), identifier), |s| Type::Variable(s.name.clone(), UniqueID(0)))
 );
 
 named!(type_function(Span) -> Type,
@@ -637,7 +638,7 @@ named!(type_function(Span) -> Type,
 named!(abi_specifier(Span) -> ABI,
     map!(
         opt!(complete!(preceded!(wscom!(tag!("/")), identifier))),
-        |s| ABI::get(&s)
+        |s| ABI::from_ident(&s)
     )
 );
 
@@ -890,6 +891,7 @@ pub fn print_error_info(name: &str, span: Span, err: (nom::ErrorKind, usize, usi
 }
 
 
+/*
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -909,5 +911,5 @@ mod tests {
         );
     }
 }
-
+*/
 

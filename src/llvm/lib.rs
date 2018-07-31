@@ -12,6 +12,7 @@ use self::llvm::core::*;
 
 use abi::ABI;
 use types::Type;
+use ast::{ Pos, Ident };
 use parser::{ parse_type };
 use scope::{ Scope, ScopeRef, ScopeMapRef, Context };
 use binding::{ declare_typevars };
@@ -148,7 +149,7 @@ pub unsafe fn declare_builtins_node<'sess>(data: &mut LLVM<'sess>, objtype: LLVM
                     if !scope.contains(&name) {
                         scope.define(name.clone(), Some(ftype.clone())).unwrap();
                     }
-                    let fname = scope.get_full_name(&Some(name.clone()), UniqueID(0));
+                    let fname = scope.get_full_name(&Some(Ident::new(Pos::empty(), name.clone())), UniqueID(0));
                     data.set_value(scope.variable_id(&name).unwrap(), from_type(&ftype, func(data, fname.as_str(), objtype)));
                 },
                 Func::Comptime(func) => {
