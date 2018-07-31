@@ -12,7 +12,7 @@ use types::Type;
 
 //pub struct ABI(i32)
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub enum ABI {
     Unknown,
     Molten,

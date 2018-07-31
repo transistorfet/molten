@@ -38,7 +38,7 @@ fn bind_names_node_or_error<'sess>(session: &'sess Session, scope: ScopeRef, nod
 
             if let Some(ref name) = *name {
                 let dscope = Scope::target(scope);
-                dscope.define_func(name.clone(), None, abi.clone())?;
+                dscope.define_func(name.clone(), None, *abi)?;
             }
 
             for ref mut arg in &mut args.iter_mut() {
@@ -66,9 +66,9 @@ fn bind_names_node_or_error<'sess>(session: &'sess Session, scope: ScopeRef, nod
             declare_typevars(scope.clone(), Some(ttype), false)?;
             let dscope = Scope::target(scope.clone());
             let abi = ttype.get_abi().unwrap_or(ABI::Molten);
-            dscope.define_func(name.clone(), Some(ttype.clone()), abi.clone())?;
+            dscope.define_func(name.clone(), Some(ttype.clone()), abi)?;
             if let Some(ref mname) = abi.unmangle_name(name.as_str()) {
-                dscope.define_func(mname.clone(), None, abi.clone())?;
+                dscope.define_func(mname.clone(), None, abi)?;
                 let mut stype = dscope.get_variable_type(mname).unwrap_or(Type::Overload(vec!()));
                 stype = stype.add_variant(scope, ttype.clone())?;
                 dscope.set_variable_type(mname, stype);

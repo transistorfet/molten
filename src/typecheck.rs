@@ -71,7 +71,7 @@ pub fn check_types_node_or_error<'sess>(session: &'sess Session, scope: ScopeRef
             }
             update_scope_variable_types(fscope.clone());
 
-            let mut nftype = Type::Function(argtypes.clone(), Box::new(rettype), abi.clone());
+            let mut nftype = Type::Function(argtypes.clone(), Box::new(rettype), *abi);
             if name.is_some() {
                 let dscope = Scope::target(scope.clone());
                 let dname = name.clone().unwrap();
@@ -118,8 +118,8 @@ pub fn check_types_node_or_error<'sess>(session: &'sess Session, scope: ScopeRef
                     */
                     get_accessor_name(tscope.clone(), fexpr.as_mut(), &etype)?;
 
-                    //let ftype = expect_type(tscope.clone(), Some(etype.clone()), Some(Type::Function(atypes, Box::new(expected.unwrap_or_else(|| tscope.new_typevar())), abi.clone())), Check::Update)?;
-                    let ftype = expect_type(tscope.clone(), Some(etype.clone()), Some(Type::Function(atypes, Box::new(etype.get_rettype()?.clone()), abi.clone())), Check::Def)?;
+                    //let ftype = expect_type(tscope.clone(), Some(etype.clone()), Some(Type::Function(atypes, Box::new(expected.unwrap_or_else(|| tscope.new_typevar())), abi)), Check::Update)?;
+                    let ftype = expect_type(tscope.clone(), Some(etype.clone()), Some(Type::Function(atypes, Box::new(etype.get_rettype()?.clone()), *abi)), Check::Def)?;
                     // TODO should this actually be another expect, so type resolutions that occur in later args affect earlier args?  Might not be needed unless you add typevar constraints
                     let ftype = resolve_type(tscope, ftype);        // NOTE This ensures the early arguments are resolved despite typevars not being assigned until later in the signature
 

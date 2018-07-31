@@ -50,7 +50,7 @@ impl Type {
 
     pub fn get_abi(&self) -> Result<ABI, Error> {
         match self {
-            &Type::Function(_, _, ref abi) => Ok(abi.clone()),
+            &Type::Function(_, _, ref abi) => Ok(*abi),
             _ => Err(Error::new(format!("TypeError: expected function type, found {:?}", self))),
         }
     }
@@ -417,7 +417,7 @@ pub fn resolve_type(scope: ScopeRef, ttype: Type) -> Type {
         },
         Type::Function(ref args, ref ret, ref abi) => {
             let argtypes = args.iter().map(|arg| resolve_type(scope.clone(), arg.clone())).collect();
-            Type::Function(argtypes, Box::new(resolve_type(scope, *ret.clone())), abi.clone())
+            Type::Function(argtypes, Box::new(resolve_type(scope, *ret.clone())), *abi)
         },
         Type::Overload(ref variants) => {
             let newvars = variants.iter().map(|variant| resolve_type(scope.clone(), variant.clone())).collect();

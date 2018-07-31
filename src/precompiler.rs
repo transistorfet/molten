@@ -55,7 +55,7 @@ pub fn precompile_node<'sess>(session: &'sess Session, scope: ScopeRef, node: AS
                 let argtypes = args.iter().map(|t| t.1.clone().unwrap()).collect();
                 let fname = abi.mangle_name(sname.as_str(), &argtypes, dscope.num_funcdefs(&sname));
                 if !dscope.contains(&fname) {
-                    dscope.define(fname.clone(), Some(Type::Function(argtypes.clone(), Box::new(ret.clone().unwrap()), abi.clone()))).unwrap();
+                    dscope.define(fname.clone(), Some(Type::Function(argtypes.clone(), Box::new(ret.clone().unwrap()), abi))).unwrap();
                     name = Some(fname);
                 }
             }
@@ -78,7 +78,7 @@ pub fn precompile_node<'sess>(session: &'sess Session, scope: ScopeRef, node: AS
 
                 // Add closure context argument to function definition
                 args.push((String::from("__context__"), Some(ctype.clone()), None));
-                let ftype = Type::Function(args.iter().map(|t| t.1.clone().unwrap()).collect(), Box::new(ret.clone().unwrap()), abi.clone());
+                let ftype = Type::Function(args.iter().map(|t| t.1.clone().unwrap()).collect(), Box::new(ret.clone().unwrap()), abi);
                 fscope.define(String::from("__context__"), Some(ctype.clone()));
                 let body = precompile_node(session, fscope.clone(), *body);
 
@@ -101,7 +101,7 @@ pub fn precompile_node<'sess>(session: &'sess Session, scope: ScopeRef, node: AS
                 // Assign the function itself to the context class
                 code.push(AST::Assignment(pos.clone(),
                     Box::new(AST::Accessor(pos.clone(), Box::new(AST::Identifier(pos.clone(), cref.clone())), String::from("__func__"), Some(ctype.clone()))),
-                    Box::new(AST::Function(pos.clone(), name, args, ret, Box::new(body), id, abi.clone()))
+                    Box::new(AST::Function(pos.clone(), name, args, ret, Box::new(body), id, abi))
                 ));
                 code.push(AST::Identifier(pos.clone(), cref.clone()));
 

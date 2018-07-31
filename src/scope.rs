@@ -150,7 +150,7 @@ impl Scope {
                 0 => Err(Error::new(format!("NameError: variable is already defined as a non-function; {:?}", name))),
                 // TODO we don't really do the right this with type here, but we don't have a scoperef to pass to Type::add_variant
                 _ => {
-                    if entry.get().abi.clone().unwrap_or(ABI::Unknown) != abi || !abi.can_overload() {
+                    if entry.get().abi.unwrap_or(ABI::Unknown) != abi || !abi.can_overload() {
                         Err(Error::new(format!("NameError: variable already defined with abi {:?} and can't be overloaded; {:?}", abi, name)))
                     } else {
                         entry.get_mut().funcdefs += 1;

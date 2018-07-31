@@ -1016,7 +1016,7 @@ if name.as_str() != "String" && !name.as_str().contains("closure") {
                             let uname = abi.unmangle_name(fname).unwrap_or(fname.clone());
                             //if parent.contains(&uname) {
                                 debug!("***************: {:?}:{:?}", name, uname);
-                                vtable.push((uname, Type::Function(args.iter().map(|t| t.2.clone().unwrap()).collect(), Box::new(rtype.clone().unwrap()), abi.clone())));
+                                vtable.push((uname, Type::Function(args.iter().map(|t| t.2.clone().unwrap()).collect(), Box::new(rtype.clone().unwrap()), *abi)));
                             //}
                         }
                     },
