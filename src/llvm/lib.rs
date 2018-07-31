@@ -64,7 +64,7 @@ impl<'sess> BuiltinMap<'sess> {
         match data.builtins.0.get(name.as_str()) {
             Some(ref list) => {
                 for ref entry in list.iter() {
-                    match check_type(scope, Some(entry.1.clone()), Some(stype.clone()), Check::Def, false) {
+                    match check_type(scope.clone(), Some(entry.1.clone()), Some(stype.clone()), Check::Def, false) {
                         Ok(_) => return Some(entry.0(data, largs.clone())),
                         Err(_) => { },
                     };
@@ -77,55 +77,55 @@ impl<'sess> BuiltinMap<'sess> {
 }
 */
 
-pub fn make_global<'sess>(map: &'sess ScopeMapRef<'sess>, builtins: &Vec<BuiltinDef<'sess>>) {
+pub fn make_global<'sess>(map: &'sess ScopeMapRef, builtins: &Vec<BuiltinDef<'sess>>) {
     let primatives = map.add(ScopeMapRef::PRIMATIVE, None);
     primatives.set_context(Context::Primative);
 
-    register_builtins_vec(primatives, primatives, builtins);
+    register_builtins_vec(primatives.clone(), primatives.clone(), builtins);
 
     let global = map.add(ScopeMapRef::GLOBAL, Some(primatives));
     global.set_context(Context::Global);
 }
  
-pub fn register_builtins_vec<'sess, 'sc>(scope: ScopeRef<'sc>, tscope: ScopeRef<'sc>, entries: &Vec<BuiltinDef<'sess>>) {
+pub fn register_builtins_vec<'sess>(scope: ScopeRef, tscope: ScopeRef, entries: &Vec<BuiltinDef<'sess>>) {
     for node in entries {
-        register_builtins_node(scope, tscope, node);
+        register_builtins_node(scope.clone(), tscope.clone(), node);
     }
 }
 
-pub fn register_builtins_node<'sess, 'sc>(scope: ScopeRef<'sc>, tscope: ScopeRef<'sc>, node: &BuiltinDef<'sess>) {
+pub fn register_builtins_node<'sess>(scope: ScopeRef, tscope: ScopeRef, node: &BuiltinDef<'sess>) {
     match *node {
         BuiltinDef::Type(ref name, ref ttype) => {
             let mut ttype = ttype.clone();
-            declare_typevars(tscope, Some(&mut ttype), true).unwrap();
+            declare_typevars(tscope.clone(), Some(&mut ttype), true).unwrap();
             scope.define_type(String::from(*name), ttype.clone()).unwrap();
         },
         BuiltinDef::Func(ref name, ref ftype, _) => {
             let mut ftype = parse_type(ftype);
-            declare_typevars(tscope, ftype.as_mut(), false).unwrap();
-            Scope::define_func_variant(scope, String::from(*name), tscope, ftype.clone().unwrap()).unwrap();
+            declare_typevars(tscope.clone(), ftype.as_mut(), false).unwrap();
+            Scope::define_func_variant(scope, String::from(*name), tscope.clone(), ftype.clone().unwrap()).unwrap();
         },
         BuiltinDef::Class(ref name, _, ref entries) => {
             let name = String::from(*name);
-            let classdef = Rc::new(Scope::new(None));
+            let classdef = Scope::new_ref(None);
             classdef.set_basename(name.clone());
             scope.set_class_def(&name, None, classdef.clone());
 
-            let tscope = Scope::new(Some(scope));
-            register_builtins_vec(&classdef, &tscope, entries);
+            let tscope = Scope::new_ref(Some(scope.clone()));
+            register_builtins_vec(classdef, tscope.clone(), entries);
         },
     }
 }
 
 pub unsafe fn initialize_builtins<'sess>(data: &mut LLVM<'sess>, scope: ScopeRef, entries: &Vec<BuiltinDef<'sess>>) {
     let pscope = scope.get_parent().unwrap();
-    declare_builtins_vec(data, ptr::null_mut(), pscope, scope, entries);
-    declare_irregular_functions(data, pscope);
+    declare_builtins_vec(data, ptr::null_mut(), pscope.clone(), scope.clone(), entries);
+    declare_irregular_functions(data, pscope.clone());
 }
 
 pub unsafe fn declare_builtins_vec<'sess>(data: &mut LLVM<'sess>, objtype: LLVMTypeRef, scope: ScopeRef, tscope: ScopeRef, entries: &Vec<BuiltinDef<'sess>>) {
     for node in entries {
-        declare_builtins_node(data, objtype, scope, tscope, node);
+        declare_builtins_node(data, objtype, scope.clone(), tscope.clone(), node);
     }
 }
 
@@ -137,7 +137,7 @@ pub unsafe fn declare_builtins_node<'sess>(data: &mut LLVM<'sess>, objtype: LLVM
             let ftype = parse_type(types).unwrap();
             match *func {
                 Func::External => {
-                    let func = LLVMAddFunction(data.module, label(name.as_str()), get_type(data, scope, ftype.clone(), false));
+                    let func = LLVMAddFunction(data.module, label(name.as_str()), get_type(data, scope.clone(), ftype.clone(), false));
                     if scope.contains(&name) {
                         data.set_value(scope.variable_id(&name).unwrap(), from_abi(&ftype.get_abi().unwrap(), func));
                     }
@@ -167,16 +167,16 @@ pub unsafe fn declare_builtins_node<'sess>(data: &mut LLVM<'sess>, objtype: LLVM
             let name = String::from(*name);
             let classdef = scope.get_class_def(&name);
 
-            //let tscope = Scope::new(Some(scope));
+            //let tscope = Scope::new_ref(Some(scope.clone()));
             let lltype = if structdef.len() > 0 {
-                build_class_type(data, scope, &name, structdef.clone(), vec!())
+                build_class_type(data, scope.clone(), &name, structdef.clone(), vec!())
             } else {
-                let lltype = get_type(data, scope, scope.find_type(&name).unwrap(), true);
+                let lltype = get_type(data, scope.clone(), scope.find_type(&name).unwrap(), true);
                 data.set_type(scope.type_id(&name).unwrap(), TypeValue { structdef: vec!(), value: lltype, vtable: vec!(), vttype: None });
                 lltype
             };
 
-            declare_builtins_vec(data, lltype, classdef.as_ref(), tscope, entries);
+            declare_builtins_vec(data, lltype, classdef.clone(), tscope.clone(), entries);
         },
     }
 }
@@ -196,19 +196,19 @@ unsafe fn declare_irregular_functions(data: &LLVM, scope: ScopeRef) {
     //let cint_type = LLVMInt32TypeInContext(data.context);
     let cint_type = int_type(data);
 
-    //declare_function(data, scope, "malloc", &mut [cint_type], bytestr_type, false);
-    //declare_function(data, scope, "realloc", &mut [bytestr_type, cint_type], bytestr_type, false);
-    //declare_function(data, scope, "free", &mut [bytestr_type], LLVMVoidType(), false);
+    //declare_function(data, scope.clone(), "malloc", &mut [cint_type], bytestr_type, false);
+    //declare_function(data, scope.clone(), "realloc", &mut [bytestr_type, cint_type], bytestr_type, false);
+    //declare_function(data, scope.clone(), "free", &mut [bytestr_type], LLVMVoidType(), false);
 
-    //declare_function(data, scope, "strlen", &mut [bytestr_type], cint_type, false);
-    //declare_function(data, scope, "memcpy", &mut [bytestr_type, bytestr_type, cint_type], bytestr_type, false);
+    //declare_function(data, scope.clone(), "strlen", &mut [bytestr_type], cint_type, false);
+    //declare_function(data, scope.clone(), "memcpy", &mut [bytestr_type, bytestr_type, cint_type], bytestr_type, false);
 
-    //declare_function(data, scope, "puts", &mut [bytestr_type], cint_type, false);
-    declare_c_function(data, scope, "sprintf", &mut [bytestr_type, bytestr_type], cint_type, true);
+    //declare_function(data, scope.clone(), "puts", &mut [bytestr_type], cint_type, false);
+    declare_c_function(data, scope.clone(), "sprintf", &mut [bytestr_type, bytestr_type], cint_type, true);
 
-    declare_c_function(data, scope, "llvm.pow.f64", &mut [real_type(data), real_type(data)], real_type(data), false);
+    declare_c_function(data, scope.clone(), "llvm.pow.f64", &mut [real_type(data), real_type(data)], real_type(data), false);
 
-    //declare_function(data, scope, "__gxx_personality_v0", &mut [bytestr_type, bytestr_type], cint_type, true);
+    //declare_function(data, scope.clone(), "__gxx_personality_v0", &mut [bytestr_type, bytestr_type], cint_type, true);
 }
 
 

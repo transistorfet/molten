@@ -89,7 +89,7 @@ fn compile_file(input: &str, output: Option<&str>) {
         let global = session.map.get_global();
         println!("\n{:?}\n", code);
         //println!("\n{:?}\n\n{:?}", &code, global);
-        debug::print_types(&session.map, global, &code);
+        debug::print_types(&session.map, global.clone(), &code);
         debug::print_types_scope(global);
     }
 

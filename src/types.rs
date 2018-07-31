@@ -109,7 +109,7 @@ impl Type {
         let rtype = match self {
             Type::Overload(ref variants) => {
                 for variant in variants {
-                    if check_type(scope, Some(variant.clone()), Some(ntype.clone()), Check::Def, false).is_ok() {
+                    if check_type(scope.clone(), Some(variant.clone()), Some(ntype.clone()), Check::Def, false).is_ok() {
                         return Err(Error::new(format!("OverloadError: function definitions overlap; {:?} vs {:?}", variant, ntype)));
                     }
                 }
@@ -127,11 +127,11 @@ impl Type {
     }
 
     pub fn update_variable_type(scope: ScopeRef, name: &String, ttype: Type) {
-        let dscope = Scope::target(scope);
-        let pscope = Scope::locate_variable(dscope, name).unwrap();
+        let dscope = Scope::target(scope.clone());
+        let pscope = Scope::locate_variable(dscope.clone(), name).unwrap();
         let otype = pscope.get_variable_type(name).clone();
         if !pscope.is_primative() {
-            let ntype = check_type(scope, otype.clone(), Some(ttype.clone()), Check::Def, false);
+            let ntype = check_type(scope.clone(), otype.clone(), Some(ttype.clone()), Check::Def, false);
             match ntype {
                 Ok(utype) => dscope.set_variable_type(name, utype),
                 Err(err) => panic!("while updating variable type {:?}:\n{:?}", name, err),
@@ -140,12 +140,12 @@ impl Type {
     }
 
     pub fn update_type(scope: ScopeRef, idname: &String, ttype: Type) {
-        let ttype = resolve_type(scope, ttype);
-        let pscope = Scope::locate_type(scope, idname).unwrap();
+        let ttype = resolve_type(scope.clone(), ttype);
+        let pscope = Scope::locate_type(scope.clone(), idname).unwrap();
         let otype = pscope.find_type(idname).clone();
         debug!("UPDATE TYPE: from {:?} to {:?}", otype, ttype);
         if !pscope.is_primative() {
-            let entype = check_type(scope, otype.clone(), Some(ttype.clone()), Check::Def, false);
+            let entype = check_type(scope.clone(), otype.clone(), Some(ttype.clone()), Check::Def, false);
             match entype {
                 Ok(ntype) => {
                     //let ntype = check_type(scope, Some(ttype.clone()), Some(ntype.clone()), Check::Def, false).unwrap();
@@ -157,7 +157,7 @@ impl Type {
                     //    }
                     //}
                     match otype {
-                        Some(Type::Variable(ref name, ref id)) if &id.to_string() != idname => Type::update_type(scope, &id.to_string(), ntype),
+                        Some(Type::Variable(ref name, ref id)) if &id.to_string() != idname => Type::update_type(scope.clone(), &id.to_string(), ntype),
                         _ => { },
                     }
                 },
@@ -258,8 +258,8 @@ pub fn check_type(scope: ScopeRef, odtype: Option<Type>, octype: Option<Type>, m
     } else if octype.is_none() {
         Ok(odtype.unwrap())
     } else {
-        let dtype = resolve_type(scope, odtype.unwrap());
-        let ctype = resolve_type(scope, octype.unwrap());
+        let dtype = resolve_type(scope.clone(), odtype.unwrap());
+        let ctype = resolve_type(scope.clone(), octype.unwrap());
 
 
 /*
@@ -293,7 +293,7 @@ pub fn check_type(scope: ScopeRef, odtype: Option<Type>, octype: Option<Type>, m
                 }
             } else {
                 if update {
-                    Type::update_type(scope, &did.to_string(), ctype.clone());
+                    Type::update_type(scope.clone(), &did.to_string(), ctype.clone());
                     Ok(resolve_type(scope, dtype.clone()))
                 } else {
                     Ok(resolve_type(scope, ctype.clone()))
@@ -301,7 +301,7 @@ pub fn check_type(scope: ScopeRef, odtype: Option<Type>, octype: Option<Type>, m
             }
         } else if let Type::Variable(_, ref cid) = ctype {
                 if update {
-                    Type::update_type(scope, &cid.to_string(), dtype.clone());
+                    Type::update_type(scope.clone(), &cid.to_string(), dtype.clone());
                     Ok(resolve_type(scope, ctype.clone()))
                 } else {
                     Ok(resolve_type(scope, dtype.clone()))
@@ -313,7 +313,7 @@ pub fn check_type(scope: ScopeRef, odtype: Option<Type>, octype: Option<Type>, m
                     if aargs.len() == bargs.len() && oabi.is_some() {
                         let mut argtypes = vec!();
                         for (atype, btype) in aargs.iter().zip(bargs.iter()) {
-                            argtypes.push(check_type(scope, Some(atype.clone()), Some(btype.clone()), mode.clone(), update)?);
+                            argtypes.push(check_type(scope.clone(), Some(atype.clone()), Some(btype.clone()), mode.clone(), update)?);
                         }
                         Ok(Type::Function(argtypes, Box::new(check_type(scope, Some(*aret.clone()), Some(*bret.clone()), mode, update)?), oabi.unwrap()))
                     } else {
@@ -321,7 +321,7 @@ pub fn check_type(scope: ScopeRef, odtype: Option<Type>, octype: Option<Type>, m
                     }
                 },
                 (Type::Object(ref aname, ref atypes), Type::Object(ref bname, ref btypes)) => {
-                    match is_subclass_of(scope, (bname, btypes), (aname, atypes), mode.clone(), true) {
+                    match is_subclass_of(scope.clone(), (bname, btypes), (aname, atypes), mode.clone(), true) {
                         ok @ Ok(_) => ok,
                         err @ Err(_) => match mode {
                             Check::List => is_subclass_of(scope, (aname, atypes), (bname, btypes), mode.clone(), true),
@@ -346,24 +346,24 @@ pub fn check_type(scope: ScopeRef, odtype: Option<Type>, octype: Option<Type>, m
 
 fn is_subclass_of(scope: ScopeRef, adef: (&String, &Vec<Type>), bdef: (&String, &Vec<Type>), mode: Check, update: bool) -> Result<Type, Error> {
     debug!("IS SUBCLASS: {:?} of {:?}", adef, bdef);
-    let tscope = Scope::new(Some(scope));
+    let tscope = Scope::new_ref(Some(scope.clone()));
     let mut names = Scope::map_new();
     let mut adef = (adef.0.clone(), adef.1.clone());
 
     loop {
         let (mut class, parent) = scope.get_class_info(&adef.0).unwrap();
         class = tscope.map_typevars(&mut names, class);
-        adef.1 = check_type_params(&tscope, &class.get_params()?, &adef.1, mode.clone(), true)?;
+        adef.1 = check_type_params(tscope.clone(), &class.get_params()?, &adef.1, mode.clone(), true)?;
 
         if *bdef.0 == adef.0 {
             let ptypes = if bdef.1.len() > 0 || adef.1.len() > 0 {
-                check_type_params(&tscope, &adef.1, bdef.1, mode.clone(), true)?
+                check_type_params(tscope.clone(), &adef.1, bdef.1, mode.clone(), true)?
             } else {
                 vec!()
             };
             //let rtype = Type::Object(adef.0, ptypes);
             //let rtype = resolve_type(&tscope, Type::Object(adef.0, ptypes));
-            let rtype = resolve_type(&tscope, tscope.unmap_typevars(&mut names, Type::Object(adef.0, ptypes)));
+            let rtype = resolve_type(tscope.clone(), tscope.unmap_typevars(&mut names, Type::Object(adef.0, ptypes)));
             debug!("DONE SUBCLASS: {:?}", rtype);
             return Ok(rtype);
             //return Ok(tscope.unmap_typevars(&mut names, Type::Object(adef.0, ptypes)));
@@ -372,7 +372,7 @@ fn is_subclass_of(scope: ScopeRef, adef: (&String, &Vec<Type>), bdef: (&String, 
             return Err(Error::new(format!("TypeError: type mismatch, expected {} but found {}", Type::Object(adef.0.clone(), adef.1), Type::Object(bdef.0.clone(), bdef.1.clone()))));
         }
         let parent = tscope.map_typevars(&mut names, parent.unwrap());
-        match resolve_type(&tscope, parent) {
+        match resolve_type(tscope.clone(), parent) {
             Type::Object(name, params) => adef = (name, params),
             ttype @ _ => return Err(Error::new(format!("TypeError: expected Object but found {}", ttype))),
         }
@@ -385,7 +385,7 @@ pub fn check_type_params(scope: ScopeRef, dtypes: &Vec<Type>, ctypes: &Vec<Type>
     } else {
         let mut ptypes = vec!();
         for (dtype, ctype) in dtypes.iter().zip(ctypes.iter()) {
-            ptypes.push(check_type(scope, Some(dtype.clone()), Some(ctype.clone()), mode.clone(), update)?);
+            ptypes.push(check_type(scope.clone(), Some(dtype.clone()), Some(ctype.clone()), mode.clone(), update)?);
         }
         Ok(ptypes)
     }
@@ -396,7 +396,7 @@ pub fn resolve_type(scope: ScopeRef, ttype: Type) -> Type {
         Type::Object(ref name, ref types) => {
             match scope.find_type(name) {
                 Some(_) => {
-                    let params = types.iter().map(|ptype| resolve_type(scope, ptype.clone())).collect();
+                    let params = types.iter().map(|ptype| resolve_type(scope.clone(), ptype.clone())).collect();
                     // TODO we are purposely returning the original type here so as not to over-resolve types... but we should probably still fully resolve for checking purposes
                     Type::Object(name.clone(), params)
                 },
@@ -416,11 +416,11 @@ pub fn resolve_type(scope: ScopeRef, ttype: Type) -> Type {
             }
         },
         Type::Function(ref args, ref ret, ref abi) => {
-            let argtypes = args.iter().map(|arg| resolve_type(scope, arg.clone())).collect();
+            let argtypes = args.iter().map(|arg| resolve_type(scope.clone(), arg.clone())).collect();
             Type::Function(argtypes, Box::new(resolve_type(scope, *ret.clone())), abi.clone())
         },
         Type::Overload(ref variants) => {
-            let newvars = variants.iter().map(|variant| resolve_type(scope, variant.clone())).collect();
+            let newvars = variants.iter().map(|variant| resolve_type(scope.clone(), variant.clone())).collect();
             Type::Overload(newvars)
         },
     }
@@ -429,7 +429,7 @@ pub fn resolve_type(scope: ScopeRef, ttype: Type) -> Type {
 pub fn find_variant(scope: ScopeRef, otype: Type, atypes: Vec<Type>, mode: Check) -> Result<Type, Error> {
     match otype {
         Type::Overload(variants) => {
-            let variants = remove_duplicates(scope, variants);
+            let variants = remove_duplicates(scope.clone(), variants);
             let mut found = vec!();
             'outer: for variant in &variants {
                 if let Type::Function(ref otypes, _, _) = *variant {
@@ -438,7 +438,7 @@ pub fn find_variant(scope: ScopeRef, otype: Type, atypes: Vec<Type>, mode: Check
                     }
                     for (otype, atype) in otypes.iter().zip(atypes.iter()) {
                         debug!("**CHECKING VARIANT: {:?} {:?}", otype, atype);
-                        if check_type(scope, Some(otype.clone()), Some(atype.clone()), mode.clone(), false).is_err() {
+                        if check_type(scope.clone(), Some(otype.clone()), Some(atype.clone()), mode.clone(), false).is_err() {
                             continue 'outer;
                         }
                     }
@@ -462,7 +462,7 @@ pub fn remove_duplicates(scope: ScopeRef, mut variants: Vec<Type>) -> Vec<Type> 
 
     while i < variants.len() {
         for j in 0 .. i {
-            if check_type(scope, Some(variants[i].clone()), Some(variants[j].clone()), Check::List, false).is_ok() {
+            if check_type(scope.clone(), Some(variants[i].clone()), Some(variants[j].clone()), Check::List, false).is_ok() {
                 variants.remove(i);
                 i -= 1;
                 break;

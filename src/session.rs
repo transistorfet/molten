@@ -15,16 +15,16 @@ use scope::{ ScopeMapRef };
 
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct Session<'sess> {
+pub struct Session {
     pub name: String,
-    pub map: ScopeMapRef<'sess>,
+    pub map: ScopeMapRef,
     pub files: RefCell<Vec<(String, String)>>,
     pub target: String,
     pub errors: Cell<u32>,
 }
 
 
-impl<'sess> Session<'sess> {
+impl Session {
     pub fn new() -> Self {
         Session {
             name: String::from(""),
