@@ -85,7 +85,7 @@ pub fn refine_node(node: AST) -> AST {
                     AST::Function(pos, ident, args, ret, mut body, id, abi) => {
                         if ident.as_ref().map(|i| i.name.as_str()) == Some("new") {
                             has_new = true;
-                            if args.len() > 0 && args[0].1.name == String::from("self") {
+                            if args.len() > 0 && args[0].ident.as_str() == "self" {
                                 body = Box::new(AST::Block(pos.clone(), vec!(*body, AST::Identifier(pos.clone(), Ident::new(pos.clone(), String::from("self"))))));
                             } else {
                                 panic!("SyntaxError: the \"new\" method on a class must have \"self\" as its first parameter");

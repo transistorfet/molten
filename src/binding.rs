@@ -42,8 +42,8 @@ fn bind_names_node_or_error<'sess>(session: &'sess Session, scope: ScopeRef, nod
             }
 
             for ref mut arg in &mut args.iter_mut() {
-                declare_typevars(fscope.clone(), arg.2.as_mut(), false)?;
-                fscope.define(arg.1.name.clone(), arg.2.clone())?;
+                declare_typevars(fscope.clone(), arg.ttype.as_mut(), false)?;
+                fscope.define(arg.ident.name.clone(), arg.ttype.clone())?;
             }
             declare_typevars(fscope.clone(), ret.as_mut(), false)?;
 

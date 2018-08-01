@@ -903,7 +903,7 @@ unsafe fn collect_functions_node<'sess>(data: &mut LLVM<'sess>, scope: ScopeRef,
             let fscope = data.map.get(id);
             let fname = scope.get_full_name(ident, *id);
 
-            let ftype = get_type(data, scope.clone(), Type::Function(args.iter().map(|t| t.2.clone().unwrap()).collect(), Box::new(rtype.clone().unwrap()), abi.clone()), false);
+            let ftype = get_type(data, scope.clone(), Type::Function(args.iter().map(|arg| arg.ttype.clone().unwrap()).collect(), Box::new(rtype.clone().unwrap()), abi.clone()), false);
             let function = LLVMAddFunction(data.module, label(fname.as_str()), ftype);
             //LLVMSetGC(function, label("shadow-stack"));
             //LLVMSetPersonalityFn(function, LLVMGetNamedFunction(data.module, label("__gxx_personality_v0")));
@@ -919,10 +919,10 @@ unsafe fn collect_functions_node<'sess>(data: &mut LLVM<'sess>, scope: ScopeRef,
                 panic!("ArgsError: argument counts don't match");
             }
 
-            for (i, &(_, ref ident, ref ttype, _)) in args.iter().enumerate() {
+            for (i, ref arg) in args.iter().enumerate() {
                 let llarg = LLVMGetParam(function, i as u32);
-                LLVMSetValueName(llarg, label(ident.name.as_str()));
-                data.set_value(fscope.variable_id(&ident.name).unwrap(), from_type(ttype.as_ref().unwrap(), llarg));
+                LLVMSetValueName(llarg, label(arg.ident.name.as_str()));
+                data.set_value(fscope.variable_id(&arg.ident.name).unwrap(), from_type(arg.ttype.as_ref().unwrap(), llarg));
             }
 
             collect_functions_node(data, fscope.clone(), body);
@@ -1016,7 +1016,7 @@ if ident.name.as_str() != "String" && !ident.name.as_str().contains("closure") {
                             let uname = abi.unmangle_name(&fname).unwrap_or(fname.clone());
                             //if parent.contains(&uname) {
                                 debug!("***************: {:?}:{:?}", ident.name, uname);
-                                vtable.push((uname, Type::Function(args.iter().map(|t| t.2.clone().unwrap()).collect(), Box::new(rtype.clone().unwrap()), *abi)));
+                                vtable.push((uname, Type::Function(args.iter().map(|arg| arg.ttype.clone().unwrap()).collect(), Box::new(rtype.clone().unwrap()), *abi)));
                             //}
                         }
                     },

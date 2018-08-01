@@ -15,7 +15,7 @@ use std::str::FromStr;
 use abi::ABI;
 use types::Type;
 use utils::UniqueID;
-use ast::{ AST, Pos, Ident };
+use ast::{ Pos, Ident, Argument, AST };
 
 
 ///// Parsing Macros /////
@@ -352,10 +352,10 @@ named!(function(Span) -> AST,
             do_parse!(
                 n: opt!(alt_complete!(identifier | any_op)) >>
                 //n: opt!(identifier) >>
-                l: delimited!(tag!("("), identifier_list_defaults, tag!(")")) >>
+                l: delimited!(tag!("("), argument_list, tag!(")")) >>
                 ((n, l))
             ) |
-            map!(identifier_list_defaults, |l| (None, l))
+            map!(argument_list, |l| (None, l))
         ) >>
         r: opt!(preceded!(wscom!(tag!("->")), type_description)) >>
         a: abi_specifier >>
@@ -364,12 +364,12 @@ named!(function(Span) -> AST,
     )
 );
 
-named!(identifier_list_defaults(Span) -> Vec<(Pos, Ident, Option<Type>, Option<AST>)>,
+named!(argument_list(Span) -> Vec<Argument>,
     separated_list_complete!(tag!(","),
         do_parse!(
             i: identifier_typed >>
             d: opt!(preceded!(tag!("="), expression)) >>
-            ((i.0, i.1, i.2, d))
+            (Argument::new(i.0, i.1, i.2, d))
         )
     )
 );

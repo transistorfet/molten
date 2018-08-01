@@ -2,7 +2,7 @@
 use std::fmt::Debug;
 
 use abi::ABI;
-use ast::AST;
+use ast::{ Argument, AST };
 use session::Session;
 use types::{ Type, resolve_type };
 use typecheck::{ self, update_scope_variable_types };
@@ -46,13 +46,13 @@ pub fn precompile_node<'sess>(session: &'sess Session, scope: ScopeRef, node: AS
                 /*
                 let mut ftype = dscope.get_variable_type(&sname).unwrap();
                 if ftype.is_overloaded() {
-                    ftype = types::find_variant(scope, ftype, args.iter().map(|t| t.1.clone().unwrap()).collect(), Check::Def).unwrap();
+                    ftype = types::find_variant(scope, ftype, args.iter().map(|t| t.ident.clone().unwrap()).collect(), Check::Def).unwrap();
                 }
                 debug!("***: {:?} {:?}", sname, ftype);
                 let argtypes = ftype.get_argtypes().unwrap();
                 let abi = ftype.get_abi().unwrap();
                 */
-                let argtypes = args.iter().map(|t| t.1.clone().unwrap()).collect();
+                let argtypes = args.iter().map(|t| t.ident.clone().unwrap()).collect();
                 let fname = abi.mangle_name(sname.as_str(), &argtypes, dscope.num_funcdefs(&sname));
                 if !dscope.contains(&fname) {
                     dscope.define(fname.clone(), Some(Type::Function(argtypes.clone(), Box::new(ret.clone().unwrap()), abi))).unwrap();
@@ -77,8 +77,8 @@ pub fn precompile_node<'sess>(session: &'sess Session, scope: ScopeRef, node: AS
                 tscope.define_type(String::from("Self"), ctype.clone());
 
                 // Add closure context argument to function definition
-                args.push((String::from("__context__"), Some(ctype.clone()), None));
-                let ftype = Type::Function(args.iter().map(|t| t.1.clone().unwrap()).collect(), Box::new(ret.clone().unwrap()), abi);
+                args.push(Argument::new(pos.clone(), Ident::from_str("__context__"), Some(ctype.clone()), None));
+                let ftype = Type::Function(args.iter().map(|t| t.ident.clone().unwrap()).collect(), Box::new(ret.clone().unwrap()), abi);
                 fscope.define(String::from("__context__"), Some(ctype.clone()));
                 let body = precompile_node(session, fscope.clone(), *body);
 
@@ -109,7 +109,7 @@ pub fn precompile_node<'sess>(session: &'sess Session, scope: ScopeRef, node: AS
                 AST::Block(pos.clone(), code)
             } else {
             */
-            let args = args.into_iter().map(|(pos, name, atype, default)| (pos, name, atype.map(|atype| resolve_type(fscope.clone(), atype)), default)).collect();
+            let args = args.into_iter().map(|arg| Argument::new(arg.pos, arg.ident, arg.ttype.map(|atype| resolve_type(fscope.clone(), atype)), arg.default)).collect();
             AST::Function(pos, name, args, Some(resolve_type(fscope.clone(), ret.unwrap())), Box::new(precompile_node(session, fscope.clone(), *body)), id, abi)
             //}
         },
@@ -284,7 +284,7 @@ pub fn register_function(session: &Session, scope: ScopeRef, function: &AST) {
             fscope.define(arg.0.clone(), arg.1.clone());
         }
 
-        let ftype = Type::Function(args.iter().map(|t| t.1.clone().unwrap()).collect(), Box::new(ret.clone().unwrap()));
+        let ftype = Type::Function(args.iter().map(|t| t.ident.clone().unwrap()).collect(), Box::new(ret.clone().unwrap()));
         let dscope = Scope::target(scope.clone());
         dscope.define(name, Some(ftype.clone()));
     }

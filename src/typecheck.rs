@@ -45,16 +45,16 @@ pub fn check_types_node_or_error<'sess>(session: &'sess Session, scope: ScopeRef
             let fscope = session.map.get(id);
 
             let mut argtypes = vec!();
-            for &(_, ref ident, ref ttype, ref value) in &*args {
-                let vtype = value.clone().map(|ref mut vexpr| check_types_node(session, scope.clone(), vexpr, ttype.clone()));
-                let mut atype = expect_type(fscope.clone(), ttype.clone(), vtype, Check::Def)?;
-                if &ident.name[..] == "self" {
+            for arg in args.iter() {
+                let vtype = arg.default.clone().map(|ref mut vexpr| check_types_node(session, scope.clone(), vexpr, arg.ttype.clone()));
+                let mut atype = expect_type(fscope.clone(), arg.ttype.clone(), vtype, Check::Def)?;
+                if &arg.ident.name[..] == "self" {
                     let mut stype = fscope.find_type(&String::from("Self")).unwrap();
                     stype = fscope.map_all_typevars(stype);
                     atype = expect_type(fscope.clone(), Some(atype), Some(stype), Check::Def)?;
                 }
-                //fscope.set_variable_type(&ident.name, atype.clone());
-                Type::update_variable_type(fscope.clone(), &ident.name, atype.clone());
+                //fscope.set_variable_type(&arg.ident.name, atype.clone());
+                Type::update_variable_type(fscope.clone(), &arg.ident.name, atype.clone());
                 argtypes.push(atype);
             }
 
@@ -65,9 +65,9 @@ pub fn check_types_node_or_error<'sess>(session: &'sess Session, scope: ScopeRef
             for i in 0 .. argtypes.len() {
                 argtypes[i] = resolve_type(fscope.clone(), argtypes[i].clone());
                 // TODO this is still not checking for type compatibility
-                //fscope.set_variable_type(&args[i].0, argtypes[i].clone());
-                Type::update_variable_type(fscope.clone(), &args[i].1.name, argtypes[i].clone());
-                args[i].2 = Some(argtypes[i].clone());
+                //fscope.set_variable_type(&args[i].pos, argtypes[i].clone());
+                Type::update_variable_type(fscope.clone(), &args[i].ident.name, argtypes[i].clone());
+                args[i].ttype = Some(argtypes[i].clone());
             }
             update_scope_variable_types(fscope.clone());
 

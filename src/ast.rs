@@ -35,7 +35,7 @@ pub struct ClassRef {
 #[derive(Clone, Debug, PartialEq)]
 pub struct Argument {
     pub pos: Pos,
-    pub name: String,
+    pub ident: Ident,
     pub ttype: Option<Type>,
     pub default: Option<AST>
 }
@@ -70,7 +70,7 @@ pub enum AST {
     Match(Pos, Box<AST>, Vec<(AST, AST)>, Option<Type>),
     For(Pos, Ident, Box<AST>, Box<AST>, UniqueID),
     Declare(Pos, Ident, Type),
-    Function(Pos, Option<Ident>, Vec<(Pos, Ident, Option<Type>, Option<AST>)>, Option<Type>, Box<AST>, UniqueID, ABI),
+    Function(Pos, Option<Ident>, Vec<Argument>, Option<Type>, Box<AST>, UniqueID, ABI),
     New(Pos, (Pos, Ident, Vec<Type>)),
     Class(Pos, (Pos, Ident, Vec<Type>), Option<(Pos, Ident, Vec<Type>)>, Vec<AST>, UniqueID),
 
@@ -121,7 +121,7 @@ impl Ident {
     pub fn new(pos: Pos, name: String) -> Ident {
         Ident {
             pos: pos,
-            name: name,
+            name: name
         }
     }
 
@@ -141,6 +141,17 @@ impl Ident {
 
     pub fn as_str(&self) -> &str {
         self.name.as_str()
+    }
+}
+
+impl Argument {
+    pub fn new(pos: Pos, ident: Ident, ttype: Option<Type>, default: Option<AST>) -> Argument {
+        Argument {
+            pos: pos,
+            ident: ident,
+            ttype: ttype,
+            default: default
+        }
     }
 }
 

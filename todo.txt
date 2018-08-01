@@ -1,5 +1,7 @@
 
-* make ABI a copy type
+* remove extraneous Pos's with Ident/Arguments?
+* make handy functions for building AST
+
 * for macos, the llvm commands don't have a "-5.0" tag, and they aren't necessarily added to the path.  Maybe the python script can detect that
 * it might also make it easier/generic to allow compiling to object files
 
