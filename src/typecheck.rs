@@ -1,7 +1,7 @@
 
 use std::fmt::Debug;
 
-use ast::AST;
+use ast::{ ClassSpec, AST };
 use session::{ Session, Error };
 use scope::{ self, Scope, ScopeRef };
 use types::{ Type, Check, ABI, expect_type, resolve_type, find_variant, check_type_params };
@@ -236,7 +236,7 @@ pub fn check_types_node_or_error<'sess>(session: &'sess Session, scope: ScopeRef
             ttype.clone()
         },
 
-        AST::New(_, (_, ref ident, ref types)) => {
+        AST::New(_, ClassSpec { ref ident, ref types, .. }) => {
             let odtype = scope.find_type(&ident.name);
             match odtype {
                 Some(dtype) => {

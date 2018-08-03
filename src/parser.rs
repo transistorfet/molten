@@ -15,7 +15,7 @@ use std::str::FromStr;
 use abi::ABI;
 use types::Type;
 use utils::UniqueID;
-use ast::{ Pos, Ident, Argument, AST };
+use ast::{ Pos, Ident, Argument, ClassSpec, AST };
 
 
 ///// Parsing Macros /////
@@ -180,8 +180,8 @@ named!(class(Span) -> AST,
     do_parse!(
         pos: position!() >>
         wscom!(tag_word!("class")) >>
-        i: class_identifier >>
-        p: opt!(preceded!(wscom!(tag_word!("extends")), class_identifier)) >>
+        i: class_spec >>
+        p: opt!(preceded!(wscom!(tag_word!("extends")), class_spec)) >>
         wscom!(tag!("{")) >>
         s: many0!(alt_complete!(
                 typedef |
@@ -323,12 +323,12 @@ named!(caselist(Span) -> Vec<(AST, AST)>,
               do_parse!(
                   pos: position!() >>
                   wscom!(tag_word!("new")) >>
-                  i: class_identifier >>
+                  cs: class_spec >>
         a: map!(
             delimited!(tag!("("), expression_list, tag!(")")),
-            |mut a| { a.insert(0, AST::New(Pos::new(pos), i.clone())); a }
+            |mut a| { a.insert(0, AST::New(Pos::new(pos), cs.clone())); a }
         ) >>
-        (AST::PtrCast(Type::Object(i.1.name.clone(), i.2), Box::new(AST::Invoke(Pos::new(pos), Box::new(AST::Resolver(Pos::new(pos), Box::new(AST::Identifier(Pos::new(pos), i.1)), Ident::from_str(pos, "new"))), a, None))))
+        (AST::PtrCast(Type::make_object(cs.clone()), Box::new(AST::Invoke(Pos::new(pos), Box::new(AST::Resolver(Pos::new(pos), Box::new(AST::Identifier(Pos::new(pos), cs.ident.clone())), Ident::from_str(pos, "new"))), a, None))))
     )
 );
 
@@ -562,12 +562,12 @@ named!(identifier(Span) -> Ident,
     )
 );
 
-named!(class_identifier(Span) -> (Pos, Ident, Vec<Type>),
+named!(class_spec(Span) -> ClassSpec,
     do_parse!(
         pos: position!() >>
         i: identifier >>
         p: opt!(complete!(delimited!(tag!("<"), separated_list_complete!(wscom!(tag!(",")), type_description), tag!(">")))) >>
-        ((Pos::new(pos), i, p.unwrap_or(vec!())))
+        (ClassSpec::new(Pos::new(pos), i, p.unwrap_or(vec!())))
     )
 );
 
@@ -609,8 +609,8 @@ named!(type_description(Span) -> Type,
 
 named!(type_object(Span) -> Type,
     do_parse!(
-        c: class_identifier >>
-        (Type::Object(c.1.name, c.2))
+        cs: class_spec >>
+        (Type::make_object(cs))
     )
 );
 

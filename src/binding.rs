@@ -3,8 +3,8 @@
 use std::fmt::Debug;
 
 use abi::ABI;
-use ast::AST;
 use types::Type;
+use ast::{ ClassSpec, AST };
 use session::{ Session, Error };
 use scope::{ self, Scope, ScopeRef };
 use utils::UniqueID;
@@ -132,30 +132,28 @@ fn bind_names_node_or_error<'sess>(session: &'sess Session, scope: ScopeRef, nod
             bind_names_node(session, scope, code)
         },
 
-        AST::New(_, (_, ref ident, ref mut types)) => {
-            types.iter_mut().map(|ref mut ttype| declare_typevars(scope.clone(), Some(ttype), false).unwrap()).count();
-            if scope.find_type(&ident.name).is_none() {
-                return Err(Error::new(format!("NameError: undefined identifier {:?}", ident.name)));
+        AST::New(_, ref mut classspec) => {
+            classspec.types.iter_mut().map(|ref mut ttype| declare_typevars(scope.clone(), Some(ttype), false).unwrap()).count();
+            if scope.find_type(&classspec.ident.name).is_none() {
+                return Err(Error::new(format!("NameError: undefined identifier {:?}", classspec.ident.name)));
             }
         },
 
-        AST::Class(_, ref mut pair, ref mut parent, ref mut body, ref id) => {
-            let &mut (ref pos, ref ident, ref mut types) = pair;
-
+        AST::Class(_, ref mut classspec, ref mut parentspec, ref mut body, ref id) => {
             // Create a temporary invisible scope to name check the class body
             let tscope = session.map.add(*id, Some(scope.clone()));
             tscope.set_class(true);
-            tscope.set_basename(ident.name.clone());
+            tscope.set_basename(classspec.ident.name.clone());
 
             // Define Self and Super, and check for typevars in the type params
-            types.iter_mut().map(|ref mut ttype| declare_typevars(tscope.clone(), Some(ttype), true).unwrap()).count();
-            tscope.define_type(String::from("Self"), Type::Object(ident.name.clone(), types.clone()))?;
-            if let &mut Some((_, ref pident, ref mut ptypes)) = parent {
+            classspec.types.iter_mut().map(|ref mut ttype| declare_typevars(tscope.clone(), Some(ttype), true).unwrap()).count();
+            tscope.define_type(String::from("Self"), Type::make_object(classspec.clone()))?;
+            if let &mut Some(ClassSpec { ident: ref pident, types: ref mut ptypes, .. }) = parentspec {
                 ptypes.iter_mut().map(|ref mut ttype| declare_typevars(tscope.clone(), Some(ttype), false).unwrap()).count();
                 tscope.define_type(String::from("Super"), Type::Object(pident.name.clone(), ptypes.clone()))?;
             }
 
-            let classdef = scope.create_class_def(&(pos.clone(), ident.clone(), types.clone()), parent.clone())?;
+            let classdef = scope.create_class_def(classspec, parentspec.clone())?;
             bind_names_vec(session, tscope, body);
         },
 

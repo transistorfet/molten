@@ -2,10 +2,10 @@
 use std::fmt::Debug;
 
 use abi::ABI;
-use ast::{ Argument, AST };
 use session::Session;
 use types::{ Type, resolve_type };
 use typecheck::{ self, update_scope_variable_types };
+use ast::{ Argument, ClassSpec, AST };
 use scope::{ Scope, ScopeRef };
 use utils::UniqueID;
 
@@ -199,21 +199,21 @@ pub fn precompile_node<'sess>(session: &'sess Session, scope: ScopeRef, node: AS
         AST::PtrCast(_, _) => { node },
         AST::New(_, _) => { node },
 
-        AST::Class(pos, pair, parent, body, id) => {
+        AST::Class(pos, classspec, parentspec, body, id) => {
             let tscope = session.map.get(&id);
             //update_scope_variable_types(tscope.clone());
-            //let classdef = scope.get_class_def(&pair.0);
+            //let classdef = scope.get_class_def(&classspec.0);
             //update_scope_variable_types(classdef.clone());
             let mut body = precompile_vec(session, tscope.clone(), body);
 
             /*
             let initname = String::from("__init__");
-            let objtype = Type::make_object(pair.clone());
+            let objtype = Type::make_object(classspec.clone());
             if !classdef.contains_local(&initname) {
                 let initid = UniqueID::generate();
 
                 let mut initbody = vec!();
-                if parent.is_some() {
+                if parentspec.is_some() {
                     //initbody.push(AST::Invoke(
                 }
                 for ref node in &body {
@@ -239,7 +239,7 @@ pub fn precompile_node<'sess>(session: &'sess Session, scope: ScopeRef, node: AS
             }
             */
 
-            AST::Class(pos, pair, parent, body, id)
+            AST::Class(pos, classspec, parentspec, body, id)
         },
 
 

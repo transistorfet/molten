@@ -77,7 +77,7 @@ pub fn refine_node(node: AST) -> AST {
 
         AST::List(pos, code, ttype) => { AST::List(pos, refine_vec(code), ttype) },
 
-        AST::Class(pos, pair, parent, body, id) => {
+        AST::Class(pos, classspec, parentspec, body, id) => {
             // Make sure constructors take "self" as the first argument, and return "self" at the end
             let mut has_new = false;
             let mut body: Vec<AST> = body.into_iter().map(|node| {
@@ -106,7 +106,7 @@ pub fn refine_node(node: AST) -> AST {
                 //body.insert(0, AST::Function(pos.clone(), Some(String::from("new")), vec!((String::from("self"), None, None)), None, Box::new(AST::Identifier(pos.clone(), String::from("self"))), UniqueID::generate(), ABI::Molten));
                 //panic!("SyntaxError: you must declare a \"new\" method on a class");
             }
-            AST::Class(pos, pair, parent, refine_vec(body), id)
+            AST::Class(pos, classspec, parentspec, refine_vec(body), id)
         },
 
         AST::Index(pos, base, index, _) => {

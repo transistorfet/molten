@@ -21,7 +21,7 @@ use types::{ self, Type };
 use utils::UniqueID;
 use config::Options;
 use session::Session;
-use ast::{ AST, Pos, Ident, NodeID };
+use ast::{ NodeID, Pos, Ident, ClassSpec, AST };
 use scope::{ Scope, ScopeRef, ScopeMapRef };
 
 use llvm::lib::{ BuiltinDef, initialize_builtins };
@@ -371,7 +371,7 @@ unsafe fn declare_globals(data: &LLVM, scope: ScopeRef) {
     }
 
     for node in &data.classes {
-        if let AST::Class(_, (_, ref cident, _), _, _, ref id) = **node {
+        if let AST::Class(_, ClassSpec { ident: ref cident, .. }, _, _, ref id) = **node {
             let tscope = data.map.get(id);
             let classdef = tscope.get_class_def(&cident.name);
             let value = data.get_type(tscope.type_id(&cident.name).unwrap()).unwrap();
@@ -759,7 +759,7 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
             //let listdef = scope.get_class_def(&String::from("List"));
             // TODO this is kinda wrong, since you're passing it without type params
             //let list = data.get_value(listdef.variable_id(&String::from("new")).unwrap()).unwrap().invoke(data, unwind, vec!(compile_node(data, func, unwind, scope.clone(), &AST::New(pos.clone(), (String::from("List"), vec!()))).get_ref()));
-            let list = newfunc.invoke(data, unwind, vec!(compile_node(data, func, unwind, scope.clone(), &AST::New(pos.clone(), (pos.clone(), Ident::new(pos.clone(), String::from("List")), vec!(itype.clone())))).get_ref()));
+            let list = newfunc.invoke(data, unwind, vec!(compile_node(data, func, unwind, scope.clone(), &AST::New(pos.clone(), ClassSpec::new(pos.clone(), Ident::new(pos.clone(), String::from("List")), vec!(itype.clone())))).get_ref()));
             for item in items {
                 let value = build_cast_to_vartype(data, compile_node(data, func, unwind, scope.clone(), item).get_ref());
                 //data.get_value(listdef.variable_id(&String::from("push")).unwrap()).unwrap().invoke(data, unwind, vec!(list, value));
@@ -775,7 +775,7 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
             from_type(ttype, value)
         },
 
-        AST::New(_, (_, ref ident, ref types)) => {
+        AST::New(_, ClassSpec { ref ident, .. }) => {
             let classdef = scope.get_class_def(&ident.name);
             let value = classdef.variable_id(&String::from("__alloc__")).ok().map(|id| data.get_value(id).unwrap());
             let object = if let Some(function) = value {
@@ -803,9 +803,9 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
             Box::new(Data(object))
         },
 
-        AST::Class(_, (_, ref ident, ref types), ref parent, ref body, ref id) => {
+        AST::Class(_, ref classspec, ref parentspec, ref body, ref id) => {
             //let tscope = data.map.get(id);
-            //let classdef = scope.get_class_def(&ident.name);
+            //let classdef = scope.get_class_def(&classpec.ident.name);
 
             // TODO you still need to compile the body of the func, if you're going to allow that... like an init function
             //compile_vec(data, func, unwind, tscope.clone(), body);
@@ -994,11 +994,11 @@ unsafe fn collect_functions_node<'sess>(data: &mut LLVM<'sess>, scope: ScopeRef,
 
         AST::New(_, _) => { },
 
-        AST::Class(ref pos, (_, ref ident, ref types), ref parent, ref body, ref id) => {
+        AST::Class(ref pos, ClassSpec { ref ident, ref types, .. }, ref parentspec, ref body, ref id) => {
             let tscope = data.map.get(id);
 
-            let (mut structdef, mut vtable) = if let Some((_, ref ident, ref types)) = *parent {
-                let value = data.get_type(scope.type_id(&ident.name).unwrap()).unwrap();
+            let (mut structdef, mut vtable) = if let Some(ref spec) = *parentspec {
+                let value = data.get_type(scope.type_id(&spec.ident.name).unwrap()).unwrap();
                 (value.structdef, value.vtable)
             } else {
                 (vec!(), vec!())

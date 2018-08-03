@@ -11,7 +11,7 @@ use abi::ABI;
 use types::Type;
 use session::Error;
 use utils::UniqueID;
-use ast::{ Pos, Ident };
+use ast::{ Pos, Ident, ClassSpec };
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum Context {
@@ -40,7 +40,7 @@ pub struct TypeInfo {
     pub id: TypeID,
     pub ttype: Type,
     pub classdef: Option<ClassDef>,
-    pub parent: Option<(String, Vec<Type>)>,
+    pub parentspec: Option<ClassSpec>,
 }
 
 
@@ -317,7 +317,7 @@ impl Scope {
                     id: id,
                     ttype: ttype,
                     classdef: None,
-                    parent: None,
+                    parentspec: None,
                 });
                 Ok(id)
             },
@@ -376,12 +376,12 @@ impl Scope {
         })
     }
 
-    pub fn create_class_def(&self, pair: &(Pos, Ident, Vec<Type>), parent: Option<(Pos, Ident, Vec<Type>)>) -> Result<ClassDef, Error> {
-        let &(_, ref ident, ref types) = pair;
+    pub fn create_class_def(&self, classspec: &ClassSpec, parentspec: Option<ClassSpec>) -> Result<ClassDef, Error> {
+        let &ClassSpec { ref ident, ref types, .. } = classspec;
 
         // Find the parent class definitions, which the new class will inherit from
-        let parentclass: Option<ScopeRef> = match parent {
-             Some((_, ref pident, ref _types)) => match self._search_type(&pident.name, |ref info| info.classdef.clone()) {
+        let parentclass: Option<ClassDef> = match parentspec {
+             Some(ClassSpec { ident: ref pident, .. }) => match self._search_type(&pident.name, |ref info| info.classdef.clone()) {
                 Some(ref parentdef) => Some(parentdef.clone()),
                 None => return Err(Error::new(format!("NameError: undefined parent class {:?} for {:?}", pident.name, ident.name))),
             },
@@ -394,15 +394,15 @@ impl Scope {
 
         // Define the class in the local scope
         self.define_type(ident.name.clone(), Type::Object(ident.name.clone(), types.clone()))?;
-        self.set_class_def(&ident.name, parent.clone(), classdef.clone());
+        self.set_class_def(&ident.name, parentspec.clone(), classdef.clone());
         // TODO i don't like this type == Class thing, but i don't know how i'll do struct types yet either
         //self.define(name.clone(), Some(Type::Object(name.clone(), vec!())))?;
         Ok(classdef)
     }
 
-    pub fn set_class_def(&self, name: &String, parentclass: Option<(Pos, Ident, Vec<Type>)>, classdef: ClassDef) {
+    pub fn set_class_def(&self, name: &String, parentspec: Option<ClassSpec>, classdef: ClassDef) {
         self.modify_type(name, move |info| {
-            info.parent = parentclass.clone().map(|c| (c.1.name, c.2));
+            info.parentspec = parentspec.clone();
             info.classdef = Some(classdef.clone());
         })
     }
@@ -422,7 +422,7 @@ impl Scope {
 
     pub fn get_class_info(&self, name: &String) -> Option<(Type, Option<Type>)> {
         self._search_type(name, |info| {
-            Some((info.ttype.clone(), info.parent.clone().map(|(name, params)| Type::Object(name, params))))
+            Some((info.ttype.clone(), info.parentspec.clone().map(|parentspec| Type::make_object(parentspec))))
         })
     }
 

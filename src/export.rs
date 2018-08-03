@@ -41,12 +41,12 @@ fn build_index_node<'sess>(index: &mut String, session: &'sess Session, scope: S
             _ => { },
         },
 
-        AST::Class(_, (_, ref ident, ref types), ref parent, ref body, ref id) => {
+        AST::Class(_, ref classspec, ref parentspec, ref body, ref id) => {
             let tscope = session.map.get(&id);
-            let classdef = scope.get_class_def(&ident.name);
-            let namespec = unparse_type(tscope.clone(), Type::Object(ident.name.clone(), types.clone()));
-            let fullspec = if parent.is_some() {
-                format!("{} extends {}", namespec, unparse_type(tscope.clone(), Type::make_object(parent.clone().unwrap())))
+            let classdef = scope.get_class_def(&classspec.ident.name);
+            let namespec = unparse_type(tscope.clone(), Type::make_object(classspec.clone()));
+            let fullspec = if parentspec.is_some() {
+                format!("{} extends {}", namespec, unparse_type(tscope.clone(), Type::make_object(parentspec.clone().unwrap())))
             } else {
                 namespec.clone()
             };

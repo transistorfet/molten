@@ -19,17 +19,11 @@ pub struct Pos {
     pub filenum: u16,
 }
 
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct Ident {
     pub pos: Pos,
     pub name: String,
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub struct ClassRef {
-    pub pos: Pos,
-    pub name: String,
-    pub types: Vec<Type>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -39,6 +33,14 @@ pub struct Argument {
     pub ttype: Option<Type>,
     pub default: Option<AST>
 }
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct ClassSpec {
+    pub pos: Pos,
+    pub ident: Ident,
+    pub types: Vec<Type>,
+}
+
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum AST {
@@ -71,8 +73,8 @@ pub enum AST {
     For(Pos, Ident, Box<AST>, Box<AST>, UniqueID),
     Declare(Pos, Ident, Type),
     Function(Pos, Option<Ident>, Vec<Argument>, Option<Type>, Box<AST>, UniqueID, ABI),
-    New(Pos, (Pos, Ident, Vec<Type>)),
-    Class(Pos, (Pos, Ident, Vec<Type>), Option<(Pos, Ident, Vec<Type>)>, Vec<AST>, UniqueID),
+    New(Pos, ClassSpec),
+    Class(Pos, ClassSpec, Option<ClassSpec>, Vec<AST>, UniqueID),
 
     Import(Pos, Ident, Vec<AST>),
     Definition(Pos, (Pos, Ident, Option<Type>), Box<AST>),
@@ -151,6 +153,16 @@ impl Argument {
             ident: ident,
             ttype: ttype,
             default: default
+        }
+    }
+}
+
+impl ClassSpec {
+    pub fn new(pos: Pos, ident: Ident, types: Vec<Type>) -> ClassSpec {
+        ClassSpec {
+            pos: pos,
+            ident: ident,
+            types: types
         }
     }
 }
