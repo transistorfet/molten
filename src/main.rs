@@ -27,6 +27,7 @@ mod refinery;
 mod binding;
 mod typecheck;
 mod precompiler;
+mod classes;
 mod export;
 mod llvm;
 

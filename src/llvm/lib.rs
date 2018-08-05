@@ -12,7 +12,8 @@ use self::llvm::core::*;
 
 use abi::ABI;
 use types::Type;
-use ast::{ Pos, Ident };
+use classes::ClassDef;
+use ast::{ Pos, Ident, ClassSpec };
 use parser::{ parse_type };
 use scope::{ Scope, ScopeRef, ScopeMapRef, Context };
 use binding::{ declare_typevars };
@@ -36,47 +37,9 @@ pub enum Func {
 pub enum BuiltinDef<'sess> {
     Type(&'sess str, Type),
     Func(&'sess str, &'sess str, Func),
-    Class(&'sess str, Vec<(String, Type)>, Vec<BuiltinDef<'sess>>),
+    Class(&'sess str, Vec<Type>, Vec<(String, Type)>, Vec<BuiltinDef<'sess>>),
 }
 
-/*
-#[derive(Clone)]
-pub struct BuiltinMap<'sess> (HashMap<&'sess str, Vec<(ComptimeFunction, Type)>>);
-
-impl<'sess> BuiltinMap<'sess> {
-    pub fn new() -> BuiltinMap<'sess> {
-        BuiltinMap(HashMap::new())
-    }
-
-    pub fn add(&mut self, name: &'sess str, func: ComptimeFunction, ftype: Type) {
-        match self.0.entry(name) {
-            Entry::Vacant(entry) => { entry.insert(vec!((func, ftype))); },
-            Entry::Occupied(mut entry) => { entry.get_mut().push((func, ftype)); },
-        }
-    }
-
-    pub unsafe fn compile_builtin(data: &LLVM, scope: ScopeRef, name: &String, largs: &Vec<LLVMValueRef>, stype: Type) -> Option<LLVMValueRef> {
-        let name = if let Some(uname) = scope::unmangle_name(name) {
-            uname
-        } else {
-            name.clone()
-        };
-
-        match data.builtins.0.get(name.as_str()) {
-            Some(ref list) => {
-                for ref entry in list.iter() {
-                    match check_type(scope.clone(), Some(entry.1.clone()), Some(stype.clone()), Check::Def, false) {
-                        Ok(_) => return Some(entry.0(data, largs.clone())),
-                        Err(_) => { },
-                    };
-                }
-                None
-            },
-            None => None,
-        }
-    }
-}
-*/
 
 pub fn make_global<'sess>(map: &'sess ScopeMapRef, builtins: &Vec<BuiltinDef<'sess>>) {
     let primatives = map.add(ScopeMapRef::PRIMATIVE, None);
@@ -100,20 +63,23 @@ pub fn register_builtins_node<'sess>(scope: ScopeRef, tscope: ScopeRef, node: &B
             let mut ttype = ttype.clone();
             declare_typevars(tscope.clone(), Some(&mut ttype), true).unwrap();
             scope.define_type(String::from(*name), ttype.clone()).unwrap();
+            let classdef = ClassDef::new_ref(ClassSpec::new(Pos::empty(), Ident::from_str(ttype.get_name().unwrap().as_str()), ttype.get_params().unwrap()), None, Scope::new_ref(None));
+            scope.set_class_def(&String::from(*name), classdef);
         },
         BuiltinDef::Func(ref name, ref ftype, _) => {
             let mut ftype = parse_type(ftype);
             declare_typevars(tscope.clone(), ftype.as_mut(), false).unwrap();
             Scope::define_func_variant(scope, String::from(*name), tscope.clone(), ftype.clone().unwrap()).unwrap();
         },
-        BuiltinDef::Class(ref name, _, ref entries) => {
-            let name = String::from(*name);
-            let classdef = Scope::new_ref(None);
-            classdef.set_basename(name.clone());
-            scope.set_class_def(&name, None, classdef.clone());
+        BuiltinDef::Class(ref name, ref params, _, ref entries) => {
+            //let cname = String::from(*name);
+            //let classdef = Scope::new_ref(None);
+            //classdef.set_basename(cname.clone());
+            //scope.set_class_def(&cname, None, classdef.clone());
+            let classdef = ClassDef::define_class(scope.clone(), &ClassSpec::new(Pos::empty(), Ident::from_str(name), params.clone()), None).unwrap();
 
             let tscope = Scope::new_ref(Some(scope.clone()));
-            register_builtins_vec(classdef, tscope.clone(), entries);
+            register_builtins_vec(classdef.classvars.clone(), tscope.clone(), entries);
         },
     }
 }
@@ -164,20 +130,20 @@ pub unsafe fn declare_builtins_node<'sess>(data: &mut LLVM<'sess>, objtype: LLVM
                 _ => { },
             }
         },
-        BuiltinDef::Class(ref name, ref structdef, ref entries) => {
-            let name = String::from(*name);
-            let classdef = scope.get_class_def(&name);
+        BuiltinDef::Class(ref name, _, ref structdef, ref entries) => {
+            let cname = String::from(*name);
+            let classdef = scope.get_class_def(&cname);
 
-            //let tscope = Scope::new_ref(Some(scope.clone()));
             let lltype = if structdef.len() > 0 {
-                build_class_type(data, scope.clone(), &name, structdef.clone(), vec!())
+                *classdef.structdef.borrow_mut() = structdef.clone();
+                build_class_type(data, scope.clone(), &cname, classdef.clone())
             } else {
-                let lltype = get_type(data, scope.clone(), scope.find_type(&name).unwrap(), true);
-                data.set_type(scope.type_id(&name).unwrap(), TypeValue { structdef: vec!(), value: lltype, vtable: vec!(), vttype: None });
+                let lltype = get_type(data, scope.clone(), scope.find_type(&cname).unwrap(), true);
+                data.set_type(scope.type_id(&cname).unwrap(), TypeValue { value: lltype, vttype: None });
                 lltype
             };
 
-            declare_builtins_vec(data, lltype, classdef.clone(), tscope.clone(), entries);
+            declare_builtins_vec(data, lltype, classdef.classvars.clone(), tscope.clone(), entries);
         },
     }
 }
@@ -233,14 +199,14 @@ pub fn get_builtins<'sess>() -> Vec<BuiltinDef<'sess>> {
         BuiltinDef::Type("Nil",    Type::Object(String::from("Nil"), vec!())),
         BuiltinDef::Type("Bool",   Type::Object(String::from("Bool"), vec!())),
         BuiltinDef::Type("Byte",   Type::Object(String::from("Byte"), vec!())),
-        BuiltinDef::Type("Int",    Type::Object(String::from("Int"), vec!())),
+        //BuiltinDef::Type("Int",    Type::Object(String::from("Int"), vec!())),
         BuiltinDef::Type("Real",   Type::Object(String::from("Real"), vec!())),
         BuiltinDef::Type("String", Type::Object(String::from("String"), vec!())),
         //BuiltinDef::Type("Class",  Type::Object(String::from("Class"), vec!())),
-        BuiltinDef::Type("Buffer", Type::Object(String::from("Buffer"), vec!(Type::Variable(String::from("item"), UniqueID(0))))),
+        //BuiltinDef::Type("Buffer", Type::Object(String::from("Buffer"), vec!(Type::Variable(String::from("item"), UniqueID(0))))),
         BuiltinDef::Type("List",   Type::Object(String::from("List"), vec!(Type::Variable(String::from("item"), UniqueID(0))))),
 
-        BuiltinDef::Class("Int", vec!(), vec!(
+        BuiltinDef::Class("Int", vec!(), vec!(), vec!(
             BuiltinDef::Func("+",   "(Int, Int) -> Int", Func::Comptime(add_int)),
             BuiltinDef::Func("add", "(Int, Int) -> Int", Func::Runtime(build_lib_add)),
         )),
@@ -253,7 +219,7 @@ pub fn get_builtins<'sess>() -> Vec<BuiltinDef<'sess>> {
         */
         BuiltinDef::Func("getindex",   "(String, Int) -> Int",       Func::Runtime(build_string_get)),
 
-        BuiltinDef::Class("Buffer", vec!(), vec!(
+        BuiltinDef::Class("Buffer", vec!(Type::Variable(String::from("item"), UniqueID(0))), vec!(), vec!(
             BuiltinDef::Func("__alloc__",  "() -> Buffer<'item>",                      Func::Runtime(build_buffer_allocator)),
             BuiltinDef::Func("new",        "(Buffer<'item>, Int) -> Buffer<'item>",    Func::Runtime(build_buffer_constructor)),
             BuiltinDef::Func("resize",     "(Buffer<'item>, Int) -> Buffer<'item>",    Func::Runtime(build_buffer_resize)),

@@ -1,7 +1,7 @@
 
 
 extern crate nom;
-use nom::{ digit, hex_digit, oct_digit, line_ending, not_line_ending, space, multispace, is_alphanumeric, is_alphabetic, is_space, Needed };
+use nom::{ digit, hex_digit, oct_digit, line_ending, not_line_ending, space, multispace, is_alphanumeric, is_alphabetic, is_space, Needed, IResult };
 use nom::types::CompleteByteSlice;
 
 extern crate nom_locate;
@@ -328,7 +328,7 @@ named!(caselist(Span) -> Vec<(AST, AST)>,
             delimited!(tag!("("), expression_list, tag!(")")),
             |mut a| { a.insert(0, AST::New(Pos::new(pos), cs.clone())); a }
         ) >>
-        (AST::PtrCast(Type::make_object(cs.clone()), Box::new(AST::Invoke(Pos::new(pos), Box::new(AST::Resolver(Pos::new(pos), Box::new(AST::Identifier(Pos::new(pos), cs.ident.clone())), Ident::from_str(pos, "new"))), a, None))))
+        (AST::PtrCast(Type::make_object(cs.clone()), Box::new(AST::Invoke(Pos::new(pos), Box::new(AST::Resolver(Pos::new(pos), Box::new(AST::Identifier(Pos::new(pos), cs.ident.clone())), Ident::from_str("new"))), a, None))))
     )
 );
 
@@ -807,6 +807,27 @@ named!(block_comment(Span) -> Span,
     delimited!(tag!("/*"), take_until!("*/"), tag!("*/"))              //, |s| AST::Comment(String::from(str::from_utf8(s).unwrap())))
 );
 
+/*
+macro_rules! named_method {
+    ($name:ident( $i:ty ) -> $o:ty, $submac:ident!( $($args:tt)* )) => (
+        fn $name( &self, i: $i ) -> IResult<$i, $o, u32> {
+            $submac!(i, $($args)*)
+        }
+    );
+}
+
+struct Test(u32);
+
+impl Test {
+    fn test<'a>(&self, i: Span<'a>) -> IResult<Span<'a>, Span<'a>> {
+        tag!(i, "Hey")
+    }
+
+    named_method!(test2(Span) -> Span,
+        tag!("Hey")
+    );
+}
+*/
 
 
 named!(alphanumeric_underscore(Span) -> Span,

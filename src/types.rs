@@ -351,7 +351,8 @@ fn is_subclass_of(scope: ScopeRef, adef: (&String, &Vec<Type>), bdef: (&String, 
     let mut adef = (adef.0.clone(), adef.1.clone());
 
     loop {
-        let (mut class, parent) = scope.get_class_info(&adef.0).unwrap();
+        let classdef = scope.get_class_def(&adef.0);
+        let (mut class, parent) = (Type::make_object(classdef.classspec.clone()), classdef.parentspec.clone().map(|s| Type::make_object(s)));
         class = tscope.map_typevars(&mut names, class);
         adef.1 = check_type_params(tscope.clone(), &class.get_params()?, &adef.1, mode.clone(), true)?;
 

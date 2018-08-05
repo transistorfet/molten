@@ -4,6 +4,7 @@ use std::fmt::Debug;
 
 use abi::ABI;
 use types::Type;
+use classes::ClassDef;
 use ast::{ ClassSpec, AST };
 use session::{ Session, Error };
 use scope::{ self, Scope, ScopeRef };
@@ -153,7 +154,7 @@ fn bind_names_node_or_error(session: &Session, scope: ScopeRef, node: &mut AST) 
                 tscope.define_type(String::from("Super"), Type::Object(pident.name.clone(), ptypes.clone()))?;
             }
 
-            let classdef = scope.create_class_def(classspec, parentspec.clone())?;
+            let classdef = ClassDef::define_class(scope, classspec, parentspec.clone())?;
             bind_names_vec(session, tscope, body);
         },
 

@@ -1,4 +1,5 @@
 
+* should you store ClassSpec as Type::Object instead, given that we use it in many places where Pos necessarily make sense
 * how do we simplify the class creating and processing code
 * one thing i'm seeing a lot of now is stuff like classspec.ident.name... can we prevent so many levels deep?
 * should we be looking up classes/types/etc by ID?  Should we be unifying IDs during name binding??  Maybe when defining a variable, we store

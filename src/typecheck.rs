@@ -263,16 +263,16 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &mut 
                 _ => return Err(Error::new(format!("SyntaxError: left-hand side of scope resolver must be identifier")))
             };
 
-            let classdef = scope.get_class_def(&ltype.get_name()?);
-            classdef.get_variable_type(&field.name).unwrap_or_else(|| expected.unwrap_or_else(|| scope.new_typevar()))
+            let classvars = scope.get_class_def(&ltype.get_name()?).classvars.clone();
+            classvars.get_variable_type(&field.name).unwrap_or_else(|| expected.unwrap_or_else(|| scope.new_typevar()))
         },
 
         AST::Accessor(_, ref mut left, ref mut field, ref mut stype) => {
             let ltype = resolve_type(scope.clone(), check_types_node(session, scope.clone(), left, None));
             *stype = Some(ltype.clone());
 
-            let classdef = scope.get_class_def(&ltype.get_name()?);
-            classdef.get_variable_type(&field.name).unwrap_or_else(|| expected.unwrap_or_else(|| scope.new_typevar()))
+            let classvars = scope.get_class_def(&ltype.get_name()?).classvars.clone();
+            classvars.get_variable_type(&field.name).unwrap_or_else(|| expected.unwrap_or_else(|| scope.new_typevar()))
         },
 
         AST::Assignment(_, ref mut left, ref mut right) => {
@@ -309,14 +309,14 @@ pub fn get_accessor_name(scope: ScopeRef, fexpr: &mut AST, etype: &Type) -> Resu
                 _ => return Err(Error::new(format!("SyntaxError: left-hand side of scope resolver must be identifier")))
             };
 
-            let classdef = scope.get_class_def(&ltype.get_name()?);
-debug!("!!!: {:?}", classdef.get_variable_type(&ident.name));
-            let funcdefs = classdef.num_funcdefs(&ident.name);
+            let classvars = scope.get_class_def(&ltype.get_name()?).classvars.clone();
+debug!("!!!: {:?}", classvars.get_variable_type(&ident.name));
+            let funcdefs = classvars.num_funcdefs(&ident.name);
             funcdefs
         },
         AST::Accessor(_, _, ref mut ident, ref ltype) => {
-            let classdef = scope.get_class_def(&ltype.as_ref().unwrap().get_name()?);
-            let funcdefs = classdef.num_funcdefs(&ident.name);
+            let classvars = scope.get_class_def(&ltype.as_ref().unwrap().get_name()?).classvars.clone();
+            let funcdefs = classvars.num_funcdefs(&ident.name);
             funcdefs
         },
         AST::Identifier(_, ref mut ident) => {

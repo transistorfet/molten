@@ -64,7 +64,7 @@ fn build_index_node(index: &mut String, session: &Session, scope: ScopeRef, node
                     },
                     AST::Function(_, ref ident, _, _, _, _, _) => {
                         if let Some(ref ident) = *ident {
-                            let ttype = classdef.get_variable_type(&ident.name).unwrap();
+                            let ttype = classdef.classvars.get_variable_type(&ident.name).unwrap();
                             index.push_str(format!("    decl {} : {}\n", ident.name, unparse_type(tscope.clone(), ttype)).as_str());
                         }
                     },

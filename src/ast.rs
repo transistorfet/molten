@@ -127,9 +127,9 @@ impl Ident {
         }
     }
 
-    pub fn from_str(span: Span, name: &str) -> Ident {
+    pub fn from_str(name: &str) -> Ident {
         Ident {
-            pos: Pos::new(span),
+            pos: Pos::empty(),
             name: String::from(name),
         }
     }
@@ -158,12 +158,16 @@ impl Argument {
 }
 
 impl ClassSpec {
-    pub fn new(pos: Pos, ident: Ident, types: Vec<Type>) -> ClassSpec {
+    pub fn new(pos: Pos, ident: Ident, types: Vec<Type>) -> Self {
         ClassSpec {
             pos: pos,
             ident: ident,
             types: types
         }
+    }
+
+    pub fn from_str(name: &str) -> Self {
+        Self::new(Pos::empty(), Ident::from_str(name), vec!())
     }
 }
 
