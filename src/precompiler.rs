@@ -10,12 +10,12 @@ use scope::{ Scope, ScopeRef };
 use utils::UniqueID;
 
 
-pub fn precompile<'sess>(session: &'sess Session, code: Vec<AST>) -> Vec<AST> {
+pub fn precompile(session: &Session, code: Vec<AST>) -> Vec<AST> {
     update_scope_variable_types(session.map.get_global());
     precompile_vec(session, session.map.get_global(), code)
 }
 
-pub fn precompile_vec<'sess>(session: &'sess Session, scope: ScopeRef, code: Vec<AST>) -> Vec<AST> {
+pub fn precompile_vec(session: &Session, scope: ScopeRef, code: Vec<AST>) -> Vec<AST> {
     let mut block = vec!();
     for node in code {
         block.push(precompile_node(session, scope.clone(), node));
@@ -23,12 +23,12 @@ pub fn precompile_vec<'sess>(session: &'sess Session, scope: ScopeRef, code: Vec
     block
 }
 
-pub fn precompile_node<'sess>(session: &'sess Session, scope: ScopeRef, node: AST) -> AST {
+pub fn precompile_node(session: &Session, scope: ScopeRef, node: AST) -> AST {
     match node {
         AST::Block(pos, code) => { AST::Block(pos, precompile_vec(session, scope, code)) },
 
-        AST::Definition(pos, (dpos, name, ttype), code) => {
-            AST::Definition(pos, (dpos, name, Some(resolve_type(scope.clone(), ttype.unwrap()))), Box::new(precompile_node(session, scope.clone(), *code)))
+        AST::Definition(pos, name, ttype, code) => {
+            AST::Definition(pos, name, Some(resolve_type(scope.clone(), ttype.unwrap())), Box::new(precompile_node(session, scope.clone(), *code)))
         },
 
         AST::Declare(pos, name, ttype) => {

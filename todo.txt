@@ -5,7 +5,9 @@
   the ID of the AST in the info struct, rather than generate a new one or save the info id in the AST, so we don't have to make AST mut
 * this wouldn't work for overloaded functions and methods...  the IDs would be different, and right now, we are storing --- wait what if we stored the ID in the type, which is overloaded???
 * how can we separate out the name mangling?  Maybe Ident can have an optional mangled name that we store?  We can always use a refcell, but having one if it's not used sucks
+* eventually we want to make a visitor
 
+* improve storing of files and file data in the Pos structs (maybe rename to Span?)
 * rename make_object to from_spec?
 * remove extraneous Pos's with Ident/Arguments?
 * make handy functions for building AST

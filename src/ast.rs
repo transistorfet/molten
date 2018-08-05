@@ -77,7 +77,7 @@ pub enum AST {
     Class(Pos, ClassSpec, Option<ClassSpec>, Vec<AST>, UniqueID),
 
     Import(Pos, Ident, Vec<AST>),
-    Definition(Pos, (Pos, Ident, Option<Type>), Box<AST>),
+    Definition(Pos, Ident, Option<Type>, Box<AST>),
     Assignment(Pos, Box<AST>, Box<AST>),
     While(Pos, Box<AST>, Box<AST>),
     Type(Pos, Ident, Vec<(Pos, Ident, Option<Type>)>),
@@ -189,7 +189,7 @@ impl AST {
             AST::New(ref pos, _) |
             AST::Class(ref pos, _, _, _, _) |
             AST::Import(ref pos, _, _) |
-            AST::Definition(ref pos, _, _) |
+            AST::Definition(ref pos, _, _, _) |
             AST::Assignment(ref pos, _, _) |
             AST::While(ref pos, _, _) |
             AST::Type(ref pos, _, _) => { pos.clone() }

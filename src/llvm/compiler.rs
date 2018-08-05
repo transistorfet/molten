@@ -520,7 +520,7 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
             //pointer
         },
 
-        AST::Definition(_, (_, ref ident, ref ttype), ref value) => {
+        AST::Definition(_, ref ident, ref ttype, ref value) => {
             let ltype = get_type(data, scope.clone(), ttype.clone().unwrap(), true);
             let pointer: Value = if scope.is_global() {
                 //LLVMAddGlobal(data.module, ltype, label(ident.name.as_str()))
@@ -939,7 +939,7 @@ unsafe fn collect_functions_node<'sess>(data: &mut LLVM<'sess>, scope: ScopeRef,
 
         AST::SideEffect(_, _, ref args) => { collect_functions_vec(data, scope.clone(), args); },
 
-        AST::Definition(_, (_, ref ident, _), ref value) => {
+        AST::Definition(_, ref ident, _, ref value) => {
             //collect_functions_node(data, scope.clone(), value);
             if let Some(function) = collect_functions_node(data, scope.clone(), value) {
                 let dscope = Scope::target(scope.clone());
@@ -1047,7 +1047,7 @@ if ident.name.as_str() != "String" && !ident.name.as_str().contains("closure") {
             }
             for ref node in body.iter() {
                 match **node {
-                    AST::Definition(_, (_, ref ident, ref ttype), ref value) => {
+                    AST::Definition(_, ref ident, ref ttype, ref value) => {
                         structdef.push((ident.name.clone(), ttype.clone().unwrap()));
                     },
                     _ => { }

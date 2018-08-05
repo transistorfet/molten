@@ -26,8 +26,8 @@ pub fn refine_node(node: AST) -> AST {
             AST::Block(pos, refine_vec(code))
         },
 
-        AST::Definition(pos, (dpos, ident, ttype), code) => {
-            AST::Definition(pos, (dpos, ident, ttype), Box::new(refine_node(*code)))
+        AST::Definition(pos, ident, ttype, code) => {
+            AST::Definition(pos, ident, ttype, Box::new(refine_node(*code)))
         },
 
         AST::Declare(pos, ident, ttype) => {

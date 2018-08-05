@@ -7,7 +7,7 @@ use scope::{ self, Scope, ScopeRef };
 use types::{ Type, Check, ABI, expect_type, resolve_type, find_variant, check_type_params };
 
 
-pub fn check_types<'sess>(session: &'sess Session, scope: ScopeRef, code: &mut Vec<AST>) -> Type {
+pub fn check_types(session: &Session, scope: ScopeRef, code: &mut Vec<AST>) -> Type {
     let ttype = check_types_vec(session, scope, code);
     if session.errors.get() > 0 {
         panic!("Exiting due to previous errors");
@@ -15,7 +15,7 @@ pub fn check_types<'sess>(session: &'sess Session, scope: ScopeRef, code: &mut V
     ttype
 }
 
-pub fn check_types_vec<'sess>(session: &'sess Session, scope: ScopeRef, code: &mut Vec<AST>) -> Type {
+pub fn check_types_vec(session: &Session, scope: ScopeRef, code: &mut Vec<AST>) -> Type {
     let mut last: Type = Type::Object(String::from("Nil"), vec!());
     for node in code {
         last = check_types_node(session, scope.clone(), node, None);
@@ -23,7 +23,7 @@ pub fn check_types_vec<'sess>(session: &'sess Session, scope: ScopeRef, code: &m
     last
 }
 
-pub fn check_types_node<'sess>(session: &'sess Session, scope: ScopeRef, node: &mut AST, expected: Option<Type>) -> Type {
+pub fn check_types_node(session: &Session, scope: ScopeRef, node: &mut AST, expected: Option<Type>) -> Type {
     match check_types_node_or_error(session, scope.clone(), node, expected) {
         Ok(ttype) => ttype,
         Err(err) => {
@@ -34,7 +34,7 @@ pub fn check_types_node<'sess>(session: &'sess Session, scope: ScopeRef, node: &
     }
 }
 
-pub fn check_types_node_or_error<'sess>(session: &'sess Session, scope: ScopeRef, node: &mut AST, expected: Option<Type>) -> Result<Type, Error> {
+pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &mut AST, expected: Option<Type>) -> Result<Type, Error> {
     let rtype = match *node {
         AST::Boolean(_) => Type::Object(String::from("Bool"), vec!()),
         AST::Integer(_) => Type::Object(String::from("Int"), vec!()),
@@ -151,7 +151,7 @@ pub fn check_types_node_or_error<'sess>(session: &'sess Session, scope: ScopeRef
             ltype.unwrap()
         },
 
-        AST::Definition(_, (_, ref ident, ref mut ttype), ref mut body) => {
+        AST::Definition(_, ref ident, ref mut ttype, ref mut body) => {
             //let dscope = Scope::target(scope);
             let btype = expect_type(scope.clone(), ttype.clone(), Some(check_types_node(session, scope.clone(), body, ttype.clone())), Check::Def)?;
             //dscope.set_variable_type(&ident.name, btype.clone());

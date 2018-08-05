@@ -6,3 +6,6 @@ Cargo.lock
 *.ll
 *.bc
 *.dec
+
+session.vim
+.local.vimrc

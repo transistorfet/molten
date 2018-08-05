@@ -10,27 +10,27 @@ use scope::{ self, Scope, ScopeRef };
 use utils::UniqueID;
 
 
-pub fn bind_names<'sess>(session: &'sess Session, code: &mut Vec<AST>) {
+pub fn bind_names(session: &Session, code: &mut Vec<AST>) {
     bind_names_vec(session, session.map.get_global(), code);
     if session.errors.get() > 0 {
         panic!("Exiting due to previous errors");
     }
 }
 
-pub fn bind_names_vec<'sess>(session: &'sess Session, scope: ScopeRef, code: &mut Vec<AST>) {
+pub fn bind_names_vec(session: &Session, scope: ScopeRef, code: &mut Vec<AST>) {
     for node in code {
         bind_names_node(session, scope.clone(), node);
     }
 }
 
-pub fn bind_names_node<'sess>(session: &'sess Session, scope: ScopeRef, node: &mut AST) {
+pub fn bind_names_node(session: &Session, scope: ScopeRef, node: &mut AST) {
     match bind_names_node_or_error(session, scope, node) {
         Ok(_) => { },
         Err(err) => session.print_error(err.add_pos(&node.get_pos())),
     }
 }
 
-fn bind_names_node_or_error<'sess>(session: &'sess Session, scope: ScopeRef, node: &mut AST) -> Result<(), Error> {
+fn bind_names_node_or_error(session: &Session, scope: ScopeRef, node: &mut AST) -> Result<(), Error> {
     match *node {
         AST::Function(_, ref ident, ref mut args, ref mut ret, ref mut body, ref id, ref abi) => {
             let fscope = session.map.add(*id, Some(scope.clone()));
@@ -55,7 +55,7 @@ fn bind_names_node_or_error<'sess>(session: &'sess Session, scope: ScopeRef, nod
             bind_names_vec(session, scope, args);
         },
 
-        AST::Definition(_, (_, ref ident, ref mut ttype), ref mut code) => {
+        AST::Definition(_, ref ident, ref mut ttype, ref mut code) => {
             declare_typevars(scope.clone(), ttype.as_mut(), false)?;
             let dscope = Scope::target(scope.clone());
             dscope.define(ident.name.clone(), ttype.clone())?;

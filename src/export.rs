@@ -10,7 +10,7 @@ use session::Session;
 use scope::{ Scope, ScopeRef, ScopeMapRef };
 
 
-pub fn write_exports<'sess>(session: &'sess Session, scope: ScopeRef, filename: &str, code: &Vec<AST>) {
+pub fn write_exports(session: &Session, scope: ScopeRef, filename: &str, code: &Vec<AST>) {
     let index_text = build_index(session, scope, code);
     let mut index_file = File::create(filename).expect("Error creating index file");
     index_file.write_all(index_text.as_bytes()).unwrap();
@@ -19,7 +19,7 @@ pub fn write_exports<'sess>(session: &'sess Session, scope: ScopeRef, filename: 
     }
 }
 
-pub fn build_index<'sess>(session: &'sess Session, scope: ScopeRef, code: &Vec<AST>) -> String {
+pub fn build_index(session: &Session, scope: ScopeRef, code: &Vec<AST>) -> String {
     let mut index = String::new();
     for node in code {
         build_index_node(&mut index, session, scope.clone(), node);
@@ -27,7 +27,7 @@ pub fn build_index<'sess>(session: &'sess Session, scope: ScopeRef, code: &Vec<A
     index
 }
 
-fn build_index_node<'sess>(index: &mut String, session: &'sess Session, scope: ScopeRef, node: &AST) {
+fn build_index_node(index: &mut String, session: &Session, scope: ScopeRef, node: &AST) {
     match *node {
         AST::Function(_, ref ident, _, _, _, _, _) => {
             if let Some(ref ident) = *ident {
@@ -36,7 +36,7 @@ fn build_index_node<'sess>(index: &mut String, session: &'sess Session, scope: S
             }
         },
 
-        AST::Definition(_, (_, _, _), ref body) => match **body {
+        AST::Definition(_, _, _, ref body) => match **body {
             ref node @ AST::Class(_, _, _, _, _) => build_index_node(index, session, scope.clone(), node),
             _ => { },
         },
@@ -56,7 +56,7 @@ fn build_index_node<'sess>(index: &mut String, session: &'sess Session, scope: S
             //index.push_str(format!("    decl __init__ : ({}) -> Nil\n", namespec).as_str());
             for node in body {
                 match *node {
-                    AST::Definition(_, (_, ref ident, ref ttype), _) => {
+                    AST::Definition(_, ref ident, ref ttype, _) => {
                         //let stype = classdef.get_variable_type(name).unwrap();
                         //println!("WHICH ONE??? {:?} {:?}", ttype, stype);
                         //index.push_str(format!("    decl {} : {}\n", ident.name, unparse_type(tscope.clone(), ttype.clone().unwrap())).as_str());

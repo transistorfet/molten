@@ -15,13 +15,13 @@ macro_rules! debug {
     }
 }
 
-pub fn print_types<'sess>(map: &'sess ScopeMapRef, scope: ScopeRef, code: &Vec<AST>) {
+pub fn print_types(map: &ScopeMapRef, scope: ScopeRef, code: &Vec<AST>) {
     for node in code {
         print_types_node(map, scope.clone(), node);
     }
 }
 
-pub fn print_types_node<'sess>(map: &'sess ScopeMapRef, scope: ScopeRef, node: &AST) {
+pub fn print_types_node(map: &ScopeMapRef, scope: ScopeRef, node: &AST) {
     match *node {
         AST::Block(_, ref body) => print_types(map, scope, body),
         AST::Function(_, _, _, _, ref body, ref id, _) => {
@@ -29,7 +29,7 @@ pub fn print_types_node<'sess>(map: &'sess ScopeMapRef, scope: ScopeRef, node: &
             print_types_scope(fscope.clone());
             print_types_node(map, fscope, body);
         },
-        AST::Definition(_, (_, ref name, ref ttype), ref body) => {
+        AST::Definition(_, ref name, ref ttype, ref body) => {
             println!("\nDefining: {:?} {:?}", name, ttype);
             print_types_node(map, scope, body);
         },

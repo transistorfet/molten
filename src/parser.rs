@@ -151,7 +151,7 @@ named!(definition(Span) -> AST,
             wscom!(tag!("=")),
             expression
         )) >>
-        (AST::Definition(Pos::new(pos), i, Box::new(if e.is_some() { e.unwrap() } else { AST::Nil(None) })))
+        (AST::Definition(Pos::new(pos), i.1, i.2, Box::new(if e.is_some() { e.unwrap() } else { AST::Nil(None) })))
     )
 );
 
