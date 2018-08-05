@@ -1,7 +1,7 @@
 
 
 extern crate nom;
-use nom::{ digit, hex_digit, oct_digit, line_ending, not_line_ending, space, multispace, is_alphanumeric, is_alphabetic, is_space, Needed, IResult };
+use nom::{ digit, hex_digit, oct_digit, line_ending, not_line_ending, space, multispace, is_alphanumeric, is_alphabetic, is_space, Needed, IResult, Context };
 use nom::types::CompleteByteSlice;
 
 extern crate nom_locate;
@@ -20,7 +20,6 @@ use ast::{ Pos, Ident, Argument, ClassSpec, AST };
 
 ///// Parsing Macros /////
 
-//pub type Span<'a> = LocatedSpan<&'a [u8]>;
 pub type Span<'a> = LocatedSpan<CompleteByteSlice<'a>>;
 
 #[inline]
@@ -93,7 +92,7 @@ pub fn parse_or_error(name: &str, text: &[u8]) -> Vec<AST> {
     match parse(span) {
         Ok((rem, _)) if rem.fragment != CompleteByteSlice(&[]) => panic!("InternalError: unparsed input remaining: {:?}", rem),
         Ok((_, code)) => code,
-        res @ Err(nom::Err::Error(_)) => { /* print_error(name, span, e); */ panic!("{:?}", res) },
+        Err(err) => { print_error(name, span, err); panic!("") },
         res @ _ => panic!("UnknownError: the parser returned an unknown result; {:?}", res),
     }
 }
@@ -840,67 +839,18 @@ pub fn is_not_colon(ch: u8) -> bool {
 }
 
 
-/*
-#[derive(Clone, Debug, PartialEq)]
-pub struct Position {
-    line: usize,
-}
 
-static mut _lines: usize = 0;
-
-pub fn count_lines(text: &[u8]) {
-    for ch in text {
-        if *ch == '\n' as u8 {
-            // *lines.get_mut() += 1;
-            unsafe { _lines += 1; }
-        }
+pub fn print_error(name: &str, span: Span, err: nom::Err<Span, u32>) {
+    match err {
+        nom::Err::Incomplete(_) => println!("ParseError: incomplete input..."),
+        nom::Err::Error(Context::Code(span, code)) |
+        nom::Err::Failure(Context::Code(span, code)) => {
+            let snippet = span_to_string(span);
+            let index = snippet.find('\n').unwrap_or(snippet.len());
+            println!("{}:{}:{}: ParseError ({:?}) near {:?}", name, span.line, span.get_utf8_column(), code, snippet.get(..index).unwrap());
+        },
     }
 }
-
-pub fn position() -> Position {
-    unsafe {
-        Position { line: _lines }
-    }
-}
-*/
-
-
-/*
-pub fn print_error<E>(name: &str, span: Span, errors: nom::Err<Span, E>) {
-    match e {
-        nom::Err::Code(c) => nom::Err::Code(c),
-        nom::Err::Node(c, b) => nom::Err::Node(c, b.into_iter().map(|e| convert_err(e, span)).collect()),
-        nom::Err::Position(c, p) => nom::Err::Position(c, span),
-        nom::Err::NodePosition(c, p, b) => nom::Err::NodePosition(c, span, b.into_iter().map(|e| convert_err(e, span)).collect()),
-    }
-    for error in errors {
-        print_error_info(name, span, error);
-    }
-}
-
-pub fn print_error_info(name: &str, span: Span, err: (nom::ErrorKind, usize, usize)) {
-    let mut lines = 0;
-    let mut start = 0;
-    for i in 0 .. err.1 {
-        if text[i] == b'\n' {
-            lines += 1;
-            start = i + 1;
-        }
-    }
-
-    let mut end = err.2 - 1;
-    for i in err.1 .. err.2 {
-        if text[i] == b'\n' {
-            end = i;
-            break;
-        }
-    }
-
-    println!("{}:{}:{}: ParseError: error with \"{:?}\" near {:?}", name, lines, err.1 - start, err.0, String::from(str::from_utf8(&text[start .. end]).unwrap()));
-
-    println!("{}:{}:{}: ParseError: error with \"{:?}\" near {:?}", name, span.line, span.get_utf8_column(), err.0, span_to_string(span).truncate(20));
-}
-*/
 
 
 /*
