@@ -1,7 +1,5 @@
 
 
-use abi::ABI;
-use types::Type;
 use utils::UniqueID;
 use ast::{ AST, Ident };
 

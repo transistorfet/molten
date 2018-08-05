@@ -1,7 +1,5 @@
 
 use std::ptr;
-use std::rc::Rc;
-use std::fmt::Debug;
 //use std::collections::HashMap;
 //use std::collections::hash_map::Entry;
 
@@ -98,7 +96,7 @@ pub unsafe fn declare_builtins_vec<'sess>(data: &mut LLVM<'sess>, objtype: LLVMT
 
 pub unsafe fn declare_builtins_node<'sess>(data: &mut LLVM<'sess>, objtype: LLVMTypeRef, scope: ScopeRef, tscope: ScopeRef, node: &BuiltinDef<'sess>) {
     match *node {
-        BuiltinDef::Type(ref name, ref ttype) => { },
+        BuiltinDef::Type(ref _name, ref _ttype) => { },
         BuiltinDef::Func(ref sname, ref types, ref func) => {
             let mut name = String::from(*sname);
             let ftype = parse_type(types).unwrap();
@@ -363,7 +361,7 @@ unsafe fn build_buffer_set(data: &LLVM, name: &str, objtype: LLVMTypeRef) -> LLV
 }
 
 
-unsafe fn build_string_get(data: &LLVM, name: &str, objtype: LLVMTypeRef) -> LLVMValueRef {
+unsafe fn build_string_get(data: &LLVM, name: &str, _objtype: LLVMTypeRef) -> LLVMValueRef {
     let function = build_function_start(data, name, vec!(str_type(data), int_type(data)), int_type(data));
     LLVMSetLinkage(function, llvm::LLVMLinkage::LLVMLinkOnceAnyLinkage);
 
@@ -377,7 +375,7 @@ unsafe fn build_string_get(data: &LLVM, name: &str, objtype: LLVMTypeRef) -> LLV
     function
 }
 
-unsafe fn build_lib_add(data: &LLVM, name: &str, objtype: LLVMTypeRef) -> LLVMValueRef {
+unsafe fn build_lib_add(data: &LLVM, name: &str, _objtype: LLVMTypeRef) -> LLVMValueRef {
     let dtype = int_type(data);
     let mut atypes = vec!(dtype, dtype);
     let function = LLVMAddFunction(data.module, label("builtin.add"), LLVMFunctionType(dtype, atypes.as_mut_ptr(), atypes.len() as u32, false as i32));
@@ -391,7 +389,7 @@ unsafe fn build_lib_add(data: &LLVM, name: &str, objtype: LLVMTypeRef) -> LLVMVa
 
 
 
-unsafe fn build_lib_println(data: &LLVM, name: &str, objtype: LLVMTypeRef) -> LLVMValueRef {
+unsafe fn build_lib_println(data: &LLVM, name: &str, _objtype: LLVMTypeRef) -> LLVMValueRef {
     let function = build_function_start(data, name, vec!(str_type(data)), str_type(data));
     LLVMSetLinkage(function, llvm::LLVMLinkage::LLVMLinkOnceAnyLinkage);
 
@@ -400,7 +398,7 @@ unsafe fn build_lib_println(data: &LLVM, name: &str, objtype: LLVMTypeRef) -> LL
     function
 }
 
-unsafe fn build_lib_readline(data: &LLVM, name: &str, objtype: LLVMTypeRef) -> LLVMValueRef {
+unsafe fn build_lib_readline(data: &LLVM, name: &str, _objtype: LLVMTypeRef) -> LLVMValueRef {
     let function = build_function_start(data, name, vec!(), str_type(data));
     LLVMSetLinkage(function, llvm::LLVMLinkage::LLVMLinkOnceAnyLinkage);
 

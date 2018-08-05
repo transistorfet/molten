@@ -1,13 +1,10 @@
 
-use std::fmt::Debug;
 
-use abi::ABI;
 use session::Session;
-use types::{ Type, resolve_type };
-use typecheck::{ self, update_scope_variable_types };
-use ast::{ Argument, ClassSpec, AST };
-use scope::{ Scope, ScopeRef };
-use utils::UniqueID;
+use types::{ resolve_type };
+use typecheck::{ update_scope_variable_types };
+use ast::{ Argument, AST };
+use scope::{ ScopeRef };
 
 
 pub fn precompile(session: &Session, code: Vec<AST>) -> Vec<AST> {
@@ -35,7 +32,7 @@ pub fn precompile_node(session: &Session, scope: ScopeRef, node: AST) -> AST {
             AST::Declare(pos, name, resolve_type(scope, ttype))
         },
 
-        AST::Function(pos, mut name, mut args, ret, body, id, abi) => {
+        AST::Function(pos, name, args, ret, body, id, abi) => {
             let fscope = session.map.get(&id);
             update_scope_variable_types(fscope.clone());
 
@@ -114,7 +111,7 @@ pub fn precompile_node(session: &Session, scope: ScopeRef, node: AST) -> AST {
             //}
         },
 
-        AST::Invoke(pos, mut fexpr, args, stype) => {
+        AST::Invoke(pos, fexpr, args, stype) => {
             //if stype.as_ref().unwrap().get_abi().unwrap() == ABI::Molten {
             //    args.insert(0, precompile_node(session, scope.clone() *fexpr));
             //}

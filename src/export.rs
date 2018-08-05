@@ -7,7 +7,7 @@ use types::Type;
 use utils::UniqueID;
 use config::Options;
 use session::Session;
-use scope::{ Scope, ScopeRef, ScopeMapRef };
+use scope::{ Scope, ScopeRef };
 
 
 pub fn write_exports(session: &Session, scope: ScopeRef, filename: &str, code: &Vec<AST>) {

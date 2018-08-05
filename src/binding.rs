@@ -1,13 +1,11 @@
 
 
-use std::fmt::Debug;
-
 use abi::ABI;
 use types::Type;
 use classes::ClassDef;
 use ast::{ ClassSpec, AST };
 use session::{ Session, Error };
-use scope::{ self, Scope, ScopeRef };
+use scope::{ Scope, ScopeRef };
 use utils::UniqueID;
 
 
@@ -154,7 +152,7 @@ fn bind_names_node_or_error(session: &Session, scope: ScopeRef, node: &mut AST) 
                 tscope.define_type(String::from("Super"), Type::Object(pident.name.clone(), ptypes.clone()))?;
             }
 
-            let classdef = ClassDef::define_class(scope, classspec, parentspec.clone())?;
+            ClassDef::define_class(scope, classspec, parentspec.clone())?;
             bind_names_vec(session, tscope, body);
         },
 

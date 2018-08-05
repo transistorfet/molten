@@ -1,5 +1,4 @@
 
-use std::fmt::Debug;
 
 use ast::{ ClassSpec, AST };
 use session::{ Session, Error };

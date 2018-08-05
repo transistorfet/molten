@@ -1,11 +1,9 @@
 
 use std::ptr;
 use std::fmt;
-use std::rc::Rc;
 use std::ffi::CString;
 use std::cell::RefCell;
 use std::collections::HashMap;
-use std::collections::hash_map::Entry;
 
 
 extern crate llvm_sys as llvm;
@@ -22,7 +20,7 @@ use utils::UniqueID;
 use config::Options;
 use session::Session;
 use classes::ClassDefRef;
-use ast::{ NodeID, Pos, Ident, ClassSpec, AST };
+use ast::{ Pos, Ident, ClassSpec, AST };
 use scope::{ Scope, ScopeRef, ScopeMapRef };
 
 use llvm::lib::{ BuiltinDef, initialize_builtins };
@@ -116,7 +114,7 @@ impl Compilable for CFunction {
         self.0
     }
 
-    unsafe fn invoke(&self, data: &LLVM, unwind: Unwind, mut largs: Vec<LLVMValueRef>) -> LLVMValueRef {
+    unsafe fn invoke(&self, data: &LLVM, _unwind: Unwind, mut largs: Vec<LLVMValueRef>) -> LLVMValueRef {
         LLVMBuildCall(data.builder, self.0, largs.as_mut_ptr(), largs.len() as u32, label("tmp"))
     }
 }
@@ -134,7 +132,7 @@ impl Compilable for Builtin {
         ptr::null_mut()
     }
 
-    unsafe fn invoke(&self, data: &LLVM, unwind: Unwind, largs: Vec<LLVMValueRef>) -> LLVMValueRef {
+    unsafe fn invoke(&self, data: &LLVM, _unwind: Unwind, largs: Vec<LLVMValueRef>) -> LLVMValueRef {
         (self.0).0(data, largs)
     }
 }
@@ -418,7 +416,7 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
 
         AST::Block(_, ref body) => { compile_vec(data, func, unwind, scope.clone(), body) },
 
-        AST::Invoke(ref pos, ref fexpr, ref args, ref stype) => {
+        AST::Invoke(_, ref fexpr, ref args, ref stype) => {
             let (atypes, rtype, abi) = match stype.clone().unwrap() {
                 Type::Function(atypes, rtype, abi) => (atypes, *rtype, abi),
                 stype @ _ => panic!("TypeError: expected function type: {:?}", stype),
@@ -437,7 +435,7 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
 
             //let function = compile_node(data, func, unwind, scope.clone(), fexpr);
             let function = match **fexpr {
-                AST::Accessor(ref pos, ref left, ref ident, ref otype) => {
+                AST::Accessor(ref pos, _, ref ident, ref otype) => {
                     let tname = format!("{}", UniqueID::generate());
                     let id = scope.define(tname.clone(), otype.clone()).unwrap();
                     data.set_value(id, from_type(otype.as_ref().unwrap(), largs[0]));
@@ -801,8 +799,8 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
             Box::new(Data(object))
         },
 
-        AST::Class(_, ref classspec, ref parentspec, ref body, ref id) => {
-            //let tscope = data.map.get(id);
+        AST::Class(_, ref classspec, _, ref body, ref id) => {
+            let tscope = data.map.get(id);
             //let classdef = scope.get_class_def(&classpec.ident.name);
 
             // TODO you still need to compile the body of the func, if you're going to allow that... like an init function
@@ -894,7 +892,7 @@ unsafe fn collect_functions_vec<'sess>(data: &mut LLVM<'sess>, scope: ScopeRef, 
 
 unsafe fn collect_functions_node<'sess>(data: &mut LLVM<'sess>, scope: ScopeRef, node: &'sess AST) -> Option<Value> {
     match *node {
-        AST::Function(ref pos, ref ident, ref args, ref rtype, ref body, ref id, ref abi) => {
+        AST::Function(_, ref ident, ref args, ref rtype, ref body, ref id, ref abi) => {
             let fscope = data.map.get(id);
             let fname = scope.get_full_name(ident, *id);
 
@@ -989,7 +987,7 @@ unsafe fn collect_functions_node<'sess>(data: &mut LLVM<'sess>, scope: ScopeRef,
 
         AST::New(_, _) => { },
 
-        AST::Class(ref pos, ClassSpec { ref ident, ref types, .. }, ref parentspec, ref body, ref id) => {
+        AST::Class(_, ClassSpec { ref ident, .. }, _, ref body, ref id) => {
             let tscope = data.map.get(id);
             let classdef = scope.get_class_def(&ident.name);
 
@@ -1018,15 +1016,15 @@ unsafe fn collect_functions_node<'sess>(data: &mut LLVM<'sess>, scope: ScopeRef,
             collect_functions_node(data, scope, right);
         },
 
-        AST::Resolver(_, ref left, ref right) => {
+        AST::Resolver(_, ref left, _) => {
             collect_functions_node(data, scope, left);
         },
 
-        AST::Accessor(_, ref left, ref right, _) => {
+        AST::Accessor(_, ref left, _, _) => {
             collect_functions_node(data, scope, left);
         },
 
-        AST::Assignment(_, ref left, ref right) => {
+        AST::Assignment(_, _, ref right) => {
             collect_functions_node(data, scope, right);
         },
 
@@ -1154,7 +1152,7 @@ pub unsafe fn build_function_start(data: &LLVM, name: &str, mut args: Vec<LLVMTy
 }
 
 unsafe fn build_function_body(data: &LLVM, node: &AST) {
-    if let AST::Function(_, ref ident, _, _, ref body, ref id, ref abi) = *node {
+    if let AST::Function(_, ref ident, _, _, ref body, ref id, _) = *node {
         // TODO do you need to take into account abi?
         let fscope = data.map.get(id);
         let pscope = fscope.get_parent().unwrap();
@@ -1268,7 +1266,7 @@ pub unsafe fn build_class_type(data: &LLVM, scope: ScopeRef, name: &String, clas
 
 pub unsafe fn get_type(data: &LLVM, scope: ScopeRef, ttype: Type, use_fptrs: bool) -> LLVMTypeRef {
     match ttype {
-        Type::Object(ref tname, ref ptypes) => match tname.as_str() {
+        Type::Object(ref tname, ref _ptypes) => match tname.as_str() {
             "Nil" => str_type(data),
             "Bool" => bool_type(data),
             "Byte" => LLVMInt8TypeInContext(data.context),

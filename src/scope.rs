@@ -1,18 +1,16 @@
 
-use std::str;
 use std::rc::Rc;
 use std::cell::Cell;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::collections::hash_map::Entry;
 
-use parser;
 use abi::ABI;
+use ast::Ident;
 use types::Type;
 use session::Error;
 use utils::UniqueID;
 use classes::ClassDefRef;
-use ast::{ Pos, Ident, ClassSpec };
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum Context {
@@ -58,8 +56,6 @@ pub type ScopeRef = Rc<Scope>;
 //#[derive(Clone, Debug, PartialEq)]
 //pub struct ScopeRef(Rc<RefCell<Scope>>);
 //pub struct ScopeRef(&'sess ScopeMapRef, UniqueID);
-
-pub type ClassDef = ScopeRef;
 
 
 impl Scope {

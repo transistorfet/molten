@@ -1,10 +1,10 @@
 
 use std::fmt;
 
+use ast::ClassSpec;
 use utils::UniqueID;
 use session::{ Error };
 use scope::{ Scope, ScopeRef };
-use ast::{ Pos, Ident, ClassSpec };
 
 pub use abi::ABI;
 
@@ -157,7 +157,7 @@ impl Type {
                     //    }
                     //}
                     match otype {
-                        Some(Type::Variable(ref name, ref id)) if &id.to_string() != idname => Type::update_type(scope.clone(), &id.to_string(), ntype),
+                        Some(Type::Variable(_, ref id)) if &id.to_string() != idname => Type::update_type(scope.clone(), &id.to_string(), ntype),
                         _ => { },
                     }
                 },
@@ -281,7 +281,7 @@ pub fn check_type(scope: ScopeRef, odtype: Option<Type>, octype: Option<Type>, m
             Ok(resolve_type(scope, ctype))
         } else {
 */
-        if let Type::Variable(ref dname, ref did) = dtype {
+        if let Type::Variable(ref _dname, ref did) = dtype {
 
             if let Type::Variable(ref cname, ref cid) = ctype {
                 if scope.contains_type(cname) {
@@ -321,10 +321,10 @@ pub fn check_type(scope: ScopeRef, odtype: Option<Type>, octype: Option<Type>, m
                     }
                 },
                 (Type::Object(ref aname, ref atypes), Type::Object(ref bname, ref btypes)) => {
-                    match is_subclass_of(scope.clone(), (bname, btypes), (aname, atypes), mode.clone(), true) {
+                    match is_subclass_of(scope.clone(), (bname, btypes), (aname, atypes), mode.clone()) {
                         ok @ Ok(_) => ok,
                         err @ Err(_) => match mode {
-                            Check::List => is_subclass_of(scope, (aname, atypes), (bname, btypes), mode.clone(), true),
+                            Check::List => is_subclass_of(scope, (aname, atypes), (bname, btypes), mode.clone()),
                             _ => err,
                         }
                     }
@@ -344,7 +344,7 @@ pub fn check_type(scope: ScopeRef, odtype: Option<Type>, octype: Option<Type>, m
 }
 
 
-fn is_subclass_of(scope: ScopeRef, adef: (&String, &Vec<Type>), bdef: (&String, &Vec<Type>), mode: Check, update: bool) -> Result<Type, Error> {
+fn is_subclass_of(scope: ScopeRef, adef: (&String, &Vec<Type>), bdef: (&String, &Vec<Type>), mode: Check) -> Result<Type, Error> {
     debug!("IS SUBCLASS: {:?} of {:?}", adef, bdef);
     let tscope = Scope::new_ref(Some(scope.clone()));
     let mut names = Scope::map_new();

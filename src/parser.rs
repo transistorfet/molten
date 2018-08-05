@@ -31,13 +31,11 @@ pub fn span_to_string(s: Span) -> String {
 //named!(sp, eat_separator!(&b" \t"[..]));
 
 #[macro_export]
-macro_rules! sp (
-    ($i:expr, $($args:tt)*) => (
-        {
-            sep!($i, sp, $($args)*)
-        }
-    )
-);
+macro_rules! sp {
+    ($i:expr, $($args:tt)*) => {
+        sep!($i, sp, $($args)*)
+    }
+}
 
 #[macro_export]
 macro_rules! wscom {
@@ -48,6 +46,7 @@ macro_rules! wscom {
         //sep!($i, multispace_comment, $submac!($($args)*))
         delimited!($i, multispace_comment, $submac!($($args)*), multispace_comment)
     });
+
     ($i:expr, $f:expr) => (
         wscom!($i, call!($f));
     );
@@ -62,6 +61,7 @@ macro_rules! wscoml {
         //sep!($i, multispace_comment, $submac!($($args)*))
         //delimited!($i, multispace_comment, $submac!($($args)*), multispace_comment)
     });
+
     ($i:expr, $f:expr) => (
         wscom!($i, call!($f));
     );
@@ -69,26 +69,20 @@ macro_rules! wscoml {
 
 #[macro_export]
 macro_rules! tag_word (
-    ($i:expr, $f:expr) => (
-        {
-            do_parse!($i,
-                s: tag!($f) >>
-                not!(peek!(alphanumeric_underscore)) >>
-                ( s )
-            )
-        }
-    )
+    ($i:expr, $f:expr) => {
+        do_parse!($i,
+            s: tag!($f) >>
+            not!(peek!(alphanumeric_underscore)) >>
+            ( s )
+        )
+    }
 );
 
 #[macro_export]
 macro_rules! map_ident (
-    ($i:expr, $($args:tt)*) => (
-        {
-            use parser::span_to_string;
-            //map!($i, $($args)*, |s| String::from(str::from_utf8(s).unwrap()))
-            map!($i, $($args)*, |s| Ident::from_span(s))
-        }
-    )
+    ($i:expr, $($args:tt)*) => {
+        map!($i, $($args)*, |s| Ident::from_span(s))
+    }
 );
 
 
@@ -871,8 +865,8 @@ pub fn position() -> Position {
 */
 
 
-pub fn print_error<E>(name: &str, span: Span, errors: nom::Err<Span, E>) {
 /*
+pub fn print_error<E>(name: &str, span: Span, errors: nom::Err<Span, E>) {
     match e {
         nom::Err::Code(c) => nom::Err::Code(c),
         nom::Err::Node(c, b) => nom::Err::Node(c, b.into_iter().map(|e| convert_err(e, span)).collect()),
@@ -882,11 +876,9 @@ pub fn print_error<E>(name: &str, span: Span, errors: nom::Err<Span, E>) {
     for error in errors {
         print_error_info(name, span, error);
     }
-*/
 }
 
 pub fn print_error_info(name: &str, span: Span, err: (nom::ErrorKind, usize, usize)) {
-/*
     let mut lines = 0;
     let mut start = 0;
     for i in 0 .. err.1 {
@@ -905,10 +897,10 @@ pub fn print_error_info(name: &str, span: Span, err: (nom::ErrorKind, usize, usi
     }
 
     println!("{}:{}:{}: ParseError: error with \"{:?}\" near {:?}", name, lines, err.1 - start, err.0, String::from(str::from_utf8(&text[start .. end]).unwrap()));
-*/
 
     println!("{}:{}:{}: ParseError: error with \"{:?}\" near {:?}", name, span.line, span.get_utf8_column(), err.0, span_to_string(span).truncate(20));
 }
+*/
 
 
 /*
