@@ -122,7 +122,7 @@ impl Type {
         Ok(rtype)
     }
 
-    pub fn make_object(classspec: ClassSpec) -> Type {
+    pub fn from_spec(classspec: ClassSpec) -> Type {
         Type::Object(classspec.ident.name, classspec.types)
     }
 
@@ -352,7 +352,7 @@ fn is_subclass_of(scope: ScopeRef, adef: (&String, &Vec<Type>), bdef: (&String, 
 
     loop {
         let classdef = scope.get_class_def(&adef.0);
-        let (mut class, parent) = (Type::make_object(classdef.classspec.clone()), classdef.parentspec.clone().map(|s| Type::make_object(s)));
+        let (mut class, parent) = (Type::from_spec(classdef.classspec.clone()), classdef.parentspec.clone().map(|s| Type::from_spec(s)));
         class = tscope.map_typevars(&mut names, class);
         adef.1 = check_type_params(tscope.clone(), &class.get_params()?, &adef.1, mode.clone(), true)?;
 

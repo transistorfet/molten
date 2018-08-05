@@ -73,7 +73,7 @@ pub fn precompile_node(session: &Session, scope: ScopeRef, node: AST) -> AST {
                 // Create class type named __closure__
                 let cpair = (String::from(format!("__closure{}__", cid)), vec!());
                 let classdef = scope.create_class_def(&cpair, None).unwrap();
-                let ctype = Type::make_object(cpair.clone());
+                let ctype = Type::from_spec(cpair.clone());
                 tscope.define_type(String::from("Self"), ctype.clone());
 
                 // Add closure context argument to function definition
@@ -208,7 +208,7 @@ pub fn precompile_node(session: &Session, scope: ScopeRef, node: AST) -> AST {
 
             /*
             let initname = String::from("__init__");
-            let objtype = Type::make_object(classspec.clone());
+            let objtype = Type::from_spec(classspec.clone());
             if !classdef.contains_local(&initname) {
                 let initid = UniqueID::generate();
 

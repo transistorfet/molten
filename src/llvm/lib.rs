@@ -199,12 +199,10 @@ pub fn get_builtins<'sess>() -> Vec<BuiltinDef<'sess>> {
         BuiltinDef::Type("Nil",    Type::Object(String::from("Nil"), vec!())),
         BuiltinDef::Type("Bool",   Type::Object(String::from("Bool"), vec!())),
         BuiltinDef::Type("Byte",   Type::Object(String::from("Byte"), vec!())),
-        //BuiltinDef::Type("Int",    Type::Object(String::from("Int"), vec!())),
         BuiltinDef::Type("Real",   Type::Object(String::from("Real"), vec!())),
         BuiltinDef::Type("String", Type::Object(String::from("String"), vec!())),
-        //BuiltinDef::Type("Class",  Type::Object(String::from("Class"), vec!())),
-        //BuiltinDef::Type("Buffer", Type::Object(String::from("Buffer"), vec!(Type::Variable(String::from("item"), UniqueID(0))))),
         BuiltinDef::Type("List",   Type::Object(String::from("List"), vec!(Type::Variable(String::from("item"), UniqueID(0))))),
+        //BuiltinDef::Type("Class",  Type::Object(String::from("Class"), vec!())),
 
         BuiltinDef::Class("Int", vec!(), vec!(), vec!(
             BuiltinDef::Func("+",   "(Int, Int) -> Int", Func::Comptime(add_int)),

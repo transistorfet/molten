@@ -148,7 +148,7 @@ fn bind_names_node_or_error(session: &Session, scope: ScopeRef, node: &mut AST) 
 
             // Define Self and Super, and check for typevars in the type params
             classspec.types.iter_mut().map(|ref mut ttype| declare_typevars(tscope.clone(), Some(ttype), true).unwrap()).count();
-            tscope.define_type(String::from("Self"), Type::make_object(classspec.clone()))?;
+            tscope.define_type(String::from("Self"), Type::from_spec(classspec.clone()))?;
             if let &mut Some(ClassSpec { ident: ref pident, types: ref mut ptypes, .. }) = parentspec {
                 ptypes.iter_mut().map(|ref mut ttype| declare_typevars(tscope.clone(), Some(ttype), false).unwrap()).count();
                 tscope.define_type(String::from("Super"), Type::Object(pident.name.clone(), ptypes.clone()))?;

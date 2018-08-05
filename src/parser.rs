@@ -328,7 +328,7 @@ named!(caselist(Span) -> Vec<(AST, AST)>,
             delimited!(tag!("("), expression_list, tag!(")")),
             |mut a| { a.insert(0, AST::New(Pos::new(pos), cs.clone())); a }
         ) >>
-        (AST::PtrCast(Type::make_object(cs.clone()), Box::new(AST::Invoke(Pos::new(pos), Box::new(AST::Resolver(Pos::new(pos), Box::new(AST::Identifier(Pos::new(pos), cs.ident.clone())), Ident::from_str("new"))), a, None))))
+        (AST::PtrCast(Type::from_spec(cs.clone()), Box::new(AST::Invoke(Pos::new(pos), Box::new(AST::Resolver(Pos::new(pos), Box::new(AST::Identifier(Pos::new(pos), cs.ident.clone())), Ident::from_str("new"))), a, None))))
     )
 );
 
@@ -610,7 +610,7 @@ named!(type_description(Span) -> Type,
 named!(type_object(Span) -> Type,
     do_parse!(
         cs: class_spec >>
-        (Type::make_object(cs))
+        (Type::from_spec(cs))
     )
 );
 
@@ -810,7 +810,7 @@ named!(block_comment(Span) -> Span,
 /*
 macro_rules! named_method {
     ($name:ident( $i:ty ) -> $o:ty, $submac:ident!( $($args:tt)* )) => (
-        fn $name( &self, i: $i ) -> IResult<$i, $o, u32> {
+        fn $name<'a>( &self, i: $i ) -> IResult<$i, $o, u32> {
             $submac!(i, $($args)*)
         }
     );
@@ -823,12 +823,11 @@ impl Test {
         tag!(i, "Hey")
     }
 
-    named_method!(test2(Span) -> Span,
+    named_method!(test2(Span<'a>) -> Span<'a>,
         tag!("Hey")
     );
 }
 */
-
 
 named!(alphanumeric_underscore(Span) -> Span,
     take_while1!(is_alphanumeric_underscore)
