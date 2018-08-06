@@ -153,3 +153,14 @@ impl ClassDef {
     }
 }
 
+
+pub mod llvm {
+    use llvm::compiler::*;
+
+    /*
+    impl Compilable for ClassDef {
+
+    }
+    */
+}
+

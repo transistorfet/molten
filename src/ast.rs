@@ -41,6 +41,12 @@ pub struct ClassSpec {
     pub types: Vec<Type>,
 }
 
+#[derive(Clone, Debug, PartialEq)]
+pub struct Field {
+    pub pos: Pos,
+    pub ident: Ident,
+    pub ttype: Option<Type>
+}
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum AST {
@@ -81,7 +87,7 @@ pub enum AST {
     Definition(Pos, Ident, Option<Type>, Box<AST>),
     Assignment(Pos, Box<AST>, Box<AST>),
     While(Pos, Box<AST>, Box<AST>),
-    Type(Pos, Ident, Vec<(Pos, Ident, Option<Type>)>),
+    TypeDef(Pos, ClassSpec, Vec<Field>),
 }
 
 
@@ -121,7 +127,7 @@ impl fmt::Debug for Pos {
 
 
 impl Ident {
-    pub fn new(pos: Pos, name: String) -> Ident {
+    pub fn new(pos: Pos, name: String) -> Self {
         Ident {
             pos: pos,
             name: name
@@ -148,7 +154,7 @@ impl Ident {
 }
 
 impl Argument {
-    pub fn new(pos: Pos, ident: Ident, ttype: Option<Type>, default: Option<AST>) -> Argument {
+    pub fn new(pos: Pos, ident: Ident, ttype: Option<Type>, default: Option<AST>) -> Self {
         Argument {
             pos: pos,
             ident: ident,
@@ -169,6 +175,16 @@ impl ClassSpec {
 
     pub fn from_str(name: &str) -> Self {
         Self::new(Pos::empty(), Ident::from_str(name), vec!())
+    }
+}
+
+impl Field {
+    pub fn new(pos: Pos, ident: Ident, ttype: Option<Type>) -> Self {
+        Self {
+            pos: pos,
+            ident: ident,
+            ttype: ttype
+        }
     }
 }
 
@@ -198,7 +214,7 @@ impl AST {
             AST::Definition(ref pos, _, _, _) |
             AST::Assignment(ref pos, _, _) |
             AST::While(ref pos, _, _) |
-            AST::Type(ref pos, _, _) => { pos.clone() }
+            AST::TypeDef(ref pos, _, _) => { pos.clone() }
             _ => Pos::empty(),
         }
     }

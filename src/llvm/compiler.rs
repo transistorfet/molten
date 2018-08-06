@@ -887,7 +887,7 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
 
         AST::Declare(_, _, _) => { Box::new(Data(zero_int(data))) },
 
-        AST::Type(_, _, _) => panic!("NotImplementedError: not yet supported, {:?}", node),
+        AST::TypeDef(_, _, _) => panic!("NotImplementedError: not yet supported, {:?}", node),
 
         AST::Underscore |
         AST::Index(_, _, _, _) => panic!("InternalError: ast element shouldn't appear at this late phase: {:?}", node),
@@ -1046,7 +1046,7 @@ unsafe fn collect_functions_node<'sess>(data: &mut LLVM<'sess>, scope: ScopeRef,
             collect_functions_vec(data, scope, decls);
         },
 
-        AST::Type(_, _, _) => panic!("NotImplementedError: not yet supported, {:?}", node),
+        AST::TypeDef(_, _, _) => { },
 
         AST::Recall(_, _) |
         AST::Identifier(_, _) |

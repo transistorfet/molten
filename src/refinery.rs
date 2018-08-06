@@ -159,7 +159,7 @@ pub fn refine_node(node: AST) -> AST {
         AST::Recall(_, _) => { node },
         AST::Identifier(_, _) => { node },
         AST::New(_, _) => { node },
-        AST::Type(_, _, _) => { node },
+        AST::TypeDef(_, _, _) => { node },
 
         //node @ _ => { node }
     }

@@ -21,6 +21,7 @@ pub enum Context {
 }
 
 
+// TODO should you unify the Var and Type IDs?  Not sure why though
 pub type VarID = UniqueID;
 
 #[derive(Clone, Debug, PartialEq)]

@@ -260,13 +260,19 @@ pub fn precompile_node(session: &Session, scope: ScopeRef, node: AST) -> AST {
 
         AST::Nil(stype) => { AST::Nil(Some(resolve_type(scope.clone(), stype.unwrap()))) },
 
+        AST::TypeDef(pos, classspec, fields) => {
+            AST::TypeDef(pos, classspec, fields.into_iter().map(|mut f| {
+                f.ttype = f.ttype.map(|t| resolve_type(scope.clone(), t));
+                f
+            }).collect())
+        },
+
         AST::Noop => { node },
         AST::Underscore => { node },
         AST::Boolean(_) => { node },
         AST::Integer(_) => { node },
         AST::Real(_) => { node },
         AST::String(_) => { node },
-        AST::Type(_, _, _) => { node },
 
         AST::Index(_, _, _, _) => panic!("InternalError: ast element shouldn't appear at this late phase: {:?}", node),
     }

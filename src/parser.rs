@@ -15,7 +15,7 @@ use std::str::FromStr;
 use abi::ABI;
 use types::Type;
 use utils::UniqueID;
-use ast::{ Pos, Ident, Argument, ClassSpec, AST };
+use ast::{ Pos, Ident, Argument, ClassSpec, Field, AST };
 
 
 ///// Parsing Macros /////
@@ -188,18 +188,18 @@ named!(class(Span) -> AST,
     );
 
 named!(typedef(Span) -> AST,
-        do_parse!(
-            pos: position!() >>
-            wscom!(tag_word!("type")) >>
-            i: identifier >>
-            wscom!(tag!("=")) >>
-            s: alt!(
-                map!(identifier_typed, |i| vec!(i)) |
-                delimited!(wscom!(tag!("{")), separated_list_complete!(wscom!(tag!(",")), identifier_typed), wscom!(tag!("}")))
-                ) >>
-            (AST::Type(Pos::new(pos), i, s))
-            )
-      );
+    do_parse!(
+        pos: position!() >>
+        wscom!(tag_word!("type")) >>
+        c: class_spec >>
+        wscom!(tag!("=")) >>
+        ts: alt!(
+            map!(identifier_typed, |i| vec!(i)) |
+            delimited!(wscom!(tag!("{")), separated_list_complete!(wscom!(tag!(",")), identifier_typed), wscom!(tag!("}")))
+        ) >>
+        (AST::TypeDef(Pos::new(pos), c, ts.into_iter().map(|f| Field::new(f.0, f.1, f.2)).collect()))
+    )
+);
 
 
 

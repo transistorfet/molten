@@ -245,6 +245,8 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &mut 
             Type::Object(String::from("List"), vec!(ltype))
         },
 
+        AST::TypeDef(_, _, _) => return Err(Error::new(format!("NotImplementedError: not yet supported, {:?}", node))),
+
         AST::PtrCast(ref ttype, ref mut code) => {
             let ctype = check_types_node(session, scope.clone(), code, Some(ttype.clone()));
             debug!("PTRCAST: {:?} <- {:?}", ttype, ctype);
@@ -306,8 +308,6 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &mut 
         AST::Noop => Type::Object(String::from("Nil"), vec!()),
 
         AST::Underscore => expected.unwrap_or_else(|| scope.new_typevar()),
-
-        AST::Type(_, _, _) => return Err(Error::new(format!("NotImplementedError: not yet supported, {:?}", node))),
 
         AST::Index(_, _, _, _) => panic!("InternalError: ast element shouldn't appear at this late phase: {:?}", node),
     };

@@ -127,6 +127,22 @@ fn bind_names_node_or_error(session: &Session, scope: ScopeRef, node: &mut AST) 
         },
 
 
+        AST::TypeDef(ref pos, ref mut classspec, ref mut fields) => {
+            //let mut types = vec!();
+            // TODO this is nearly identical to class... these need to be separated
+            let tscope = session.map.add(pos.id, None);
+            tscope.set_class(true);
+            tscope.set_basename(classspec.ident.name.clone());
+
+            classspec.types.iter_mut().map(|ref mut ttype| declare_typevars(tscope.clone(), Some(ttype), true).unwrap()).count();
+            for field in fields {
+                //let dscope = Scope::target(scope.clone());
+                scope.define(field.ident.name.clone(), field.ttype.clone())?;
+                declare_typevars(scope.clone(), field.ttype.as_mut(), true);
+            }
+        },
+
+
         AST::PtrCast(ref mut ttype, ref mut code) => {
             declare_typevars(scope.clone(), Some(ttype), false)?;
             bind_names_node(session, scope, code)
@@ -188,8 +204,6 @@ fn bind_names_node_or_error(session: &Session, scope: ScopeRef, node: &mut AST) 
             *decls = session.parse_file(path.as_str(), true);
             bind_names_vec(session, scope, decls);
         },
-
-        AST::Type(_, _, _) => panic!("NotImplementedError: not yet supported, {:?}", node),
 
         AST::Noop | AST::Underscore | AST::Nil(_) |
         AST::Boolean(_) | AST::Integer(_) | AST::Real(_) | AST::String(_) => { }
