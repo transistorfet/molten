@@ -44,16 +44,21 @@ def run_all(args):
     #dirname = os.path.join(testdir, args.directory)
     dirname = args.directory
 
-    total = 0
-    passed = 0
+    testfiles = [ ]
     for (basedir, dirnames, filenames) in os.walk(dirname, topdown=True):
         dirnames.sort()
         for filename in sorted(filenames):
             if filename.endswith(".ml") or filename.endswith(".mol"):
-                total += 1
-                test = Test(os.path.join(basedir, filename), verbose=args.verbose)
-                if test.run_test(args.force, short=len(dirname)+1):
-                    passed += 1
+                testfiles.append( (os.path.join(basedir, filename), len(dirname)+1) )
+
+    total = 0
+    passed = 0
+    for i, (path, short) in enumerate(testfiles):
+        total += 1
+        test = Test(path, verbose=args.verbose)
+        print("[{:02.0f}/{:02.0f}] ".format(i + 1, len(testfiles)), end="")
+        if test.run_test(args.force, short=short):
+            passed += 1
     print("{G}{}{C} tests passed, {R}{}{C} tests failed, {} total".format(passed, total - passed, total, R=RED, G=GREEN, C=CLEAR))
 
 

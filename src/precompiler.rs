@@ -75,7 +75,7 @@ pub fn precompile_node(session: &Session, scope: ScopeRef, node: AST) -> AST {
 
                 // Add closure context argument to function definition
                 args.push(Argument::new(pos.clone(), Ident::from_str("__context__"), Some(ctype.clone()), None));
-                let ftype = Type::Function(args.iter().map(|t| t.ident.clone().unwrap()).collect(), Box::new(ret.clone().unwrap()), abi);
+                let ftype = Type::Function(Box::new(Type::Tuple(args.iter().map(|t| t.ident.clone().unwrap()).collect()), Box::new(ret.clone().unwrap()), abi);
                 fscope.define(String::from("__context__"), Some(ctype.clone()));
                 let body = precompile_node(session, fscope.clone(), *body);
 
@@ -170,6 +170,8 @@ pub fn precompile_node(session: &Session, scope: ScopeRef, node: AST) -> AST {
             AST::For(pos, name, Box::new(precompile_node(session, lscope.clone(), *cond)), Box::new(precompile_node(session, lscope.clone(), *body)), id)
         },
 
+        AST::Tuple(pos, code, ttype) => { AST::Tuple(pos, precompile_vec(session, scope.clone(), code), ttype) },
+
         AST::List(pos, code, ttype) => { AST::List(pos, precompile_vec(session, scope.clone(), code), ttype) },
         /*
         AST::List(pos, code, stype) => {
@@ -182,11 +184,11 @@ pub fn precompile_node(session: &Session, scope: ScopeRef, node: AST) -> AST {
             block.push(AST::Definition(pos.clone(), (id, Some(ltype.clone())),
                 Box::new(AST::Invoke(pos.clone(),
                     Box::new(AST::Resolver(pos.clone(), Box::new(AST::Identifier(pos.clone(), format!("List"))), String::from("new"))),
-                    vec!(AST::New(pos.clone(), (format!("List"), vec!(itype.clone()))) /*, AST::Integer(code.len() as isize)*/), Some(Type::Function(vec!(ltype.clone()), Box::new(ltype.clone()), ABI::Molten))))));
+                    vec!(AST::New(pos.clone(), (format!("List"), vec!(itype.clone()))) /*, AST::Integer(code.len() as isize)*/), Some(Type::Function(Box::new(Type::Tuple(vec!(ltype.clone()))), Box::new(ltype.clone()), ABI::Molten))))));
             for item in code {
                 block.push(AST::Invoke(pos.clone(),
                     Box::new(AST::Accessor(pos.clone(), Box::new(AST::Identifier(pos.clone(), id)), String::from("push"), Some(ltype.clone()))),
-                    vec!(AST::Identifier(pos.clone(), id), item), Some(Type::Function(vec!(ltype.clone()), Box::new(ltype.clone()), ABI::Molten))));
+                    vec!(AST::Identifier(pos.clone(), id), item), Some(Type::Function(Box::new(Type::Tuple(vec!(ltype.clone()))), Box::new(ltype.clone()), ABI::Molten))));
             }
             block.push(AST::Identifier(pos.clone(), id));
             AST::Block(pos.clone(), precompile_vec(session, scope.clone(), block))
@@ -281,7 +283,7 @@ pub fn register_function(session: &Session, scope: ScopeRef, function: &AST) {
             fscope.define(arg.0.clone(), arg.1.clone());
         }
 
-        let ftype = Type::Function(args.iter().map(|t| t.ident.clone().unwrap()).collect(), Box::new(ret.clone().unwrap()));
+        let ftype = Type::Function(Box::new(Type::Tuple(args.iter().map(|t| t.ident.clone().unwrap()).collect())), Box::new(ret.clone().unwrap()));
         let dscope = Scope::target(scope.clone());
         dscope.define(name, Some(ftype.clone()));
     }

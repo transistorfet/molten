@@ -93,9 +93,13 @@ pub fn unparse_type(scope: ScopeRef, ttype: Type) -> String {
             //format!("'v{}", id)
             format!("'{}", name)
         }
+        Type::Tuple(types) => {
+            let tuple: Vec<String> = types.iter().map(|t| unparse_type(scope.clone(), t.clone())).collect();
+            format!("({})", tuple.join(", "))
+
+        },
         Type::Function(args, ret, abi) => {
-            let argstr: Vec<String> = args.iter().map(|t| unparse_type(scope.clone(), t.clone())).collect();
-            format!("({}) -> {}{}", argstr.join(", "), unparse_type(scope.clone(), *ret), abi)
+            format!("{} -> {}{}", unparse_type(scope.clone(), *args), unparse_type(scope.clone(), *ret), abi)
         }
         Type::Overload(variants) => {
             let varstr: Vec<String> = variants.iter().map(|v| unparse_type(scope.clone(), v.clone())).collect();

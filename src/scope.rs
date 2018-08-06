@@ -463,9 +463,10 @@ impl Scope {
                     }
                 }
             },
-            Type::Function(args, ret, abi) => Type::Function(self.map_typevars_vec(varmap, args), Box::new(self.map_typevars(varmap, *ret)), abi),
+            Type::Function(args, ret, abi) => Type::Function(Box::new(self.map_typevars(varmap, *args)), Box::new(self.map_typevars(varmap, *ret)), abi),
             // TODO why did I do this?  Was it because of a bug or just to reduce typevars, because it caused another bug with constructors
-            //Type::Function(args, ret, abi) => Type::Function(self.map_typevars_vec(varmap, args), ret, abi),
+            //Type::Function(args, ret, abi) => Type::Function(Box::new(self.map_typevars(varmap, *args)), ret, abi),
+            Type::Tuple(types) => Type::Tuple(self.map_typevars_vec(varmap, types)),
             Type::Overload(variants) => Type::Overload(self.map_typevars_vec(varmap, variants)),
             Type::Object(name, types) => Type::Object(name.clone(), self.map_typevars_vec(varmap, types)),
         }
@@ -486,9 +487,10 @@ impl Scope {
                 }
                 Type::Variable(name, id)
             },
-            Type::Function(args, ret, abi) => Type::Function(self.unmap_typevars_vec(varmap, args), Box::new(self.unmap_typevars(varmap, *ret)), abi),
+            Type::Function(args, ret, abi) => Type::Function(Box::new(self.unmap_typevars(varmap, *args)), Box::new(self.unmap_typevars(varmap, *ret)), abi),
             // TODO why did I do this?  Was it because of a bug or just to reduce typevars, because it caused another bug with constructors
-            //Type::Function(args, ret, abi) => Type::Function(self.map_typevars_vec(varmap, args), ret, abi),
+            //Type::Function(args, ret, abi) => Type::Function(Box::new(self.map_typevars(varmap, *args)), ret, abi),
+            Type::Tuple(types) => Type::Tuple(self.unmap_typevars_vec(varmap, types)),
             Type::Overload(variants) => Type::Overload(self.unmap_typevars_vec(varmap, variants)),
             Type::Object(name, types) => Type::Object(name.clone(), self.unmap_typevars_vec(varmap, types)),
         }

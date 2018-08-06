@@ -68,7 +68,7 @@ impl ABI {
         }
     }
 
-    pub fn mangle_name(&self, name: &str, argtypes: &Vec<Type>, funcdefs: i32) -> String {
+    pub fn mangle_name(&self, name: &str, argtypes: &Type, funcdefs: i32) -> String {
         match *self {
             ABI::Molten => molten_mangle_name(name, argtypes, funcdefs),
             // TODO C++, etc
@@ -95,21 +95,28 @@ impl fmt::Display for ABI {
 }
 
 
-pub fn molten_mangle_name(name: &str, argtypes: &Vec<Type>, funcdefs: i32) -> String {
+pub fn molten_mangle_name(name: &str, argtypes: &Type, funcdefs: i32) -> String {
     if funcdefs >= 2 {
-        let mut args = String::from("");
-        for ttype in argtypes {
-            args = args + &match *ttype {
-                // TODO add type paramaters into name
-                Type::Variable(_, _) => format!("V"),
-                Type::Object(ref name, ref types) => format!("N{}{}", name.len(), name),
-                // TODO this isn't complete, you have to deal with other types
-                _ => String::from(""),
-            };
-        }
-        format!("_Z{}{}{}", name.len(), name, args)
+        format!("_Z{}{}{}", name.len(), name, molten_mangle_type(argtypes))
     } else {
         String::from(name)
+    }
+}
+
+pub fn molten_mangle_type(ttype: &Type) -> String {
+    match *ttype {
+        // TODO add type paramaters into name
+        Type::Variable(_, _) => format!("V"),
+        Type::Object(ref name, ref types) => format!("N{}{}", name.len(), name),
+        Type::Tuple(ref types) => {
+            let mut tuple = String::from("");
+            for ttype in types {
+                tuple = tuple + &molten_mangle_type(ttype);
+            }
+            format!("T{}{}", tuple.len(), tuple)
+        },
+        // TODO this isn't complete, you have to deal with other types
+        _ => String::from("")
     }
 }
 

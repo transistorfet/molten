@@ -255,7 +255,7 @@ unsafe fn compile_module<'sess>(builtins: &Vec<BuiltinDef<'sess>>, session: &'se
     let module_init_name = format!("init.{}", module_name.replace("/", "."));
 
 
-    let ftype = Type::Function(vec!(), Box::new(Type::Object(String::from("Bool"), vec!())), ABI::Molten);
+    let ftype = Type::Function(Box::new(Type::Tuple(vec!())), Box::new(Type::Object(String::from("Bool"), vec!())), ABI::Molten);
     let lftype = LLVMFunctionType(bool_type(data), ptr::null_mut(), 0, 0);
     let function = LLVMAddFunction(module, label(module_init_name.as_str()), lftype);
     //LLVMSetPersonalityFn(function, LLVMGetNamedFunction(data.module, label("__gxx_personality_v0")));
@@ -272,11 +272,11 @@ unsafe fn compile_module<'sess>(builtins: &Vec<BuiltinDef<'sess>>, session: &'se
         let function = LLVMAddFunction(module, b"main\0".as_ptr() as *const _, function_type);
         //LLVMSetPersonalityFn(function, LLVMGetNamedFunction(data.module, label("__gxx_personality_v0")));
         LLVMPositionBuilderAtEnd(builder, LLVMAppendBasicBlockInContext(context, function, label("entry")));
-        compile_node(data, function, None, scope.clone(), &AST::Invoke(pos.clone(), Box::new(AST::Identifier(pos.clone(), Ident::new(pos.clone(), String::from(module_init_name)))), vec!(), Some(Type::Function(vec!(), Box::new(Type::Object(String::from("Bool"), vec!())), ABI::Molten))));
+        compile_node(data, function, None, scope.clone(), &AST::Invoke(pos.clone(), Box::new(AST::Identifier(pos.clone(), Ident::new(pos.clone(), String::from(module_init_name)))), vec!(), Some(Type::Function(Box::new(Type::Tuple(vec!())), Box::new(Type::Object(String::from("Bool"), vec!())), ABI::Molten))));
         LLVMBuildRet(builder, int_value(data, 0));
     }
 
-    optimize_ir(data, 3);
+    //optimize_ir(data, 3);
 
     // Output to a file, and also a string for debugging
     //format!("{}.ll", module_name)
@@ -423,7 +423,8 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
             };
 
             let mut largs = vec!();
-            for (ttype, arg) in atypes.iter().zip(args.iter()) {
+            // TODO this forces the function arg type to be a tuple
+            for (ttype, arg) in atypes.get_types().unwrap().iter().zip(args.iter()) {
                 let mut larg = compile_node(data, func, unwind, scope.clone(), arg).get_ref();
                 let ltype = get_type(data, scope.clone(), ttype.clone(), true);
                 if ltype != LLVMTypeOf(larg) {
@@ -764,6 +765,18 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
             Box::new(Data(list))
         },
 
+        AST::Tuple(ref pos, ref items, ref stype) => {
+            let ltype = get_type(data, scope.clone(), stype.clone().unwrap(), true);
+            let tuple = LLVMBuildAlloca(data.builder, ltype, label("tuple"));
+            for (index, item) in items.iter().enumerate() {
+                let value = compile_node(data, func, unwind, scope.clone(), item).get_ref();
+                let mut indices = vec!(i32_value(data, 0), i32_value(data, index));
+                let pointer = LLVMBuildGEP(data.builder, tuple, indices.as_mut_ptr(), indices.len() as u32, label("tmp"));
+                LLVMBuildStore(data.builder, value, pointer);
+            }
+            Box::new(Var(tuple))
+        },
+
         AST::PtrCast(ref ttype, ref code) => {
             let mut value = compile_node(data, func, unwind, scope.clone(), code).get_ref();
             let ltype = get_type(data, scope.clone(), ttype.clone(), true);
@@ -861,7 +874,7 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
 
         AST::Import(ref pos, ref ident, _) => {
             let module_init_name = format!("init.{}", &ident.name);
-            let ftype = Type::Function(vec!(), Box::new(Type::Object(String::from("Bool"), vec!())), ABI::Molten);
+            let ftype = Type::Function(Box::new(Type::Tuple(vec!())), Box::new(Type::Object(String::from("Bool"), vec!())), ABI::Molten);
             if LLVMGetNamedFunction(data.module, label(module_init_name.as_str())).is_null() {
                 let lftype = LLVMFunctionType(bool_type(data), &mut [].as_mut_ptr(), 0, false as i32);
                 let function = LLVMAddFunction(data.module, label(module_init_name.as_str()), lftype);
@@ -896,7 +909,7 @@ unsafe fn collect_functions_node<'sess>(data: &mut LLVM<'sess>, scope: ScopeRef,
             let fscope = data.map.get(id);
             let fname = scope.get_full_name(ident, *id);
 
-            let ftype = get_type(data, scope.clone(), Type::Function(args.iter().map(|arg| arg.ttype.clone().unwrap()).collect(), Box::new(rtype.clone().unwrap()), abi.clone()), false);
+            let ftype = get_type(data, scope.clone(), Type::Function(Box::new(Type::Tuple(args.iter().map(|arg| arg.ttype.clone().unwrap()).collect())), Box::new(rtype.clone().unwrap()), abi.clone()), false);
             let function = LLVMAddFunction(data.module, label(fname.as_str()), ftype);
             //LLVMSetGC(function, label("shadow-stack"));
             //LLVMSetPersonalityFn(function, LLVMGetNamedFunction(data.module, label("__gxx_personality_v0")));
@@ -923,6 +936,7 @@ unsafe fn collect_functions_node<'sess>(data: &mut LLVM<'sess>, scope: ScopeRef,
             return Some(from_abi(abi, function));
         },
 
+        AST::Tuple(_, ref items, _) => { collect_functions_vec(data, scope.clone(), items); },
         AST::List(_, ref items, _) => { collect_functions_vec(data, scope.clone(), items); },
 
         AST::Invoke(_, ref fexpr, ref args, _) => {
@@ -1004,7 +1018,7 @@ unsafe fn collect_functions_node<'sess>(data: &mut LLVM<'sess>, scope: ScopeRef,
             //if !classdef.contains_local(&alloc) {
             //    debug!("******* CREATING ALLOC: {}", name);
             //    let cname = scope.get_full_name(&Some(name.clone()), id);
-            //    let id = classdef.define(alloc.clone(), Some(Type::Function(vec!(), Box::new(Type::Object(name.clone(), types.clone())))));
+            //    let id = classdef.define(alloc.clone(), Some(Type::Function(Box::new(Type::Tuple(vec!())), Box::new(Type::Object(name.clone(), types.clone())))));
             //    data.set_value(id, build_allocator(data, tscope.clone(), &name, format!("{}_{}", cname, alloc).as_str(), lltype));
             //}
             collect_functions_vec(data, tscope, body);
@@ -1179,7 +1193,7 @@ pub fn get_method(data: &LLVM, scope: ScopeRef, class: &str, method: &str, argty
         scope.get_class_def(&String::from(class)).classvars.clone()
     };
     let name = String::from(method);
-    let ftype = find_variant(scope.clone(), classdef.get_variable_type(&name).unwrap(), argtypes, Check::Def).unwrap();
+    let ftype = find_variant(scope.clone(), classdef.get_variable_type(&name).unwrap(), Type::Tuple(argtypes), Check::Def).unwrap();
     let funcdefs = classdef.num_funcdefs(&name);
     let mname = ABI::Molten.mangle_name(&name, ftype.get_argtypes().unwrap(), funcdefs);
     let function = data.get_value(classdef.variable_id(&String::from(mname)).unwrap()).unwrap();
@@ -1282,10 +1296,17 @@ pub unsafe fn get_type(data: &LLVM, scope: ScopeRef, ttype: Type, use_fptrs: boo
                 None => panic!("CompileError: unassigned type value, {:?}", tname),
             }
         },
+        Type::Tuple(ref types) => {
+            let mut ltypes = vec!();
+            for ttype in types {
+                ltypes.push(get_type(data, scope.clone(), ttype.clone(), true));
+            }
+            LLVMStructType(ltypes.as_mut_ptr(), ltypes.len() as u32, false as i32)
+        },
         Type::Function(ref args, ref ret, _) => {
             // TODO should you incorporate abi??
             let mut atypes = vec!();
-            for ttype in args {
+            for ttype in args.get_types().unwrap() {
                 atypes.push(get_type(data, scope.clone(), ttype.clone(), true));
             }
             let rtype = get_type(data, scope.clone(), *ret.clone(), true);

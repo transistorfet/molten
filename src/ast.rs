@@ -54,6 +54,7 @@ pub enum AST {
     String(String),
     Nil(Option<Type>),
     PtrCast(Type, Box<AST>),
+    Tuple(Pos, Vec<AST>, Option<Type>),
     List(Pos, Vec<AST>, Option<Type>),
 
     Recall(Pos, Ident),
@@ -174,6 +175,7 @@ impl ClassSpec {
 impl AST {
     pub fn get_pos(&self) -> Pos {
         match *self {
+            AST::Tuple(ref pos, _, _) |
             AST::List(ref pos, _, _) |
             AST::Recall(ref pos, _) |
             AST::Identifier(ref pos, _) |

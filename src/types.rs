@@ -13,7 +13,8 @@ pub use abi::ABI;
 pub enum Type {
     Object(String, Vec<Type>),
     Variable(String, UniqueID),
-    Function(Vec<Type>, Box<Type>, ABI),
+    Function(Box<Type>, Box<Type>, ABI),
+    Tuple(Vec<Type>),
     Overload(Vec<Type>),
     //Generic(String, Vec<Type>),
     //Constrained(Box<&mut AST>),
@@ -34,7 +35,31 @@ impl Type {
         }
     }
 
-    pub fn get_argtypes(&self) -> Result<&Vec<Type>, Error> {
+
+    pub fn is_tuple(&self) -> bool {
+        match *self {
+            Type::Tuple(_) => true,
+            _ => false
+        }
+    }
+
+    pub fn get_types(&self) -> Result<&Vec<Type>, Error> {
+        match self {
+            &Type::Tuple(ref types) => Ok(types),
+            _ => Err(Error::new(format!("TypeError: expected tuple type, found {:?}", self))),
+        }
+    }
+
+
+    pub fn is_function(&self) -> bool {
+        match *self {
+            Type::Function(_, _, _) => true,
+            _ => false
+        }
+    }
+
+
+    pub fn get_argtypes(&self) -> Result<&Type, Error> {
         match self {
             &Type::Function(ref args, _, _) => Ok(args),
             _ => Err(Error::new(format!("TypeError: expected function type, found {:?}", self))),
@@ -55,6 +80,14 @@ impl Type {
         }
     }
 
+
+    pub fn is_variable(&self) -> bool {
+        match *self {
+            Type::Variable(_, _) => true,
+            _ => false
+        }
+    }
+
     pub fn get_varname(&self) -> Result<String, Error> {
         match self {
             &Type::Variable(ref name, _) => Ok(name.clone()),
@@ -66,20 +99,6 @@ impl Type {
         match self {
             &Type::Variable(_, ref id) => Ok(*id),
             _ => Err(Error::new(format!("TypeError: expected variable type, found {:?}", self))),
-        }
-    }
-
-    pub fn is_function(&self) -> bool {
-        match *self {
-            Type::Function(_, _, _) => true,
-            _ => false
-        }
-    }
-
-    pub fn is_variable(&self) -> bool {
-        match *self {
-            Type::Variable(_, _) => true,
-            _ => false
         }
     }
 
@@ -208,9 +227,12 @@ impl fmt::Display for Type {
             Type::Variable(ref name, ref _id) => {
                 write!(f, "'{}", name)
             }
+            Type::Tuple(ref types) => {
+                let tuple: Vec<String> = types.iter().map(|t| format!("{}", t)).collect();
+                write!(f, "({})", tuple.join(", "))
+            }
             Type::Function(ref args, ref ret, ref abi) => {
-                let argstr: Vec<String> = args.iter().map(|t| format!("{}", t)).collect();
-                write!(f, "({}) -> {}{}", argstr.join(", "), *ret, abi)
+                write!(f, "{} -> {}{}", args, *ret, abi)
             }
             Type::Overload(ref variants) => {
                 let varstr: Vec<String> = variants.iter().map(|v| format!("{}", v)).collect();
@@ -310,12 +332,20 @@ pub fn check_type(scope: ScopeRef, odtype: Option<Type>, octype: Option<Type>, m
             match (dtype.clone(), ctype.clone()) {
                 (Type::Function(ref aargs, ref aret, ref aabi), Type::Function(ref bargs, ref bret, ref babi)) => {
                     let oabi = aabi.compare(babi);
-                    if aargs.len() == bargs.len() && oabi.is_some() {
-                        let mut argtypes = vec!();
-                        for (atype, btype) in aargs.iter().zip(bargs.iter()) {
-                            argtypes.push(check_type(scope.clone(), Some(atype.clone()), Some(btype.clone()), mode.clone(), update)?);
+                    if oabi.is_some() {
+                        let mut argtypes = check_type(scope.clone(), Some(*aargs.clone()), Some(*bargs.clone()), mode.clone(), update)?;
+                        Ok(Type::Function(Box::new(argtypes), Box::new(check_type(scope, Some(*aret.clone()), Some(*bret.clone()), mode, update)?), oabi.unwrap()))
+                    } else {
+                        Err(Error::new(format!("TypeError: type mismatch, expected {} but found {}", dtype, ctype)))
+                    }
+                },
+                (Type::Tuple(ref atypes), Type::Tuple(ref btypes)) => {
+                    let mut types = vec!();
+                    if atypes.len() == btypes.len() {
+                        for (atype, btype) in atypes.iter().zip(btypes.iter()) {
+                            types.push(check_type(scope.clone(), Some(atype.clone()), Some(btype.clone()), mode.clone(), update)?);
                         }
-                        Ok(Type::Function(argtypes, Box::new(check_type(scope, Some(*aret.clone()), Some(*bret.clone()), mode, update)?), oabi.unwrap()))
+                        Ok(Type::Tuple(types))
                     } else {
                         Err(Error::new(format!("TypeError: type mismatch, expected {} but found {}", dtype, ctype)))
                     }
@@ -416,9 +446,12 @@ pub fn resolve_type(scope: ScopeRef, ttype: Type) -> Type {
                 None => panic!("TypeError: undefined type variable {}", ttype),
             }
         },
+        Type::Tuple(ref types) => {
+            let types = types.iter().map(|ttype| resolve_type(scope.clone(), ttype.clone())).collect();
+            Type::Tuple(types)
+        },
         Type::Function(ref args, ref ret, ref abi) => {
-            let argtypes = args.iter().map(|arg| resolve_type(scope.clone(), arg.clone())).collect();
-            Type::Function(argtypes, Box::new(resolve_type(scope, *ret.clone())), *abi)
+            Type::Function(Box::new(resolve_type(scope.clone(), *args.clone())), Box::new(resolve_type(scope, *ret.clone())), *abi)
         },
         Type::Overload(ref variants) => {
             let newvars = variants.iter().map(|variant| resolve_type(scope.clone(), variant.clone())).collect();
@@ -427,30 +460,25 @@ pub fn resolve_type(scope: ScopeRef, ttype: Type) -> Type {
     }
 }
 
-pub fn find_variant(scope: ScopeRef, otype: Type, atypes: Vec<Type>, mode: Check) -> Result<Type, Error> {
+pub fn find_variant(scope: ScopeRef, otype: Type, atypes: Type, mode: Check) -> Result<Type, Error> {
     match otype {
         Type::Overload(variants) => {
             let variants = remove_duplicates(scope.clone(), variants);
             let mut found = vec!();
             'outer: for variant in &variants {
                 if let Type::Function(ref otypes, _, _) = *variant {
-                    if otypes.len() != atypes.len() {
+                    debug!("**CHECKING VARIANT: {:?} {:?}", otypes, atypes);
+                    if check_type(scope.clone(), Some(*otypes.clone()), Some(atypes.clone()), mode.clone(), false).is_err() {
                         continue 'outer;
-                    }
-                    for (otype, atype) in otypes.iter().zip(atypes.iter()) {
-                        debug!("**CHECKING VARIANT: {:?} {:?}", otype, atype);
-                        if check_type(scope.clone(), Some(otype.clone()), Some(atype.clone()), mode.clone(), false).is_err() {
-                            continue 'outer;
-                        }
                     }
                     found.push(variant);
                 }
             }
 
             match found.len() {
-                0 => Err(Error::new(format!("OverloadError: No valid variant found for ({})\n\tout of {}", Type::display_vec(&atypes), Type::display_vec(&variants)))),
+                0 => Err(Error::new(format!("OverloadError: No valid variant found for ({})\n\tout of {}", atypes, Type::display_vec(&variants)))),
                 1 => Ok(found[0].clone()),
-                _ => Err(Error::new(format!("OverloadError: Ambiguous ({})\n\tvariants found {}", Type::display_vec(&atypes), found.iter().map(|t| format!("{}", t)).collect::<Vec<String>>().join(", ")))),
+                _ => Err(Error::new(format!("OverloadError: Ambiguous ({})\n\tvariants found {}", atypes, found.iter().map(|t| format!("{}", t)).collect::<Vec<String>>().join(", ")))),
             }
         },
         _ => Ok(otype.clone()),

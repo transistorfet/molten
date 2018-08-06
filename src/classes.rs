@@ -79,7 +79,7 @@ impl ClassDef {
                         let uname = abi.unmangle_name(&fname).unwrap_or(fname.clone());
                         //if parent.contains(&uname) {
                             debug!("***************: {:?}:{:?}", self.classspec.ident.name, uname);
-                            vtable.push((uname, Type::Function(args.iter().map(|arg| arg.ttype.clone().unwrap()).collect(), Box::new(rtype.clone().unwrap()), *abi)));
+                            vtable.push((uname, Type::Function(Box::new(Type::Tuple(args.iter().map(|arg| arg.ttype.clone().unwrap()).collect())), Box::new(rtype.clone().unwrap()), *abi)));
                         //}
                     }
                 },

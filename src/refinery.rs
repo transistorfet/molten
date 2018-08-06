@@ -74,6 +74,7 @@ pub fn refine_node(node: AST) -> AST {
         },
 
         AST::List(pos, code, ttype) => { AST::List(pos, refine_vec(code), ttype) },
+        AST::Tuple(pos, code, ttype) => { AST::Tuple(pos, refine_vec(code), ttype) },
 
         AST::Class(pos, classspec, parentspec, body, id) => {
             // Make sure constructors take "self" as the first argument, and return "self" at the end

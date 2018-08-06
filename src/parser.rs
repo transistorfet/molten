@@ -525,10 +525,10 @@ impl AST {
 
 named!(subatomic(Span) -> AST,
     alt_complete!(
+        delimited!(tag!("("), wscom!(expression), tag!(")")) |
         block |
         literal |
-        identifier_node |
-        delimited!(tag!("("), wscom!(expression), tag!(")"))
+        identifier_node
     )
 );
 
@@ -595,6 +595,7 @@ pub fn parse_type(s: &str) -> Option<Type> {
 named!(type_description(Span) -> Type,
     alt_complete!(
         type_function |
+        type_tuple |
         type_variable |
         type_object
     )
@@ -611,13 +612,21 @@ named!(type_variable(Span) -> Type,
     map!(preceded!(tag!("'"), identifier), |s| Type::Variable(s.name.clone(), UniqueID(0)))
 );
 
+named!(type_tuple(Span) -> Type,
+    wscom!(do_parse!(
+        types: delimited!(tag!("("), separated_list_complete!(wscom!(tag!(",")), type_description), tag!(")")) >>
+        (Type::Tuple(types))
+    ))
+);
+
 named!(type_function(Span) -> Type,
     wscom!(do_parse!(
-        args: delimited!(tag!("("), separated_list_complete!(wscom!(tag!(",")), type_description), tag!(")")) >>
+        //args: delimited!(tag!("("), separated_list_complete!(wscom!(tag!(",")), type_description), tag!(")")) >>
+        args: alt_complete!(type_tuple | type_variable | type_object) >>
         wscom!(tag!("->")) >>
         ret: type_description >>
         abi: abi_specifier >>
-        (Type::Function(args, Box::new(ret), abi))
+        (Type::Function(Box::new(args), Box::new(ret), abi))
     ))
 );
 
@@ -662,6 +671,8 @@ named!(literal(Span) -> AST,
         boolean |
         string |
         number |
+        // TODO currently a parse error
+        tuple |
         list
     )
 );
@@ -753,6 +764,18 @@ impl AST {
         }
     }
 }
+
+named!(tuple(Span) -> AST,
+    do_parse!(
+        pos: position!() >>
+        l: delimited!(
+            wscom!(tag!("(")),
+            separated_list_complete!(wscom!(tag!(",")), expression),
+            wscom!(tag!(")"))
+        ) >>
+        (AST::Tuple(Pos::new(pos), l, None))
+    )
+);
 
 named!(list(Span) -> AST,
     do_parse!(

@@ -70,12 +70,13 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &mut 
             }
             update_scope_variable_types(fscope.clone());
 
-            let mut nftype = Type::Function(argtypes.clone(), Box::new(rettype), *abi);
+            let tupleargs = Type::Tuple(argtypes);
+            let mut nftype = Type::Function(Box::new(tupleargs.clone()), Box::new(rettype), *abi);
             if ident.is_some() {
                 let dscope = Scope::target(scope.clone());
                 let dname = ident.as_ref().unwrap().name.clone();
                 //if dscope.is_overloaded(&dname) {
-                    let fname = abi.mangle_name(dname.as_str(), &argtypes, dscope.num_funcdefs(&dname));
+                    let fname = abi.mangle_name(dname.as_str(), &tupleargs, dscope.num_funcdefs(&dname));
                     if !dscope.contains(&fname) {
                         dscope.define(fname.clone(), Some(nftype.clone()))?;
                         ident.as_mut().unwrap().name = fname;
@@ -99,7 +100,7 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &mut 
                 _ => tscope.map_all_typevars(dtype.clone()),
             };
             let etype = match etype.is_overloaded() {
-                true => find_variant(tscope.clone(), etype, atypes.clone(), Check::Def)?,
+                true => find_variant(tscope.clone(), etype, Type::Tuple(atypes.clone()), Check::Def)?,
                 false => etype,
             };
 
@@ -117,15 +118,15 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &mut 
                     */
                     get_accessor_name(tscope.clone(), fexpr.as_mut(), &etype)?;
 
-                    //let ftype = expect_type(tscope.clone(), Some(etype.clone()), Some(Type::Function(atypes, Box::new(expected.unwrap_or_else(|| tscope.new_typevar())), abi)), Check::Update)?;
-                    let ftype = expect_type(tscope.clone(), Some(etype.clone()), Some(Type::Function(atypes, Box::new(etype.get_rettype()?.clone()), *abi)), Check::Def)?;
+                    //let ftype = expect_type(tscope.clone(), Some(etype.clone()), Some(Type::Function(Box::new(Type::Tuple(atypes)), Box::new(expected.unwrap_or_else(|| tscope.new_typevar())), abi)), Check::Update)?;
+                    let ftype = expect_type(tscope.clone(), Some(etype.clone()), Some(Type::Function(Box::new(Type::Tuple(atypes)), Box::new(etype.get_rettype()?.clone()), *abi)), Check::Def)?;
                     // TODO should this actually be another expect, so type resolutions that occur in later args affect earlier args?  Might not be needed unless you add typevar constraints
                     let ftype = resolve_type(tscope, ftype);        // NOTE This ensures the early arguments are resolved despite typevars not being assigned until later in the signature
 
                     ftype
                 },
                 Type::Variable(_, ref id) => {
-                    let ftype = Type::Function(atypes.clone(), Box::new(expected.unwrap_or_else(|| tscope.new_typevar())), ABI::Unknown);
+                    let ftype = Type::Function(Box::new(Type::Tuple(atypes.clone())), Box::new(expected.unwrap_or_else(|| tscope.new_typevar())), ABI::Unknown);
                     // TODO This is suspect... we might be updating type without checking for a conflict
                     // TODO we also aren't handling other function types, like accessor and resolve
                     //if let AST::Identifier(ref fname) = **fexpr {
@@ -215,6 +216,23 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &mut 
         AST::Nil(ref mut ttype) => {
             *ttype = Some(expected.unwrap_or_else(|| scope.new_typevar()));
             ttype.clone().unwrap()
+        },
+
+        AST::Tuple(_, ref mut items, ref mut stype) => {
+            let etypes = match expected {
+                Some(ref e) => e.get_types()?.iter().map(|i| Some(i.clone())).collect(),
+                None => vec![None; items.len()]
+            };
+
+            if etypes.len() != items.len() {
+                return Err(Error::new(format!("TypeError: number of tuple items don't match: expected {:?} with {} items but found {} items", expected, etypes.len(), items.len())));
+            }
+            let mut types = vec!();
+            for (ref mut expr, etype) in items.iter_mut().zip(etypes.iter()) {
+                types.push(expect_type(scope.clone(), etype.clone(), Some(check_types_node(session, scope.clone(), expr, etype.clone())), Check::List)?);
+            }
+            *stype = Some(Type::Tuple(types.clone()));
+            Type::Tuple(types)
         },
 
         AST::List(_, ref mut items, ref mut stype) => {

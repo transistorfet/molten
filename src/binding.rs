@@ -117,6 +117,7 @@ fn bind_names_node_or_error(session: &Session, scope: ScopeRef, node: &mut AST) 
             bind_names_node(session, lscope, body);
         },
 
+        AST::Tuple(_, ref mut code, _) |
         AST::List(_, ref mut code, _) |
         AST::Block(_, ref mut code) => { bind_names_vec(session, scope, code); },
 
@@ -205,10 +206,13 @@ pub fn declare_typevars(scope: ScopeRef, ttype: Option<&mut Type>, always_new: b
                     declare_typevars(scope.clone(), Some(ttype), always_new)?;
                 }
             },
-            &mut Type::Function(ref mut args, ref mut ret, _) => {
-                for atype in args.iter_mut() {
-                    declare_typevars(scope.clone(), Some(atype), always_new)?;
+            &mut Type::Tuple(ref mut types) => {
+                for ttype in types.iter_mut() {
+                    declare_typevars(scope.clone(), Some(ttype), always_new)?;
                 }
+            },
+            &mut Type::Function(ref mut args, ref mut ret, _) => {
+                declare_typevars(scope.clone(), Some(args.as_mut()), always_new)?;
                 declare_typevars(scope, Some(ret.as_mut()), always_new)?;
             },
             &mut Type::Variable(ref name, ref mut id) => {
