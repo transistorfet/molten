@@ -847,7 +847,7 @@ pub fn print_error(name: &str, span: Span, err: nom::Err<Span, u32>) {
         nom::Err::Failure(Context::Code(span, code)) => {
             let snippet = span_to_string(span);
             let index = snippet.find('\n').unwrap_or(snippet.len());
-            println!("{}:{}:{}: ParseError ({:?}) near {:?}", name, span.line, span.get_utf8_column(), code, snippet.get(..index).unwrap());
+            println!("\x1B[1;31m{}:{}:{}: ParseError ({:?}) near {:?}\x1B[0m", name, span.line, span.get_utf8_column(), code, snippet.get(..index).unwrap());
         },
     }
 }

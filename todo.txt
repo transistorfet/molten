@@ -11,6 +11,9 @@
 * remove extraneous Pos's with Ident/Arguments?
 * make handy functions for building AST
 
+* make common error printer, with fancy colours
+* there are poor error messages when deleting the "=" from a "let something = fn x => ..." both inside and outside classes.... shouldn't be doing this
+
 * for macos, the llvm commands don't have a "-5.0" tag, and they aren't necessarily added to the path.  Maybe the python script can detect that
 * it might also make it easier/generic to allow compiling to object files
 
