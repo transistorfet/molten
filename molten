@@ -8,17 +8,25 @@ import argparse
 import subprocess
 
 
+if shutil.which("lli") is not None:
+    # MacOS
+    EXT = ""
+elif shutil.which("lli-5.0") is not None:
+    # Debian
+    EXT = "-5.0"
+else:
+    print("Error: unable to locate LLVM command line program \"lli\".  Please ensure that the LLVM 5.0 tools are included in your $PATH")
+    sys.exit(-1)
+
 RM = "rm"
 BUILD = "cargo build"
 COMPILE = "cargo run --"
-LINK = "llvm-link"
-OPT = "opt"
-RUN = "lli"
+LINK = "llvm-link" + EXT
+OPT = "opt" + EXT
+RUN = "lli" + EXT
 
 
 def main():
-    check_requirements()
-
     parser = argparse.ArgumentParser(prog='molten', formatter_class=argparse.ArgumentDefaultsHelpFormatter, description='Simple build script for molten programs')
     parser.add_argument('-f', '--force', action='store_true', help='Force a recompile of all files')
     parser.add_argument('-d', '--debug', action='store_true', help='Run the compiler with debugging on')
@@ -45,14 +53,6 @@ def main():
         args.command(args)
     else:
         parser.print_help()
-
-
-def check_requirements():
-    global LINK, OPT, RUN
-    if shutil.which(LINK) is None:
-        LINK = "llvm-link-5.0"
-        OPT = "opt-5.0"
-        RUN = "lli-5.0"
 
 
 def command_build(args):
