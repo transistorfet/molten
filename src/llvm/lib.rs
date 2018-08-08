@@ -10,7 +10,9 @@ use self::llvm::core::*;
 
 use abi::ABI;
 use types::Type;
-use classes::ClassDef;
+use defs::TypeDef;
+use session::Session;
+use defs::classes::ClassDef;
 use ast::{ Pos, Ident, ClassSpec };
 use parser::{ parse_type };
 use scope::{ Scope, ScopeRef, ScopeMapRef, Context };
@@ -39,45 +41,45 @@ pub enum BuiltinDef<'sess> {
 }
 
 
-pub fn make_global<'sess>(map: &'sess ScopeMapRef, builtins: &Vec<BuiltinDef<'sess>>) {
-    let primatives = map.add(ScopeMapRef::PRIMATIVE, None);
+pub fn make_global<'sess>(session: &Session, builtins: &Vec<BuiltinDef<'sess>>) {
+    let primatives = session.map.add(ScopeMapRef::PRIMATIVE, None);
     primatives.set_context(Context::Primative);
 
-    register_builtins_vec(primatives.clone(), primatives.clone(), builtins);
+    register_builtins_vec(session, primatives.clone(), primatives.clone(), builtins);
 
-    let global = map.add(ScopeMapRef::GLOBAL, Some(primatives));
+    let global = session.map.add(ScopeMapRef::GLOBAL, Some(primatives));
     global.set_context(Context::Global);
 }
  
-pub fn register_builtins_vec<'sess>(scope: ScopeRef, tscope: ScopeRef, entries: &Vec<BuiltinDef<'sess>>) {
+pub fn register_builtins_vec<'sess>(session: &Session, scope: ScopeRef, tscope: ScopeRef, entries: &Vec<BuiltinDef<'sess>>) {
     for node in entries {
-        register_builtins_node(scope.clone(), tscope.clone(), node);
+        register_builtins_node(session, scope.clone(), tscope.clone(), node);
     }
 }
 
-pub fn register_builtins_node<'sess>(scope: ScopeRef, tscope: ScopeRef, node: &BuiltinDef<'sess>) {
+pub fn register_builtins_node<'sess>(session: &Session, scope: ScopeRef, tscope: ScopeRef, node: &BuiltinDef<'sess>) {
     match *node {
         BuiltinDef::Type(ref name, ref ttype) => {
             let mut ttype = ttype.clone();
             declare_typevars(tscope.clone(), Some(&mut ttype), true).unwrap();
             scope.define_type(String::from(*name), ttype.clone()).unwrap();
             let classdef = ClassDef::new_ref(ClassSpec::new(Pos::empty(), Ident::from_str(ttype.get_name().unwrap().as_str()), ttype.get_params().unwrap()), None, Scope::new_ref(None));
-            scope.set_class_def(&String::from(*name), classdef);
+            scope.set_type_def(&String::from(*name), TypeDef::Class(classdef));
         },
         BuiltinDef::Func(ref name, ref ftype, _) => {
             let mut ftype = parse_type(ftype);
             declare_typevars(tscope.clone(), ftype.as_mut(), false).unwrap();
-            Scope::define_func_variant(scope, String::from(*name), tscope.clone(), ftype.clone().unwrap()).unwrap();
+            Scope::define_func_variant(session, scope, String::from(*name), tscope.clone(), ftype.clone().unwrap()).unwrap();
         },
         BuiltinDef::Class(ref name, ref params, _, ref entries) => {
             //let cname = String::from(*name);
             //let classdef = Scope::new_ref(None);
             //classdef.set_basename(cname.clone());
-            //scope.set_class_def(&cname, None, classdef.clone());
+            //scope.set_type_def(&cname, None, TypeDef::Class(classdef.clone()));
             let classdef = ClassDef::define_class(scope.clone(), &ClassSpec::new(Pos::empty(), Ident::from_str(name), params.clone()), None).unwrap();
 
             let tscope = Scope::new_ref(Some(scope.clone()));
-            register_builtins_vec(classdef.classvars.clone(), tscope.clone(), entries);
+            register_builtins_vec(session, classdef.classvars.clone(), tscope.clone(), entries);
         },
     }
 }
@@ -130,7 +132,7 @@ pub unsafe fn declare_builtins_node<'sess>(data: &mut LLVM<'sess>, objtype: LLVM
         },
         BuiltinDef::Class(ref name, _, ref structdef, ref entries) => {
             let cname = String::from(*name);
-            let classdef = scope.get_class_def(&cname);
+            let classdef = scope.get_type_def(&cname).as_class().unwrap();
 
             let lltype = if structdef.len() > 0 {
                 *classdef.structdef.borrow_mut() = structdef.clone();

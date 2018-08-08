@@ -43,7 +43,7 @@ fn build_index_node(index: &mut String, session: &Session, scope: ScopeRef, node
 
         AST::Class(_, ref classspec, ref parentspec, ref body, ref id) => {
             let tscope = session.map.get(&id);
-            let classdef = scope.get_class_def(&classspec.ident.name);
+            let classdef = scope.get_type_def(&classspec.ident.name).as_class().unwrap();
             let namespec = unparse_type(tscope.clone(), Type::from_spec(classspec.clone()));
             let fullspec = if parentspec.is_some() {
                 format!("{} extends {}", namespec, unparse_type(tscope.clone(), Type::from_spec(parentspec.clone().unwrap())))

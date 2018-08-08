@@ -133,7 +133,7 @@ impl ClassDef {
         let mut structdef = parentclass.map_or(vec!(), |c| c.structdef.borrow().clone());
 
         if self.has_vtable() {
-            if let Some(index) = self.get_struct_index("__vtable__") {
+            if let Some(index) = structdef.iter().position(|ref r| r.0.as_str() == "__vtable__") {
                 structdef[index].1 = Type::Object(format!("{}_vtable", self.classspec.ident.name), vec!());
             } else {
                 structdef.push((String::from("__vtable__"), Type::Object(format!("{}_vtable", self.classspec.ident.name), vec!())));

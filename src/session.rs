@@ -6,18 +6,23 @@ use std::path::Path;
 use std::cell::Cell;
 use std::cell::RefCell;
 use std::io::prelude::*;
+use std::collections::HashMap;
 
 use parser;
 use refinery;
 use config::Options;
-use ast::{ AST, Pos };
-use scope::{ ScopeMapRef };
+use ast::{ NodeID, Pos, AST };
+use defs::{ VarDef, TypeDef };
+use scope::{ Scope, ScopeRef, ScopeMapRef };
 
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Session {
     pub name: String,
     pub map: ScopeMapRef,
+    // TODO I really want to unify these, but I figured I should wait and refactor later when it's known to actually work
+    pub vardefs: RefCell<HashMap<NodeID, VarDef>>,
+    pub typedefs: RefCell<HashMap<NodeID, TypeDef>>,
     pub files: RefCell<Vec<(String, String)>>,
     pub target: String,
     pub errors: Cell<u32>,
@@ -30,6 +35,8 @@ impl Session {
             name: String::from(""),
             //builtins: builtins,
             map: ScopeMapRef::new(),
+            vardefs: RefCell::new(HashMap::new()),
+            typedefs: RefCell::new(HashMap::new()),
             files: RefCell::new(vec!()),
             target: String::from(""),
             errors: Cell::new(0),
@@ -84,6 +91,22 @@ impl Session {
         self.print_error(err.clone());
         err
     }
+
+/*
+    pub fn get_def(&self, id: NodeID) -> VarDef {
+        self.vardefs.borrow().get(&id).clone()
+    }
+
+    pub fn set_def(&self, id: NodeID, def: VarDef) {
+        self.vardefs.borrow_mut().insert(id, def);
+    }
+
+    pub fn define(&self, scope: ScopeRef, name: &str, id: NodeID) {
+        let dscope = Scope::target(scope.clone());
+        dscope.define(String::from(name), None);
+        dscope.set_var_def(name, id);
+    }
+*/
 }
 
 #[derive(Clone, Debug, PartialEq)]

@@ -46,18 +46,18 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &mut 
             let mut argtypes = vec!();
             for arg in args.iter() {
                 let vtype = arg.default.clone().map(|ref mut vexpr| check_types_node(session, scope.clone(), vexpr, arg.ttype.clone()));
-                let mut atype = expect_type(fscope.clone(), arg.ttype.clone(), vtype, Check::Def)?;
+                let mut atype = expect_type(session, fscope.clone(), arg.ttype.clone(), vtype, Check::Def)?;
                 if &arg.ident.name[..] == "self" {
                     let mut stype = fscope.find_type(&String::from("Self")).unwrap();
                     stype = fscope.map_all_typevars(stype);
-                    atype = expect_type(fscope.clone(), Some(atype), Some(stype), Check::Def)?;
+                    atype = expect_type(session, fscope.clone(), Some(atype), Some(stype), Check::Def)?;
                 }
                 //fscope.set_variable_type(&arg.ident.name, atype.clone());
-                Type::update_variable_type(fscope.clone(), &arg.ident.name, atype.clone());
+                Type::update_variable_type(session, fscope.clone(), &arg.ident.name, atype.clone());
                 argtypes.push(atype);
             }
 
-            let rettype = expect_type(fscope.clone(), rtype.clone(), Some(check_types_node(session, fscope.clone(), body, rtype.clone())), Check::Def)?;
+            let rettype = expect_type(session, fscope.clone(), rtype.clone(), Some(check_types_node(session, fscope.clone(), body, rtype.clone())), Check::Def)?;
             *rtype = Some(rettype.clone());
 
             // Resolve type variables that can be
@@ -65,7 +65,7 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &mut 
                 argtypes[i] = resolve_type(fscope.clone(), argtypes[i].clone());
                 // TODO this is still not checking for type compatibility
                 //fscope.set_variable_type(&args[i].pos, argtypes[i].clone());
-                Type::update_variable_type(fscope.clone(), &args[i].ident.name, argtypes[i].clone());
+                Type::update_variable_type(session, fscope.clone(), &args[i].ident.name, argtypes[i].clone());
                 args[i].ttype = Some(argtypes[i].clone());
             }
             update_scope_variable_types(fscope.clone());
@@ -82,8 +82,9 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &mut 
                         ident.as_mut().unwrap().name = fname;
                     }
                 //}
-                Scope::add_func_variant(dscope, &dname, scope, nftype.clone())?;
+                Scope::add_func_variant(session, dscope, &dname, scope, nftype.clone())?;
             }
+            // TODO build closure context from body (all references)
             nftype
         },
 
@@ -100,7 +101,7 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &mut 
                 _ => tscope.map_all_typevars(dtype.clone()),
             };
             let etype = match etype.is_overloaded() {
-                true => find_variant(tscope.clone(), etype, Type::Tuple(atypes.clone()), Check::Def)?,
+                true => find_variant(session, tscope.clone(), etype, Type::Tuple(atypes.clone()), Check::Def)?,
                 false => etype,
             };
 
@@ -118,8 +119,8 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &mut 
                     */
                     get_accessor_name(tscope.clone(), fexpr.as_mut(), &etype)?;
 
-                    //let ftype = expect_type(tscope.clone(), Some(etype.clone()), Some(Type::Function(Box::new(Type::Tuple(atypes)), Box::new(expected.unwrap_or_else(|| tscope.new_typevar())), abi)), Check::Update)?;
-                    let ftype = expect_type(tscope.clone(), Some(etype.clone()), Some(Type::Function(Box::new(Type::Tuple(atypes)), Box::new(etype.get_rettype()?.clone()), *abi)), Check::Def)?;
+                    //let ftype = expect_type(session, tscope.clone(), Some(etype.clone()), Some(Type::Function(Box::new(Type::Tuple(atypes)), Box::new(expected.unwrap_or_else(|| tscope.new_typevar())), abi)), Check::Update)?;
+                    let ftype = expect_type(session, tscope.clone(), Some(etype.clone()), Some(Type::Function(Box::new(Type::Tuple(atypes)), Box::new(etype.get_rettype()?.clone()), *abi)), Check::Def)?;
                     // TODO should this actually be another expect, so type resolutions that occur in later args affect earlier args?  Might not be needed unless you add typevar constraints
                     let ftype = resolve_type(tscope, ftype);        // NOTE This ensures the early arguments are resolved despite typevars not being assigned until later in the signature
 
@@ -133,7 +134,7 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &mut 
                     //    update_type(scope.clone(), fname, ftype.clone());
                     //}
                     //tscope.update_type(name, ftype.clone());
-                    Type::update_type(tscope, &id.to_string(), ftype.clone());
+                    Type::update_type(session, tscope, &id.to_string(), ftype.clone());
                     ftype
                 },
                 _ => return Err(Error::new(format!("NotAFunction: {:?}", fexpr))),
@@ -146,16 +147,16 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &mut 
         AST::SideEffect(_, _, ref mut args) => {
             let mut ltype = None;
             for ref mut expr in args {
-                ltype = Some(expect_type(scope.clone(), ltype.clone(), Some(check_types_node(session, scope.clone(), expr, ltype.clone())), Check::List)?);
+                ltype = Some(expect_type(session, scope.clone(), ltype.clone(), Some(check_types_node(session, scope.clone(), expr, ltype.clone())), Check::List)?);
             }
             ltype.unwrap()
         },
 
         AST::Definition(_, ref ident, ref mut ttype, ref mut body) => {
             //let dscope = Scope::target(scope);
-            let btype = expect_type(scope.clone(), ttype.clone(), Some(check_types_node(session, scope.clone(), body, ttype.clone())), Check::Def)?;
+            let btype = expect_type(session, scope.clone(), ttype.clone(), Some(check_types_node(session, scope.clone(), body, ttype.clone())), Check::Def)?;
             //dscope.set_variable_type(&ident.name, btype.clone());
-            Type::update_variable_type(scope, &ident.name, btype.clone());
+            Type::update_variable_type(session, scope, &ident.name, btype.clone());
             *ttype = Some(btype.clone());
             btype
         },
@@ -176,7 +177,7 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &mut 
             check_types_node(session, scope.clone(), cond, None);
             let ttype = check_types_node(session, scope.clone(), texpr, None);
             let ftype = check_types_node(session, scope.clone(), fexpr, Some(ttype.clone()));
-            expect_type(scope, Some(ttype), Some(ftype), Check::List)?
+            expect_type(session, scope, Some(ttype), Some(ftype), Check::List)?
         },
 
         AST::Try(_, ref mut cond, ref mut cases, ref mut condtype) |
@@ -184,8 +185,8 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &mut 
             let mut ctype = Some(check_types_node(session, scope.clone(), cond, None));
             let mut rtype = None;
             for &mut (ref mut case, ref mut expr) in cases {
-                ctype = Some(expect_type(scope.clone(), ctype.clone(), Some(check_types_node(session, scope.clone(), case, ctype.clone())), Check::List)?);
-                rtype = Some(expect_type(scope.clone(), rtype.clone(), Some(check_types_node(session, scope.clone(), expr, rtype.clone())), Check::List)?);
+                ctype = Some(expect_type(session, scope.clone(), ctype.clone(), Some(check_types_node(session, scope.clone(), case, ctype.clone())), Check::List)?);
+                rtype = Some(expect_type(session, scope.clone(), rtype.clone(), Some(check_types_node(session, scope.clone(), expr, rtype.clone())), Check::List)?);
             }
             *condtype = ctype;
             rtype.unwrap()
@@ -207,9 +208,9 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &mut 
             let lscope = session.map.get(id);
             let itype = lscope.get_variable_type(&ident.name).unwrap_or_else(|| expected.unwrap_or_else(|| scope.new_typevar()));
             let etype = Some(Type::Object(String::from("List"), vec!(itype)));
-            let ltype = expect_type(lscope.clone(), etype.clone(), Some(check_types_node(session, lscope.clone(), list, etype.clone())), Check::Def)?;
+            let ltype = expect_type(session, lscope.clone(), etype.clone(), Some(check_types_node(session, lscope.clone(), list, etype.clone())), Check::Def)?;
             //lscope.set_variable_type(&ident.name, ltype.get_params()[0].clone());
-            Type::update_variable_type(lscope.clone(), &ident.name, ltype.get_params()?[0].clone());
+            Type::update_variable_type(session, lscope.clone(), &ident.name, ltype.get_params()?[0].clone());
             check_types_node(session, lscope, body, None)
         },
 
@@ -229,7 +230,7 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &mut 
             }
             let mut types = vec!();
             for (ref mut expr, etype) in items.iter_mut().zip(etypes.iter()) {
-                types.push(expect_type(scope.clone(), etype.clone(), Some(check_types_node(session, scope.clone(), expr, etype.clone())), Check::List)?);
+                types.push(expect_type(session, scope.clone(), etype.clone(), Some(check_types_node(session, scope.clone(), expr, etype.clone())), Check::List)?);
             }
             *stype = Some(Type::Tuple(types.clone()));
             Type::Tuple(types)
@@ -238,7 +239,7 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &mut 
         AST::List(_, ref mut items, ref mut stype) => {
             let mut ltype = None;
             for ref mut expr in items {
-                ltype = Some(expect_type(scope.clone(), ltype.clone(), Some(check_types_node(session, scope.clone(), expr, ltype.clone())), Check::List)?);
+                ltype = Some(expect_type(session, scope.clone(), ltype.clone(), Some(check_types_node(session, scope.clone(), expr, ltype.clone())), Check::List)?);
             }
             let ltype = ltype.unwrap_or_else(|| expected.unwrap_or_else(|| scope.new_typevar()));
             *stype = Some(ltype.clone());
@@ -251,7 +252,7 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &mut 
             let ctype = check_types_node(session, scope.clone(), code, Some(ttype.clone()));
             debug!("PTRCAST: {:?} <- {:?}", ttype, ctype);
             // TODO is this quite right?
-            expect_type(scope, Some(ttype.clone()), Some(ctype), Check::List)?;
+            expect_type(session, scope, Some(ttype.clone()), Some(ctype), Check::List)?;
             ttype.clone()
         },
 
@@ -261,7 +262,7 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &mut 
                 Some(dtype) => {
                     let tscope = Scope::new_ref(Some(scope.clone()));
                     let mtype = tscope.map_all_typevars(dtype.clone());
-                    check_type_params(scope, &mtype.get_params()?, types, Check::Def, false)?;
+                    check_type_params(session, scope, &mtype.get_params()?, types, Check::Def, false)?;
                 },
                 None => return Err(Error::new(format!("TypeError: undefined type {:?}", ident.name))),
             };
@@ -282,7 +283,7 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &mut 
                 _ => return Err(Error::new(format!("SyntaxError: left-hand side of scope resolver must be identifier")))
             };
 
-            let classvars = scope.get_class_def(&ltype.get_name()?).classvars.clone();
+            let classvars = scope.get_type_def(&ltype.get_name()?).as_class()?.classvars.clone();
             classvars.get_variable_type(&field.name).unwrap_or_else(|| expected.unwrap_or_else(|| scope.new_typevar()))
         },
 
@@ -290,14 +291,14 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &mut 
             let ltype = resolve_type(scope.clone(), check_types_node(session, scope.clone(), left, None));
             *stype = Some(ltype.clone());
 
-            let classvars = scope.get_class_def(&ltype.get_name()?).classvars.clone();
+            let classvars = scope.get_type_def(&ltype.get_name()?).as_class()?.classvars.clone();
             classvars.get_variable_type(&field.name).unwrap_or_else(|| expected.unwrap_or_else(|| scope.new_typevar()))
         },
 
         AST::Assignment(_, ref mut left, ref mut right) => {
             let ltype = check_types_node(session, scope.clone(), left, None);
             let rtype = check_types_node(session, scope.clone(), right, Some(ltype.clone()));
-            expect_type(scope, Some(ltype), Some(rtype), Check::Def)?
+            expect_type(session, scope, Some(ltype), Some(rtype), Check::Def)?
         },
 
         AST::Import(_, _, ref mut decls) => {
@@ -326,13 +327,13 @@ pub fn get_accessor_name(scope: ScopeRef, fexpr: &mut AST, etype: &Type) -> Resu
                 _ => return Err(Error::new(format!("SyntaxError: left-hand side of scope resolver must be identifier")))
             };
 
-            let classvars = scope.get_class_def(&ltype.get_name()?).classvars.clone();
+            let classvars = scope.get_type_def(&ltype.get_name()?).as_class()?.classvars.clone();
 debug!("!!!: {:?}", classvars.get_variable_type(&ident.name));
             let funcdefs = classvars.num_funcdefs(&ident.name);
             funcdefs
         },
         AST::Accessor(_, _, ref mut ident, ref ltype) => {
-            let classvars = scope.get_class_def(&ltype.as_ref().unwrap().get_name()?).classvars.clone();
+            let classvars = scope.get_type_def(&ltype.as_ref().unwrap().get_name()?).as_class()?.classvars.clone();
             let funcdefs = classvars.num_funcdefs(&ident.name);
             funcdefs
         },

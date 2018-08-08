@@ -6,18 +6,19 @@ use std::collections::HashMap;
 use std::collections::hash_map::Entry;
 
 use abi::ABI;
-use ast::Ident;
 use types::Type;
-use session::Error;
+use ast::{ NodeID, Ident };
+use session::{ Session, Error };
 use utils::UniqueID;
-use classes::ClassDefRef;
+use defs::classes::ClassDefRef;
+use defs::{ VarDef, TypeDef };
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum Context {
     Primative,
     Global,
     Local,
-    Class,
+    Redirect,
 }
 
 
@@ -28,6 +29,8 @@ pub type VarID = UniqueID;
 pub struct VarInfo {
     pub id: VarID,
     pub ttype: Option<Type>,
+    pub def: Option<VarDef>,
+    //pub def: Option<NodeID>,
     pub funcdefs: i32,
     pub abi: Option<ABI>,
 }
@@ -39,7 +42,8 @@ pub type TypeID = UniqueID;
 pub struct TypeInfo {
     pub id: TypeID,
     pub ttype: Type,
-    pub classdef: Option<ClassDefRef>,
+    pub def: Option<TypeDef>,
+    //pub def: Option<NodeID>,
 }
 
 
@@ -78,8 +82,8 @@ impl Scope {
         self.context.set(context);
     }
 
-    pub fn set_class(&self, value: bool) {
-        self.context.set(if value { Context::Class } else { Context::Local });
+    pub fn set_redirect(&self, value: bool) {
+        self.context.set(if value { Context::Redirect } else { Context::Local });
     }
 
     pub fn is_primative(&self) -> bool {
@@ -104,7 +108,7 @@ impl Scope {
 
     pub fn target(scope: ScopeRef) -> ScopeRef {
         match scope.context.get() {
-            Context::Class => scope.get_class_def(&scope.basename.borrow()).classvars.clone(),
+            Context::Redirect => scope.get_type_def(&scope.basename.borrow()).as_class().unwrap().classvars.clone(),
             _ => scope,
         }
     }
@@ -121,6 +125,7 @@ impl Scope {
                 names.insert(name, VarInfo {
                     id: id,
                     ttype: ttype,
+                    def: None,
                     funcdefs: 0,
                     abi: None
                 });
@@ -131,13 +136,14 @@ impl Scope {
 
     #[must_use]
     pub fn define_func(&self, name: String, ttype: Option<Type>, abi: ABI) -> Result<VarID, Error> {
-        let funcs = self.search(&name, |sym| Some(sym.funcdefs)).unwrap_or(0);
+        let funcs = self._search(&name, |sym| Some(sym.funcdefs)).unwrap_or(0);
         match self.names.borrow_mut().entry(name.clone()) {
             Entry::Vacant(entry) => {
                 let id = VarID::generate();
                 entry.insert(VarInfo {
                     id: id,
                     ttype: ttype,
+                    def: None,
                     funcdefs: funcs + 1,
                     abi: Some(abi)
                 });
@@ -159,10 +165,10 @@ impl Scope {
     }
 
     #[must_use]
-    pub fn define_func_variant(dscope: ScopeRef, name: String, tscope: ScopeRef, ftype: Type) -> Result<VarID, Error> {
+    pub fn define_func_variant(session: &Session, dscope: ScopeRef, name: String, tscope: ScopeRef, ftype: Type) -> Result<VarID, Error> {
         let abi = ftype.get_abi().unwrap_or(ABI::Molten);
         let id = dscope.define_func(name.clone(), None, abi)?;
-        Scope::add_func_variant(dscope, &name, tscope, ftype)?;
+        Scope::add_func_variant(session, dscope, &name, tscope, ftype)?;
         Ok(id)
     }
 
@@ -188,18 +194,18 @@ impl Scope {
     }
     */
 
-    pub fn search<F, U>(&self, name: &String, f: F) -> Option<U> where F: Fn(&VarInfo) -> Option<U> {
+    pub fn _search<F, U>(&self, name: &String, f: F) -> Option<U> where F: Fn(&VarInfo) -> Option<U> {
         if let Some(sym) = self.names.borrow().get(name) {
             f(sym)
         } else if let Some(ref parent) = self.parent {
-            parent.search(name, f)
+            parent._search(name, f)
         } else {
             None
         }
     }
 
     pub fn contains(&self, name: &String) -> bool {
-        match self.search(name, |_sym| Some(true)) {
+        match self._search(name, |_sym| Some(true)) {
             Some(true) => true,
             _ => false,
         }
@@ -210,7 +216,7 @@ impl Scope {
     }
 
     pub fn variable_id(&self, name: &String) -> Result<VarID, Error> {
-        match self.search(name, |sym| Some(sym.id)) {
+        match self._search(name, |sym| Some(sym.id)) {
             Some(id) => Ok(id),
             None => Err(Error::new(format!("NameError: variable is undefined; {:?}", name))),
         }
@@ -224,8 +230,25 @@ impl Scope {
         self.get_variable_type_full(name, false)
     }
 
+    pub fn set_var_def(&self, name: &String, def: VarDef) {
+        self.modify_local(name, move |sym| { sym.def = Some(def.clone()); })
+    }
+
+    pub fn get_var_def(&self, name: &String) -> VarDef {
+        let def = self._search(name, |sym| {
+            match sym.def.as_ref() {
+                Some(def) => Some(def.clone()),
+                None => panic!("VarError: definition not set for {:?}", name),
+            }
+        });
+        match def {
+            Some(def) => def.clone(),
+            None => panic!("NameError: variable is undefined; {:?}", name),
+        }
+    }
+
     pub fn get_variable_type_full(&self, name: &String, local: bool) -> Option<Type> {
-        let otype = self.search(name, |sym| {
+        let otype = self._search(name, |sym| {
             if sym.funcdefs > 1 {
                 Some(Some(Type::Overload(self.get_all_variants(name, local))))
             } else {
@@ -266,10 +289,10 @@ impl Scope {
     */
 
     #[must_use]
-    pub fn add_func_variant(dscope: ScopeRef, name: &String, tscope: ScopeRef, ftype: Type) -> Result<(), Error> {
+    pub fn add_func_variant(session: &Session, dscope: ScopeRef, name: &String, tscope: ScopeRef, ftype: Type) -> Result<(), Error> {
         let otype = dscope.get_variable_type_full(name, true);
         let ftype = match otype {
-            Some(ttype) => ttype.add_variant(tscope, ftype.clone())?,
+            Some(ttype) => ttype.add_variant(session, tscope, ftype.clone())?,
             None => ftype,
         };
         dscope.set_variable_type(name, ftype.clone());
@@ -277,7 +300,7 @@ impl Scope {
     }
 
     pub fn num_funcdefs(&self, name: &String) -> i32 {
-        self.search(name, |sym| Some(sym.funcdefs)).unwrap_or(0)
+        self._search(name, |sym| Some(sym.funcdefs)).unwrap_or(0)
     }
 
 
@@ -313,7 +336,7 @@ impl Scope {
                 types.insert(name, TypeInfo {
                     id: id,
                     ttype: ttype,
-                    classdef: None,
+                    def: None,
                 });
                 Ok(id)
             },
@@ -372,21 +395,21 @@ impl Scope {
         })
     }
 
-    pub fn set_class_def(&self, name: &String, classdef: ClassDefRef) {
+    pub fn set_type_def(&self, name: &String, def: TypeDef) {
         self.modify_type(name, move |info| {
-            info.classdef = Some(classdef.clone());
+            info.def = Some(def.clone());
         })
     }
 
-    pub fn get_class_def(&self, name: &String) -> ClassDefRef {
-        let classdef = self._search_type(name, |info| {
-            match info.classdef.as_ref() {
-                Some(classdef) => Some(classdef.clone()),
-                None => panic!("TypeError: class definition not set for {:?}", name),
+    pub fn get_type_def(&self, name: &String) -> TypeDef {
+        let def = self._search_type(name, |info| {
+            match info.def.as_ref() {
+                Some(def) => Some(def.clone()),
+                None => panic!("TypeError: definition not set for {:?}", name),
             }
         });
-        match classdef {
-            Some(classdef) => classdef.clone(),
+        match def {
+            Some(def) => def.clone(),
             None => panic!("NameError: type is undefined; {:?}", name),
         }
     }

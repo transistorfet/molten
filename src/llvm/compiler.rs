@@ -19,7 +19,7 @@ use types::{ self, Type };
 use utils::UniqueID;
 use config::Options;
 use session::Session;
-use classes::ClassDefRef;
+use defs::classes::ClassDefRef;
 use ast::{ Pos, Ident, ClassSpec, AST };
 use scope::{ Scope, ScopeRef, ScopeMapRef };
 
@@ -369,7 +369,7 @@ unsafe fn declare_globals(data: &LLVM, scope: ScopeRef) {
     for node in &data.classes {
         if let AST::Class(_, ClassSpec { ident: ref cident, .. }, _, _, ref id) = **node {
             let tscope = data.map.get(id);
-            let classdef = tscope.get_class_def(&cident.name);
+            let classdef = tscope.get_type_def(&cident.name).as_class().unwrap();
             let value = data.get_type(tscope.type_id(&cident.name).unwrap()).unwrap();
 
             if classdef.has_vtable() {
@@ -377,7 +377,7 @@ unsafe fn declare_globals(data: &LLVM, scope: ScopeRef) {
                 for (index, &(ref name, ref ttype)) in classdef.vtable.borrow().iter().enumerate() {
                     let mut dtype = classdef.classvars.get_variable_type(&name).unwrap();
                     if dtype.is_overloaded() {
-                        dtype = types::find_variant(tscope.clone(), dtype, ttype.get_argtypes().unwrap().clone(), types::Check::List).unwrap();
+                        dtype = types::find_variant(data.session, tscope.clone(), dtype, ttype.get_argtypes().unwrap().clone(), types::Check::List).unwrap();
                     }
                     let name = ttype.get_abi().unwrap().mangle_name(name, dtype.get_argtypes().unwrap(), classdef.classvars.num_funcdefs(&name));
                     debug!("VTABLE INIT: {:?} {:?} {:?}", cident.name, name, index);
@@ -703,7 +703,7 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
 
         AST::For(_, ref ident, ref list, ref body, ref id) => {
             let lscope = data.map.get(id);
-            let listdef = scope.get_class_def(&String::from("List"));
+            let listdef = scope.get_type_def(&String::from("List")).as_class().unwrap();
 
             let list_value = compile_node(data, func, unwind, scope.clone(), list).get_ref();
             let inc = LLVMBuildAlloca(data.builder, int_type(data), label("inc"));
@@ -753,7 +753,7 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
             let ltype = Type::Object(format!("List"), vec!(itype.clone()));
             let newfunc = get_method(data, scope.clone(), "List", "new", vec!(ltype.clone()));
             let pushfunc = get_method(data, scope.clone(), "List", "push", vec!(ltype.clone(), itype.clone()));
-            //let listdef = scope.get_class_def(&String::from("List"));
+            //let listdef = scope.get_type_def(&String::from("List")).as_class().unwrap();
             // TODO this is kinda wrong, since you're passing it without type params
             //let list = data.get_value(listdef.variable_id(&String::from("new")).unwrap()).unwrap().invoke(data, unwind, vec!(compile_node(data, func, unwind, scope.clone(), &AST::New(pos.clone(), (String::from("List"), vec!()))).get_ref()));
             let list = newfunc.invoke(data, unwind, vec!(compile_node(data, func, unwind, scope.clone(), &AST::New(pos.clone(), ClassSpec::new(pos.clone(), Ident::new(pos.clone(), String::from("List")), vec!(itype.clone())))).get_ref()));
@@ -785,7 +785,7 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
         },
 
         AST::New(_, ClassSpec { ref ident, .. }) => {
-            let classdef = scope.get_class_def(&ident.name);
+            let classdef = scope.get_type_def(&ident.name).as_class().unwrap();
             let value = classdef.classvars.variable_id(&String::from("__alloc__")).ok().map(|id| data.get_value(id).unwrap());
             let object = if let Some(function) = value {
                 let mut largs = vec!();
@@ -814,7 +814,7 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
 
         AST::Class(_, ref classspec, _, ref body, ref id) => {
             let tscope = data.map.get(id);
-            //let classdef = scope.get_class_def(&classpec.ident.name);
+            //let classdef = scope.get_type_def(&classpec.ident.name).as_class().unwrap();
 
             // TODO you still need to compile the body of the func, if you're going to allow that... like an init function
             //compile_vec(data, func, unwind, tscope.clone(), body);
@@ -825,7 +825,7 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
         AST::Resolver(ref pos, ref left, ref right) => {
             match **left {
                 AST::Identifier(_, ref ident) => {
-                    let classdef = scope.get_class_def(&ident.name);
+                    let classdef = scope.get_type_def(&ident.name).as_class().unwrap();
                     let classid = classdef.classvars.variable_id(&right.name).unwrap();
                     data.get_value(classid).unwrap()
                 },
@@ -837,7 +837,7 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
             let object = compile_node(data, func, unwind, scope.clone(), left).get_ref();
 
             let name = ltype.clone().unwrap().get_name().unwrap();
-            let classdef = scope.get_class_def(&name);
+            let classdef = scope.get_type_def(&name).as_class().unwrap();
             debug!("*ACCESS: {:?} {:?}", right, classdef);
 
             if let Some(structindex) = classdef.get_struct_index(right.name.as_str()) {
@@ -863,7 +863,7 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
                 AST::Accessor(_, ref left, ref right, ref ltype) => {
                     let name = ltype.clone().unwrap().get_name().unwrap();
                     let object = compile_node(data, func, unwind, scope.clone(), left).get_ref();
-                    let classdef = scope.get_class_def(&name);
+                    let classdef = scope.get_type_def(&name).as_class().unwrap();
                     let pointer = build_struct_access(data, classdef, &right.name, object);
                     LLVMBuildStore(data.builder, value.get_ref(), pointer)
                 },
@@ -1003,7 +1003,7 @@ unsafe fn collect_functions_node<'sess>(data: &mut LLVM<'sess>, scope: ScopeRef,
 
         AST::Class(_, ClassSpec { ref ident, .. }, _, ref body, ref id) => {
             let tscope = data.map.get(id);
-            let classdef = scope.get_class_def(&ident.name);
+            let classdef = scope.get_type_def(&ident.name).as_class().unwrap();
 
             // TODO remove this hardcoded check before constructing
             if ident.name.as_str() != "String" && !ident.name.as_str().contains("closure") {
@@ -1014,7 +1014,7 @@ unsafe fn collect_functions_node<'sess>(data: &mut LLVM<'sess>, scope: ScopeRef,
             let lltype = build_class_type(data, scope.clone(), &ident.name, classdef);
 
             //let alloc = String::from("__alloc__");
-            //let classdef = scope.get_class_def(name);
+            //let classdef = scope.get_type_def(name).as_class().unwrap();
             //if !classdef.contains_local(&alloc) {
             //    debug!("******* CREATING ALLOC: {}", name);
             //    let cname = scope.get_full_name(&Some(name.clone()), id);
@@ -1190,10 +1190,10 @@ pub fn get_method(data: &LLVM, scope: ScopeRef, class: &str, method: &str, argty
     let classdef = if class == "" {
         scope.clone()
     } else {
-        scope.get_class_def(&String::from(class)).classvars.clone()
+        scope.get_type_def(&String::from(class)).as_class().unwrap().classvars.clone()
     };
     let name = String::from(method);
-    let ftype = find_variant(scope.clone(), classdef.get_variable_type(&name).unwrap(), Type::Tuple(argtypes), Check::Def).unwrap();
+    let ftype = find_variant(data.session, scope.clone(), classdef.get_variable_type(&name).unwrap(), Type::Tuple(argtypes), Check::Def).unwrap();
     let funcdefs = classdef.num_funcdefs(&name);
     let mname = ABI::Molten.mangle_name(&name, ftype.get_argtypes().unwrap(), funcdefs);
     let function = data.get_value(classdef.variable_id(&String::from(mname)).unwrap()).unwrap();

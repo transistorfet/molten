@@ -2,7 +2,7 @@
 
 use abi::ABI;
 use types::Type;
-use classes::ClassDef;
+use defs::classes::ClassDef;
 use ast::{ ClassSpec, AST };
 use session::{ Session, Error };
 use scope::{ Scope, ScopeRef };
@@ -69,7 +69,7 @@ fn bind_names_node_or_error(session: &Session, scope: ScopeRef, node: &mut AST) 
             if let Some(ref mname) = abi.unmangle_name(ident.as_str()) {
                 dscope.define_func(mname.clone(), None, abi)?;
                 let mut stype = dscope.get_variable_type(mname).unwrap_or(Type::Overload(vec!()));
-                stype = stype.add_variant(scope, ttype.clone())?;
+                stype = stype.add_variant(session, scope, ttype.clone())?;
                 dscope.set_variable_type(mname, stype);
             }
         },
@@ -131,7 +131,7 @@ fn bind_names_node_or_error(session: &Session, scope: ScopeRef, node: &mut AST) 
             //let mut types = vec!();
             // TODO this is nearly identical to class... these need to be separated
             let tscope = session.map.add(pos.id, None);
-            tscope.set_class(true);
+            tscope.set_redirect(true);
             tscope.set_basename(classspec.ident.name.clone());
 
             classspec.types.iter_mut().map(|ref mut ttype| declare_typevars(tscope.clone(), Some(ttype), true).unwrap()).count();
@@ -158,7 +158,7 @@ fn bind_names_node_or_error(session: &Session, scope: ScopeRef, node: &mut AST) 
         AST::Class(_, ref mut classspec, ref mut parentspec, ref mut body, ref id) => {
             // Create a temporary invisible scope to name check the class body
             let tscope = session.map.add(*id, Some(scope.clone()));
-            tscope.set_class(true);
+            tscope.set_redirect(true);
             tscope.set_basename(classspec.ident.name.clone());
 
             // Define Self and Super, and check for typevars in the type params

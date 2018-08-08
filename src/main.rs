@@ -27,7 +27,7 @@ mod refinery;
 mod binding;
 mod typecheck;
 mod precompiler;
-mod classes;
+mod defs;
 mod export;
 mod llvm;
 
@@ -79,7 +79,7 @@ fn compile_file(input: &str, output: Option<&str>) {
     session.target = output.map(|s| String::from(s)).unwrap_or_else(|| format!("{}.ll", name));
 
     let builtins = lib::get_builtins();
-    lib::make_global(&session.map, &builtins);
+    lib::make_global(&session, &builtins);
 
     let mut code = session.parse_file(input, false);
     //code = refinery::refine(code);
