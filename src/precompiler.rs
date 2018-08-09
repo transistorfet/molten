@@ -267,7 +267,6 @@ pub fn precompile_node(session: &Session, scope: ScopeRef, node: AST) -> AST {
             }).collect())
         },
 
-        AST::Noop => { node },
         AST::Underscore => { node },
         AST::Boolean(_) => { node },
         AST::Integer(_) => { node },

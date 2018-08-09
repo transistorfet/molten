@@ -50,7 +50,6 @@ pub struct Field {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum AST {
-    Noop,
     //Comment(String),
 
     Underscore,
@@ -218,5 +217,77 @@ impl AST {
             _ => Pos::empty(),
         }
     }
+
+    pub fn make_
+
+
+    /*
+    pub fn set_id(self, id: NodeID) -> Self {
+        self.id = id;
+        self
+    }
+
+    pub fn set_pos(self, pos: Pos) -> Self {
+        self.pos = pos;
+        self
+    }
+
+    pub fn set_span(self, span: Span) -> Self {
+        self.pos = Pos::new(span);
+        self
+    }
+
+    pub fn mk_ident(ident: Ident) -> Self {
+        AST::Identifier(Pos::empty(), ident);
+        AST {
+            id: UniqueID::generate(),
+            pos: Pos::empty(),
+            kind: ASTKind::Ident(ident),
+        }
+    }
+    */
+
+
+
+
+    /*
+    AST::make_for(ident, list, body).set_span(span)
+    AST::make_while(ident, body).set_span(span)
+    AST::make_ident(ident).set_span(span)
+    AST::make_def(ident).set_span(span)
+    AST::make_decl(ident, ttype, value).set_span(span)
+    AST::make_func(ident, args, rettype, body).set_span(span)
+    */
+
+
+    /*
+    AST::mkident(ident).set_span(span)
+    AST::mkdef(ident).set_span(span)
+
+
+    AST::mk_ident(ident).set_span(span)
+    AST::mk_def(ident).set_span(span)
+    AST::make_for(ident, list, body).set_span(span)
+    AST::make_while(ident, body).set_span(span)
+    AST::make_identifer(ident).set_span(span)
+    AST::make_definition(ident, ttype, value).set_span(span)
+    AST::make_function(ident, args, rettype, body).set_span(span)
+
+
+    AST::build_identifer(ident).set_span(span)
+    AST::build_defintion(ident).set_span(span)
+
+    AST::cons_for(ident).set_span(span)
+    AST::cons_while(ident).set_span(span)
+    AST::cons_identifer(ident).set_span(span)
+    AST::cons_definition(ident).set_span(span)
+
+
+
+    AST::mkdefinition(ident).set_span(span)
+    AST::mkidentifer(ident).set_span(span)
+    AST::mk_identifer(ident).set_span(span)
+    AST::makeidentifer(ident).set_span(span)
+    */
 } 
 

@@ -205,7 +205,7 @@ fn bind_names_node_or_error(session: &Session, scope: ScopeRef, node: &mut AST) 
             bind_names_vec(session, scope, decls);
         },
 
-        AST::Noop | AST::Underscore | AST::Nil(_) |
+        AST::Underscore | AST::Nil(_) |
         AST::Boolean(_) | AST::Integer(_) | AST::Real(_) | AST::String(_) => { }
     }
     Ok(())

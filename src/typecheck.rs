@@ -306,8 +306,6 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &mut 
             Type::Object(String::from("Nil"), vec!())
         },
 
-        AST::Noop => Type::Object(String::from("Nil"), vec!()),
-
         AST::Underscore => expected.unwrap_or_else(|| scope.new_typevar()),
 
         AST::Index(_, _, _, _) => panic!("InternalError: ast element shouldn't appear at this late phase: {:?}", node),

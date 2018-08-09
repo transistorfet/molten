@@ -118,7 +118,6 @@ named!(statement(Span) -> AST,
             typedef |
             expression
             // TODO should class be here too?
-            //value!(AST::Noop, multispace_comment)
         )) >>
         //eat_separator!("\n") >>
         separator >>
@@ -204,119 +203,116 @@ named!(typedef(Span) -> AST,
 
 
 named!(expression(Span) -> AST,
-        alt_complete!(
-            noop |
-            underscore |
-            //block |
-            ifexpr |
-            trywith |
-            raise |
-            matchcase |
-            forloop |
-            newclass |
-            declare |
-            function |
-            infix
-            )
-      );
+    alt_complete!(
+        underscore |
+        //block |
+        ifexpr |
+        trywith |
+        raise |
+        matchcase |
+        forloop |
+        newclass |
+        declare |
+        function |
+        infix
+    )
+);
 
-named!(noop(Span) -> AST,
-        value!(AST::Noop, tag_word!("noop"))
-      );
+
 
 named!(underscore(Span) -> AST,
-        value!(AST::Underscore, tag!("_"))
-      );
+    value!(AST::Underscore, tag!("_"))
+);
 
 named!(block(Span) -> AST,
-        delimited!(
-            wscom!(alt!(tag_word!("begin") | tag!("{"))),
-            do_parse!(
-                pos: position!() >>
-                s: many0!(statement) >>
-                (AST::Block(Pos::new(pos), s))
-                ),
-            wscom!(alt!(tag_word!("end") | tag!("}")))
-            )
-      );
+    delimited!(
+        wscom!(alt!(tag_word!("begin") | tag!("{"))),
+        do_parse!(
+            pos: position!() >>
+            s: many0!(statement) >>
+            (AST::Block(Pos::new(pos), s))
+        ),
+        wscom!(alt!(tag_word!("end") | tag!("}")))
+    )
+);
 
 named!(ifexpr(Span) -> AST,
-        do_parse!(
-            pos: position!() >>
-            wscom!(tag_word!("if")) >>
-            c: expression >>
-            wscom!(tag_word!("then")) >>
-            t: expression >>
-            f: opt!(preceded!(
-                    wscom!(tag_word!("else")),
-                    expression
-                    )) >>
-            (AST::If(Pos::new(pos), Box::new(c), Box::new(t), Box::new(if f.is_some() { f.unwrap() } else { AST::Nil(None) })))
-            )
-      );
+    do_parse!(
+        pos: position!() >>
+        wscom!(tag_word!("if")) >>
+        c: expression >>
+        wscom!(tag_word!("then")) >>
+        t: expression >>
+        f: opt!(preceded!(
+            wscom!(tag_word!("else")),
+            expression
+        )) >>
+        (AST::If(Pos::new(pos), Box::new(c), Box::new(t), Box::new(if f.is_some() { f.unwrap() } else { AST::Nil(None) })))
+    )
+);
 
 named!(trywith(Span) -> AST,
-        do_parse!(
-            pos: position!() >>
-            wscom!(tag_word!("try")) >>
-            c: expression >>
-            wscom!(tag_word!("with")) >>
-            l: caselist >>
-            (AST::Try(Pos::new(pos), Box::new(c), l, None))
-            )
-      );
+    do_parse!(
+        pos: position!() >>
+        wscom!(tag_word!("try")) >>
+        c: expression >>
+        wscom!(tag_word!("with")) >>
+        l: caselist >>
+        (AST::Try(Pos::new(pos), Box::new(c), l, None))
+    )
+);
 
 named!(raise(Span) -> AST,
-        do_parse!(
-            pos: position!() >>
-            wscom!(tag_word!("raise")) >>
-            e: expression >>
-            (AST::Raise(Pos::new(pos), Box::new(e)))
-            )
-      );
+    do_parse!(
+        pos: position!() >>
+        wscom!(tag_word!("raise")) >>
+        e: expression >>
+        (AST::Raise(Pos::new(pos), Box::new(e)))
+    )
+);
 
 named!(matchcase(Span) -> AST,
-        do_parse!(
-            pos: position!() >>
-            wscom!(tag_word!("match")) >>
-            c: expression >>
-            //wscom!(tag_word!("with")) >>
-            //l: caselist >>
-            l: delimited!(wscom!(tag!("{")), caselist, wscom!(tag!("}"))) >>
-            (AST::Match(Pos::new(pos), Box::new(c), l, None))
-            )
-      );
+    do_parse!(
+        pos: position!() >>
+        wscom!(tag_word!("match")) >>
+        c: expression >>
+        //wscom!(tag_word!("with")) >>
+        //l: caselist >>
+        l: delimited!(wscom!(tag!("{")), caselist, wscom!(tag!("}"))) >>
+        (AST::Match(Pos::new(pos), Box::new(c), l, None))
+    )
+);
 
 named!(caselist(Span) -> Vec<(AST, AST)>,
-        //separated_list_complete!(wscom!(tag!(",")), do_parse!(
-        many1!(do_parse!(
-                //wscom!(tag!("|")) >>
-                c: alt_complete!(value!(AST::Underscore, tag!("_")) | literal) >>
-                wscom!(tag!("=>")) >>
-                e: expression >>
-                //wscom!(tag!(",")) >>
-                (c, e)
-                ))
-      );
+    //separated_list_complete!(wscom!(tag!(",")), do_parse!(
+    many1!(do_parse!(
+        //wscom!(tag!("|")) >>
+        c: alt_complete!(value!(AST::Underscore, tag!("_")) | literal) >>
+        wscom!(tag!("=>")) >>
+        e: expression >>
+        //wscom!(tag!(",")) >>
+        (c, e)
+    ))
+);
 
-      named!(forloop(Span) -> AST,
-          do_parse!(
-              pos: position!() >>
-              wscom!(tag_word!("for")) >>
-              i: identifier >>
-              wscom!(tag_word!("in")) >>
-              l: expression >>
-              opt!(multispace_comment) >>
-              e: expression >>
-              (AST::For(Pos::new(pos), i, Box::new(l), Box::new(e), UniqueID::generate()))
-              )
-          );
+named!(forloop(Span) -> AST,
+    do_parse!(
+        pos: position!() >>
+        wscom!(tag_word!("for")) >>
+        i: identifier >>
+        wscom!(tag_word!("in")) >>
+        l: expression >>
+        opt!(multispace_comment) >>
+        e: expression >>
+        (AST::For(Pos::new(pos), i, Box::new(l), Box::new(e), UniqueID::generate()))
+    )
+);
 
-      named!(newclass(Span) -> AST,
-              do_parse!(
-                  pos: position!() >>
-                  wscom!(tag_word!("new")) >>
-                  cs: class_spec >>
+named!(newclass(Span) -> AST,
+    do_parse!(
+        pos: position!() >>
+        wscom!(tag_word!("new")) >>
+        cs: class_spec >>
         a: map!(
             delimited!(tag!("("), expression_list, tag!(")")),
             |mut a| { a.insert(0, AST::New(Pos::new(pos), cs.clone())); a }
@@ -659,7 +655,6 @@ named!(reserved(Span) -> Span,
         tag_word!("try") | tag_word!("with") | tag_word!("raise") |
         tag_word!("for") | tag_word!("in") |
         tag_word!("fn") | tag_word!("decl") |
-        tag_word!("noop")
     )
 );
 

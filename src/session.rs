@@ -92,9 +92,11 @@ impl Session {
         err
     }
 
-/*
     pub fn get_def(&self, id: NodeID) -> VarDef {
-        self.vardefs.borrow().get(&id).clone()
+        match self.vardefs.borrow().get(&id) {
+            Some(def) => def.clone(),
+            None => panic!("VarError: definition not set for {:?}", id),
+        }
     }
 
     pub fn set_def(&self, id: NodeID, def: VarDef) {
@@ -104,9 +106,8 @@ impl Session {
     pub fn define(&self, scope: ScopeRef, name: &str, id: NodeID) {
         let dscope = Scope::target(scope.clone());
         dscope.define(String::from(name), None);
-        dscope.set_var_def(name, id);
+        //dscope.set_var_def(name, id);
     }
-*/
 }
 
 #[derive(Clone, Debug, PartialEq)]

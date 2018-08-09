@@ -148,7 +148,6 @@ pub fn refine_node(node: AST) -> AST {
         //    AST::Import(pos, ident, refine_vec(decls))
         //},
 
-        AST::Noop => { node },
         AST::Underscore => { node },
         AST::Boolean(_) => { node },
         AST::Integer(_) => { node },

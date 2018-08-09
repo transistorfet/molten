@@ -407,7 +407,6 @@ unsafe fn compile_vec(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: Sc
 unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: ScopeRef, node: &AST) -> Value {
     debug!("COMPILE: {:?}", node);
     match *node {
-        AST::Noop => Box::new(Data(ptr::null_mut())),
         AST::Nil(ref ttype) => Box::new(Data(null_value(get_type(data, scope.clone(), ttype.clone().unwrap(), true)))),
         AST::Boolean(ref num) => Box::new(Data(LLVMConstInt(bool_type(data), *num as u64, 0))),
         AST::Integer(ref num) => Box::new(Data(LLVMConstInt(int_type(data), *num as u64, 0))),
@@ -1050,7 +1049,7 @@ unsafe fn collect_functions_node<'sess>(data: &mut LLVM<'sess>, scope: ScopeRef,
 
         AST::Recall(_, _) |
         AST::Identifier(_, _) |
-        AST::Noop | AST::Underscore | AST::Nil(_) |
+        AST::Underscore | AST::Nil(_) |
         AST::Boolean(_) | AST::Integer(_) | AST::Real(_) | AST::String(_) => { }
     };
     None
