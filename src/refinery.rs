@@ -17,135 +17,135 @@ pub fn refine_vec(code: Vec<AST>) -> Vec<AST> {
 
 pub fn refine_node(node: AST) -> AST {
     match node {
-        AST::Block(pos, mut code) => {
+        AST::Block(id, pos, mut code) => {
             if code.len() == 0 {
                 code.push(AST::Nil(None))
             }
-            AST::Block(pos, refine_vec(code))
+            AST::Block(id, pos, refine_vec(code))
         },
 
-        AST::Definition(pos, ident, ttype, code) => {
-            AST::Definition(pos, ident, ttype, Box::new(refine_node(*code)))
+        AST::Definition(id, pos, ident, ttype, code) => {
+            AST::Definition(id, pos, ident, ttype, Box::new(refine_node(*code)))
         },
 
-        AST::Declare(pos, ident, ttype) => {
-            AST::Declare(pos, ident, ttype)
+        AST::Declare(id, pos, ident, ttype) => {
+            AST::Declare(id, pos, ident, ttype)
         },
 
-        AST::Function(pos, ident, args, ret, body, id, abi) => {
-            AST::Function(pos, ident, args, ret, Box::new(refine_node(*body)), id, abi)
+        AST::Function(id, pos, ident, args, ret, body, abi) => {
+            AST::Function(id, pos, ident, args, ret, Box::new(refine_node(*body)), abi)
         },
 
-        AST::Invoke(pos, fexpr, mut args, ttype) => {
-            if let AST::Accessor(_, ref expr, _, _) = *fexpr {
+        AST::Invoke(id, pos, fexpr, mut args, ttype) => {
+            if let AST::Accessor(_, _, ref expr, _, _) = *fexpr {
                 args.insert(0, *expr.clone());
             }
-            AST::Invoke(pos, Box::new(refine_node(*fexpr)), refine_vec(args), ttype)
+            AST::Invoke(id, pos, Box::new(refine_node(*fexpr)), refine_vec(args), ttype)
         },
 
-        AST::SideEffect(pos, op, args) => {
-            AST::SideEffect(pos, op, refine_vec(args))
+        AST::SideEffect(id, pos, op, args) => {
+            AST::SideEffect(id, pos, op, refine_vec(args))
         },
 
-        AST::If(pos, cond, texpr, fexpr) => {
-            AST::If(pos, Box::new(refine_node(*cond)), Box::new(refine_node(*texpr)), Box::new(refine_node(*fexpr)))
+        AST::If(id, pos, cond, texpr, fexpr) => {
+            AST::If(id, pos, Box::new(refine_node(*cond)), Box::new(refine_node(*texpr)), Box::new(refine_node(*fexpr)))
         },
 
-        AST::Match(pos, cond, cases, condtype) => {
+        AST::Match(id, pos, cond, cases, condtype) => {
             let cases = cases.into_iter().map(move |(case, body)| ( refine_node(case), refine_node(body) )).collect();
-            AST::Match(pos, Box::new(refine_node(*cond)), cases, condtype)
+            AST::Match(id, pos, Box::new(refine_node(*cond)), cases, condtype)
         },
 
-        AST::Try(pos, cond, cases, condtype) => {
+        AST::Try(id, pos, cond, cases, condtype) => {
             let cases = cases.into_iter().map(move |(case, body)| ( refine_node(case), refine_node(body) )).collect();
-            AST::Try(pos, Box::new(refine_node(*cond)), cases, condtype)
+            AST::Try(id, pos, Box::new(refine_node(*cond)), cases, condtype)
         },
 
-        AST::Raise(pos, expr) => {
-            AST::Raise(pos, Box::new(refine_node(*expr)))
+        AST::Raise(id, pos, expr) => {
+            AST::Raise(id, pos, Box::new(refine_node(*expr)))
         },
 
-        AST::While(pos, cond, body) => {
-            AST::While(pos, Box::new(refine_node(*cond)), Box::new(refine_node(*body)))
+        AST::While(id, pos, cond, body) => {
+            AST::While(id, pos, Box::new(refine_node(*cond)), Box::new(refine_node(*body)))
         },
 
-        AST::For(pos, ident, cond, body, id) => {
-            AST::For(pos, ident, Box::new(refine_node(*cond)), Box::new(refine_node(*body)), id)
+        AST::For(id, pos, ident, cond, body) => {
+            AST::For(id, pos, ident, Box::new(refine_node(*cond)), Box::new(refine_node(*body)))
         },
 
-        AST::List(pos, code, ttype) => { AST::List(pos, refine_vec(code), ttype) },
-        AST::Tuple(pos, code, ttype) => { AST::Tuple(pos, refine_vec(code), ttype) },
+        AST::List(id, pos, code, ttype) => { AST::List(id, pos, refine_vec(code), ttype) },
+        AST::Tuple(id, pos, code, ttype) => { AST::Tuple(id, pos, refine_vec(code), ttype) },
 
-        AST::Class(pos, classspec, parentspec, body, id) => {
+        AST::Class(id, pos, classspec, parentspec, body) => {
             // Make sure constructors take "self" as the first argument, and return "self" at the end
             let mut has_new = false;
             let mut body: Vec<AST> = body.into_iter().map(|node| {
                 match node {
-                    AST::Function(pos, ident, args, ret, mut body, id, abi) => {
+                    AST::Function(id, pos, ident, args, ret, mut body, abi) => {
                         if ident.as_ref().map(|i| i.name.as_str()) == Some("new") {
                             has_new = true;
                             if args.len() > 0 && args[0].ident.as_str() == "self" {
-                                body = Box::new(AST::Block(pos.clone(), vec!(*body, AST::Identifier(pos.clone(), Ident::new(pos.clone(), String::from("self"))))));
+                                body = Box::new(AST::Block(id, pos.clone(), vec!(*body, AST::Identifier(id, pos.clone(), Ident::new(pos.clone(), String::from("self"))))));
                             } else {
                                 panic!("SyntaxError: the \"new\" method on a class must have \"self\" as its first parameter");
                             }
                         }
-                        AST::Function(pos, ident, args, ret, body, id, abi)
+                        AST::Function(id, pos, ident, args, ret, body, abi)
                     },
-                    AST::Declare(pos, ident, ttype) => {
+                    AST::Declare(id, pos, ident, ttype) => {
                         if ident.name == String::from("new") {
                             has_new = true;
                         }
-                        AST::Declare(pos, ident, ttype)
+                        AST::Declare(id, pos, ident, ttype)
                     },
                     _ => node
                 }
             }).collect();
             if !has_new {
-                //body.insert(0, AST::Function(pos.clone(), Some(String::from("new")), vec!((String::from("self"), None, None)), None, Box::new(AST::Identifier(pos.clone(), String::from("self"))), UniqueID::generate(), ABI::Molten));
+                //body.insert(0, AST::Function(id, pos.clone(), Some(String::from("new")), vec!((String::from("self"), None, None)), None, Box::new(AST::Identifier(id, pos.clone(), String::from("self"))), UniqueID::generate(), ABI::Molten));
                 //panic!("SyntaxError: you must declare a \"new\" method on a class");
             }
-            AST::Class(pos, classspec, parentspec, refine_vec(body), id)
+            AST::Class(id, pos, classspec, parentspec, refine_vec(body))
         },
 
-        AST::Index(pos, base, index, _) => {
-            //AST::Index(pos, Box::new(refine_node(*base)), Box::new(refine_node(*index)), stype)
-            refine_node(AST::Invoke(pos.clone(), Box::new(AST::Accessor(pos.clone(), base, Ident::new(pos.clone(), String::from("[]")), None)), vec!(*index), None))
+        AST::Index(id, pos, base, index, _) => {
+            //AST::Index(id, pos, Box::new(refine_node(*base)), Box::new(refine_node(*index)), stype)
+            refine_node(AST::Invoke(id, pos.clone(), Box::new(AST::Accessor(id, pos.clone(), base, Ident::new(pos.clone(), String::from("[]")), None)), vec!(*index), None))
         },
 
-        AST::Resolver(pos, left, right) => {
+        AST::Resolver(id, pos, left, right) => {
             // TODO should this also allow a non-type specifier?
             match *left {
-                AST::Identifier(_, _) => { },
+                AST::Identifier(_, _, _) => { },
                 _ => panic!("SyntaxError: left-hand side of scope resolver must be identifier")
             }
-            AST::Resolver(pos, Box::new(refine_node(*left)), right)
+            AST::Resolver(id, pos, Box::new(refine_node(*left)), right)
         },
 
-        AST::Accessor(pos, left, right, stype) => {
-            AST::Accessor(pos, Box::new(refine_node(*left)), right, stype)
+        AST::Accessor(id, pos, left, right, stype) => {
+            AST::Accessor(id, pos, Box::new(refine_node(*left)), right, stype)
         },
 
-        AST::Assignment(pos, left, right) => {
+        AST::Assignment(id, pos, left, right) => {
             let left = *left;
             match left {
-                AST::Accessor(_, _, _, _) => {
-                    AST::Assignment(pos, Box::new(refine_node(left)), Box::new(refine_node(*right)))
+                AST::Accessor(_, _, _, _, _) => {
+                    AST::Assignment(id, pos, Box::new(refine_node(left)), Box::new(refine_node(*right)))
                 },
-                AST::Index(ipos, base, index, _) => {
-                    refine_node(AST::Invoke(pos, Box::new(AST::Accessor(ipos.clone(), base, Ident::new(ipos.clone(), String::from("[]")), None)), vec!(*index, *right), None))
+                AST::Index(iid, ipos, base, index, _) => {
+                    refine_node(AST::Invoke(id, pos, Box::new(AST::Accessor(iid, ipos.clone(), base, Ident::new(ipos.clone(), String::from("[]")), None)), vec!(*index, *right), None))
                 },
                 _ => panic!("SyntaxError: assignment to something other than a list or class element: {:?}", left),
             }
             //AST::Assignment(Box::new(refine_node(*left)), Box::new(refine_node(*right)))
         },
 
-        AST::Import(_, _, _) => { node },
-        //AST::Import(pos, ident, _) => {
+        AST::Import(_, _, _, _) => { node },
+        //AST::Import(id, pos, ident, _) => {
         //    let path = ident.replace(".", "/") + ".dec";
         //    let decls = import::load_index(path.as_str());
         //    //let decls = session.parse_file(path.as_str());
-        //    AST::Import(pos, ident, refine_vec(decls))
+        //    AST::Import(id, pos, ident, refine_vec(decls))
         //},
 
         AST::Underscore => { node },
@@ -155,10 +155,10 @@ pub fn refine_node(node: AST) -> AST {
         AST::String(_) => { node },
         AST::Nil(_) => { node },
         AST::PtrCast(_, _) => { node },
-        AST::Recall(_, _) => { node },
-        AST::Identifier(_, _) => { node },
-        AST::New(_, _) => { node },
-        AST::TypeDef(_, _, _) => { node },
+        AST::Recall(_, _, _) => { node },
+        AST::Identifier(_, _, _) => { node },
+        AST::New(_, _, _) => { node },
+        AST::TypeDef(_, _, _, _) => { node },
 
         //node @ _ => { node }
     }

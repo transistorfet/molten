@@ -40,7 +40,7 @@ impl ClassDef {
 
     /*
     pub fn define(session: &Session, scope: ScopeRef, node: &mut AST) -> Result<(), Error> {
-        if let AST::Class(_, ref mut classspec, ref mut parentspec, ref mut body, ref id) = *node {
+        if let AST::Class(ref id, _, ref mut classspec, ref mut parentspec, ref mut body) = *node {
             // Create a temporary invisible scope to name check the class body
             let tscope = session.map.add(*id, Some(scope.clone()));
             tscope.set_class(true);
@@ -96,7 +96,7 @@ impl ClassDef {
 
         for ref node in body.iter() {
             match **node {
-                AST::Function(_, ref fident, ref args, ref rtype, _, _, ref abi) => {
+                AST::Function(ref id, _, ref fident, ref args, ref rtype, _, ref abi) => {
                     if fident.is_some() {
                         let fname = &fident.as_ref().unwrap().name;
                         let uname = abi.unmangle_name(&fname).unwrap_or(fname.clone());
@@ -106,7 +106,7 @@ impl ClassDef {
                         //}
                     }
                 },
-                AST::Declare(_, ref fident, ref ttype) => {
+                AST::Declare(ref id, _, ref fident, ref ttype) => {
                     match *ttype {
                         Type::Function(_, _, ref abi) => {
                             let uname = abi.unmangle_name(fident.name.as_ref()).unwrap_or(fident.name.clone());
@@ -141,7 +141,7 @@ impl ClassDef {
         }
         for ref node in body.iter() {
             match **node {
-                AST::Definition(_, ref ident, ref ttype, ref value) => {
+                AST::Definition(ref id, _, ref ident, ref ttype, ref value) => {
                     structdef.push((ident.name.clone(), ttype.clone().unwrap()));
                 },
                 _ => { }

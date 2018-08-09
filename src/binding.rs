@@ -31,7 +31,7 @@ pub fn bind_names_node(session: &Session, scope: ScopeRef, node: &mut AST) {
 
 fn bind_names_node_or_error(session: &Session, scope: ScopeRef, node: &mut AST) -> Result<(), Error> {
     match *node {
-        AST::Function(_, ref ident, ref mut args, ref mut ret, ref mut body, ref id, ref abi) => {
+        AST::Function(ref id, _, ref ident, ref mut args, ref mut ret, ref mut body, ref abi) => {
             let fscope = session.map.add(*id, Some(scope.clone()));
             fscope.set_basename(ident.as_ref().map_or(format!("anon{}", id), |ident| ident.name.clone()));
 
@@ -49,19 +49,19 @@ fn bind_names_node_or_error(session: &Session, scope: ScopeRef, node: &mut AST) 
             bind_names_node(session, fscope, body)
         },
 
-        AST::Invoke(_, ref mut fexpr, ref mut args, _) => {
+        AST::Invoke(ref id, _, ref mut fexpr, ref mut args, _) => {
             bind_names_node(session, scope.clone(), fexpr);
             bind_names_vec(session, scope, args);
         },
 
-        AST::Definition(_, ref ident, ref mut ttype, ref mut code) => {
+        AST::Definition(ref id, _, ref ident, ref mut ttype, ref mut code) => {
             declare_typevars(scope.clone(), ttype.as_mut(), false)?;
             let dscope = Scope::target(scope.clone());
             dscope.define(ident.name.clone(), ttype.clone())?;
             bind_names_node(session, scope, code);
         },
 
-        AST::Declare(_, ref ident, ref mut ttype) => {
+        AST::Declare(ref id, _, ref ident, ref mut ttype) => {
             declare_typevars(scope.clone(), Some(ttype), false)?;
             let dscope = Scope::target(scope.clone());
             let abi = ttype.get_abi().unwrap_or(ABI::Molten);
@@ -74,25 +74,25 @@ fn bind_names_node_or_error(session: &Session, scope: ScopeRef, node: &mut AST) 
             }
         },
 
-        AST::Recall(_, ref ident) |
-        AST::Identifier(_, ref ident) => {
+        AST::Recall(ref id, _, ref ident) |
+        AST::Identifier(ref id, _, ref ident) => {
             if !scope.contains(&ident.name) {
                 return Err(Error::new(format!("NameError: undefined identifier {:?}", ident.name)));
             }
         },
 
-        AST::SideEffect(_, _, ref mut args) => {
+        AST::SideEffect(ref id, _, _, ref mut args) => {
             bind_names_vec(session, scope, args);
         },
 
-        AST::If(_, ref mut cond, ref mut texpr, ref mut fexpr) => {
+        AST::If(ref id, _, ref mut cond, ref mut texpr, ref mut fexpr) => {
             bind_names_node(session, scope.clone(), cond);
             bind_names_node(session, scope.clone(), texpr);
             bind_names_node(session, scope, fexpr);
         },
 
-        AST::Try(_, ref mut cond, ref mut cases, _) |
-        AST::Match(_, ref mut cond, ref mut cases, _) => {
+        AST::Try(ref id, _, ref mut cond, ref mut cases, _) |
+        AST::Match(ref id, _, ref mut cond, ref mut cases, _) => {
             bind_names_node(session, scope.clone(), cond);
             // TODO check to make sure AST::Underscore only occurs as the last case, if at all
             for &mut (ref mut case, ref mut body) in cases {
@@ -101,36 +101,36 @@ fn bind_names_node_or_error(session: &Session, scope: ScopeRef, node: &mut AST) 
             }
         },
 
-        AST::Raise(_, ref mut expr) => {
+        AST::Raise(ref id, _, ref mut expr) => {
             bind_names_node(session, scope, expr);
         },
 
-        AST::While(_, ref mut cond, ref mut body) => {
+        AST::While(ref id, _, ref mut cond, ref mut body) => {
             bind_names_node(session, scope.clone(), cond);
             bind_names_node(session, scope, body);
         },
 
-        AST::For(_, ref ident, ref mut cond, ref mut body, ref id) => {
+        AST::For(ref id, _, ref ident, ref mut cond, ref mut body) => {
             let lscope = session.map.add(*id, Some(scope.clone()));
             lscope.define(ident.name.clone(), None)?;
             bind_names_node(session, lscope.clone(), cond);
             bind_names_node(session, lscope, body);
         },
 
-        AST::Tuple(_, ref mut code, _) |
-        AST::List(_, ref mut code, _) |
-        AST::Block(_, ref mut code) => { bind_names_vec(session, scope, code); },
+        AST::Tuple(ref id, _, ref mut code, _) |
+        AST::List(ref id, _, ref mut code, _) |
+        AST::Block(ref id, _, ref mut code) => { bind_names_vec(session, scope, code); },
 
-        AST::Index(_, ref mut base, ref mut index, _) => {
+        AST::Index(ref id, _, ref mut base, ref mut index, _) => {
             bind_names_node(session, scope.clone(), base);
             bind_names_node(session, scope, index);
         },
 
 
-        AST::TypeDef(ref pos, ref mut classspec, ref mut fields) => {
+        AST::TypeDef(ref id, ref pos, ref mut classspec, ref mut fields) => {
             //let mut types = vec!();
             // TODO this is nearly identical to class... these need to be separated
-            let tscope = session.map.add(pos.id, None);
+            let tscope = session.map.add(*id, None);
             tscope.set_redirect(true);
             tscope.set_basename(classspec.ident.name.clone());
 
@@ -148,14 +148,14 @@ fn bind_names_node_or_error(session: &Session, scope: ScopeRef, node: &mut AST) 
             bind_names_node(session, scope, code)
         },
 
-        AST::New(_, ref mut classspec) => {
+        AST::New(ref id, _, ref mut classspec) => {
             classspec.types.iter_mut().map(|ref mut ttype| declare_typevars(scope.clone(), Some(ttype), false).unwrap()).count();
             if scope.find_type(&classspec.ident.name).is_none() {
                 return Err(Error::new(format!("NameError: undefined identifier {:?}", classspec.ident.name)));
             }
         },
 
-        AST::Class(_, ref mut classspec, ref mut parentspec, ref mut body, ref id) => {
+        AST::Class(ref id, _, ref mut classspec, ref mut parentspec, ref mut body) => {
             // Create a temporary invisible scope to name check the class body
             let tscope = session.map.add(*id, Some(scope.clone()));
             tscope.set_redirect(true);
@@ -173,11 +173,11 @@ fn bind_names_node_or_error(session: &Session, scope: ScopeRef, node: &mut AST) 
             bind_names_vec(session, tscope, body);
         },
 
-        AST::Resolver(_, ref mut left, _) => {
+        AST::Resolver(ref id, _, ref mut left, _) => {
             // TODO should this always work on a type reference, or should classes be added as values as well as types?
             //bind_names_node(session, scope, left);
             match **left {
-                AST::Identifier(_, ref ident) => {
+                AST::Identifier(_, _, ref ident) => {
                     if scope.find_type(&ident.name).is_none() {
                         return Err(Error::new(format!("NameError: undefined type {:?}", ident.name)));
                     }
@@ -186,20 +186,20 @@ fn bind_names_node_or_error(session: &Session, scope: ScopeRef, node: &mut AST) 
             }
         },
 
-        AST::Accessor(_, ref mut left, _, _) => {
+        AST::Accessor(ref id, _, ref mut left, _, _) => {
             bind_names_node(session, scope, left);
         },
 
-        AST::Assignment(_, ref mut left, ref mut right) => {
+        AST::Assignment(ref id, _, ref mut left, ref mut right) => {
             match **left {
-                AST::Accessor(_, _, _, _) | AST::Index(_, _, _, _) => { },
+                AST::Accessor(_, _, _, _, _) | AST::Index(_, _, _, _, _) => { },
                 _ => return Err(Error::new(format!("SyntaxError: assignment to something other than a list or class element: {:?}", left))),
             };
             bind_names_node(session, scope.clone(), left);
             bind_names_node(session, scope, right);
         },
 
-        AST::Import(_, ref ident, ref mut decls) => {
+        AST::Import(ref id, _, ref ident, ref mut decls) => {
             let path = ident.name.replace(".", "/") + ".dec";
             *decls = session.parse_file(path.as_str(), true);
             bind_names_vec(session, scope, decls);

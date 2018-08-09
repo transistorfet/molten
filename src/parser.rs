@@ -130,7 +130,7 @@ named!(import(Span) -> AST,
         pos: position!() >>
         wscom!(tag_word!("import")) >>
         e: recognize!(separated_list_complete!(tag!("."), identifier)) >>
-        (AST::Import(Pos::new(pos), Ident::from_span(e), vec!()))
+        (AST::make_import(Pos::new(pos), Ident::from_span(e), vec!()))
     )
 );
 
@@ -143,7 +143,7 @@ named!(definition(Span) -> AST,
             wscom!(tag!("=")),
             expression
         )) >>
-        (AST::Definition(Pos::new(pos), i.1, i.2, Box::new(if e.is_some() { e.unwrap() } else { AST::Nil(None) })))
+        (AST::make_def(Pos::new(pos), i.1, i.2, Box::new(if e.is_some() { e.unwrap() } else { AST::Nil(None) })))
     )
 );
 
@@ -153,7 +153,7 @@ named!(assignment(Span) -> AST,
         o: subatomic_operation >>
         wscom!(tag!("=")) >>
         e: expression >>
-        (AST::Assignment(Pos::new(pos), Box::new(o), Box::new(e)))
+        (AST::make_assign(Pos::new(pos), Box::new(o), Box::new(e)))
     )
 );
 
@@ -164,7 +164,7 @@ named!(whileloop(Span) -> AST,
         c: expression >>
         opt!(multispace_comment) >>
         e: expression >>
-        (AST::While(Pos::new(pos), Box::new(c), Box::new(e)))
+        (AST::make_while(Pos::new(pos), Box::new(c), Box::new(e)))
     )
 );
 
@@ -182,7 +182,7 @@ named!(class(Span) -> AST,
                 function
                 )) >>
         wscom!(tag!("}")) >>
-        (AST::Class(Pos::new(pos), i, p, s, UniqueID::generate()))
+        (AST::make_class(Pos::new(pos), i, p, s))
         )
     );
 
@@ -196,7 +196,7 @@ named!(typedef(Span) -> AST,
             map!(identifier_typed, |i| vec!(i)) |
             delimited!(wscom!(tag!("{")), separated_list_complete!(wscom!(tag!(",")), identifier_typed), wscom!(tag!("}")))
         ) >>
-        (AST::TypeDef(Pos::new(pos), c, ts.into_iter().map(|f| Field::new(f.0, f.1, f.2)).collect()))
+        (AST::make_typedef(Pos::new(pos), c, ts.into_iter().map(|f| Field::new(f.0, f.1, f.2)).collect()))
     )
 );
 
@@ -230,7 +230,7 @@ named!(block(Span) -> AST,
         do_parse!(
             pos: position!() >>
             s: many0!(statement) >>
-            (AST::Block(Pos::new(pos), s))
+            (AST::make_block(Pos::new(pos), s))
         ),
         wscom!(alt!(tag_word!("end") | tag!("}")))
     )
@@ -247,7 +247,7 @@ named!(ifexpr(Span) -> AST,
             wscom!(tag_word!("else")),
             expression
         )) >>
-        (AST::If(Pos::new(pos), Box::new(c), Box::new(t), Box::new(if f.is_some() { f.unwrap() } else { AST::Nil(None) })))
+        (AST::make_if(Pos::new(pos), Box::new(c), Box::new(t), Box::new(if f.is_some() { f.unwrap() } else { AST::Nil(None) })))
     )
 );
 
@@ -258,7 +258,7 @@ named!(trywith(Span) -> AST,
         c: expression >>
         wscom!(tag_word!("with")) >>
         l: caselist >>
-        (AST::Try(Pos::new(pos), Box::new(c), l, None))
+        (AST::make_try(Pos::new(pos), Box::new(c), l, None))
     )
 );
 
@@ -267,7 +267,7 @@ named!(raise(Span) -> AST,
         pos: position!() >>
         wscom!(tag_word!("raise")) >>
         e: expression >>
-        (AST::Raise(Pos::new(pos), Box::new(e)))
+        (AST::make_raise(Pos::new(pos), Box::new(e)))
     )
 );
 
@@ -279,7 +279,7 @@ named!(matchcase(Span) -> AST,
         //wscom!(tag_word!("with")) >>
         //l: caselist >>
         l: delimited!(wscom!(tag!("{")), caselist, wscom!(tag!("}"))) >>
-        (AST::Match(Pos::new(pos), Box::new(c), l, None))
+        (AST::make_match(Pos::new(pos), Box::new(c), l, None))
     )
 );
 
@@ -304,7 +304,7 @@ named!(forloop(Span) -> AST,
         l: expression >>
         opt!(multispace_comment) >>
         e: expression >>
-        (AST::For(Pos::new(pos), i, Box::new(l), Box::new(e), UniqueID::generate()))
+        (AST::make_for(Pos::new(pos), i, Box::new(l), Box::new(e)))
     )
 );
 
@@ -315,9 +315,9 @@ named!(newclass(Span) -> AST,
         cs: class_spec >>
         a: map!(
             delimited!(tag!("("), expression_list, tag!(")")),
-            |mut a| { a.insert(0, AST::New(Pos::new(pos), cs.clone())); a }
+            |mut a| { a.insert(0, AST::make_new(Pos::new(pos), cs.clone())); a }
         ) >>
-        (AST::PtrCast(Type::from_spec(cs.clone()), Box::new(AST::Invoke(Pos::new(pos), Box::new(AST::Resolver(Pos::new(pos), Box::new(AST::Identifier(Pos::new(pos), cs.ident.clone())), Ident::from_str("new"))), a, None))))
+        (AST::PtrCast(Type::from_spec(cs.clone()), Box::new(AST::make_invoke(Pos::new(pos), Box::new(AST::make_resolve(Pos::new(pos), Box::new(AST::make_ident(Pos::new(pos), cs.ident.clone())), Ident::from_str("new"))), a, None))))
     )
 );
 
@@ -328,7 +328,7 @@ named!(declare(Span) -> AST,
         n: symbol_name >>
         wscom!(tag!(":")) >>
         t: type_description >>
-        (AST::Declare(Pos::new(pos), n, t))
+        (AST::make_decl(Pos::new(pos), n, t))
     )
 );
 
@@ -349,7 +349,7 @@ named!(function(Span) -> AST,
         r: opt!(preceded!(wscom!(tag!("->")), type_description)) >>
         a: abi_specifier >>
         e: alt_complete!(block | preceded!(wscom!(tag!("=>")), expression)) >>
-        (AST::Function(Pos::new(pos), l.0, l.1, r, Box::new(e), UniqueID::generate(), a))
+        (AST::make_func(Pos::new(pos), l.0, l.1, r, Box::new(e), a))
     )
 );
 
@@ -441,11 +441,11 @@ impl AST {
 
     fn make_op(pos: Pos, op: Ident, r1: AST, r2: AST) -> AST {
         match op.as_str() {
-            "and" | "or" => AST::SideEffect(pos, op, vec!(r1, r2)),
+            "and" | "or" => AST::make_side_effect(pos, op, vec!(r1, r2)),
             _ => 
             //AST::Infix(pos, op, Box::new(r1), Box::new(r2))
-            AST::Invoke(pos.clone(), Box::new(AST::Identifier(pos, op)), vec!(r1, r2), None)
-            //AST::Invoke(pos, Box::new(AST::Accessor(pos, Box::new(r1), op, None)), vec!(r2), None)
+            AST::make_invoke(pos.clone(), Box::new(AST::make_ident(pos, op)), vec!(r1, r2), None)
+            //AST::make_invoke(pos, Box::new(AST::make_access(pos, Box::new(r1), op, None)), vec!(r2), None)
         }
     }
 }
@@ -479,8 +479,8 @@ named!(prefix(Span) -> AST,
         op: prefix_op >>
         a: atomic >>
         //(AST::Prefix(op, Box::new(a)))
-        (AST::Invoke(Pos::new(pos), Box::new(AST::Identifier(Pos::new(pos), op)), vec!(a), None))
-        //(AST::Invoke(Box::new(AST::Accessor(Pos::new(pos), Box::new(a), op, None)), vec!(), None))
+        (AST::make_invoke(Pos::new(pos), Box::new(AST::make_ident(Pos::new(pos), op)), vec!(a), None))
+        //(AST::make_invoke(Box::new(AST::make_access(Pos::new(pos), Box::new(a), op, None)), vec!(), None))
     )
 );
 
@@ -509,10 +509,10 @@ impl AST {
         let mut ret = left;
         for op in operations {
             match op {
-                SubOP::Index(p, e) => ret = AST::Index(p, Box::new(ret), Box::new(e), None),
-                SubOP::Invoke(p, e) => ret = AST::Invoke(p, Box::new(ret), e, None),
-                SubOP::Accessor(p, name) => ret = AST::Accessor(p, Box::new(ret), name.clone(), None),
-                SubOP::Resolver(p, name) => ret = AST::Resolver(p, Box::new(ret), name.clone()),
+                SubOP::Index(p, e) => ret = AST::make_index(p, Box::new(ret), Box::new(e), None),
+                SubOP::Invoke(p, e) => ret = AST::make_invoke(p, Box::new(ret), e, None),
+                SubOP::Accessor(p, name) => ret = AST::make_access(p, Box::new(ret), name.clone(), None),
+                SubOP::Resolver(p, name) => ret = AST::make_resolve(p, Box::new(ret), name.clone()),
             }
         }
         ret
@@ -536,7 +536,7 @@ named!(identifier_node(Span) -> AST,
     do_parse!(
         pos: position!() >>
         i: identifier >>
-        (AST::Identifier(Pos::new(pos), i))
+        (AST::make_ident(Pos::new(pos), i))
     )
 );
 
@@ -654,7 +654,7 @@ named!(reserved(Span) -> Span,
         tag_word!("if") | tag_word!("then") | tag_word!("else") |
         tag_word!("try") | tag_word!("with") | tag_word!("raise") |
         tag_word!("for") | tag_word!("in") |
-        tag_word!("fn") | tag_word!("decl") |
+        tag_word!("fn") | tag_word!("decl")
     )
 );
 
@@ -768,7 +768,7 @@ named!(tuple(Span) -> AST,
             separated_list_complete!(wscom!(tag!(",")), expression),
             wscom!(tag!(")"))
         ) >>
-        (AST::Tuple(Pos::new(pos), l, None))
+        (AST::make_tuple(Pos::new(pos), l, None))
     )
 );
 
@@ -780,7 +780,7 @@ named!(list(Span) -> AST,
             separated_list_complete!(wscom!(tag!(",")), expression),
             wscom!(tag!("]"))
         ) >>
-        (AST::List(Pos::new(pos), l, None))
+        (AST::make_list(Pos::new(pos), l, None))
     )
 );
 
@@ -870,26 +870,4 @@ pub fn print_error(name: &str, span: Span, err: nom::Err<Span, u32>) {
     }
 }
 
-
-/*
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_parse() {
-        assert_eq!(
-            parse("
-                5 * 3 + 8 / 100
-            ".as_bytes()),
-            Ok((&b""[..], vec!(
-                AST::Invoke(Box::new(AST::Identifier(String::from("+"))), vec!(
-                    AST::Invoke(Box::new(AST::Identifier(String::from("*"))), vec!(AST::Integer(5), AST::Integer(3)), None),
-                    AST::Invoke(Box::new(AST::Identifier(String::from("/"))), vec!(AST::Integer(8), AST::Integer(100)), None)
-                ), None)
-            )))
-        );
-    }
-}
-*/
 

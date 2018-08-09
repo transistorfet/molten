@@ -272,7 +272,7 @@ unsafe fn compile_module<'sess>(builtins: &Vec<BuiltinDef<'sess>>, session: &'se
         let function = LLVMAddFunction(module, b"main\0".as_ptr() as *const _, function_type);
         //LLVMSetPersonalityFn(function, LLVMGetNamedFunction(data.module, label("__gxx_personality_v0")));
         LLVMPositionBuilderAtEnd(builder, LLVMAppendBasicBlockInContext(context, function, label("entry")));
-        compile_node(data, function, None, scope.clone(), &AST::Invoke(pos.clone(), Box::new(AST::Identifier(pos.clone(), Ident::new(pos.clone(), String::from(module_init_name)))), vec!(), Some(Type::Function(Box::new(Type::Tuple(vec!())), Box::new(Type::Object(String::from("Bool"), vec!())), ABI::Molten))));
+        compile_node(data, function, None, scope.clone(), &AST::make_invoke(pos.clone(), Box::new(AST::make_ident(pos.clone(), Ident::new(pos.clone(), String::from(module_init_name)))), vec!(), Some(Type::Function(Box::new(Type::Tuple(vec!())), Box::new(Type::Object(String::from("Bool"), vec!())), ABI::Molten))));
         LLVMBuildRet(builder, int_value(data, 0));
     }
 
@@ -367,7 +367,7 @@ unsafe fn declare_globals(data: &LLVM, scope: ScopeRef) {
     }
 
     for node in &data.classes {
-        if let AST::Class(_, ClassSpec { ident: ref cident, .. }, _, _, ref id) = **node {
+        if let AST::Class(ref id, _, ClassSpec { ident: ref cident, .. }, _, _) = **node {
             let tscope = data.map.get(id);
             let classdef = tscope.get_type_def(&cident.name).as_class().unwrap();
             let value = data.get_type(tscope.type_id(&cident.name).unwrap()).unwrap();
@@ -413,9 +413,9 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
         AST::Real(ref num) => Box::new(Data(LLVMConstReal(real_type(data), *num))),
         AST::String(ref string) => Box::new(Data(LLVMBuildGlobalStringPtr(data.builder, label(string.as_str()), label("strc")))),
 
-        AST::Block(_, ref body) => { compile_vec(data, func, unwind, scope.clone(), body) },
+        AST::Block(ref id, _, ref body) => { compile_vec(data, func, unwind, scope.clone(), body) },
 
-        AST::Invoke(_, ref fexpr, ref args, ref stype) => {
+        AST::Invoke(ref id, _, ref fexpr, ref args, ref stype) => {
             let (atypes, rtype, abi) = match stype.clone().unwrap() {
                 Type::Function(atypes, rtype, abi) => (atypes, *rtype, abi),
                 stype @ _ => panic!("TypeError: expected function type: {:?}", stype),
@@ -435,11 +435,11 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
 
             //let function = compile_node(data, func, unwind, scope.clone(), fexpr);
             let function = match **fexpr {
-                AST::Accessor(ref pos, _, ref ident, ref otype) => {
+                AST::Accessor(ref id, ref pos, _, ref ident, ref otype) => {
                     let tname = format!("{}", UniqueID::generate());
                     let id = scope.define(tname.clone(), otype.clone()).unwrap();
                     data.set_value(id, from_type(otype.as_ref().unwrap(), largs[0]));
-                    compile_node(data, func, unwind, scope.clone(), &AST::Accessor(pos.clone(), Box::new(AST::Recall(pos.clone(), Ident::new(pos.clone(), tname))), ident.clone(), otype.clone()))
+                    compile_node(data, func, unwind, scope.clone(), &AST::make_access(pos.clone(), Box::new(AST::make_recall(pos.clone(), Ident::new(pos.clone(), tname))), ident.clone(), otype.clone()))
                 },
                 _ => compile_node(data, func, unwind, scope.clone(), fexpr)
             };
@@ -476,7 +476,7 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
             from_type(&rtype, value)
         },
 
-        AST::Function(_, ref ident, _, _, _, ref id, ref abi) => {
+        AST::Function(ref id, _, ref ident, _, _, _, ref abi) => {
             let fname = scope.get_full_name(ident, *id);
             //from_abi(abi, LLVMGetNamedFunction(data.module, label(fname.as_str())))
             match *ident {
@@ -485,14 +485,14 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
             }
         },
 
-        AST::Recall(ref pos, ref ident) => {
+        AST::Recall(ref id, ref pos, ref ident) => {
             match data.get_value(scope.variable_id(&ident.name).unwrap()) {
                 Some(x) => x,
                 None => panic!("UnsetError:{:?}: use before assignment {:?}", pos, &ident.name),
             }
         },
 
-        AST::Identifier(ref pos, ref ident) => {
+        AST::Identifier(ref id, ref pos, ref ident) => {
             let pointer = match data.get_value(scope.variable_id(&ident.name).unwrap()) {
                 Some(x) => x,
                 None => panic!("UnsetError:{:?}: use before assignment {:?}", pos, &ident.name),
@@ -516,7 +516,7 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
             //pointer
         },
 
-        AST::Definition(_, ref ident, ref ttype, ref value) => {
+        AST::Definition(ref id, _, ref ident, ref ttype, ref value) => {
             let ltype = get_type(data, scope.clone(), ttype.clone().unwrap(), true);
             let pointer: Value = if scope.is_global() {
                 //LLVMAddGlobal(data.module, ltype, label(ident.name.as_str()))
@@ -534,7 +534,7 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
         // TODO you might need to create a new function to hold the body, so that it can be resumed from, and there also
         // might be an issue when you call a function one level down, and pass it the same unwind locations... it might effect all
         // functions, all the way down
-        AST::Try(_, ref body, ref cases, ref condtype) => {
+        AST::Try(ref id, _, ref body, ref cases, ref condtype) => {
             /*
             // TODO need to add multiple cases, and also it doesn't work
             let try_block = LLVMAppendBasicBlockInContext(data.context, func, label("try"));
@@ -561,12 +561,12 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
             Box::new(Data(null_value(str_type(data))))
         },
 
-        AST::Raise(_, ref expr) => {
+        AST::Raise(ref id, _, ref expr) => {
             //LLVMBuildResume(data.builder, compile_node(data, func, unwind, scope.clone(), expr))
             Box::new(Data(null_value(str_type(data))))
         },
 
-        AST::SideEffect(_, ref op, ref args) => {
+        AST::SideEffect(ref id, _, ref op, ref args) => {
             // TODO This only handles two arguments, which is all that will be parsed, but you can do better... 
             let lexpr_block = LLVMAppendBasicBlockInContext(data.context, func, label(op.name.as_str()));
             let rexpr_block = LLVMAppendBasicBlockInContext(data.context, func, label(op.name.as_str()));
@@ -598,7 +598,7 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
             Box::new(Data(phi))
         },
 
-        AST::If(_, ref cond, ref texpr, ref fexpr) => {
+        AST::If(ref id, _, ref cond, ref texpr, ref fexpr) => {
             let cond_value = compile_node(data, func, unwind, scope.clone(), cond).get_ref();
             let cond_zero = LLVMConstInt(LLVMTypeOf(cond_value), 0, 0);
             let is_nonzero = LLVMBuildICmp(data.builder, llvm::LLVMIntPredicate::LLVMIntNE, cond_value, cond_zero, label("is_nonzero"));
@@ -630,7 +630,7 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
             Box::new(Data(phi))
         },
 
-        AST::Match(_, ref cond, ref cases, ref condtype) => {
+        AST::Match(ref id, _, ref cond, ref cases, ref condtype) => {
             let mut cond_blocks = vec!();
             let mut do_blocks = vec!();
             for _ in 0 .. cases.len() {
@@ -671,7 +671,7 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
             Box::new(Data(phi))
         },
 
-        AST::While(_, ref cond, ref body) => {
+        AST::While(ref id, _, ref cond, ref body) => {
             let before_block = LLVMAppendBasicBlockInContext(data.context, func, label("while"));
             let body_block = LLVMAppendBasicBlockInContext(data.context, func, label("whilebody"));
             let after_block = LLVMAppendBasicBlockInContext(data.context, func, label("whileend"));
@@ -700,7 +700,7 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
             Box::new(Data(null_value(str_type(data))))
         },
 
-        AST::For(_, ref ident, ref list, ref body, ref id) => {
+        AST::For(ref id, _, ref ident, ref list, ref body) => {
             let lscope = data.map.get(id);
             let listdef = scope.get_type_def(&String::from("List")).as_class().unwrap();
 
@@ -747,15 +747,15 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
             Box::new(Data(body_value))
         },
 
-        AST::List(ref pos, ref items, ref stype) => {
+        AST::List(ref id, ref pos, ref items, ref stype) => {
             let itype = stype.as_ref().unwrap();
             let ltype = Type::Object(format!("List"), vec!(itype.clone()));
             let newfunc = get_method(data, scope.clone(), "List", "new", vec!(ltype.clone()));
             let pushfunc = get_method(data, scope.clone(), "List", "push", vec!(ltype.clone(), itype.clone()));
             //let listdef = scope.get_type_def(&String::from("List")).as_class().unwrap();
             // TODO this is kinda wrong, since you're passing it without type params
-            //let list = data.get_value(listdef.variable_id(&String::from("new")).unwrap()).unwrap().invoke(data, unwind, vec!(compile_node(data, func, unwind, scope.clone(), &AST::New(pos.clone(), (String::from("List"), vec!()))).get_ref()));
-            let list = newfunc.invoke(data, unwind, vec!(compile_node(data, func, unwind, scope.clone(), &AST::New(pos.clone(), ClassSpec::new(pos.clone(), Ident::new(pos.clone(), String::from("List")), vec!(itype.clone())))).get_ref()));
+            //let list = data.get_value(listdef.variable_id(&String::from("new")).unwrap()).unwrap().invoke(data, unwind, vec!(compile_node(data, func, unwind, scope.clone(), &AST::make_new(pos.clone(), (String::from("List"), vec!()))).get_ref()));
+            let list = newfunc.invoke(data, unwind, vec!(compile_node(data, func, unwind, scope.clone(), &AST::make_new(pos.clone(), ClassSpec::new(pos.clone(), Ident::new(pos.clone(), String::from("List")), vec!(itype.clone())))).get_ref()));
             for item in items {
                 let value = build_cast_to_vartype(data, compile_node(data, func, unwind, scope.clone(), item).get_ref());
                 //data.get_value(listdef.variable_id(&String::from("push")).unwrap()).unwrap().invoke(data, unwind, vec!(list, value));
@@ -764,7 +764,7 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
             Box::new(Data(list))
         },
 
-        AST::Tuple(ref pos, ref items, ref stype) => {
+        AST::Tuple(ref id, ref pos, ref items, ref stype) => {
             let ltype = get_type(data, scope.clone(), stype.clone().unwrap(), true);
             let tuple = LLVMBuildAlloca(data.builder, ltype, label("tuple"));
             for (index, item) in items.iter().enumerate() {
@@ -783,7 +783,7 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
             from_type(ttype, value)
         },
 
-        AST::New(_, ClassSpec { ref ident, .. }) => {
+        AST::New(ref id, _, ClassSpec { ref ident, .. }) => {
             let classdef = scope.get_type_def(&ident.name).as_class().unwrap();
             let value = classdef.classvars.variable_id(&String::from("__alloc__")).ok().map(|id| data.get_value(id).unwrap());
             let object = if let Some(function) = value {
@@ -811,7 +811,7 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
             Box::new(Data(object))
         },
 
-        AST::Class(_, ref classspec, _, ref body, ref id) => {
+        AST::Class(ref id, _, ref classspec, _, ref body) => {
             let tscope = data.map.get(id);
             //let classdef = scope.get_type_def(&classpec.ident.name).as_class().unwrap();
 
@@ -821,9 +821,9 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
             Box::new(Data(null_value(str_type(data))))
         },
 
-        AST::Resolver(ref pos, ref left, ref right) => {
+        AST::Resolver(ref id, ref pos, ref left, ref right) => {
             match **left {
-                AST::Identifier(_, ref ident) => {
+                AST::Identifier(ref id, _, ref ident) => {
                     let classdef = scope.get_type_def(&ident.name).as_class().unwrap();
                     let classid = classdef.classvars.variable_id(&right.name).unwrap();
                     data.get_value(classid).unwrap()
@@ -832,7 +832,7 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
             }
         },
 
-        AST::Accessor(_, ref left, ref right, ref ltype) => {
+        AST::Accessor(ref id, _, ref left, ref right, ref ltype) => {
             let object = compile_node(data, func, unwind, scope.clone(), left).get_ref();
 
             let name = ltype.clone().unwrap().get_name().unwrap();
@@ -856,10 +856,10 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
             }
         },
 
-        AST::Assignment(_, ref left, ref right) => {
+        AST::Assignment(ref id, _, ref left, ref right) => {
             let value = compile_node(data, func, unwind, scope.clone(), right);
             match **left {
-                AST::Accessor(_, ref left, ref right, ref ltype) => {
+                AST::Accessor(ref id, _, ref left, ref right, ref ltype) => {
                     let name = ltype.clone().unwrap().get_name().unwrap();
                     let object = compile_node(data, func, unwind, scope.clone(), left).get_ref();
                     let classdef = scope.get_type_def(&name).as_class().unwrap();
@@ -871,7 +871,7 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
             value
         },
 
-        AST::Import(ref pos, ref ident, _) => {
+        AST::Import(ref id, ref pos, ref ident, _) => {
             let module_init_name = format!("init.{}", &ident.name);
             let ftype = Type::Function(Box::new(Type::Tuple(vec!())), Box::new(Type::Object(String::from("Bool"), vec!())), ABI::Molten);
             if LLVMGetNamedFunction(data.module, label(module_init_name.as_str())).is_null() {
@@ -880,16 +880,16 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
                 let id = scope.define(module_init_name.clone(), Some(ftype.clone())).unwrap();
                 data.set_value(id, Box::new(Function(function)));
             }
-            compile_node(data, func, None, scope.clone(), &AST::Invoke(pos.clone(), Box::new(AST::Identifier(pos.clone(), Ident::new(pos.clone(), String::from(module_init_name)))), vec!(), Some(ftype)));
+            compile_node(data, func, None, scope.clone(), &AST::make_invoke(pos.clone(), Box::new(AST::make_ident(pos.clone(), Ident::new(pos.clone(), String::from(module_init_name)))), vec!(), Some(ftype)));
             Box::new(Data(ptr::null_mut()))
         },
 
-        AST::Declare(_, _, _) => { Box::new(Data(zero_int(data))) },
+        AST::Declare(ref id, _, _, _) => { Box::new(Data(zero_int(data))) },
 
-        AST::TypeDef(_, _, _) => panic!("NotImplementedError: not yet supported, {:?}", node),
+        AST::TypeDef(ref id, _, _, _) => panic!("NotImplementedError: not yet supported, {:?}", node),
 
         AST::Underscore |
-        AST::Index(_, _, _, _) => panic!("InternalError: ast element shouldn't appear at this late phase: {:?}", node),
+        AST::Index(_, _, _, _, _) => panic!("InternalError: ast element shouldn't appear at this late phase: {:?}", node),
     }
 }
 
@@ -904,7 +904,7 @@ unsafe fn collect_functions_vec<'sess>(data: &mut LLVM<'sess>, scope: ScopeRef, 
 
 unsafe fn collect_functions_node<'sess>(data: &mut LLVM<'sess>, scope: ScopeRef, node: &'sess AST) -> Option<Value> {
     match *node {
-        AST::Function(_, ref ident, ref args, ref rtype, ref body, ref id, ref abi) => {
+        AST::Function(ref id, _, ref ident, ref args, ref rtype, ref body, ref abi) => {
             let fscope = data.map.get(id);
             let fname = scope.get_full_name(ident, *id);
 
@@ -935,17 +935,17 @@ unsafe fn collect_functions_node<'sess>(data: &mut LLVM<'sess>, scope: ScopeRef,
             return Some(from_abi(abi, function));
         },
 
-        AST::Tuple(_, ref items, _) => { collect_functions_vec(data, scope.clone(), items); },
-        AST::List(_, ref items, _) => { collect_functions_vec(data, scope.clone(), items); },
+        AST::Tuple(ref id, _, ref items, _) => { collect_functions_vec(data, scope.clone(), items); },
+        AST::List(ref id, _, ref items, _) => { collect_functions_vec(data, scope.clone(), items); },
 
-        AST::Invoke(_, ref fexpr, ref args, _) => {
+        AST::Invoke(ref id, _, ref fexpr, ref args, _) => {
             collect_functions_node(data, scope.clone(), fexpr);
             collect_functions_vec(data, scope.clone(), args);
         },
 
-        AST::SideEffect(_, _, ref args) => { collect_functions_vec(data, scope.clone(), args); },
+        AST::SideEffect(ref id, _, _, ref args) => { collect_functions_vec(data, scope.clone(), args); },
 
-        AST::Definition(_, ref ident, _, ref value) => {
+        AST::Definition(ref id, _, ref ident, _, ref value) => {
             //collect_functions_node(data, scope.clone(), value);
             if let Some(function) = collect_functions_node(data, scope.clone(), value) {
                 let dscope = Scope::target(scope.clone());
@@ -953,7 +953,7 @@ unsafe fn collect_functions_node<'sess>(data: &mut LLVM<'sess>, scope: ScopeRef,
             }
         },
 
-        AST::Declare(_, ref ident, ref ttype) => {
+        AST::Declare(ref id, _, ref ident, ref ttype) => {
             // TODO what to do about abi??
             if let &Type::Function(_, _, _) = ttype {
                 let fname = scope.get_full_name(&Some(ident.clone()), UniqueID(0));
@@ -964,18 +964,18 @@ unsafe fn collect_functions_node<'sess>(data: &mut LLVM<'sess>, scope: ScopeRef,
             }
         },
 
-        AST::Block(_, ref body) => { collect_functions_vec(data, scope, body); },
+        AST::Block(ref id, _, ref body) => { collect_functions_vec(data, scope, body); },
 
-        AST::If(_, ref cond, ref texpr, ref fexpr) => {
+        AST::If(ref id, _, ref cond, ref texpr, ref fexpr) => {
             collect_functions_node(data, scope.clone(), cond);
             collect_functions_node(data, scope.clone(), texpr);
             collect_functions_node(data, scope, fexpr);
         },
 
-        AST::Raise(_, ref expr) => { collect_functions_node(data, scope, expr); },
+        AST::Raise(ref id, _, ref expr) => { collect_functions_node(data, scope, expr); },
 
-        AST::Try(_, ref cond, ref cases, _) |
-        AST::Match(_, ref cond, ref cases, _) => {
+        AST::Try(ref id, _, ref cond, ref cases, _) |
+        AST::Match(ref id, _, ref cond, ref cases, _) => {
             collect_functions_node(data, scope.clone(), cond);
             for case in cases {
                 collect_functions_node(data, scope.clone(), &case.0);
@@ -983,13 +983,13 @@ unsafe fn collect_functions_node<'sess>(data: &mut LLVM<'sess>, scope: ScopeRef,
             }
         },
 
-        AST::For(_, _, ref cond, ref body, ref id) => {
+        AST::For(ref id, _, _, ref cond, ref body) => {
             let lscope = data.map.get(id);
             collect_functions_node(data, lscope.clone(), cond);
             collect_functions_node(data, lscope.clone(), body);
         },
 
-        AST::While(_, ref cond, ref body) => {
+        AST::While(ref id, _, ref cond, ref body) => {
             collect_functions_node(data, scope.clone(), cond);
             collect_functions_node(data, scope.clone(), body);
         },
@@ -998,9 +998,9 @@ unsafe fn collect_functions_node<'sess>(data: &mut LLVM<'sess>, scope: ScopeRef,
             collect_functions_node(data, scope.clone(), code);
         },
 
-        AST::New(_, _) => { },
+        AST::New(ref id, _, _) => { },
 
-        AST::Class(_, ClassSpec { ref ident, .. }, _, ref body, ref id) => {
+        AST::Class(ref id, _, ClassSpec { ref ident, .. }, _, ref body) => {
             let tscope = data.map.get(id);
             let classdef = scope.get_type_def(&ident.name).as_class().unwrap();
 
@@ -1024,31 +1024,31 @@ unsafe fn collect_functions_node<'sess>(data: &mut LLVM<'sess>, scope: ScopeRef,
             data.classes.push(node);
         },
 
-        AST::Index(_, ref left, ref right, _) => {
+        AST::Index(ref id, _, ref left, ref right, _) => {
             collect_functions_node(data, scope.clone(), left);
             collect_functions_node(data, scope, right);
         },
 
-        AST::Resolver(_, ref left, _) => {
+        AST::Resolver(ref id, _, ref left, _) => {
             collect_functions_node(data, scope, left);
         },
 
-        AST::Accessor(_, ref left, _, _) => {
+        AST::Accessor(ref id, _, ref left, _, _) => {
             collect_functions_node(data, scope, left);
         },
 
-        AST::Assignment(_, _, ref right) => {
+        AST::Assignment(ref id, _, _, ref right) => {
             collect_functions_node(data, scope, right);
         },
 
-        AST::Import(_, _, ref decls) => {
+        AST::Import(ref id, _, _, ref decls) => {
             collect_functions_vec(data, scope, decls);
         },
 
-        AST::TypeDef(_, _, _) => { },
+        AST::TypeDef(ref id, _, _, _) => { },
 
-        AST::Recall(_, _) |
-        AST::Identifier(_, _) |
+        AST::Recall(_, _, _) |
+        AST::Identifier(_, _, _) |
         AST::Underscore | AST::Nil(_) |
         AST::Boolean(_) | AST::Integer(_) | AST::Real(_) | AST::String(_) => { }
     };
@@ -1165,7 +1165,7 @@ pub unsafe fn build_function_start(data: &LLVM, name: &str, mut args: Vec<LLVMTy
 }
 
 unsafe fn build_function_body(data: &LLVM, node: &AST) {
-    if let AST::Function(_, ref ident, _, _, ref body, ref id, _) = *node {
+    if let AST::Function(ref id, _, ref ident, _, _, ref body, _) = *node {
         // TODO do you need to take into account abi?
         let fscope = data.map.get(id);
         let pscope = fscope.get_parent().unwrap();

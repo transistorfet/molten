@@ -1,42 +1,42 @@
-Mon Mar 26 11:40:32 PDT 2018
-basic/abi-across-exprs.mol......................................success
-basic/block-assign.mol..........................................success
-basic/block-invoke.mol..........................................success
-basic/conditionals-bool.mol.....................................success
-basic/conditionals-ints.mol.....................................success
-basic/conditionals-reals.mol....................................success
-basic/conditionals-strings.mol..................................success
-basic/exceptions.mol............................................FAIL
-basic/forloops.mol..............................................success
-basic/func-with-func-arg.mol....................................success
-basic/funcs-lambda-direct.mol...................................FAIL
-basic/funcs-lambda-variable.mol.................................success
-basic/funcs-named.mol...........................................success
-basic/if-exprs.mol..............................................success
-basic/invoke-before-define.mol..................................success
-basic/lists.mol.................................................success
-basic/match-ints.mol............................................success
-basic/match-strings.mol.........................................success
-basic/operators.mol.............................................success
-basic/recursion.mol.............................................success
-basic/string-escapes.mol........................................success
-basic/whileloops.mol............................................success
-binding/definition-fail.mol.....................................success
-binding/function-fail.mol.......................................success
-binding/method-fail.mol.........................................success
-binding/overload-c-fail.mol.....................................success
-binding/overload.mol............................................success
-objects/basic.mol...............................................success
-objects/constructors.mol........................................success
-objects/funcptr-member.mol......................................success
-objects/funcptr-uninitialized-issue.mol.........................FAIL
-objects/inheritence-super.mol...................................success
-objects/inheritence-third.mol...................................success
-objects/inheritence-vtable.mol..................................success
-objects/inheritence.mol.........................................success
-objects/interface.mol...........................................success
-typecheck/basic.mol.............................................success
-typecheck/definition-fail.mol...................................success
-typecheck/infer-arg-as-typevar.mol..............................FAIL
-typecheck/infer-forward-method.mol..............................FAIL
-35 tests passed, 5 tests failed, 40 total
+Wed Aug  8 21:30:24 PDT 2018
+[01/40] basic/abi-across-exprs.mol......................................success
+[02/40] basic/block-assign.mol..........................................success
+[03/40] basic/block-invoke.mol..........................................success
+[04/40] basic/conditionals-bool.mol.....................................success
+[05/40] basic/conditionals-ints.mol.....................................success
+[06/40] basic/conditionals-reals.mol....................................success
+[07/40] basic/conditionals-strings.mol..................................success
+[08/40] basic/exceptions.mol............................................FAIL
+[09/40] basic/forloops.mol..............................................success
+[10/40] basic/func-with-func-arg.mol....................................success
+[11/40] basic/funcs-lambda-direct.mol...................................success
+[12/40] basic/funcs-lambda-variable.mol.................................success
+[13/40] basic/funcs-named.mol...........................................success
+[14/40] basic/if-exprs.mol..............................................success
+[15/40] basic/invoke-before-define.mol..................................success
+[16/40] basic/lists.mol.................................................success
+[17/40] basic/match-ints.mol............................................success
+[18/40] basic/match-strings.mol.........................................success
+[19/40] basic/operators.mol.............................................success
+[20/40] basic/recursion.mol.............................................success
+[21/40] basic/string-escapes.mol........................................success
+[22/40] basic/whileloops.mol............................................success
+[23/40] binding/definition-fail.mol.....................................success
+[24/40] binding/function-fail.mol.......................................success
+[25/40] binding/method-fail.mol.........................................success
+[26/40] binding/overload-c-fail.mol.....................................success
+[27/40] binding/overload.mol............................................success
+[28/40] objects/basic.mol...............................................success
+[29/40] objects/constructors.mol........................................success
+[30/40] objects/funcptr-member.mol......................................success
+[31/40] objects/funcptr-uninitialized-issue.mol.........................FAIL
+[32/40] objects/inheritence-super.mol...................................success
+[33/40] objects/inheritence-third.mol...................................success
+[34/40] objects/inheritence-vtable.mol..................................success
+[35/40] objects/inheritence.mol.........................................success
+[36/40] objects/interface.mol...........................................success
+[37/40] typecheck/basic.mol.............................................success
+[38/40] typecheck/definition-fail.mol...................................success
+[39/40] typecheck/infer-arg-as-typevar.mol..............................FAIL
+[40/40] typecheck/infer-forward-method.mol..............................FAIL
+36 tests passed, 4 tests failed, 40 total

@@ -12,7 +12,6 @@ pub type NodeID = UniqueID;
 
 #[derive(Clone, PartialEq)]
 pub struct Pos {
-    pub id: NodeID,
     pub offset: usize,
     pub column: usize,
     pub line: u32,
@@ -28,6 +27,7 @@ pub struct Ident {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Argument {
+    pub id: NodeID,
     pub pos: Pos,
     pub ident: Ident,
     pub ttype: Option<Type>,
@@ -59,34 +59,35 @@ pub enum AST {
     String(String),
     Nil(Option<Type>),
     PtrCast(Type, Box<AST>),
-    Tuple(Pos, Vec<AST>, Option<Type>),
-    List(Pos, Vec<AST>, Option<Type>),
 
-    Recall(Pos, Ident),
-    Identifier(Pos, Ident),
-    Index(Pos, Box<AST>, Box<AST>, Option<Type>),
-    Resolver(Pos, Box<AST>, Ident),
-    Accessor(Pos, Box<AST>, Ident, Option<Type>),
-    Invoke(Pos, Box<AST>, Vec<AST>, Option<Type>),
-    SideEffect(Pos, Ident, Vec<AST>),
-    //Prefix(Pos, Ident, Box<AST>),
-    //Infix(Pos, Ident, Box<AST>, Box<AST>),
-    Block(Pos, Vec<AST>),
-    If(Pos, Box<AST>, Box<AST>, Box<AST>),
-    Raise(Pos, Box<AST>),
-    Try(Pos, Box<AST>, Vec<(AST, AST)>, Option<Type>),
-    Match(Pos, Box<AST>, Vec<(AST, AST)>, Option<Type>),
-    For(Pos, Ident, Box<AST>, Box<AST>, UniqueID),
-    Declare(Pos, Ident, Type),
-    Function(Pos, Option<Ident>, Vec<Argument>, Option<Type>, Box<AST>, UniqueID, ABI),
-    New(Pos, ClassSpec),
-    Class(Pos, ClassSpec, Option<ClassSpec>, Vec<AST>, UniqueID),
+    Tuple(NodeID, Pos, Vec<AST>, Option<Type>),
+    List(NodeID, Pos, Vec<AST>, Option<Type>),
 
-    Import(Pos, Ident, Vec<AST>),
-    Definition(Pos, Ident, Option<Type>, Box<AST>),
-    Assignment(Pos, Box<AST>, Box<AST>),
-    While(Pos, Box<AST>, Box<AST>),
-    TypeDef(Pos, ClassSpec, Vec<Field>),
+    Recall(NodeID, Pos, Ident),
+    Identifier(NodeID, Pos, Ident),
+    Index(NodeID, Pos, Box<AST>, Box<AST>, Option<Type>),
+    Resolver(NodeID, Pos, Box<AST>, Ident),
+    Accessor(NodeID, Pos, Box<AST>, Ident, Option<Type>),
+    Invoke(NodeID, Pos, Box<AST>, Vec<AST>, Option<Type>),
+    SideEffect(NodeID, Pos, Ident, Vec<AST>),
+    //Prefix(NodeID, Pos, Ident, Box<AST>),
+    //Infix(NodeID, Pos, Ident, Box<AST>, Box<AST>),
+    Block(NodeID, Pos, Vec<AST>),
+    If(NodeID, Pos, Box<AST>, Box<AST>, Box<AST>),
+    Raise(NodeID, Pos, Box<AST>),
+    Try(NodeID, Pos, Box<AST>, Vec<(AST, AST)>, Option<Type>),
+    Match(NodeID, Pos, Box<AST>, Vec<(AST, AST)>, Option<Type>),
+    For(NodeID, Pos, Ident, Box<AST>, Box<AST>),
+    Declare(NodeID, Pos, Ident, Type),
+    Function(NodeID, Pos, Option<Ident>, Vec<Argument>, Option<Type>, Box<AST>, ABI),
+    New(NodeID, Pos, ClassSpec),
+    Class(NodeID, Pos, ClassSpec, Option<ClassSpec>, Vec<AST>),
+
+    Import(NodeID, Pos, Ident, Vec<AST>),
+    Definition(NodeID, Pos, Ident, Option<Type>, Box<AST>),
+    Assignment(NodeID, Pos, Box<AST>, Box<AST>),
+    While(NodeID, Pos, Box<AST>, Box<AST>),
+    TypeDef(NodeID, Pos, ClassSpec, Vec<Field>),
 }
 
 
@@ -94,7 +95,6 @@ pub enum AST {
 impl Pos {
     pub fn new(span: Span) -> Pos {
         Pos {
-            id: UniqueID::generate(),
             offset: span.offset,
             column: span.get_utf8_column(),
             line: span.line,
@@ -103,7 +103,7 @@ impl Pos {
     }
 
     pub fn empty() -> Pos {
-        Pos { id: UniqueID::generate(), offset: 0, column: 0, line: 0, filenum: 0 }
+        Pos { offset: 0, column: 0, line: 0, filenum: 0 }
     }
 
     pub fn exerpt(&self, text: &[u8]) -> String {
@@ -155,6 +155,7 @@ impl Ident {
 impl Argument {
     pub fn new(pos: Pos, ident: Ident, ttype: Option<Type>, default: Option<AST>) -> Self {
         Argument {
+            id: NodeID::generate(),
             pos: pos,
             ident: ident,
             ttype: ttype,
@@ -190,36 +191,129 @@ impl Field {
 impl AST {
     pub fn get_pos(&self) -> Pos {
         match *self {
-            AST::Tuple(ref pos, _, _) |
-            AST::List(ref pos, _, _) |
-            AST::Recall(ref pos, _) |
-            AST::Identifier(ref pos, _) |
-            AST::Index(ref pos, _, _, _) |
-            AST::Resolver(ref pos, _, _) |
-            AST::Accessor(ref pos, _, _, _) |
-            AST::Invoke(ref pos, _, _, _) |
-            AST::SideEffect(ref pos, _, _) |
-            AST::Block(ref pos, _) |
-            AST::If(ref pos, _, _, _) |
-            AST::Raise(ref pos, _) |
-            AST::Try(ref pos, _, _, _) |
-            AST::Match(ref pos, _, _, _) |
-            AST::For(ref pos, _, _, _, _) |
-            AST::Declare(ref pos, _, _) |
-            AST::Function(ref pos, _, _, _, _, _, _) |
-            AST::New(ref pos, _) |
-            AST::Class(ref pos, _, _, _, _) |
-            AST::Import(ref pos, _, _) |
-            AST::Definition(ref pos, _, _, _) |
-            AST::Assignment(ref pos, _, _) |
-            AST::While(ref pos, _, _) |
-            AST::TypeDef(ref pos, _, _) => { pos.clone() }
+            AST::Tuple(_, ref pos, _, _) |
+            AST::List(_, ref pos, _, _) |
+            AST::Recall(_, ref pos, _) |
+            AST::Identifier(_, ref pos, _) |
+            AST::Index(_, ref pos, _, _, _) |
+            AST::Resolver(_, ref pos, _, _) |
+            AST::Accessor(_, ref pos, _, _, _) |
+            AST::Invoke(_, ref pos, _, _, _) |
+            AST::SideEffect(_, ref pos, _, _) |
+            AST::Block(_, ref pos, _) |
+            AST::If(_, ref pos, _, _, _) |
+            AST::Raise(_, ref pos, _) |
+            AST::Try(_, ref pos, _, _, _) |
+            AST::Match(_, ref pos, _, _, _) |
+            AST::For(_, ref pos, _, _, _) |
+            AST::Declare(_, ref pos, _, _) |
+            AST::Function(_, ref pos, _, _, _, _, _) |
+            AST::New(_, ref pos, _) |
+            AST::Class(_, ref pos, _, _, _) |
+            AST::Import(_, ref pos, _, _) |
+            AST::Definition(_, ref pos, _, _, _) |
+            AST::Assignment(_, ref pos, _, _) |
+            AST::While(_, ref pos, _, _) |
+            AST::TypeDef(_, ref pos, _, _) => { pos.clone() }
             _ => Pos::empty(),
         }
     }
 
-    pub fn make_
+    pub fn make_tuple(pos: Pos, items: Vec<AST>, ttype: Option<Type>) -> AST {
+        AST::Tuple(NodeID::generate(), pos, items, ttype)
+    }
 
+    pub fn make_list(pos: Pos, items: Vec<AST>, ttype: Option<Type>) -> AST {
+        AST::List(NodeID::generate(), pos, items, ttype)
+    }
+
+    pub fn make_recall(pos: Pos, ident: Ident) -> AST {
+        AST::Recall(NodeID::generate(), pos, ident)
+    }
+
+    pub fn make_ident(pos: Pos, ident: Ident) -> AST {
+        AST::Identifier(NodeID::generate(), pos, ident)
+    }
+
+    pub fn make_index(pos: Pos, list: Box<AST>, index: Box<AST>, ttype: Option<Type>) -> AST {
+        AST::Index(NodeID::generate(), pos, list, index, ttype)
+    }
+
+    pub fn make_resolve(pos: Pos, object: Box<AST>, ident: Ident) -> AST {
+        AST::Resolver(NodeID::generate(), pos, object, ident)
+    }
+
+    pub fn make_access(pos: Pos, object: Box<AST>, ident: Ident, ttype: Option<Type>) -> AST {
+        AST::Accessor(NodeID::generate(), pos, object, ident, ttype)
+    }
+
+    pub fn make_invoke(pos: Pos, fexpr: Box<AST>, args: Vec<AST>, ttype: Option<Type>) -> AST {
+        AST::Invoke(NodeID::generate(), pos, fexpr, args, ttype)
+    }
+
+    pub fn make_side_effect(pos: Pos, ident: Ident, args: Vec<AST>) -> AST {
+        AST::SideEffect(NodeID::generate(), pos, ident, args)
+    }
+
+    pub fn make_block(pos: Pos, body: Vec<AST>) -> AST {
+        AST::Block(NodeID::generate(), pos, body)
+    }
+
+    pub fn make_if(pos: Pos, cond: Box<AST>, texpr: Box<AST>, fexpr: Box<AST>) -> AST {
+        AST::If(NodeID::generate(), pos, cond, texpr, fexpr)
+    }
+
+    pub fn make_raise(pos: Pos, expr: Box<AST>) -> AST {
+        AST::Raise(NodeID::generate(), pos, expr)
+    }
+
+    pub fn make_try(pos: Pos, cond: Box<AST>, cases: Vec<(AST, AST)>, ttype: Option<Type>) -> AST {
+        AST::Try(NodeID::generate(), pos, cond, cases, ttype)
+    }
+
+    pub fn make_match(pos: Pos, cond: Box<AST>, cases: Vec<(AST, AST)>, ttype: Option<Type>) -> AST {
+        AST::Match(NodeID::generate(), pos, cond, cases, ttype)
+    }
+
+    pub fn make_for(pos: Pos, ident: Ident, list: Box<AST>, body: Box<AST>) -> AST {
+        AST::For(NodeID::generate(), pos, ident, list, body)
+    }
+
+    pub fn make_decl(pos: Pos, ident: Ident, ttype: Type) -> AST {
+        AST::Declare(NodeID::generate(), pos, ident, ttype)
+    }
+
+    pub fn make_func(pos: Pos, ident: Option<Ident>, args: Vec<Argument>, rtype: Option<Type>, body: Box<AST>, abi: ABI) -> AST {
+        AST::Function(NodeID::generate(), pos, ident, args, rtype, body, abi)
+    }
+
+    pub fn make_new(pos: Pos, classspec: ClassSpec) -> AST {
+        AST::New(NodeID::generate(), pos, classspec)
+    }
+
+    pub fn make_class(pos: Pos, classspec: ClassSpec, parentspec: Option<ClassSpec>, body: Vec<AST>) -> AST {
+        AST::Class(NodeID::generate(), pos, classspec, parentspec, body)
+    }
+
+    pub fn make_import(pos: Pos, ident: Ident, decls: Vec<AST>) -> AST {
+        AST::Import(NodeID::generate(), pos, ident, decls)
+    }
+
+    pub fn make_def(pos: Pos, ident: Ident, ttype: Option<Type>, value: Box<AST>) -> AST {
+        AST::Definition(NodeID::generate(), pos, ident, ttype, value)
+    }
+
+    pub fn make_assign(pos: Pos, left: Box<AST>, right: Box<AST>) -> AST {
+        AST::Assignment(NodeID::generate(), pos, left, right)
+    }
+
+    pub fn make_while(pos: Pos, cond: Box<AST>, body: Box<AST>) -> AST {
+        AST::While(NodeID::generate(), pos, cond, body)
+    }
+
+    pub fn make_typedef(pos: Pos, classspec: ClassSpec, fields: Vec<Field>) -> AST {
+        AST::TypeDef(NodeID::generate(), pos, classspec, fields)
+    }
 
     /*
     pub fn set_id(self, id: NodeID) -> Self {
