@@ -36,7 +36,7 @@ fn bind_names_node_or_error(session: &Session, scope: ScopeRef, node: &mut AST) 
             fscope.set_basename(ident.as_ref().map_or(format!("anon{}", id), |ident| ident.name.clone()));
 
             if let Some(ref ident) = *ident {
-                let dscope = Scope::target(scope);
+                let dscope = Scope::target(session, scope);
                 dscope.define_func(ident.name.clone(), None, *abi)?;
             }
 
@@ -56,14 +56,14 @@ fn bind_names_node_or_error(session: &Session, scope: ScopeRef, node: &mut AST) 
 
         AST::Definition(ref id, _, ref ident, ref mut ttype, ref mut code) => {
             declare_typevars(scope.clone(), ttype.as_mut(), false)?;
-            let dscope = Scope::target(scope.clone());
+            let dscope = Scope::target(session, scope.clone());
             dscope.define(ident.name.clone(), ttype.clone())?;
             bind_names_node(session, scope, code);
         },
 
         AST::Declare(ref id, _, ref ident, ref mut ttype) => {
             declare_typevars(scope.clone(), Some(ttype), false)?;
-            let dscope = Scope::target(scope.clone());
+            let dscope = Scope::target(session, scope.clone());
             let abi = ttype.get_abi().unwrap_or(ABI::Molten);
             dscope.define_func(ident.name.clone(), Some(ttype.clone()), abi)?;
             if let Some(ref mname) = abi.unmangle_name(ident.as_str()) {
@@ -136,7 +136,7 @@ fn bind_names_node_or_error(session: &Session, scope: ScopeRef, node: &mut AST) 
 
             classspec.types.iter_mut().map(|ref mut ttype| declare_typevars(tscope.clone(), Some(ttype), true).unwrap()).count();
             for field in fields {
-                //let dscope = Scope::target(scope.clone());
+                //let dscope = Scope::target(session, scope.clone());
                 scope.define(field.ident.name.clone(), field.ttype.clone())?;
                 declare_typevars(scope.clone(), field.ttype.as_mut(), true);
             }
@@ -169,7 +169,7 @@ fn bind_names_node_or_error(session: &Session, scope: ScopeRef, node: &mut AST) 
                 tscope.define_type(String::from("Super"), Type::Object(pident.name.clone(), ptypes.clone()))?;
             }
 
-            ClassDef::define_class(scope, classspec, parentspec.clone())?;
+            ClassDef::define_class(session, scope, *id, classspec, parentspec.clone())?;
             bind_names_vec(session, tscope, body);
         },
 

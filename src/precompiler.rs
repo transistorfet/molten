@@ -8,7 +8,7 @@ use scope::{ ScopeRef };
 
 
 pub fn precompile(session: &Session, code: Vec<AST>) -> Vec<AST> {
-    update_scope_variable_types(session.map.get_global());
+    update_scope_variable_types(session, session.map.get_global());
     precompile_vec(session, session.map.get_global(), code)
 }
 
@@ -34,12 +34,12 @@ pub fn precompile_node(session: &Session, scope: ScopeRef, node: AST) -> AST {
 
         AST::Function(id, pos, name, args, ret, body, abi) => {
             let fscope = session.map.get(&id);
-            update_scope_variable_types(fscope.clone());
+            update_scope_variable_types(session, fscope.clone());
 
             // Mangle names of overloaded functions
             /*
             if let Some(sname) = name.clone() {
-                let dscope = Scope::target(scope);
+                let dscope = Scope::target(session, scope);
                 /*
                 let mut ftype = dscope.get_variable_type(&sname).unwrap();
                 if ftype.is_overloaded() {
@@ -200,9 +200,9 @@ pub fn precompile_node(session: &Session, scope: ScopeRef, node: AST) -> AST {
 
         AST::Class(id, pos, classspec, parentspec, body) => {
             let tscope = session.map.get(&id);
-            //update_scope_variable_types(tscope.clone());
+            //update_scope_variable_types(session, tscope.clone());
             //let classdef = scope.get_class_def(&classspec.0);
-            //update_scope_variable_types(classdef.clone());
+            //update_scope_variable_types(session, classdef.clone());
             let mut body = precompile_vec(session, tscope.clone(), body);
 
             /*
@@ -289,7 +289,7 @@ pub fn register_function(session: &Session, scope: ScopeRef, function: &AST) {
         }
 
         let ftype = Type::Function(Box::new(Type::Tuple(args.iter().map(|t| t.ident.clone().unwrap()).collect())), Box::new(ret.clone().unwrap()));
-        let dscope = Scope::target(scope.clone());
+        let dscope = Scope::target(session, scope.clone());
         dscope.define(name, Some(ftype.clone()));
     }
 }

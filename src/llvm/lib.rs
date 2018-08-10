@@ -13,7 +13,7 @@ use types::Type;
 use defs::TypeDef;
 use session::Session;
 use defs::classes::ClassDef;
-use ast::{ Pos, Ident, ClassSpec };
+use ast::{ NodeID, Pos, Ident, ClassSpec };
 use parser::{ parse_type };
 use scope::{ Scope, ScopeRef, ScopeMapRef, Context };
 use binding::{ declare_typevars };
@@ -35,9 +35,9 @@ pub enum Func {
 
 #[derive(Clone)]
 pub enum BuiltinDef<'sess> {
-    Type(&'sess str, Type),
-    Func(&'sess str, &'sess str, Func),
-    Class(&'sess str, Vec<Type>, Vec<(String, Type)>, Vec<BuiltinDef<'sess>>),
+    Type(NodeID, &'sess str, Type),
+    Func(NodeID, &'sess str, &'sess str, Func),
+    Class(NodeID, &'sess str, Vec<Type>, Vec<(String, Type)>, Vec<BuiltinDef<'sess>>),
 }
 
 
@@ -59,24 +59,27 @@ pub fn register_builtins_vec<'sess>(session: &Session, scope: ScopeRef, tscope: 
 
 pub fn register_builtins_node<'sess>(session: &Session, scope: ScopeRef, tscope: ScopeRef, node: &BuiltinDef<'sess>) {
     match *node {
-        BuiltinDef::Type(ref name, ref ttype) => {
+        BuiltinDef::Type(ref id, ref name, ref ttype) => {
             let mut ttype = ttype.clone();
             declare_typevars(tscope.clone(), Some(&mut ttype), true).unwrap();
             scope.define_type(String::from(*name), ttype.clone()).unwrap();
             let classdef = ClassDef::new_ref(ClassSpec::new(Pos::empty(), Ident::from_str(ttype.get_name().unwrap().as_str()), ttype.get_params().unwrap()), None, Scope::new_ref(None));
-            scope.set_type_def(&String::from(*name), TypeDef::Class(classdef));
+            session.set_type_def(*id, TypeDef::Class(classdef));
+            scope.set_type_def(&String::from(*name), *id);
         },
-        BuiltinDef::Func(ref name, ref ftype, _) => {
+        BuiltinDef::Func(ref id, ref name, ref ftype, _) => {
             let mut ftype = parse_type(ftype);
             declare_typevars(tscope.clone(), ftype.as_mut(), false).unwrap();
             Scope::define_func_variant(session, scope, String::from(*name), tscope.clone(), ftype.clone().unwrap()).unwrap();
         },
-        BuiltinDef::Class(ref name, ref params, _, ref entries) => {
+        BuiltinDef::Class(ref id, ref name, ref params, _, ref entries) => {
             //let cname = String::from(*name);
             //let classdef = Scope::new_ref(None);
             //classdef.set_basename(cname.clone());
             //scope.set_type_def(&cname, None, TypeDef::Class(classdef.clone()));
-            let classdef = ClassDef::define_class(scope.clone(), &ClassSpec::new(Pos::empty(), Ident::from_str(name), params.clone()), None).unwrap();
+            let mut ttype = Type::Object(String::from(*name), params.clone());
+            declare_typevars(tscope.clone(), Some(&mut ttype), true).unwrap();
+            let classdef = ClassDef::define_class(session, scope.clone(), *id, &ClassSpec::new(Pos::empty(), Ident::from_str(name), ttype.get_params().unwrap()), None).unwrap();
 
             let tscope = Scope::new_ref(Some(scope.clone()));
             register_builtins_vec(session, classdef.classvars.clone(), tscope.clone(), entries);
@@ -98,8 +101,8 @@ pub unsafe fn declare_builtins_vec<'sess>(data: &mut LLVM<'sess>, objtype: LLVMT
 
 pub unsafe fn declare_builtins_node<'sess>(data: &mut LLVM<'sess>, objtype: LLVMTypeRef, scope: ScopeRef, tscope: ScopeRef, node: &BuiltinDef<'sess>) {
     match *node {
-        BuiltinDef::Type(ref _name, ref _ttype) => { },
-        BuiltinDef::Func(ref sname, ref types, ref func) => {
+        BuiltinDef::Type(ref id, ref _name, ref _ttype) => { },
+        BuiltinDef::Func(ref id, ref sname, ref types, ref func) => {
             let mut name = String::from(*sname);
             let ftype = parse_type(types).unwrap();
             match *func {
@@ -127,12 +130,12 @@ pub unsafe fn declare_builtins_node<'sess>(data: &mut LLVM<'sess>, objtype: LLVM
                     }
                     data.set_value(scope.variable_id(&name).unwrap(), Box::new(Builtin(BuiltinFunction(func), ftype)));
                 },
-                _ => { },
+                Func::Undefined => { },
             }
         },
-        BuiltinDef::Class(ref name, _, ref structdef, ref entries) => {
+        BuiltinDef::Class(ref id, ref name, _, ref structdef, ref entries) => {
             let cname = String::from(*name);
-            let classdef = scope.get_type_def(&cname).as_class().unwrap();
+            let classdef = data.session.find_type_def(scope.clone(), name).unwrap().as_class().unwrap();
 
             let lltype = if structdef.len() > 0 {
                 *classdef.structdef.borrow_mut() = structdef.clone();
@@ -179,91 +182,106 @@ unsafe fn declare_irregular_functions(data: &LLVM, scope: ScopeRef) {
 }
 
 
+fn id() -> NodeID {
+    NodeID::generate()
+}
+
 pub fn get_builtins<'sess>() -> Vec<BuiltinDef<'sess>> {
     vec!(
-        BuiltinDef::Func("malloc",     "(Int) -> 'ptr / C",             Func::External),
-        BuiltinDef::Func("realloc",    "('ptr, Int) -> 'ptr / C",       Func::External),
-        BuiltinDef::Func("free",       "('ptr) -> Nil / C",             Func::External),
-        BuiltinDef::Func("memcpy",     "('ptr, 'ptr, Int) -> 'ptr / C", Func::External),
-        BuiltinDef::Func("strcmp",     "(String, String) -> Int / C",   Func::External),
-        BuiltinDef::Func("puts",       "(String) -> Nil / C",           Func::External),
-        BuiltinDef::Func("gets",       "(String) -> String / C",        Func::External),
-        BuiltinDef::Func("strlen",     "(String) -> Int / C",           Func::External),
-        //BuiltinDef::Func("sprintf",    "'tmp",                          Func::Undefined),
-        BuiltinDef::Func("sprintf",    "(String, String, 'sess1, 'sess2) -> Nil / C", Func::Undefined),
+        /*
+        BuiltinDef::Type(id(), "Nil",    Type::Object(String::from("Nil"), vec!())),
+        BuiltinDef::Type(id(), "Bool",   Type::Object(String::from("Bool"), vec!())),
+        BuiltinDef::Type(id(), "Byte",   Type::Object(String::from("Byte"), vec!())),
+        BuiltinDef::Type(id(), "Real",   Type::Object(String::from("Real"), vec!())),
+        BuiltinDef::Type(id(), "String", Type::Object(String::from("String"), vec!())),
+        BuiltinDef::Type(id(), "List",   Type::Object(String::from("List"), vec!(Type::Variable(String::from("item"), UniqueID(0))))),
+        //BuiltinDef::Type(id(), "Class",  Type::Object(String::from("Class"), vec!())),
+        */
 
-        BuiltinDef::Func("println",    "(String) -> Nil / C",           Func::Runtime(build_lib_println)),
-        BuiltinDef::Func("readline",   "() -> String / C",              Func::Runtime(build_lib_readline)),
+        BuiltinDef::Class(id(), "Nil",    vec!(), vec!(), vec!()),
+        BuiltinDef::Class(id(), "Bool",   vec!(), vec!(), vec!()),
+        BuiltinDef::Class(id(), "Byte",   vec!(), vec!(), vec!()),
+        BuiltinDef::Class(id(), "Real",   vec!(), vec!(), vec!()),
+        BuiltinDef::Class(id(), "String", vec!(), vec!(), vec!()),
+        //BuiltinDef::Class(id(), "List",   vec!(Type::Variable(String::from("item"), UniqueID(0))), vec!(), vec!()),
+        //BuiltinDef::Class(id(), "Class",  Type::Object(String::from("Class"), vec!())),
 
-
-        BuiltinDef::Type("Nil",    Type::Object(String::from("Nil"), vec!())),
-        BuiltinDef::Type("Bool",   Type::Object(String::from("Bool"), vec!())),
-        BuiltinDef::Type("Byte",   Type::Object(String::from("Byte"), vec!())),
-        BuiltinDef::Type("Real",   Type::Object(String::from("Real"), vec!())),
-        BuiltinDef::Type("String", Type::Object(String::from("String"), vec!())),
-        BuiltinDef::Type("List",   Type::Object(String::from("List"), vec!(Type::Variable(String::from("item"), UniqueID(0))))),
-        //BuiltinDef::Type("Class",  Type::Object(String::from("Class"), vec!())),
-
-        BuiltinDef::Class("Int", vec!(), vec!(), vec!(
-            BuiltinDef::Func("+",   "(Int, Int) -> Int", Func::Comptime(add_int)),
-            BuiltinDef::Func("add", "(Int, Int) -> Int", Func::Runtime(build_lib_add)),
+        BuiltinDef::Class(id(), "Int", vec!(), vec!(), vec!(
+            BuiltinDef::Func(id(), "+",   "(Int, Int) -> Int", Func::Comptime(add_int)),
+            BuiltinDef::Func(id(), "add", "(Int, Int) -> Int", Func::Runtime(build_lib_add)),
         )),
 
         /*
-        BuiltinDef::Class("String", vec!(), vec!(
-            //BuiltinDef::Func("push", "(String, String) -> String", Func::Comptime(add_int)),
-            BuiltinDef::Func("[]",   "(String, Int) -> Int",       Func::Runtime(build_string_get)),
+        BuiltinDef::Class(id(), "String", vec!(), vec!(
+            //BuiltinDef::Func(id(), "push", "(String, String) -> String", Func::Comptime(add_int)),
+            BuiltinDef::Func(id(), "[]",   "(String, Int) -> Int",       Func::Runtime(build_string_get)),
         )),
         */
-        BuiltinDef::Func("getindex",   "(String, Int) -> Int",       Func::Runtime(build_string_get)),
+        BuiltinDef::Func(id(), "getindex",   "(String, Int) -> Int",       Func::Runtime(build_string_get)),
 
-        BuiltinDef::Class("Buffer", vec!(Type::Variable(String::from("item"), UniqueID(0))), vec!(), vec!(
-            BuiltinDef::Func("__alloc__",  "() -> Buffer<'item>",                      Func::Runtime(build_buffer_allocator)),
-            BuiltinDef::Func("new",        "(Buffer<'item>, Int) -> Buffer<'item>",    Func::Runtime(build_buffer_constructor)),
-            BuiltinDef::Func("resize",     "(Buffer<'item>, Int) -> Buffer<'item>",    Func::Runtime(build_buffer_resize)),
-            BuiltinDef::Func("[]",         "(Buffer<'item>, Int) -> 'item",            Func::Runtime(build_buffer_get)),
-            BuiltinDef::Func("[]",         "(Buffer<'item>, Int, 'item) -> 'item",     Func::Runtime(build_buffer_set)),
+
+        BuiltinDef::Func(id(), "malloc",     "(Int) -> 'ptr / C",             Func::External),
+        BuiltinDef::Func(id(), "realloc",    "('ptr, Int) -> 'ptr / C",       Func::External),
+        BuiltinDef::Func(id(), "free",       "('ptr) -> Nil / C",             Func::External),
+        BuiltinDef::Func(id(), "memcpy",     "('ptr, 'ptr, Int) -> 'ptr / C", Func::External),
+        BuiltinDef::Func(id(), "strcmp",     "(String, String) -> Int / C",   Func::External),
+        BuiltinDef::Func(id(), "puts",       "(String) -> Nil / C",           Func::External),
+        BuiltinDef::Func(id(), "gets",       "(String) -> String / C",        Func::External),
+        BuiltinDef::Func(id(), "strlen",     "(String) -> Int / C",           Func::External),
+        //BuiltinDef::Func(id(), "sprintf",    "'tmp",                          Func::Undefined),
+        BuiltinDef::Func(id(), "sprintf",    "(String, String, 'sess1, 'sess2) -> Nil / C", Func::Undefined),
+
+        BuiltinDef::Func(id(), "println",    "(String) -> Nil / C",           Func::Runtime(build_lib_println)),
+        BuiltinDef::Func(id(), "readline",   "() -> String / C",              Func::Runtime(build_lib_readline)),
+
+
+        BuiltinDef::Class(id(), "Buffer", vec!(Type::Variable(String::from("item"), UniqueID(0))), vec!(), vec!(
+            BuiltinDef::Func(id(), "__alloc__",  "() -> Buffer<'item>",                      Func::Runtime(build_buffer_allocator)),
+            BuiltinDef::Func(id(), "new",        "(Buffer<'item>, Int) -> Buffer<'item>",    Func::Runtime(build_buffer_constructor)),
+            BuiltinDef::Func(id(), "resize",     "(Buffer<'item>, Int) -> Buffer<'item>",    Func::Runtime(build_buffer_resize)),
+            BuiltinDef::Func(id(), "[]",         "(Buffer<'item>, Int) -> 'item",            Func::Runtime(build_buffer_get)),
+            BuiltinDef::Func(id(), "[]",         "(Buffer<'item>, Int, 'item) -> 'item",     Func::Runtime(build_buffer_set)),
         )),
 
 
-        BuiltinDef::Func("+",   "(Int, Int) -> Int",    Func::Comptime(add_int)),
-        BuiltinDef::Func("-",   "(Int, Int) -> Int",    Func::Comptime(sub_int)),
-        BuiltinDef::Func("*",   "(Int, Int) -> Int",    Func::Comptime(mul_int)),
-        BuiltinDef::Func("/",   "(Int, Int) -> Int",    Func::Comptime(div_int)),
-        BuiltinDef::Func("%",   "(Int, Int) -> Int",    Func::Comptime(mod_int)),
-        //BuiltinDef::Func("^",   "(Int, Int) -> Int",    Func::Comptime(pow_int)),
-        //BuiltinDef::Func("<<",  "(Int, Int) -> Int",    Func::Comptime(shl_int)),
-        //BuiltinDef::Func(">>",  "(Int, Int) -> Int",    Func::Comptime(shr_int)),
-        BuiltinDef::Func("&",   "(Int, Int) -> Int",    Func::Comptime(and_int)),
-        BuiltinDef::Func("|",   "(Int, Int) -> Int",    Func::Comptime(or_int)),
-        BuiltinDef::Func("<",   "(Int, Int) -> Bool",   Func::Comptime(lt_int)),
-        BuiltinDef::Func(">",   "(Int, Int) -> Bool",   Func::Comptime(gt_int)),
-        BuiltinDef::Func("<=",  "(Int, Int) -> Bool",   Func::Comptime(lte_int)),
-        BuiltinDef::Func(">=",  "(Int, Int) -> Bool",   Func::Comptime(gte_int)),
-        BuiltinDef::Func("==",  "(Int, Int) -> Bool",   Func::Comptime(eq_int)),
-        BuiltinDef::Func("!=",  "(Int, Int) -> Bool",   Func::Comptime(ne_int)),
-        BuiltinDef::Func("~",   "(Int) -> Int",         Func::Comptime(com_int)),
-        BuiltinDef::Func("not", "(Int) -> Bool",        Func::Comptime(not_int)),
+        BuiltinDef::Func(id(), "+",   "(Int, Int) -> Int",    Func::Comptime(add_int)),
+        BuiltinDef::Func(id(), "-",   "(Int, Int) -> Int",    Func::Comptime(sub_int)),
+        BuiltinDef::Func(id(), "*",   "(Int, Int) -> Int",    Func::Comptime(mul_int)),
+        BuiltinDef::Func(id(), "/",   "(Int, Int) -> Int",    Func::Comptime(div_int)),
+        BuiltinDef::Func(id(), "%",   "(Int, Int) -> Int",    Func::Comptime(mod_int)),
+        //BuiltinDef::Func(id(), "^",   "(Int, Int) -> Int",    Func::Comptime(pow_int)),
+        //BuiltinDef::Func(id(), "<<",  "(Int, Int) -> Int",    Func::Comptime(shl_int)),
+        //BuiltinDef::Func(id(), ">>",  "(Int, Int) -> Int",    Func::Comptime(shr_int)),
+        BuiltinDef::Func(id(), "&",   "(Int, Int) -> Int",    Func::Comptime(and_int)),
+        BuiltinDef::Func(id(), "|",   "(Int, Int) -> Int",    Func::Comptime(or_int)),
+        BuiltinDef::Func(id(), "<",   "(Int, Int) -> Bool",   Func::Comptime(lt_int)),
+        BuiltinDef::Func(id(), ">",   "(Int, Int) -> Bool",   Func::Comptime(gt_int)),
+        BuiltinDef::Func(id(), "<=",  "(Int, Int) -> Bool",   Func::Comptime(lte_int)),
+        BuiltinDef::Func(id(), ">=",  "(Int, Int) -> Bool",   Func::Comptime(gte_int)),
+        BuiltinDef::Func(id(), "==",  "(Int, Int) -> Bool",   Func::Comptime(eq_int)),
+        BuiltinDef::Func(id(), "!=",  "(Int, Int) -> Bool",   Func::Comptime(ne_int)),
+        BuiltinDef::Func(id(), "~",   "(Int) -> Int",         Func::Comptime(com_int)),
+        BuiltinDef::Func(id(), "not", "(Int) -> Bool",        Func::Comptime(not_int)),
 
 
-        BuiltinDef::Func("+",   "(Real, Real) -> Real", Func::Comptime(add_real)),
-        BuiltinDef::Func("-",   "(Real, Real) -> Real", Func::Comptime(sub_real)),
-        BuiltinDef::Func("*",   "(Real, Real) -> Real", Func::Comptime(mul_real)),
-        BuiltinDef::Func("/",   "(Real, Real) -> Real", Func::Comptime(div_real)),
-        BuiltinDef::Func("%",   "(Real, Real) -> Real", Func::Comptime(mod_real)),
-        BuiltinDef::Func("^",   "(Real, Real) -> Real", Func::Comptime(pow_real)),
-        BuiltinDef::Func("<",   "(Real, Real) -> Bool", Func::Comptime(lt_real)),
-        BuiltinDef::Func(">",   "(Real, Real) -> Bool", Func::Comptime(gt_real)),
-        BuiltinDef::Func("<=",  "(Real, Real) -> Bool", Func::Comptime(lte_real)),
-        BuiltinDef::Func(">=",  "(Real, Real) -> Bool", Func::Comptime(gte_real)),
-        BuiltinDef::Func("==",  "(Real, Real) -> Bool", Func::Comptime(eq_real)),
-        BuiltinDef::Func("!=",  "(Real, Real) -> Bool", Func::Comptime(ne_real)),
-        BuiltinDef::Func("not", "(Real) -> Bool",       Func::Comptime(not_real)),
+        BuiltinDef::Func(id(), "+",   "(Real, Real) -> Real", Func::Comptime(add_real)),
+        BuiltinDef::Func(id(), "-",   "(Real, Real) -> Real", Func::Comptime(sub_real)),
+        BuiltinDef::Func(id(), "*",   "(Real, Real) -> Real", Func::Comptime(mul_real)),
+        BuiltinDef::Func(id(), "/",   "(Real, Real) -> Real", Func::Comptime(div_real)),
+        BuiltinDef::Func(id(), "%",   "(Real, Real) -> Real", Func::Comptime(mod_real)),
+        BuiltinDef::Func(id(), "^",   "(Real, Real) -> Real", Func::Comptime(pow_real)),
+        BuiltinDef::Func(id(), "<",   "(Real, Real) -> Bool", Func::Comptime(lt_real)),
+        BuiltinDef::Func(id(), ">",   "(Real, Real) -> Bool", Func::Comptime(gt_real)),
+        BuiltinDef::Func(id(), "<=",  "(Real, Real) -> Bool", Func::Comptime(lte_real)),
+        BuiltinDef::Func(id(), ">=",  "(Real, Real) -> Bool", Func::Comptime(gte_real)),
+        BuiltinDef::Func(id(), "==",  "(Real, Real) -> Bool", Func::Comptime(eq_real)),
+        BuiltinDef::Func(id(), "!=",  "(Real, Real) -> Bool", Func::Comptime(ne_real)),
+        BuiltinDef::Func(id(), "not", "(Real) -> Bool",       Func::Comptime(not_real)),
 
 
-        BuiltinDef::Func("==",  "(Bool, Bool) -> Bool", Func::Comptime(eq_bool)),
-        BuiltinDef::Func("!=",  "(Bool, Bool) -> Bool", Func::Comptime(ne_bool)),
-        BuiltinDef::Func("not", "(Bool) -> Bool",       Func::Comptime(not_bool)),
+        BuiltinDef::Func(id(), "==",  "(Bool, Bool) -> Bool", Func::Comptime(eq_bool)),
+        BuiltinDef::Func(id(), "!=",  "(Bool, Bool) -> Bool", Func::Comptime(ne_bool)),
+        BuiltinDef::Func(id(), "not", "(Bool) -> Bool",       Func::Comptime(not_bool)),
     )
 }
 

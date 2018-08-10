@@ -68,12 +68,12 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &mut 
                 Type::update_variable_type(session, fscope.clone(), &args[i].ident.name, argtypes[i].clone());
                 args[i].ttype = Some(argtypes[i].clone());
             }
-            update_scope_variable_types(fscope.clone());
+            update_scope_variable_types(session, fscope.clone());
 
             let tupleargs = Type::Tuple(argtypes);
             let mut nftype = Type::Function(Box::new(tupleargs.clone()), Box::new(rettype), *abi);
             if ident.is_some() {
-                let dscope = Scope::target(scope.clone());
+                let dscope = Scope::target(session, scope.clone());
                 let dname = ident.as_ref().unwrap().name.clone();
                 //if dscope.is_overloaded(&dname) {
                     let fname = abi.mangle_name(dname.as_str(), &tupleargs, dscope.num_funcdefs(&dname));
@@ -117,7 +117,7 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &mut 
                         _ =>  { } //return Err(Error::new(format!("OverloadError: calling an overloaded function must be by name: not {:?}", fexpr))),
                     }
                     */
-                    get_accessor_name(tscope.clone(), fexpr.as_mut(), &etype)?;
+                    get_accessor_name(session, tscope.clone(), fexpr.as_mut(), &etype)?;
 
                     //let ftype = expect_type(session, tscope.clone(), Some(etype.clone()), Some(Type::Function(Box::new(Type::Tuple(atypes)), Box::new(expected.unwrap_or_else(|| tscope.new_typevar())), abi)), Check::Update)?;
                     let ftype = expect_type(session, tscope.clone(), Some(etype.clone()), Some(Type::Function(Box::new(Type::Tuple(atypes)), Box::new(etype.get_rettype()?.clone()), *abi)), Check::Def)?;
@@ -153,7 +153,7 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &mut 
         },
 
         AST::Definition(ref id, _, ref ident, ref mut ttype, ref mut body) => {
-            //let dscope = Scope::target(scope);
+            //let dscope = Scope::target(session, scope);
             let btype = expect_type(session, scope.clone(), ttype.clone(), Some(check_types_node(session, scope.clone(), body, ttype.clone())), Check::Def)?;
             //dscope.set_variable_type(&ident.name, btype.clone());
             Type::update_variable_type(session, scope, &ident.name, btype.clone());
@@ -283,7 +283,7 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &mut 
                 _ => return Err(Error::new(format!("SyntaxError: left-hand side of scope resolver must be identifier")))
             };
 
-            let classvars = scope.get_type_def(&ltype.get_name()?).as_class()?.classvars.clone();
+            let classvars = session.find_type_def(scope.clone(), &ltype.get_name()?.as_str())?.as_class()?.classvars.clone();
             classvars.get_variable_type(&field.name).unwrap_or_else(|| expected.unwrap_or_else(|| scope.new_typevar()))
         },
 
@@ -291,7 +291,7 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &mut 
             let ltype = resolve_type(scope.clone(), check_types_node(session, scope.clone(), left, None));
             *stype = Some(ltype.clone());
 
-            let classvars = scope.get_type_def(&ltype.get_name()?).as_class()?.classvars.clone();
+            let classvars = session.find_type_def(scope.clone(), &ltype.get_name()?.as_str())?.as_class()?.classvars.clone();
             classvars.get_variable_type(&field.name).unwrap_or_else(|| expected.unwrap_or_else(|| scope.new_typevar()))
         },
 
@@ -315,7 +315,7 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &mut 
     Ok(rtype)
 }
 
-pub fn get_accessor_name(scope: ScopeRef, fexpr: &mut AST, etype: &Type) -> Result<i32, Error> {
+pub fn get_accessor_name(session: &Session, scope: ScopeRef, fexpr: &mut AST, etype: &Type) -> Result<i32, Error> {
     let funcdefs = match *fexpr {
         AST::Resolver(ref id, _, ref left, ref mut ident) => {
             let ltype = match **left {
@@ -325,13 +325,13 @@ pub fn get_accessor_name(scope: ScopeRef, fexpr: &mut AST, etype: &Type) -> Resu
                 _ => return Err(Error::new(format!("SyntaxError: left-hand side of scope resolver must be identifier")))
             };
 
-            let classvars = scope.get_type_def(&ltype.get_name()?).as_class()?.classvars.clone();
+            let classvars = session.find_type_def(scope.clone(), &ltype.get_name()?.as_str())?.as_class()?.classvars.clone();
 debug!("!!!: {:?}", classvars.get_variable_type(&ident.name));
             let funcdefs = classvars.num_funcdefs(&ident.name);
             funcdefs
         },
         AST::Accessor(ref id, _, _, ref mut ident, ref ltype) => {
-            let classvars = scope.get_type_def(&ltype.as_ref().unwrap().get_name()?).as_class()?.classvars.clone();
+            let classvars = session.find_type_def(scope.clone(), &ltype.as_ref().unwrap().get_name()?.as_str())?.as_class()?.classvars.clone();
             let funcdefs = classvars.num_funcdefs(&ident.name);
             funcdefs
         },
@@ -354,8 +354,8 @@ debug!("!!!: {:?}", classvars.get_variable_type(&ident.name));
     Ok(funcdefs)
 }
 
-pub fn update_scope_variable_types(scope: ScopeRef) {
-    let dscope = Scope::target(scope.clone());
+pub fn update_scope_variable_types(session: &Session, scope: ScopeRef) {
+    let dscope = Scope::target(session, scope.clone());
     let mut names = vec!();
     for name in dscope.names.borrow().keys() {
         names.push(name.clone());

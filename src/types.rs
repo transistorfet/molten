@@ -146,7 +146,7 @@ impl Type {
     }
 
     pub fn update_variable_type(session: &Session, scope: ScopeRef, name: &String, ttype: Type) {
-        let dscope = Scope::target(scope.clone());
+        let dscope = Scope::target(session, scope.clone());
         let pscope = Scope::locate_variable(dscope.clone(), name).unwrap();
         let otype = pscope.get_variable_type(name).clone();
         if !pscope.is_primative() {
@@ -381,8 +381,7 @@ fn is_subclass_of(session: &Session, scope: ScopeRef, adef: (&String, &Vec<Type>
     let mut adef = (adef.0.clone(), adef.1.clone());
 
     loop {
-        let classdef = scope.get_type_def(&adef.0).as_class()?;
-        let (mut class, parent) = (Type::from_spec(classdef.classspec.clone()), classdef.parentspec.clone().map(|s| Type::from_spec(s)));
+        let mut class = scope.find_type(&adef.0).unwrap();
         class = tscope.map_typevars(&mut names, class);
         adef.1 = check_type_params(session, tscope.clone(), &class.get_params()?, &adef.1, mode.clone(), true)?;
 
@@ -399,6 +398,9 @@ fn is_subclass_of(session: &Session, scope: ScopeRef, adef: (&String, &Vec<Type>
             return Ok(rtype);
             //return Ok(tscope.unmap_typevars(&mut names, Type::Object(adef.0, ptypes)));
         }
+
+        let classdef = session.find_type_def(scope.clone(), &adef.0.as_str())?.as_class()?;
+        let parent = classdef.parentspec.clone().map(|s| Type::from_spec(s));
         if parent.is_none() {
             return Err(Error::new(format!("TypeError: type mismatch, expected {} but found {}", Type::Object(adef.0.clone(), adef.1), Type::Object(bdef.0.clone(), bdef.1.clone()))));
         }

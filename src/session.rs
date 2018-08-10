@@ -10,6 +10,7 @@ use std::collections::HashMap;
 
 use parser;
 use refinery;
+use types::Type;
 use config::Options;
 use ast::{ NodeID, Pos, AST };
 use defs::{ VarDef, TypeDef };
@@ -92,10 +93,10 @@ impl Session {
         err
     }
 
-    pub fn get_def(&self, id: NodeID) -> VarDef {
+    pub fn get_def(&self, id: NodeID) -> Result<VarDef, Error> {
         match self.vardefs.borrow().get(&id) {
-            Some(def) => def.clone(),
-            None => panic!("VarError: definition not set for {:?}", id),
+            Some(def) => Ok(def.clone()),
+            None => Err(Error::new(format!("DefinitionError: var definition not set for {:?}", id))),
         }
     }
 
@@ -104,9 +105,39 @@ impl Session {
     }
 
     pub fn define(&self, scope: ScopeRef, name: &str, id: NodeID) {
-        let dscope = Scope::target(scope.clone());
+        let dscope = Scope::target(self, scope.clone());
         dscope.define(String::from(name), None);
-        //dscope.set_var_def(name, id);
+        dscope.set_var_def(&String::from(name), id);
+    }
+
+    pub fn find_def(&self, scope: ScopeRef, name: &str) -> Result<VarDef, Error> {
+        // TODO replace String arguments in scope methods
+        self.get_def(scope.get_var_def(&String::from(name)).ok_or(Error::new(format!("VarError: definition not set for {:?}", name)))?)
+    }
+
+
+
+    pub fn set_type_def(&self, id: NodeID, def: TypeDef) {
+        //debug!("------- {:?} {:#?}", id, def);
+        self.typedefs.borrow_mut().insert(id, def);
+    }
+
+    pub fn get_type_def(&self, id: NodeID) -> Result<TypeDef, Error> {
+        match self.typedefs.borrow().get(&id) {
+            Some(def) => Ok(def.clone()),
+            None => Err(Error::new(format!("DefinitionError: type definition not set for {:?}", id))),
+        }
+    }
+
+    pub fn define_type(&self, scope: ScopeRef, name: &str, ttype: Type, id: NodeID) {
+        let dscope = Scope::target(self, scope.clone());
+        dscope.define_type(String::from(name), ttype);
+        dscope.set_type_def(&String::from(name), id);
+    }
+
+    pub fn find_type_def(&self, scope: ScopeRef, name: &str) -> Result<TypeDef, Error> {
+        // TODO replace String arguments in scope methods
+        self.get_type_def(scope.get_type_def(&String::from(name)).ok_or(Error::new(format!("TypeError: definition not set for {:?}", name)))?)
     }
 }
 

@@ -4,9 +4,9 @@ use std::cell::RefCell;
  
 use types::Type;
 use defs::TypeDef;
-use session::Error;
-use ast::{ ClassSpec, AST };
+use ast::{ NodeID, ClassSpec, AST };
 use scope::{ Scope, ScopeRef };
+use session::{ Session, Error };
 
 
 pub type ClassVars = ScopeRef;
@@ -60,12 +60,12 @@ impl ClassDef {
     }
     */
 
-    pub fn define_class(scope: ScopeRef, classspec: &ClassSpec, parentspec: Option<ClassSpec>) -> Result<ClassDefRef, Error> {
+    pub fn define_class(session: &Session, scope: ScopeRef, id: NodeID, classspec: &ClassSpec, parentspec: Option<ClassSpec>) -> Result<ClassDefRef, Error> {
         let &ClassSpec { ref ident, ref types, .. } = classspec;
 
         // Find the parent class definitions, which the new class will inherit from
         let parentclass = match parentspec {
-            Some(ClassSpec { ident: ref pident, .. }) => Some(scope.get_type_def(&pident.name).as_class()?),
+            Some(ClassSpec { ident: ref pident, .. }) => Some(session.find_type_def(scope.clone(), &pident.as_str())?.as_class()?),
             None => None
         };
 
@@ -76,7 +76,8 @@ impl ClassDef {
         // Define the class in the local scope
         let classdef = ClassDef::new_ref(classspec.clone(), parentspec.clone(), classvars);
         scope.define_type(ident.name.clone(), Type::Object(ident.name.clone(), types.clone()))?;
-        scope.set_type_def(&ident.name, TypeDef::Class(classdef.clone()));
+        scope.set_type_def(&ident.name, id);
+        session.set_type_def(id, TypeDef::Class(classdef.clone()));
         // TODO i don't like this type == Class thing, but i don't know how i'll do struct types yet either
         //scope.define(name.clone(), Some(Type::Object(name.clone(), vec!())))?;
         Ok(classdef)
@@ -87,9 +88,9 @@ impl ClassDef {
     }
 
 
-    pub fn build_vtable(&self, scope: ScopeRef, body: &Vec<AST>) {
+    pub fn build_vtable(&self, session: &Session, scope: ScopeRef, body: &Vec<AST>) {
         let parentclass = match self.parentspec {
-            Some(ref spec) => Some(scope.get_type_def(&spec.ident.name).as_class().unwrap()),
+            Some(ref spec) => Some(session.find_type_def(scope.clone(), &spec.ident.as_str()).unwrap().as_class().unwrap()),
             None => None,
         };
         let mut vtable = parentclass.map_or(vec!(), |c| c.vtable.borrow().clone());
@@ -125,9 +126,9 @@ impl ClassDef {
         *self.vtable.borrow_mut() = vtable;
     }
 
-    pub fn build_structdef(&self, scope: ScopeRef, body: &Vec<AST>) {
+    pub fn build_structdef(&self, session: &Session, scope: ScopeRef, body: &Vec<AST>) {
         let parentclass = match self.parentspec {
-            Some(ref spec) => Some(scope.get_type_def(&spec.ident.name).as_class().unwrap()),
+            Some(ref spec) => Some(session.find_type_def(scope.clone(), &spec.ident.as_str()).unwrap().as_class().unwrap()),
             None => None
         };
         let mut structdef = parentclass.map_or(vec!(), |c| c.structdef.borrow().clone());

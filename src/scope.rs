@@ -29,8 +29,7 @@ pub type VarID = UniqueID;
 pub struct VarInfo {
     pub id: VarID,
     pub ttype: Option<Type>,
-    pub def: Option<VarDef>,
-    //pub def: Option<NodeID>,
+    pub def: Option<NodeID>,
     pub funcdefs: i32,
     pub abi: Option<ABI>,
 }
@@ -42,8 +41,7 @@ pub type TypeID = UniqueID;
 pub struct TypeInfo {
     pub id: TypeID,
     pub ttype: Type,
-    pub def: Option<TypeDef>,
-    //pub def: Option<NodeID>,
+    pub def: Option<NodeID>,
 }
 
 
@@ -106,9 +104,9 @@ impl Scope {
         self.parent.clone()
     }
 
-    pub fn target(scope: ScopeRef) -> ScopeRef {
+    pub fn target(session: &Session, scope: ScopeRef) -> ScopeRef {
         match scope.context.get() {
-            Context::Redirect => scope.get_type_def(&scope.basename.borrow()).as_class().unwrap().classvars.clone(),
+            Context::Redirect => session.find_type_def(scope.clone(), &scope.basename.borrow().as_str()).unwrap().as_class().unwrap().classvars.clone(),
             _ => scope,
         }
     }
@@ -230,21 +228,18 @@ impl Scope {
         self.get_variable_type_full(name, false)
     }
 
-    pub fn set_var_def(&self, name: &String, def: VarDef) {
+    pub fn set_var_def(&self, name: &String, def: NodeID) {
         self.modify_local(name, move |sym| { sym.def = Some(def.clone()); })
     }
 
-    pub fn get_var_def(&self, name: &String) -> VarDef {
-        let def = self._search(name, |sym| {
+    pub fn get_var_def(&self, name: &String) -> Option<NodeID> {
+        self._search(name, |sym| {
             match sym.def.as_ref() {
                 Some(def) => Some(def.clone()),
-                None => panic!("VarError: definition not set for {:?}", name),
+                //None => Err(Error::new(format!("VarError: definition not set for {:?}", name))),
+                None => None,
             }
-        });
-        match def {
-            Some(def) => def.clone(),
-            None => panic!("NameError: variable is undefined; {:?}", name),
-        }
+        })
     }
 
     pub fn get_variable_type_full(&self, name: &String, local: bool) -> Option<Type> {
@@ -395,23 +390,20 @@ impl Scope {
         })
     }
 
-    pub fn set_type_def(&self, name: &String, def: TypeDef) {
+    pub fn set_type_def(&self, name: &String, def: NodeID) {
         self.modify_type(name, move |info| {
             info.def = Some(def.clone());
         })
     }
 
-    pub fn get_type_def(&self, name: &String) -> TypeDef {
-        let def = self._search_type(name, |info| {
+    pub fn get_type_def(&self, name: &String) -> Option<NodeID> {
+        self._search_type(name, |info| {
             match info.def.as_ref() {
                 Some(def) => Some(def.clone()),
-                None => panic!("TypeError: definition not set for {:?}", name),
+                //None => Err(Error::new(format!("TypeError: definition not set for {:?}", name))),
+                None => None,
             }
-        });
-        match def {
-            Some(def) => def.clone(),
-            None => panic!("NameError: type is undefined; {:?}", name),
-        }
+        })
     }
 
     pub fn type_id(&self, name: &String) -> Result<TypeID, Error> {
