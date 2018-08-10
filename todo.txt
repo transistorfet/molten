@@ -1,16 +1,18 @@
 
+* convert all lookups to use &str instead of &String
+* make type constructor functions or macros that are easier to use than Type::Object(String::from(name), vec!())
+* unify defs in session?  You'll still need find_type_def/find_var_def functions because of the dual namespace of scopes, but you'll only have get_def/set_def as the direct lookups
+
 * should we be looking up classes/types/etc by ID?  Should we be unifying IDs during name binding??  Maybe when defining a variable, we store
   the ID of the AST in the info struct, rather than generate a new one or save the info id in the AST, so we don't have to make AST mut
 * this wouldn't work for overloaded functions and methods...  the IDs would be different, and right now, we are storing --- wait what if we stored the ID in the type, which is overloaded???
 * how can we separate out the name mangling?  Maybe Ident can have an optional mangled name that we store?  We can always use a refcell, but having one if it's not used sucks
-* if you had a tuple type, you could use a typevar to represent a tuple of the arguments to a function: Type::Function(Type::Variable(..), Type::Variable(..)) or 'a -> 'b where 'a = ('c, 'd, 'e)
 
 * there must be a way to fix the 'scope exceptions' (Scope::target) that we're doing to make class bodies work...
-* unify defs in session?  You'll still need find_type_def/find_var_def functions because of the dual namespace of scopes, but you'll only have get_def/set_def as the direct lookups
 * but actually... what if you had an argument that you sent to all the scoped functions that select the namespace?  This might be a refactor for later, once scopes only store def ids
-* convert all lookups to use &str instead of &String
 * add some helpful things to the AST::make_* functions, maybe we'd need a different name format for those?
 * add the .set_id() functions to simpliy ast builders
+
 
 * should you store ClassSpec as Type::Object instead, given that we use it in many places where Pos necessarily make sense
 * one thing i'm seeing a lot of now is stuff like classspec.ident.name... can we prevent so many levels deep?
@@ -18,6 +20,8 @@
 * improve storing of files and file data in the Pos structs (maybe rename to Span?); pass session to parsers
 * change parser to take session argument or something so it can record the file info, and maybe do other advanced things
 * remove extraneous Pos's with Ident/Arguments?
+
+* if you had a tuple type, you could use a typevar to represent a tuple of the arguments to a function: Type::Function(Type::Variable(..), Type::Variable(..)) or 'a -> 'b where 'a = ('c, 'd, 'e)
 
 * make common error printer, with fancy colours
 * there are poor error messages when deleting the "=" from a "let something = fn x => ..." both inside and outside classes.... shouldn't be doing this

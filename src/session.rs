@@ -13,7 +13,7 @@ use refinery;
 use types::Type;
 use config::Options;
 use ast::{ NodeID, Pos, AST };
-use defs::{ VarDef, TypeDef };
+use defs::{ Def };
 use scope::{ Scope, ScopeRef, ScopeMapRef };
 
 
@@ -22,8 +22,7 @@ pub struct Session {
     pub name: String,
     pub map: ScopeMapRef,
     // TODO I really want to unify these, but I figured I should wait and refactor later when it's known to actually work
-    pub vardefs: RefCell<HashMap<NodeID, VarDef>>,
-    pub typedefs: RefCell<HashMap<NodeID, TypeDef>>,
+    pub defs: RefCell<HashMap<NodeID, Def>>,
     pub files: RefCell<Vec<(String, String)>>,
     pub target: String,
     pub errors: Cell<u32>,
@@ -36,8 +35,7 @@ impl Session {
             name: String::from(""),
             //builtins: builtins,
             map: ScopeMapRef::new(),
-            vardefs: RefCell::new(HashMap::new()),
-            typedefs: RefCell::new(HashMap::new()),
+            defs: RefCell::new(HashMap::new()),
             files: RefCell::new(vec!()),
             target: String::from(""),
             errors: Cell::new(0),
@@ -93,15 +91,15 @@ impl Session {
         err
     }
 
-    pub fn get_def(&self, id: NodeID) -> Result<VarDef, Error> {
-        match self.vardefs.borrow().get(&id) {
+    pub fn get_def(&self, id: NodeID) -> Result<Def, Error> {
+        match self.defs.borrow().get(&id) {
             Some(def) => Ok(def.clone()),
-            None => Err(Error::new(format!("DefinitionError: var definition not set for {:?}", id))),
+            None => Err(Error::new(format!("DefinitionError: definition not set for {:?}", id))),
         }
     }
 
-    pub fn set_def(&self, id: NodeID, def: VarDef) {
-        self.vardefs.borrow_mut().insert(id, def);
+    pub fn set_def(&self, id: NodeID, def: Def) {
+        self.defs.borrow_mut().insert(id, def);
     }
 
     pub fn define(&self, scope: ScopeRef, name: &str, id: NodeID) {
@@ -110,23 +108,9 @@ impl Session {
         dscope.set_var_def(&String::from(name), id);
     }
 
-    pub fn find_def(&self, scope: ScopeRef, name: &str) -> Result<VarDef, Error> {
+    pub fn find_def(&self, scope: ScopeRef, name: &str) -> Result<Def, Error> {
         // TODO replace String arguments in scope methods
         self.get_def(scope.get_var_def(&String::from(name)).ok_or(Error::new(format!("VarError: definition not set for {:?}", name)))?)
-    }
-
-
-
-    pub fn set_type_def(&self, id: NodeID, def: TypeDef) {
-        //debug!("------- {:?} {:#?}", id, def);
-        self.typedefs.borrow_mut().insert(id, def);
-    }
-
-    pub fn get_type_def(&self, id: NodeID) -> Result<TypeDef, Error> {
-        match self.typedefs.borrow().get(&id) {
-            Some(def) => Ok(def.clone()),
-            None => Err(Error::new(format!("DefinitionError: type definition not set for {:?}", id))),
-        }
     }
 
     pub fn define_type(&self, scope: ScopeRef, name: &str, ttype: Type, id: NodeID) {
@@ -135,9 +119,9 @@ impl Session {
         dscope.set_type_def(&String::from(name), id);
     }
 
-    pub fn find_type_def(&self, scope: ScopeRef, name: &str) -> Result<TypeDef, Error> {
+    pub fn find_type_def(&self, scope: ScopeRef, name: &str) -> Result<Def, Error> {
         // TODO replace String arguments in scope methods
-        self.get_type_def(scope.get_type_def(&String::from(name)).ok_or(Error::new(format!("TypeError: definition not set for {:?}", name)))?)
+        self.get_def(scope.get_type_def(&String::from(name)).ok_or(Error::new(format!("TypeError: definition not set for {:?}", name)))?)
     }
 }
 

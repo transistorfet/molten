@@ -10,8 +10,6 @@ use types::Type;
 use ast::{ NodeID, Ident };
 use session::{ Session, Error };
 use utils::UniqueID;
-use defs::classes::ClassDefRef;
-use defs::{ VarDef, TypeDef };
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum Context {

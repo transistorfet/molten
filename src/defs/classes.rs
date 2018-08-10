@@ -3,7 +3,7 @@ use std::rc::Rc;
 use std::cell::RefCell;
  
 use types::Type;
-use defs::TypeDef;
+use defs::Def;
 use ast::{ NodeID, ClassSpec, AST };
 use scope::{ Scope, ScopeRef };
 use session::{ Session, Error };
@@ -77,7 +77,7 @@ impl ClassDef {
         let classdef = ClassDef::new_ref(classspec.clone(), parentspec.clone(), classvars);
         scope.define_type(ident.name.clone(), Type::Object(ident.name.clone(), types.clone()))?;
         scope.set_type_def(&ident.name, id);
-        session.set_type_def(id, TypeDef::Class(classdef.clone()));
+        session.set_def(id, Def::Class(classdef.clone()));
         // TODO i don't like this type == Class thing, but i don't know how i'll do struct types yet either
         //scope.define(name.clone(), Some(Type::Object(name.clone(), vec!())))?;
         Ok(classdef)
@@ -234,7 +234,7 @@ impl StructDef {
 
         // Define the class in the local scope
         //scope.define_type(ident.name.clone(), Type::Object(ident.name.clone(), types.clone()))?;
-        //scope.set_type_def(&ident.name, TypeDef::Struct(structdef.clone()));
+        //scope.set_type_def(&ident.name, Def::Struct(structdef.clone()));
         Ok(structdef)
     }
 }

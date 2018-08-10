@@ -10,7 +10,7 @@ use self::llvm::core::*;
 
 use abi::ABI;
 use types::Type;
-use defs::TypeDef;
+use defs::Def;
 use session::Session;
 use defs::classes::ClassDef;
 use ast::{ NodeID, Pos, Ident, ClassSpec };
@@ -64,7 +64,7 @@ pub fn register_builtins_node<'sess>(session: &Session, scope: ScopeRef, tscope:
             declare_typevars(tscope.clone(), Some(&mut ttype), true).unwrap();
             scope.define_type(String::from(*name), ttype.clone()).unwrap();
             let classdef = ClassDef::new_ref(ClassSpec::new(Pos::empty(), Ident::from_str(ttype.get_name().unwrap().as_str()), ttype.get_params().unwrap()), None, Scope::new_ref(None));
-            session.set_type_def(*id, TypeDef::Class(classdef));
+            session.set_def(*id, Def::Class(classdef));
             scope.set_type_def(&String::from(*name), *id);
         },
         BuiltinDef::Func(ref id, ref name, ref ftype, _) => {
@@ -76,7 +76,7 @@ pub fn register_builtins_node<'sess>(session: &Session, scope: ScopeRef, tscope:
             //let cname = String::from(*name);
             //let classdef = Scope::new_ref(None);
             //classdef.set_basename(cname.clone());
-            //scope.set_type_def(&cname, None, TypeDef::Class(classdef.clone()));
+            //scope.set_type_def(&cname, None, Def::Class(classdef.clone()));
             let mut ttype = Type::Object(String::from(*name), params.clone());
             declare_typevars(tscope.clone(), Some(&mut ttype), true).unwrap();
             let classdef = ClassDef::define_class(session, scope.clone(), *id, &ClassSpec::new(Pos::empty(), Ident::from_str(name), ttype.get_params().unwrap()), None).unwrap();
