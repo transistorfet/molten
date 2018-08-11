@@ -1,6 +1,7 @@
 
 use session::Error;
 
+pub mod traits;
 pub mod classes;
 //pub mod functions;
 
@@ -38,5 +39,6 @@ impl Def {
         }
     }
     */
-} 
+}
+
 

@@ -6,12 +6,13 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 
 
-extern crate llvm_sys as llvm;
-use self::llvm::prelude::*;
-use self::llvm::core::*;
-use self::llvm::target::*;
-use self::llvm::target_machine::*;
-use self::llvm::transforms::pass_manager_builder::*;
+extern crate llvm_sys;
+use self::llvm_sys::*;
+use self::llvm_sys::prelude::*;
+use self::llvm_sys::core::*;
+use self::llvm_sys::target::*;
+use self::llvm_sys::target_machine::*;
+use self::llvm_sys::transforms::pass_manager_builder::*;
 
 use export;
 use abi::ABI;
@@ -388,7 +389,7 @@ unsafe fn declare_globals(data: &LLVM, scope: ScopeRef) {
                 let vname = format!("__{}_vtable", cident.name);
                 let global = LLVMAddGlobal(data.module, LLVMGetElementType(vtype), label(vname.as_str()));
                 LLVMSetInitializer(global, LLVMConstNamedStruct(vtype, methods.as_mut_ptr(), methods.len() as u32));
-                LLVMSetLinkage(global, llvm::LLVMLinkage::LLVMLinkOnceAnyLinkage);
+                LLVMSetLinkage(global, LLVMLinkage::LLVMLinkOnceAnyLinkage);
                 let id = scope.define(vname.clone(), Some(Type::Object(format!("{}_vtable", cident.name), vec!()))).unwrap();
                 data.set_value(id, Box::new(Global(global)));
             }
@@ -448,7 +449,7 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
             if !function.get_ref().is_null() {
                 // Cast values to the function's declared type; this is a hack for typevar/generic arguments
                 let mut lftype = LLVMTypeOf(function.get_ref());
-                if LLVMGetTypeKind(lftype) == llvm::LLVMTypeKind::LLVMPointerTypeKind {
+                if LLVMGetTypeKind(lftype) == LLVMTypeKind::LLVMPointerTypeKind {
                     lftype = LLVMGetElementType(lftype);
                 }
                 let mut ltypes = Vec::with_capacity(LLVMCountParamTypes(lftype) as usize);
@@ -500,13 +501,13 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
             let ttype = scope.get_variable_type(&ident.name).unwrap();
             if !pointer.get_ref().is_null() { debug!("IDENT: {:?} {:?} {:?}", LLVMGetValueKind(pointer.get_ref()), LLVMGetTypeKind(LLVMTypeOf(pointer.get_ref())), ttype); }
             //if !pointer.get_ref().is_null() { LLVMDumpValue(pointer.get_ref()); }
-            //if LLVMGetTypeKind(LLVMTypeOf(pointer)) == llvm::LLVMTypeKind::LLVMPointerTypeKind {
+            //if LLVMGetTypeKind(LLVMTypeOf(pointer)) == LLVMTypeKind::LLVMPointerTypeKind {
             if !pointer.get_ref().is_null() {
                 match LLVMGetValueKind(pointer.get_ref()) {
-                    //llvm::LLVMValueKind::LLVMArgumentValueKind |
-                    //llvm::LLVMValueKind::LLVMFunctionValueKind => pointer,
-                    llvm::LLVMValueKind::LLVMInstructionValueKind |
-                    llvm::LLVMValueKind::LLVMGlobalVariableValueKind => from_type(&ttype, LLVMBuildLoad(data.builder, pointer.get_ref(), label("tmp"))),
+                    //LLVMValueKind::LLVMArgumentValueKind |
+                    //LLVMValueKind::LLVMFunctionValueKind => pointer,
+                    LLVMValueKind::LLVMInstructionValueKind |
+                    LLVMValueKind::LLVMGlobalVariableValueKind => from_type(&ttype, LLVMBuildLoad(data.builder, pointer.get_ref(), label("tmp"))),
                     _ => pointer,
                 }
             } else {
@@ -577,8 +578,8 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
             LLVMPositionBuilderAtEnd(data.builder, lexpr_block);
             let lexpr_value = compile_node(data, func, unwind, scope.clone(), &args[0]).get_ref();
             let test_type = match op.as_str() {
-                "or" => llvm::LLVMIntPredicate::LLVMIntNE,
-                "and" => llvm::LLVMIntPredicate::LLVMIntEQ,
+                "or" => LLVMIntPredicate::LLVMIntNE,
+                "and" => LLVMIntPredicate::LLVMIntEQ,
                 _ => panic!("NotImplementedError: attempted to compile invalid side effect operation: {}", op.name.as_str())
             };
             let is_enough = LLVMBuildICmp(data.builder, test_type, lexpr_value, null_value(LLVMTypeOf(lexpr_value)), label("is_enough"));
@@ -601,7 +602,7 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
         AST::If(ref id, _, ref cond, ref texpr, ref fexpr) => {
             let cond_value = compile_node(data, func, unwind, scope.clone(), cond).get_ref();
             let cond_zero = LLVMConstInt(LLVMTypeOf(cond_value), 0, 0);
-            let is_nonzero = LLVMBuildICmp(data.builder, llvm::LLVMIntPredicate::LLVMIntNE, cond_value, cond_zero, label("is_nonzero"));
+            let is_nonzero = LLVMBuildICmp(data.builder, LLVMIntPredicate::LLVMIntNE, cond_value, cond_zero, label("is_nonzero"));
 
             let texpr_block = LLVMAppendBasicBlockInContext(data.context, func, label("ifthen"));
             let fexpr_block = LLVMAppendBasicBlockInContext(data.context, func, label("ifelse"));
@@ -651,7 +652,7 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
                     AST::Underscore => { LLVMBuildBr(data.builder, do_blocks[i]); },
                     _ => {
                         let case_value = compile_node(data, func, unwind, scope.clone(), case).get_ref();
-                        //let is_true = LLVMBuildICmp(data.builder, llvm::LLVMIntPredicate::LLVMIntEQ, cond_value, case_value, label("is_true"));
+                        //let is_true = LLVMBuildICmp(data.builder, LLVMIntPredicate::LLVMIntEQ, cond_value, case_value, label("is_true"));
                         let eqfunc = get_method(data, scope.clone(), "", "==", vec!(ctype.clone(), ctype.clone()));
                         let is_true = eqfunc.invoke(data, unwind, vec!(cond_value, case_value));
                         LLVMBuildCondBr(data.builder, is_true, do_blocks[i], cond_blocks[i + 1]);
@@ -680,7 +681,7 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
             LLVMPositionBuilderAtEnd(data.builder, before_block);
             let cond_value = compile_node(data, func, unwind, scope.clone(), cond).get_ref();
             let cond_zero = LLVMConstInt(LLVMTypeOf(cond_value), 0, 0);
-            let is_nonzero = LLVMBuildICmp(data.builder, llvm::LLVMIntPredicate::LLVMIntNE, cond_value, cond_zero, label("is_nonzero"));
+            let is_nonzero = LLVMBuildICmp(data.builder, LLVMIntPredicate::LLVMIntNE, cond_value, cond_zero, label("is_nonzero"));
             LLVMBuildCondBr(data.builder, is_nonzero, body_block, after_block);
 
             LLVMPositionBuilderAtEnd(data.builder, body_block);
@@ -722,7 +723,7 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
 
             let cond_value = LLVMBuildLoad(data.builder, inc, label("tmp"));
             let cond_length = data.get_value(listdef.classvars.variable_id(&String::from("len")).unwrap()).unwrap().invoke(data, unwind, vec!(list_value));
-            let is_end = LLVMBuildICmp(data.builder, llvm::LLVMIntPredicate::LLVMIntSGE, cond_value, cond_length, label("is_end"));
+            let is_end = LLVMBuildICmp(data.builder, LLVMIntPredicate::LLVMIntSGE, cond_value, cond_length, label("is_end"));
             LLVMBuildCondBr(data.builder, is_end, after_block, body_block);
 
             LLVMPositionBuilderAtEnd(data.builder, body_block);
@@ -1108,14 +1109,14 @@ pub unsafe fn int_value(data: &LLVM, num: usize) -> LLVMValueRef {
 pub unsafe fn build_generic_cast(data: &LLVM, value: LLVMValueRef, ltype: LLVMTypeRef) -> LLVMValueRef {
     if ltype != LLVMTypeOf(value) {
         debug!("{:?} -> {:?}", LLVMGetTypeKind(LLVMTypeOf(value)), LLVMGetTypeKind(ltype));
-        if LLVMGetTypeKind(LLVMTypeOf(value)) == llvm::LLVMTypeKind::LLVMPointerTypeKind {
-            if LLVMGetTypeKind(ltype) == llvm::LLVMTypeKind::LLVMPointerTypeKind {
+        if LLVMGetTypeKind(LLVMTypeOf(value)) == LLVMTypeKind::LLVMPointerTypeKind {
+            if LLVMGetTypeKind(ltype) == LLVMTypeKind::LLVMPointerTypeKind {
                 LLVMBuildPointerCast(data.builder, value, ltype, label("ptr"))
             } else {
                 LLVMBuildPtrToInt(data.builder, value, ltype, label("ptr"))
             }
         } else {
-            if LLVMGetTypeKind(ltype) == llvm::LLVMTypeKind::LLVMPointerTypeKind {
+            if LLVMGetTypeKind(ltype) == LLVMTypeKind::LLVMPointerTypeKind {
                 LLVMBuildIntToPtr(data.builder, value, ltype, label("ptr"))
             } else {
                 panic!("I HAVEN'T DONE THIS");
@@ -1127,7 +1128,7 @@ pub unsafe fn build_generic_cast(data: &LLVM, value: LLVMValueRef, ltype: LLVMTy
 }
 
 pub unsafe fn build_cast_to_vartype(data: &LLVM, value: LLVMValueRef) -> LLVMValueRef {
-    if LLVMGetTypeKind(LLVMTypeOf(value)) == llvm::LLVMTypeKind::LLVMPointerTypeKind {
+    if LLVMGetTypeKind(LLVMTypeOf(value)) == LLVMTypeKind::LLVMPointerTypeKind {
         LLVMBuildPointerCast(data.builder, value, str_type(data), label("ptr"))
     } else {
         LLVMBuildIntToPtr(data.builder, value, str_type(data), label("ptr"))
@@ -1135,7 +1136,7 @@ pub unsafe fn build_cast_to_vartype(data: &LLVM, value: LLVMValueRef) -> LLVMVal
 }
 
 pub unsafe fn build_cast_from_vartype(data: &LLVM, value: LLVMValueRef, ltype: LLVMTypeRef) -> LLVMValueRef {
-    if LLVMGetTypeKind(ltype) == llvm::LLVMTypeKind::LLVMPointerTypeKind {
+    if LLVMGetTypeKind(ltype) == LLVMTypeKind::LLVMPointerTypeKind {
         LLVMBuildPointerCast(data.builder, value, ltype, label("ptr"))
     } else {
         LLVMBuildPtrToInt(data.builder, value, ltype, label("ptr"))
