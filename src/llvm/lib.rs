@@ -35,7 +35,6 @@ pub enum Func {
 
 #[derive(Clone)]
 pub enum BuiltinDef<'sess> {
-    Type(NodeID, &'sess str, Type),
     Func(NodeID, &'sess str, &'sess str, Func),
     Class(NodeID, &'sess str, Vec<Type>, Vec<(String, Type)>, Vec<BuiltinDef<'sess>>),
 }
@@ -59,29 +58,17 @@ pub fn register_builtins_vec<'sess>(session: &Session, scope: ScopeRef, tscope: 
 
 pub fn register_builtins_node<'sess>(session: &Session, scope: ScopeRef, tscope: ScopeRef, node: &BuiltinDef<'sess>) {
     match *node {
-        BuiltinDef::Type(ref id, ref name, ref ttype) => {
-            let mut ttype = ttype.clone();
-            declare_typevars(tscope.clone(), Some(&mut ttype), true).unwrap();
-            scope.define_type(String::from(*name), ttype.clone()).unwrap();
-            let classdef = ClassDef::new_ref(ClassSpec::new(Pos::empty(), Ident::from_str(ttype.get_name().unwrap().as_str()), ttype.get_params().unwrap()), None, Scope::new_ref(None));
-            session.set_def(*id, Def::Class(classdef));
-            scope.set_type_def(&String::from(*name), *id);
-        },
         BuiltinDef::Func(ref id, ref name, ref ftype, _) => {
             let mut ftype = parse_type(ftype);
             declare_typevars(tscope.clone(), ftype.as_mut(), false).unwrap();
             Scope::define_func_variant(session, scope, String::from(*name), tscope.clone(), ftype.clone().unwrap()).unwrap();
         },
         BuiltinDef::Class(ref id, ref name, ref params, _, ref entries) => {
-            //let cname = String::from(*name);
-            //let classdef = Scope::new_ref(None);
-            //classdef.set_basename(cname.clone());
-            //scope.set_type_def(&cname, None, Def::Class(classdef.clone()));
+            let tscope = ClassDef::create_class_scope(session, scope.clone(), *id);
             let mut ttype = Type::Object(String::from(*name), params.clone());
             declare_typevars(tscope.clone(), Some(&mut ttype), true).unwrap();
-            let classdef = ClassDef::define_class(session, scope.clone(), *id, &ClassSpec::new(Pos::empty(), Ident::from_str(name), ttype.get_params().unwrap()), None).unwrap();
+            let classdef = ClassDef::define_class(session, scope.clone(), *id, ttype, None).unwrap();
 
-            let tscope = Scope::new_ref(Some(scope.clone()));
             register_builtins_vec(session, classdef.classvars.clone(), tscope.clone(), entries);
         },
     }
@@ -101,7 +88,6 @@ pub unsafe fn declare_builtins_vec<'sess>(data: &mut LLVM<'sess>, objtype: LLVMT
 
 pub unsafe fn declare_builtins_node<'sess>(data: &mut LLVM<'sess>, objtype: LLVMTypeRef, scope: ScopeRef, tscope: ScopeRef, node: &BuiltinDef<'sess>) {
     match *node {
-        BuiltinDef::Type(ref id, ref _name, ref _ttype) => { },
         BuiltinDef::Func(ref id, ref sname, ref types, ref func) => {
             let mut name = String::from(*sname);
             let ftype = parse_type(types).unwrap();

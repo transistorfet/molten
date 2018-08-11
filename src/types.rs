@@ -212,6 +212,42 @@ impl Type {
     }
     */
 
+
+    /*
+    pub fn convert<F>(self, f: &F) -> Type where F: FnOnce(Type) -> Type {
+        let ttype = match self {
+            Type::Object(name, types) => {
+                let types = types.into_iter().map(move |ttype| {
+                    ttype.convert(f)
+                }).collect();
+                Type::Object(name, types)
+            },
+            Type::Overload(types) => {
+                let types = types.into_iter().map(move |ttype| {
+                    ttype.convert(f)
+                }).collect();
+                Type::Overload(types)
+            },
+            Type::Tuple(types) => {
+                let types = types.into_iter().map(move |ttype| {
+                    ttype.convert(f)
+                }).collect();
+                Type::Tuple(types)
+            },
+            Type::Function(args, ret, abi) => {
+                let args = args.convert(f);
+                let ret = ret.convert(f);
+                Type::Function(Box::new(args), Box::new(ret), abi)
+            },
+            Type::Variable(name, id) => {
+                Type::Variable(name, id)
+            }
+        };
+        f(ttype)
+    }
+    */
+
+
     pub fn display_vec(list: &Vec<Type>) -> String {
         list.iter().map(|t| format!("{}", t)).collect::<Vec<String>>().join(", ")
     }
@@ -400,11 +436,10 @@ fn is_subclass_of(session: &Session, scope: ScopeRef, adef: (&String, &Vec<Type>
         }
 
         let classdef = session.find_type_def(scope.clone(), &adef.0.as_str())?.as_class()?;
-        let parent = classdef.parentspec.clone().map(|s| Type::from_spec(s));
-        if parent.is_none() {
+        if classdef.parenttype.is_none() {
             return Err(Error::new(format!("TypeError: type mismatch, expected {} but found {}", Type::Object(adef.0.clone(), adef.1), Type::Object(bdef.0.clone(), bdef.1.clone()))));
         }
-        let parent = tscope.map_typevars(&mut names, parent.unwrap());
+        let parent = tscope.map_typevars(&mut names, classdef.parenttype.clone().unwrap());
         match resolve_type(tscope.clone(), parent) {
             Type::Object(name, params) => adef = (name, params),
             ttype @ _ => return Err(Error::new(format!("TypeError: expected Object but found {}", ttype))),

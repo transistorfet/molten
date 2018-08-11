@@ -13,8 +13,9 @@ pub type ClassVars = ScopeRef;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct ClassDef {
-    pub classspec: ClassSpec,
-    pub parentspec: Option<ClassSpec>,
+    pub classname: String,
+    pub classtype: Type,
+    pub parenttype: Option<Type>,
     pub classvars: ClassVars,
     pub structdef: RefCell<Vec<(String, Type)>>,
     pub vtable: RefCell<Vec<(String, Type)>>,
@@ -24,95 +25,92 @@ pub type ClassDefRef = Rc<ClassDef>;
 
 
 impl ClassDef {
-    pub fn new(classspec: ClassSpec, parentspec: Option<ClassSpec>, classvars: ClassVars) -> Self {
+    pub fn new(classname: String, classtype: Type, parenttype: Option<Type>, classvars: ClassVars) -> Self {
         Self {
-            classspec: classspec,
-            parentspec: parentspec,
+            classname: classname,
+            classtype: classtype,
+            parenttype: parenttype,
             classvars: classvars,
             structdef: RefCell::new(vec!()),
             vtable: RefCell::new(vec!()),
         }
     }
 
-    pub fn new_ref(classspec: ClassSpec, parentspec: Option<ClassSpec>, classvars: ClassVars) -> ClassDefRef {
-        Rc::new(Self::new(classspec, parentspec, classvars))
+    pub fn new_ref(classname: String, classtype: Type, parenttype: Option<Type>, classvars: ClassVars) -> ClassDefRef {
+        Rc::new(Self::new(classname, classtype, parenttype, classvars))
     }
 
-    /*
-    pub fn define(session: &Session, scope: ScopeRef, node: &mut AST) -> Result<(), Error> {
-        if let AST::Class(ref id, _, ref mut classspec, ref mut parentspec, ref mut body) = *node {
-            // Create a temporary invisible scope to name check the class body
-            let tscope = session.map.add(*id, Some(scope.clone()));
-            tscope.set_class(true);
-            tscope.set_basename(classspec.ident.name.clone());
+    pub fn create_class_scope(session: &Session, scope: ScopeRef, id: NodeID) -> ScopeRef {
+        // Create a temporary invisible scope to name check the class body
+        let tscope = session.map.add(id, Some(scope.clone()));
+        tscope
+    }
 
-            // Define Self and Super, and check for typevars in the type params
-            classspec.types.iter_mut().map(|ref mut ttype| declare_typevars(tscope.clone(), Some(ttype), true).unwrap()).count();
-            tscope.define_type(String::from("Self"), Type::from_spec(classspec.clone()))?;
-            if let &mut Some(ClassSpec { ident: ref pident, types: ref mut ptypes, .. }) = parentspec {
-                ptypes.iter_mut().map(|ref mut ttype| declare_typevars(tscope.clone(), Some(ttype), false).unwrap()).count();
-                tscope.define_type(String::from("Super"), Type::Object(pident.name.clone(), ptypes.clone()))?;
-            }
+    pub fn define_class(session: &Session, scope: ScopeRef, id: NodeID, classtype: Type, parenttype: Option<Type>) -> Result<ClassDefRef, Error> {
+        let name = classtype.get_name()?;
+        let tscope = session.map.get(&id);
+        tscope.set_redirect(true);
+        tscope.set_basename(name.clone());
 
-            ClassDef::define_class(scope, classspec, parentspec.clone())?;
-            bind_names_vec(session, tscope, body);
+        // Define Self and Super, and check for typevars in the type params
+        tscope.define_type(String::from("Self"), classtype.clone())?;
+        if let Some(ref ptype) = parenttype {
+            tscope.define_type(String::from("Super"), ptype.clone())?;
         }
+
+        let classdef = Self::create_class(session, scope.clone(), id, classtype.clone(), parenttype)?;
+
+        // Define the class in the local scope
+        scope.define_type(name.clone(), classtype)?;
+        scope.set_type_def(&name, id);
+        session.set_def(id, Def::Class(classdef.clone()));
+        // TODO i don't like this type == Class thing, but i don't know how i'll do struct types yet either
+        //scope.define(name.clone(), Some(Type::Object(name.clone(), vec!())))?;
+
+        Ok(classdef)
     }
-    */
 
-    pub fn define_class(session: &Session, scope: ScopeRef, id: NodeID, classspec: &ClassSpec, parentspec: Option<ClassSpec>) -> Result<ClassDefRef, Error> {
-        let &ClassSpec { ref ident, ref types, .. } = classspec;
-
+    pub fn create_class(session: &Session, scope: ScopeRef, id: NodeID, classtype: Type, parenttype: Option<Type>) -> Result<ClassDefRef, Error> {
         // Find the parent class definitions, which the new class will inherit from
-        let parentclass = match parentspec {
-            Some(ClassSpec { ident: ref pident, .. }) => Some(session.find_type_def(scope.clone(), &pident.as_str())?.as_class()?),
-            None => None
+        let parentclass = match parenttype {
+            Some(Type::Object(ref pident, _)) => Some(session.find_type_def(scope.clone(), &pident.as_str())?.as_class()?),
+            _ => None
         };
 
         // Create class name bindings for checking ast::accessors
         let classvars = Scope::new_ref(parentclass.map(|p| p.classvars.clone()));
-        classvars.set_basename(ident.name.clone());
+        classvars.set_basename(classtype.get_name()?);
 
-        // Define the class in the local scope
-        let classdef = ClassDef::new_ref(classspec.clone(), parentspec.clone(), classvars);
-        scope.define_type(ident.name.clone(), Type::Object(ident.name.clone(), types.clone()))?;
-        scope.set_type_def(&ident.name, id);
-        session.set_def(id, Def::Class(classdef.clone()));
-        // TODO i don't like this type == Class thing, but i don't know how i'll do struct types yet either
-        //scope.define(name.clone(), Some(Type::Object(name.clone(), vec!())))?;
+        let classdef = ClassDef::new_ref(classtype.get_name()?, classtype, parenttype, classvars);
         Ok(classdef)
-    }
-
-    pub fn get_parent_spec(&self) -> Option<ClassSpec> {
-        self.parentspec.clone()
     }
 
 
     pub fn build_vtable(&self, session: &Session, scope: ScopeRef, body: &Vec<AST>) {
-        let parentclass = match self.parentspec {
-            Some(ref spec) => Some(session.find_type_def(scope.clone(), &spec.ident.as_str()).unwrap().as_class().unwrap()),
+        let parentclass = match self.parenttype {
+            Some(ref ptype) => Some(session.find_type_def(scope.clone(), &ptype.get_name().unwrap().as_str()).unwrap().as_class().unwrap()),
             None => None,
         };
         let mut vtable = parentclass.map_or(vec!(), |c| c.vtable.borrow().clone());
 
         for ref node in body.iter() {
             match **node {
-                AST::Function(ref id, _, ref fident, ref args, ref rtype, _, ref abi) => {
+                AST::Function(_, _, ref fident, ref args, ref rtype, _, ref abi) => {
                     if fident.is_some() {
                         let fname = &fident.as_ref().unwrap().name;
                         let uname = abi.unmangle_name(&fname).unwrap_or(fname.clone());
                         //if parent.contains(&uname) {
-                            debug!("***************: {:?}:{:?}", self.classspec.ident.name, uname);
+                            debug!("***************: {:?}:{:?}", self.classname, uname);
                             vtable.push((uname, Type::Function(Box::new(Type::Tuple(args.iter().map(|arg| arg.ttype.clone().unwrap()).collect())), Box::new(rtype.clone().unwrap()), *abi)));
                         //}
                     }
                 },
-                AST::Declare(ref id, _, ref fident, ref ttype) => {
+                AST::Declare(_, _, ref fident, ref ttype) => {
                     match *ttype {
                         Type::Function(_, _, ref abi) => {
                             let uname = abi.unmangle_name(fident.name.as_ref()).unwrap_or(fident.name.clone());
                             //if parent.contains(&uname) {
-                                debug!("+++++++++++++++: {:?}:{:?}", self.classspec.ident.name, uname);
+                                debug!("+++++++++++++++: {:?}:{:?}", self.classname, uname);
                                 vtable.push((uname.clone(), ttype.clone()))
                             //}
                         },
@@ -127,22 +125,22 @@ impl ClassDef {
     }
 
     pub fn build_structdef(&self, session: &Session, scope: ScopeRef, body: &Vec<AST>) {
-        let parentclass = match self.parentspec {
-            Some(ref spec) => Some(session.find_type_def(scope.clone(), &spec.ident.as_str()).unwrap().as_class().unwrap()),
-            None => None
+        let parentclass = match self.parenttype {
+            Some(ref ptype) => Some(session.find_type_def(scope.clone(), &ptype.get_name().unwrap().as_str()).unwrap().as_class().unwrap()),
+            None => None,
         };
         let mut structdef = parentclass.map_or(vec!(), |c| c.structdef.borrow().clone());
 
         if self.has_vtable() {
             if let Some(index) = structdef.iter().position(|ref r| r.0.as_str() == "__vtable__") {
-                structdef[index].1 = Type::Object(format!("{}_vtable", self.classspec.ident.name), vec!());
+                structdef[index].1 = Type::Object(format!("{}_vtable", self.classname), vec!());
             } else {
-                structdef.push((String::from("__vtable__"), Type::Object(format!("{}_vtable", self.classspec.ident.name), vec!())));
+                structdef.push((String::from("__vtable__"), Type::Object(format!("{}_vtable", self.classname), vec!())));
             }
         }
         for ref node in body.iter() {
             match **node {
-                AST::Definition(ref id, _, ref ident, ref ttype, ref value) => {
+                AST::Definition(_, _, ref ident, ref ttype, ref value) => {
                     structdef.push((ident.name.clone(), ttype.clone().unwrap()));
                 },
                 _ => { }

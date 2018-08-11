@@ -3,7 +3,7 @@ use session::Error;
 
 pub mod traits;
 pub mod classes;
-//pub mod functions;
+pub mod functions;
 
 use defs::classes::ClassDefRef;
 //use defs::functions::ClosureDefRef;
