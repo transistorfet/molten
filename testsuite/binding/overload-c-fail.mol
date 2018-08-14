@@ -1,6 +1,6 @@
 
 //!should_fail
-//!err .*NameError: variable already defined with abi.*
+//!err .*NameError: variable is already defined.*
 //!err .*
 
 import lib.libcore

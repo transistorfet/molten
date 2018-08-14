@@ -73,7 +73,7 @@ impl ClassDef {
     pub fn create_class(session: &Session, scope: ScopeRef, id: NodeID, classtype: Type, parenttype: Option<Type>) -> Result<ClassDefRef, Error> {
         // Find the parent class definitions, which the new class will inherit from
         let parentclass = match parenttype {
-            Some(Type::Object(ref pident, _)) => Some(session.find_type_def(scope.clone(), &pident.as_str())?.as_class()?),
+            Some(Type::Object(ref pname, _)) => Some(session.find_type_def(scope.clone(), &pname)?.as_class()?),
             _ => None
         };
 
@@ -88,7 +88,7 @@ impl ClassDef {
 
     pub fn build_vtable(&self, session: &Session, scope: ScopeRef, body: &Vec<AST>) {
         let parentclass = match self.parenttype {
-            Some(ref ptype) => Some(session.find_type_def(scope.clone(), &ptype.get_name().unwrap().as_str()).unwrap().as_class().unwrap()),
+            Some(ref ptype) => Some(session.find_type_def(scope.clone(), &ptype.get_name().unwrap()).unwrap().as_class().unwrap()),
             None => None,
         };
         let mut vtable = parentclass.map_or(vec!(), |c| c.vtable.borrow().clone());
@@ -126,7 +126,7 @@ impl ClassDef {
 
     pub fn build_structdef(&self, session: &Session, scope: ScopeRef, body: &Vec<AST>) {
         let parentclass = match self.parenttype {
-            Some(ref ptype) => Some(session.find_type_def(scope.clone(), &ptype.get_name().unwrap().as_str()).unwrap().as_class().unwrap()),
+            Some(ref ptype) => Some(session.find_type_def(scope.clone(), &ptype.get_name().unwrap()).unwrap().as_class().unwrap()),
             None => None,
         };
         let mut structdef = parentclass.map_or(vec!(), |c| c.structdef.borrow().clone());
@@ -211,9 +211,11 @@ impl StructDef {
         Rc::new(Self::new(ttype, parent))
     }
 
-    pub fn add_field(&self, name: &str, ttype: Type) {
-        self.vars.define(String::from(name), Some(ttype.clone()));
+    #[must_use]
+    pub fn add_field(&self, name: &str, ttype: Type) -> Result<(), Error> {
+        self.vars.define(String::from(name), Some(ttype.clone()))?;
         self.structdef.borrow_mut().push((String::from(name), ttype));
+        Ok(())
     }
 
     pub fn get_struct_index(&self, field: &str) -> Option<usize> {

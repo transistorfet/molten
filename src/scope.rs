@@ -5,11 +5,11 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::collections::hash_map::Entry;
 
-use abi::ABI;
 use types::Type;
 use ast::{ NodeID, Ident };
 use session::{ Session, Error };
 use utils::UniqueID;
+
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum Context {
@@ -20,26 +20,20 @@ pub enum Context {
 }
 
 
-// TODO should you unify the Var and Type IDs?  Not sure why though
-pub type VarID = UniqueID;
+pub type BindID = UniqueID;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct VarInfo {
-    pub id: VarID,
+    pub id: BindID,
     pub ttype: Option<Type>,
-    pub def: Option<NodeID>,
-    pub funcdefs: i32,
-    pub abi: Option<ABI>,
+    pub defid: Option<NodeID>,
 }
-
-
-pub type TypeID = UniqueID;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct TypeInfo {
-    pub id: TypeID,
+    pub id: BindID,
     pub ttype: Type,
-    pub def: Option<NodeID>,
+    pub defid: Option<NodeID>,
 }
 
 
@@ -94,6 +88,10 @@ impl Scope {
         self.context.get() == Context::Local
     }
 
+    pub fn is_redirect(&self) -> bool {
+        self.context.get() == Context::Redirect
+    }
+
     //pub fn set_parent(&mut self, parent: ScopeRef) {
     //    self.parent = Some(parent);
     //}
@@ -104,7 +102,7 @@ impl Scope {
 
     pub fn target(session: &Session, scope: ScopeRef) -> ScopeRef {
         match scope.context.get() {
-            Context::Redirect => session.find_type_def(scope.clone(), &scope.basename.borrow().as_str()).unwrap().as_class().unwrap().classvars.clone(),
+            Context::Redirect => session.find_type_def(scope.clone(), &scope.basename.borrow()).unwrap().as_class().unwrap().classvars.clone(),
             _ => scope,
         }
     }
@@ -112,34 +110,33 @@ impl Scope {
     ///// Variable Functions /////
 
     #[must_use]
-    pub fn define(&self, name: String, ttype: Option<Type>) -> Result<VarID, Error> {
+    pub fn define(&self, name: String, ttype: Option<Type>) -> Result<BindID, Error> {
         let mut names = self.names.borrow_mut();
         match names.contains_key(&name) {
             true => Err(Error::new(format!("NameError: variable is already defined; {:?}", name))),
             false => {
-                let id = VarID::generate();
+                let id = BindID::generate();
                 names.insert(name, VarInfo {
                     id: id,
                     ttype: ttype,
-                    def: None,
-                    funcdefs: 0,
-                    abi: None
+                    defid: None,
                 });
                 Ok(id)
             },
         }
     }
 
+    /*
     #[must_use]
-    pub fn define_func(&self, name: String, ttype: Option<Type>, abi: ABI) -> Result<VarID, Error> {
+    pub fn define_func(&self, name: String, ttype: Option<Type>, abi: ABI) -> Result<BindID, Error> {
         let funcs = self._search(&name, |sym| Some(sym.funcdefs)).unwrap_or(0);
         match self.names.borrow_mut().entry(name.clone()) {
             Entry::Vacant(entry) => {
-                let id = VarID::generate();
+                let id = BindID::generate();
                 entry.insert(VarInfo {
                     id: id,
                     ttype: ttype,
-                    def: None,
+                    defid: None,
                     funcdefs: funcs + 1,
                     abi: Some(abi)
                 });
@@ -161,12 +158,13 @@ impl Scope {
     }
 
     #[must_use]
-    pub fn define_func_variant(session: &Session, dscope: ScopeRef, name: String, tscope: ScopeRef, ftype: Type) -> Result<VarID, Error> {
+    pub fn define_func_variant(session: &Session, dscope: ScopeRef, name: String, tscope: ScopeRef, ftype: Type) -> Result<BindID, Error> {
         let abi = ftype.get_abi().unwrap_or(ABI::Molten);
         let id = dscope.define_func(name.clone(), None, abi)?;
         Scope::add_func_variant(session, dscope, &name, tscope, ftype)?;
         Ok(id)
     }
+    */
 
     pub fn modify_local<F>(&self, name: &String, mut f: F) -> () where F: FnMut(&mut VarInfo) -> () {
         match self.names.borrow_mut().entry(name.clone()) {
@@ -211,7 +209,7 @@ impl Scope {
         self.names.borrow().contains_key(name)
     }
 
-    pub fn variable_id(&self, name: &String) -> Result<VarID, Error> {
+    pub fn variable_id(&self, name: &String) -> Result<BindID, Error> {
         match self._search(name, |sym| Some(sym.id)) {
             Some(id) => Ok(id),
             None => Err(Error::new(format!("NameError: variable is undefined; {:?}", name))),
@@ -222,27 +220,27 @@ impl Scope {
         self.modify_local(name, move |sym| sym.ttype = Some(ttype.clone()))
     }
 
-    pub fn get_variable_type(&self, name: &String) -> Option<Type> {
-        self.get_variable_type_full(name, false)
+    pub fn get_variable_type(&self, session: &Session, name: &String) -> Option<Type> {
+        self.get_variable_type_full(session, name, false)
     }
 
-    pub fn set_var_def(&self, name: &String, def: NodeID) {
-        self.modify_local(name, move |sym| { sym.def = Some(def.clone()); })
+    pub fn set_var_def(&self, name: &String, defid: NodeID) {
+        self.modify_local(name, move |sym| { sym.defid = Some(defid.clone()); })
     }
 
     pub fn get_var_def(&self, name: &String) -> Option<NodeID> {
         self._search(name, |sym| {
-            match sym.def.as_ref() {
-                Some(def) => Some(def.clone()),
+            match sym.defid.as_ref() {
+                Some(defid) => Some(defid.clone()),
                 //None => Err(Error::new(format!("VarError: definition not set for {:?}", name))),
                 None => None,
             }
         })
     }
 
-    pub fn get_variable_type_full(&self, name: &String, local: bool) -> Option<Type> {
+    pub fn get_variable_type_full(&self, session: &Session, name: &String, local: bool) -> Option<Type> {
         let otype = self._search(name, |sym| {
-            if sym.funcdefs > 1 {
+            if sym.defid.and_then(|id| session.get_def(id).ok()).and_then(|def| Some(def.num_variants(session))).unwrap_or(1) > 1 {
                 Some(Some(Type::Overload(self.get_all_variants(name, local))))
             } else {
                 Some(sym.ttype.clone())
@@ -262,28 +260,9 @@ impl Scope {
         variants
     }
 
-    /*
-    pub fn get_all_variants(&self, name: &String, local: bool) -> Vec<Type> {
-        let mut variants = self.names.get(name).as_ref().map(|sym| sym.ttype.as_ref().map(|ttype| ttype.get_variants()).unwrap_or(vec!())).unwrap_or(vec!());
-        if !local && self.parent.is_some() {
-            let parent = self.parent.clone().unwrap();
-            //variants.extend(self.parent.as_ref().map(|parent| parent.borrow().get_all_variants(name, local)).unwrap_or(vec!()));
-            'outer: for variant in parent.borrow().get_all_variants(name, local) {
-                for existing in &variants {
-                    if check_type(parent.clone(), Some(existing.clone()), Some(variant.clone()), Check::Def, false).is_ok() {
-                        continue 'outer;
-                    }
-                }
-                variants.push(variant);
-            }
-        }
-        variants
-    }
-    */
-
     #[must_use]
     pub fn add_func_variant(session: &Session, dscope: ScopeRef, name: &String, tscope: ScopeRef, ftype: Type) -> Result<(), Error> {
-        let otype = dscope.get_variable_type_full(name, true);
+        let otype = dscope.get_variable_type_full(session, name, true);
         let ftype = match otype {
             Some(ttype) => ttype.add_variant(session, tscope, ftype.clone())?,
             None => ftype,
@@ -292,8 +271,13 @@ impl Scope {
         Ok(())
     }
 
-    pub fn num_funcdefs(&self, name: &String) -> i32 {
-        self._search(name, |sym| Some(sym.funcdefs)).unwrap_or(0)
+    pub fn num_funcdefs(&self, session: &Session, name: &String) -> i32 {
+        self._search(name, |sym| {
+            match sym.defid {
+                Some(id) => Some(session.get_def(id).unwrap().num_variants(session)),
+                _ => None
+            }
+        }).unwrap_or(0)
     }
 
 
@@ -320,16 +304,16 @@ impl Scope {
     ///// Type Functions /////
 
     #[must_use]
-    pub fn define_type(&self, name: String, ttype: Type) -> Result<TypeID, Error> {
+    pub fn define_type(&self, name: String, ttype: Type) -> Result<BindID, Error> {
         let mut types = self.types.borrow_mut();
         match types.contains_key(&name) {
             true => Err(Error::new(format!("NameError: type is already defined; {:?}", name))),
             false => {
-                let id = TypeID::generate();
+                let id = BindID::generate();
                 types.insert(name, TypeInfo {
                     id: id,
                     ttype: ttype,
-                    def: None,
+                    defid: None,
                 });
                 Ok(id)
             },
@@ -388,23 +372,23 @@ impl Scope {
         })
     }
 
-    pub fn set_type_def(&self, name: &String, def: NodeID) {
+    pub fn set_type_def(&self, name: &String, defid: NodeID) {
         self.modify_type(name, move |info| {
-            info.def = Some(def.clone());
+            info.defid = Some(defid.clone());
         })
     }
 
     pub fn get_type_def(&self, name: &String) -> Option<NodeID> {
         self._search_type(name, |info| {
-            match info.def.as_ref() {
-                Some(def) => Some(def.clone()),
+            match info.defid.as_ref() {
+                Some(defid) => Some(defid.clone()),
                 //None => Err(Error::new(format!("TypeError: definition not set for {:?}", name))),
                 None => None,
             }
         })
     }
 
-    pub fn type_id(&self, name: &String) -> Result<TypeID, Error> {
+    pub fn type_id(&self, name: &String) -> Result<BindID, Error> {
         match self._search_type(name, |info| Some(info.id)) {
             Some(id) => Ok(id),
             None => Err(Error::new(format!("NameError: type is undefined; {:?}", name))),

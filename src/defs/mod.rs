@@ -1,19 +1,22 @@
 
-use session::Error;
+use session::{ Session, Error };
 
 pub mod traits;
 pub mod classes;
 pub mod functions;
 
 use defs::classes::ClassDefRef;
-//use defs::functions::ClosureDefRef;
+use defs::functions::{ FuncDefRef, OverloadDefRef, ClosureDefRef, MethodDefRef, CFuncDefRef };
 
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Def {
     Class(ClassDefRef),
-    //Function(FunctionDefRef)
-    //Closure(ClosureDefRef)
+    Func(FuncDefRef),
+    Overload(OverloadDefRef),
+    Closure(ClosureDefRef),
+    Method(MethodDefRef),
+    CFunc(CFuncDefRef)
 }
 
 impl Def {
@@ -39,6 +42,25 @@ impl Def {
         }
     }
     */
+
+    /*
+    pub fn as_overloadable(&self) -> Option<Box<Overloadable>> {
+        match self {
+            Def::Func(def) => Some(Box::new(def.clone())),
+            Def::Method(def) => Some(Box::new(def.func.clone())),
+            _ => None
+        }
+    }
+    */
+
+    pub fn num_variants(&self, session: &Session) -> i32 {
+        match self {
+            Def::Func(_) |
+            Def::Method(_) => 1,
+            Def::Overload(def) => def.num_variants(session),
+            _ => 0
+        }
+    }
 }
 
 

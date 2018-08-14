@@ -12,12 +12,14 @@ use abi::ABI;
 use types::Type;
 use defs::Def;
 use session::Session;
-use defs::classes::ClassDef;
-use ast::{ NodeID, Pos, Ident, ClassSpec };
+use ast::{ NodeID, Pos, Ident };
 use parser::{ parse_type };
 use scope::{ Scope, ScopeRef, ScopeMapRef, Context };
 use binding::{ declare_typevars };
 use utils::UniqueID;
+
+use defs::classes::ClassDef;
+use defs::functions::FuncDef;
 
 use llvm::compiler::*;
 
@@ -58,10 +60,15 @@ pub fn register_builtins_vec<'sess>(session: &Session, scope: ScopeRef, tscope: 
 
 pub fn register_builtins_node<'sess>(session: &Session, scope: ScopeRef, tscope: ScopeRef, node: &BuiltinDef<'sess>) {
     match *node {
-        BuiltinDef::Func(ref id, ref name, ref ftype, _) => {
+        BuiltinDef::Func(ref id, ref name, ref ftype, ref func) => {
             let mut ftype = parse_type(ftype);
             declare_typevars(tscope.clone(), ftype.as_mut(), false).unwrap();
-            Scope::define_func_variant(session, scope, String::from(*name), tscope.clone(), ftype.clone().unwrap()).unwrap();
+            let abi = match func {
+                Func::External => ABI::C,
+                _ => ABI::Molten,
+            };
+            FuncDef::define_func(session, tscope.clone(), *id, &Some(String::from(*name)), abi, ftype.clone()).unwrap();
+            //Scope::define_func_variant(session, scope, String::from(*name), tscope.clone(), ftype.clone().unwrap()).unwrap();
         },
         BuiltinDef::Class(ref id, ref name, ref params, _, ref entries) => {
             let tscope = ClassDef::create_class_scope(session, scope.clone(), *id);
@@ -99,7 +106,7 @@ pub unsafe fn declare_builtins_node<'sess>(data: &mut LLVM<'sess>, objtype: LLVM
                     }
                 },
                 Func::Runtime(func) => {
-                    let sftype = scope.get_variable_type(&name).unwrap();
+                    let sftype = scope.get_variable_type(data.session, &name).unwrap();
                     name = ftype.get_abi().unwrap_or(ABI::Molten).mangle_name(&name, ftype.get_argtypes().unwrap(), sftype.num_funcdefs());
                     if !scope.contains(&name) {
                         scope.define(name.clone(), Some(ftype.clone())).unwrap();
@@ -109,7 +116,7 @@ pub unsafe fn declare_builtins_node<'sess>(data: &mut LLVM<'sess>, objtype: LLVM
                 },
                 Func::Comptime(func) => {
                     //data.builtins.add(sname, func, ftype.clone());
-                    let sftype = scope.get_variable_type(&name).unwrap();
+                    let sftype = scope.get_variable_type(data.session, &name).unwrap();
                     name = ftype.get_abi().unwrap_or(ABI::Molten).mangle_name(&name, ftype.get_argtypes().unwrap(), sftype.num_funcdefs());
                     if !scope.contains(&name) {
                         scope.define(name.clone(), Some(ftype.clone())).unwrap();
@@ -121,7 +128,7 @@ pub unsafe fn declare_builtins_node<'sess>(data: &mut LLVM<'sess>, objtype: LLVM
         },
         BuiltinDef::Class(ref id, ref name, _, ref structdef, ref entries) => {
             let cname = String::from(*name);
-            let classdef = data.session.find_type_def(scope.clone(), name).unwrap().as_class().unwrap();
+            let classdef = data.session.find_type_def(scope.clone(), &String::from(*name)).unwrap().as_class().unwrap();
 
             let lltype = if structdef.len() > 0 {
                 *classdef.structdef.borrow_mut() = structdef.clone();

@@ -28,10 +28,10 @@
         //let fac2 = fn x, y, z => if not x then 1 else x - -123
         testy(3)
 
-        // TODO this were causing trouble, but seem to compile now...
 	let test2 = fn x => x()
+        // TODO this is causing a problem with ambiguous overload variant, because it can't determine the return type of test3
 	let test3 = fn x => x() + 1
-        println(str(test3(fn => 3)))
+        //println(str(test3(fn => 3)))
 
         let recfoo = fn x => begin  //comment
             if x < 1 then           //comment
@@ -188,7 +188,6 @@
         println("STUFF".push(" things"))
         println(strnum(12))
         println(strnum(1.214))
-
 
         // TODO not yet implemented
         //try str(123) with

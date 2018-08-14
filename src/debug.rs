@@ -40,7 +40,7 @@ pub fn print_types_node(map: &ScopeMapRef, scope: ScopeRef, node: &AST) {
 pub fn print_types_scope(scope: ScopeRef) {
     println!("\nNames:");
     for (ref name, ref sym) in scope.names.borrow().iter() {
-        println!("{:?} {:?} {:?}", name, sym.ttype, sym.funcdefs);
+        println!("{:?} {:?} {:?}", name, sym.ttype, sym.defid);
     }
 
     println!("\nTypes:");

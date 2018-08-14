@@ -1,60 +1,145 @@
 
 use std::rc::Rc;
+use std::cell::RefCell;
 
-use ast::AST;
 use types::*;
 use defs::Def;
 use utils::UniqueID;
+use ast::{ NodeID, Ident, AST };
 use scope::{ Scope, ScopeRef };
 use session::{ Session, Error };
-// TODO this might move
+
+use defs::traits::{  };
 use defs::classes::{ StructDef, StructDefRef };
 
 
-
 #[derive(Clone, Debug, PartialEq)]
-pub struct CFuncDef {
-    pub id: UniqueID,
-    //pub ftype: Type,
+pub struct FuncDef {
+
 }
 
-pub type CFuncDefRef = Rc<CFuncDef>;
+pub type FuncDefRef = Rc<FuncDef>;
 
-impl CFuncDef {
-    pub fn new(id: UniqueID) -> Self {
-        Self {
-            id: id,
+impl FuncDef {
+    pub fn define_func(session: &Session, scope: ScopeRef, id: NodeID, name: &Option<String>, abi: ABI, ttype: Option<Type>) -> Result<Def, Error> {
+        match abi {
+            ABI::C => CFuncDef::define(session, scope.clone(), id, name, ttype),
+            ABI::Molten => {
+                if scope.is_redirect() && name.is_some() {
+                    MethodDef::define(session, scope.clone(), id, name, ttype)
+                } else {
+                    FuncDef::define(session, scope.clone(), id, name, ttype)
+                }
+            },
+            _ => return Err(Error::new(format!("DefError: unsupported ABI {:?}", abi))),
         }
     }
 
-    pub fn new_ref(id: UniqueID) -> CFuncDefRef {
-        Rc::new(Self::new(id))
+    pub fn define(session: &Session, scope: ScopeRef, id: NodeID, name: &Option<String>, ttype: Option<Type>) -> Result<Def, Error> {
+
+        let def = Def::Func(Rc::new(FuncDef {
+
+        }));
+
+        FuncDef::set_func_def(session, scope.clone(), id, name, def.clone(), ttype)?;
+        Ok(def)
     }
 
+    pub fn set_func_def(session: &Session, scope: ScopeRef, id: NodeID, name: &Option<String>, def: Def, ttype: Option<Type>) -> Result<(), Error> {
+        if let Some(name) = name {
+            let dscope = Scope::target(session, scope.clone());
+            if let Some(previd) = dscope.get_var_def(&name) {
+                OverloadDef::define(session, scope.clone(), &name, id, previd, ttype)?;
+            } else {
+                dscope.define(name.clone(), ttype)?;
+                dscope.set_var_def(&name, id);
+            }
+        }
+        session.set_def(id, def.clone());
+        Ok(())
+    }
 }
 
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct MethodDef {
-    pub id: UniqueID,
+pub struct OverloadDef {
+    pub id: NodeID,
+    pub parent: Option<NodeID>,
+    pub variants: RefCell<Vec<NodeID>>
 }
 
-pub type MethodDefRef = Rc<MethodDef>;
+pub type OverloadDefRef = Rc<OverloadDef>;
 
-impl MethodDef {
-    pub fn new(id: UniqueID) -> Self {
-        Self {
-            id: id,
+impl OverloadDef {
+    pub fn create(session: &Session, parent: Option<NodeID>, variants: Vec<NodeID>) -> NodeID {
+        let defid = NodeID::generate();
+        let def = Def::Overload(Rc::new(OverloadDef {
+            id: defid,
+            parent: parent,
+            variants: RefCell::new(variants)
+        }));
+        session.set_def(defid, def.clone());
+        defid
+    }
+
+    pub fn define(session: &Session, scope: ScopeRef, name: &String, id: NodeID, previd: NodeID, ttype: Option<Type>) -> Result<(), Error> {
+        let dscope = Scope::target(session, scope.clone());
+
+        if dscope.contains_local(&name) {
+            match session.get_def(previd) {
+                Ok(Def::Overload(prev)) => {
+                    prev.add_variant(id);
+                },
+                Ok(Def::Func(_)) |
+                Ok(Def::Method(_)) => {
+                    let defid = OverloadDef::create(session, None, vec!(previd, id));
+                    dscope.set_var_def(&name, defid);
+                }
+                _ => return Err(Error::new(format!("NameError: unable to overload {} because of a previous definitions", name)))
+            }
+        } else {
+            let parentid = match session.get_def(previd) {
+                Ok(Def::Overload(_)) => previd,
+                _ => {
+                    let newprev = OverloadDef::create(session, None, vec!(previd));
+                    let pscope = Scope::locate_variable(dscope.clone(), name).unwrap();
+                    pscope.set_var_def(name, newprev);
+                    newprev
+                },
+            };
+            let defid = OverloadDef::create(session, Some(parentid), vec!(id));
+            dscope.define(name.clone(), dscope.get_variable_type(session, &name))?;
+            dscope.set_var_def(&name, defid);
         }
+        ttype.map(|ttype| Scope::add_func_variant(session, dscope.clone(), name, scope.clone(), ttype).unwrap());
+        Ok(())
     }
 
-    pub fn new_ref(id: UniqueID) -> MethodDefRef {
-        Rc::new(Self::new(id))
+    pub fn num_variants(&self, session: &Session) -> i32 {
+        let prev = match self.parent {
+            Some(id) => session.get_def(id).unwrap().num_variants(session),
+            _ => 0,
+        };
+        prev + self.variants.borrow().len() as i32
     }
 
+    pub fn add_variant(&self, id: NodeID) {
+        self.variants.borrow_mut().push(id);
+    }
 }
 
 
+/*
+impl Overloadable for Rc<FuncDef> {
+    fn num_variants(&self) -> i32 {
+        self.variants.borrow().len() as i32
+    }
+
+    fn add_variant(&self, id: NodeID) {
+        self.variants.borrow_mut().push(id);
+    }
+}
+*/
 
 
 #[derive(Clone, Debug, PartialEq)]
@@ -66,24 +151,60 @@ pub struct ClosureDef {
 pub type ClosureDefRef = Rc<ClosureDef>;
 
 impl ClosureDef {
-    pub fn new(id: UniqueID) -> Self {
-        Self {
-            id: id,
-            context: StructDef::new_ref(Type::Object(id.to_string(), vec!()), None),
+
+
+}
+
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct MethodDef {
+    //pub id: UniqueID,
+
+}
+
+pub type MethodDefRef = Rc<MethodDef>;
+
+impl MethodDef {
+    pub fn define(session: &Session, scope: ScopeRef, id: NodeID, name: &Option<String>, ttype: Option<Type>) -> Result<Def, Error> {
+        let def = Def::Method(Rc::new(MethodDef {
+
+        }));
+
+        FuncDef::set_func_def(session, scope.clone(), id, name, def.clone(), ttype)?;
+        Ok(def)
+    }
+}
+
+
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct CFuncDef {
+    //pub id: UniqueID,
+    //pub ftype: Type,
+}
+
+pub type CFuncDefRef = Rc<CFuncDef>;
+
+impl CFuncDef {
+    pub fn define(session: &Session, scope: ScopeRef, id: NodeID, name: &Option<String>, ttype: Option<Type>) -> Result<Def, Error> {
+        if scope.is_redirect() {
+            return Err(Error::new(format!("DefError: cannot declare a C ABI function within a class body")));
         }
+
+        let name = match name.as_ref() {
+            Some(name) => name,
+            None => return Err(Error::new(format!("NameError: C ABI function declared without a name"))),
+        };
+
+        let def = Def::CFunc(Rc::new(CFuncDef {
+
+        }));
+
+        scope.define(name.clone(), ttype)?;
+        scope.set_var_def(&name, id);
+        session.set_def(id, def.clone());
+        Ok(def)
     }
-
-    pub fn new_ref(id: UniqueID) -> ClosureDefRef {
-        Rc::new(Self::new(id))
-    }
-
-
 }
 
 
-/*
-impl Invokable for Function {
-
-
-}
-*/

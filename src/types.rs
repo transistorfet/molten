@@ -148,7 +148,7 @@ impl Type {
     pub fn update_variable_type(session: &Session, scope: ScopeRef, name: &String, ttype: Type) {
         let dscope = Scope::target(session, scope.clone());
         let pscope = Scope::locate_variable(dscope.clone(), name).unwrap();
-        let otype = pscope.get_variable_type(name).clone();
+        let otype = pscope.get_variable_type(session, name).clone();
         if !pscope.is_primative() {
             let ntype = check_type(session, scope.clone(), otype.clone(), Some(ttype.clone()), Check::Def, false);
             match ntype {
@@ -435,7 +435,7 @@ fn is_subclass_of(session: &Session, scope: ScopeRef, adef: (&String, &Vec<Type>
             //return Ok(tscope.unmap_typevars(&mut names, Type::Object(adef.0, ptypes)));
         }
 
-        let classdef = session.find_type_def(scope.clone(), &adef.0.as_str())?.as_class()?;
+        let classdef = session.find_type_def(scope.clone(), &adef.0)?.as_class()?;
         if classdef.parenttype.is_none() {
             return Err(Error::new(format!("TypeError: type mismatch, expected {} but found {}", Type::Object(adef.0.clone(), adef.1), Type::Object(bdef.0.clone(), bdef.1.clone()))));
         }
@@ -513,9 +513,9 @@ pub fn find_variant(session: &Session, scope: ScopeRef, otype: Type, atypes: Typ
             }
 
             match found.len() {
-                0 => Err(Error::new(format!("OverloadError: No valid variant found for ({})\n\tout of {}", atypes, Type::display_vec(&variants)))),
+                0 => Err(Error::new(format!("OverloadError: No valid variant found for {}\n\tout of [{}]", atypes, Type::display_vec(&variants)))),
                 1 => Ok(found[0].clone()),
-                _ => Err(Error::new(format!("OverloadError: Ambiguous ({})\n\tvariants found {}", atypes, found.iter().map(|t| format!("{}", t)).collect::<Vec<String>>().join(", ")))),
+                _ => Err(Error::new(format!("OverloadError: Ambiguous {}\n\tvariants found [{}]", atypes, found.iter().map(|t| format!("{}", t)).collect::<Vec<String>>().join(", ")))),
             }
         },
         _ => Ok(otype.clone()),

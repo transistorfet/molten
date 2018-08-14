@@ -20,10 +20,9 @@ use scope::{ Scope, ScopeRef, ScopeMapRef };
 #[derive(Clone, Debug, PartialEq)]
 pub struct Session {
     pub name: String,
-    pub map: ScopeMapRef,
-    // TODO I really want to unify these, but I figured I should wait and refactor later when it's known to actually work
-    pub defs: RefCell<HashMap<NodeID, Def>>,
     pub files: RefCell<Vec<(String, String)>>,
+    pub map: ScopeMapRef,
+    pub defs: RefCell<HashMap<NodeID, Def>>,
     pub target: String,
     pub errors: Cell<u32>,
 }
@@ -33,10 +32,9 @@ impl Session {
     pub fn new() -> Self {
         Session {
             name: String::from(""),
-            //builtins: builtins,
+            files: RefCell::new(vec!()),
             map: ScopeMapRef::new(),
             defs: RefCell::new(HashMap::new()),
-            files: RefCell::new(vec!()),
             target: String::from(""),
             errors: Cell::new(0),
         }
@@ -102,28 +100,49 @@ impl Session {
         self.defs.borrow_mut().insert(id, def);
     }
 
-    pub fn define(&self, scope: ScopeRef, name: &str, id: NodeID) {
+    #[must_use]
+    pub fn define(&self, scope: ScopeRef, name: &String, id: NodeID) -> Result<(), Error> {
         let dscope = Scope::target(self, scope.clone());
-        dscope.define(String::from(name), None);
-        dscope.set_var_def(&String::from(name), id);
+        dscope.define(name.clone(), None)?;
+        dscope.set_var_def(name, id);
+        Ok(())
     }
 
-    pub fn find_def(&self, scope: ScopeRef, name: &str) -> Result<Def, Error> {
-        // TODO replace String arguments in scope methods
-        self.get_def(scope.get_var_def(&String::from(name)).ok_or(Error::new(format!("VarError: definition not set for {:?}", name)))?)
+    pub fn find_def(&self, scope: ScopeRef, name: &String) -> Result<Def, Error> {
+        self.get_def(scope.get_var_def(name).ok_or(Error::new(format!("VarError: definition not set for {:?}", name)))?)
     }
 
-    pub fn define_type(&self, scope: ScopeRef, name: &str, ttype: Type, id: NodeID) {
+    #[must_use]
+    pub fn define_type(&self, scope: ScopeRef, name: &String, ttype: Type, id: NodeID) -> Result<(), Error> {
         let dscope = Scope::target(self, scope.clone());
-        dscope.define_type(String::from(name), ttype);
-        dscope.set_type_def(&String::from(name), id);
+        dscope.define_type(name.clone(), ttype)?;
+        dscope.set_type_def(name, id);
+        Ok(())
     }
 
-    pub fn find_type_def(&self, scope: ScopeRef, name: &str) -> Result<Def, Error> {
-        // TODO replace String arguments in scope methods
-        self.get_def(scope.get_type_def(&String::from(name)).ok_or(Error::new(format!("TypeError: definition not set for {:?}", name)))?)
+    pub fn find_type_def(&self, scope: ScopeRef, name: &String) -> Result<Def, Error> {
+        self.get_def(scope.get_type_def(name).ok_or(Error::new(format!("TypeError: definition not set for {:?}", name)))?)
     }
 }
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct TypeTable(RefCell<HashMap<NodeID, Type>>);
+
+impl TypeTable {
+    pub fn new() -> Self {
+        TypeTable(RefCell::new(HashMap::new()))
+    }
+
+    pub fn set(&self, id: NodeID, ttype: Type) {
+        self.0.borrow_mut().insert(id, ttype);
+    }
+
+    pub fn get_def(&self, id: NodeID) -> Option<Type> {
+        self.0.borrow().get(&id).map(|ttype| ttype.clone())
+    }
+}
+
+
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Error {

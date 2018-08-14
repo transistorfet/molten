@@ -2,11 +2,13 @@
 
 use abi::ABI;
 use types::Type;
-use defs::classes::ClassDef;
-use ast::{ ClassSpec, AST };
+use ast::{ NodeID, ClassSpec, AST };
 use session::{ Session, Error };
 use scope::{ Scope, ScopeRef };
 use utils::UniqueID;
+
+use defs::classes::ClassDef;
+use defs::functions::FuncDef;
 
 
 pub fn bind_names(session: &Session, code: &mut Vec<AST>) {
@@ -35,16 +37,23 @@ fn bind_names_node_or_error(session: &Session, scope: ScopeRef, node: &mut AST) 
             let fscope = session.map.add(*id, Some(scope.clone()));
             fscope.set_basename(ident.as_ref().map_or(format!("anon{}", id), |ident| ident.name.clone()));
 
-            if let Some(ref ident) = *ident {
-                let dscope = Scope::target(session, scope);
-                dscope.define_func(ident.name.clone(), None, *abi)?;
-            }
-
+            // Check for typevars in the type params
             for ref mut arg in &mut args.iter_mut() {
                 declare_typevars(fscope.clone(), arg.ttype.as_mut(), false)?;
-                fscope.define(arg.ident.name.clone(), arg.ttype.clone())?;
             }
             declare_typevars(fscope.clone(), ret.as_mut(), false)?;
+
+
+            FuncDef::define_func(session, scope.clone(), *id, &ident.as_ref().map(|ref ident| String::from(ident.as_str())), *abi, None)?;
+
+            //if let Some(ref ident) = *ident {
+            //    let dscope = Scope::target(session, scope);
+            //    dscope.define_func(ident.name.clone(), None, *abi)?;
+            //}
+
+            for ref arg in args.iter() {
+                fscope.define(arg.ident.name.clone(), arg.ttype.clone())?;
+            }
 
             bind_names_node(session, fscope, body)
         },
@@ -65,13 +74,19 @@ fn bind_names_node_or_error(session: &Session, scope: ScopeRef, node: &mut AST) 
             declare_typevars(scope.clone(), Some(ttype), false)?;
             let dscope = Scope::target(session, scope.clone());
             let abi = ttype.get_abi().unwrap_or(ABI::Molten);
-            dscope.define_func(ident.name.clone(), Some(ttype.clone()), abi)?;
+            //dscope.define_func(ident.name.clone(), Some(ttype.clone()), abi)?;
             if let Some(ref mname) = abi.unmangle_name(ident.as_str()) {
-                dscope.define_func(mname.clone(), None, abi)?;
-                let mut stype = dscope.get_variable_type(mname).unwrap_or(Type::Overload(vec!()));
-                stype = stype.add_variant(session, scope, ttype.clone())?;
-                dscope.set_variable_type(mname, stype);
+                let parentid = NodeID::generate();
+                let parent = FuncDef::define_func(session, scope.clone(), parentid, &Some(mname.clone()), abi, Some(ttype.clone()))?;
+
+                //dscope.define_func(mname.clone(), None, abi)?;
+                //let mut stype = dscope.get_variable_type(session, mname).unwrap_or(Type::Overload(vec!()));
+                //stype = stype.add_variant(session, scope.clone(), ttype.clone())?;
+                //dscope.set_variable_type(mname, stype);
+                //dscope.set_var_def(mname, parentid);
             }
+
+            FuncDef::define_func(session, scope.clone(), *id, &Some(ident.name.clone()), abi, Some(ttype.clone()))?;
         },
 
         AST::Recall(ref id, _, ref ident) |
@@ -138,7 +153,7 @@ fn bind_names_node_or_error(session: &Session, scope: ScopeRef, node: &mut AST) 
             for field in fields {
                 //let dscope = Scope::target(session, scope.clone());
                 scope.define(field.ident.name.clone(), field.ttype.clone())?;
-                declare_typevars(scope.clone(), field.ttype.as_mut(), true);
+                declare_typevars(scope.clone(), field.ttype.as_mut(), true)?;
             }
         },
 
@@ -158,6 +173,7 @@ fn bind_names_node_or_error(session: &Session, scope: ScopeRef, node: &mut AST) 
         AST::Class(ref id, _, ref mut classspec, ref mut parentspec, ref mut body) => {
             let tscope = ClassDef::create_class_scope(session, scope.clone(), *id);
 
+            // Check for typevars in the type params
             declare_classspec_typevars(tscope.clone(), classspec, true)?;
             if let &mut Some(ref mut pspec) = parentspec {
                 declare_classspec_typevars(tscope.clone(), pspec, false)?;
@@ -254,7 +270,7 @@ pub fn declare_typevars(scope: ScopeRef, ttype: Option<&mut Type>, always_new: b
 
 #[must_use]
 pub fn declare_classspec_typevars(scope: ScopeRef, classspec: &mut ClassSpec, always_new: bool) -> Result<(), Error> {
-    let &mut ClassSpec { ident: ref ident, types: ref mut types, .. } = classspec;
+    let &mut ClassSpec { ref ident, ref mut types, .. } = classspec;
     types.iter_mut().map(|ref mut ttype| declare_typevars(scope.clone(), Some(ttype), always_new)).count();
     Ok(())
 }
