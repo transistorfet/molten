@@ -8,6 +8,7 @@ use scope::{ Scope, ScopeRef };
 use utils::UniqueID;
 
 use defs::classes::ClassDef;
+use defs::variables::VarDef;
 use defs::functions::FuncDef;
 
 
@@ -65,8 +66,9 @@ fn bind_names_node_or_error(session: &Session, scope: ScopeRef, node: &mut AST) 
 
         AST::Definition(ref id, _, ref ident, ref mut ttype, ref mut code) => {
             declare_typevars(scope.clone(), ttype.as_mut(), false)?;
-            let dscope = Scope::target(session, scope.clone());
-            dscope.define(ident.name.clone(), ttype.clone())?;
+            VarDef::define_var(session, scope.clone(), *id, &ident.name, ttype.clone())?;
+            //let dscope = Scope::target(session, scope.clone());
+            //dscope.define(ident.name.clone(), ttype.clone())?;
             bind_names_node(session, scope, code);
         },
 

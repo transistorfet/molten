@@ -3,14 +3,17 @@ use session::{ Session, Error };
 
 pub mod traits;
 pub mod classes;
+pub mod variables;
 pub mod functions;
 
 use defs::classes::ClassDefRef;
+use defs::variables::VarDefRef;
 use defs::functions::{ FuncDefRef, OverloadDefRef, ClosureDefRef, MethodDefRef, CFuncDefRef };
 
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Def {
+    Var(VarDefRef),
     Class(ClassDefRef),
     Func(FuncDefRef),
     Overload(OverloadDefRef),
@@ -26,22 +29,6 @@ impl Def {
             _ => Err(Error::new(format!("DefError: expected class def but found {:#?}", self))),
         }
     }
-
-    /*
-    pub fn as_function(&self) -> Result<FunctionDefRef, Error> {
-        match self {
-            VarDef::Function(function) => Ok(function.clone()),
-            _ => Err(Error::new(format!("VarDefError: expected function def but found {:#?}", self))),
-        }
-    }
-
-    pub fn as_function(&self) -> Result<FunctionDefRef, Error> {
-        match self {
-            VarDef::Function(function) => Ok(function.clone()),
-            _ => Err(Error::new(format!("VarDefError: expected function def but found {:#?}", self))),
-        }
-    }
-    */
 
     /*
     pub fn as_overloadable(&self) -> Option<Box<Overloadable>> {

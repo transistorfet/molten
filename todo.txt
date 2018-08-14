@@ -1,7 +1,7 @@
 
-* convert all lookups to use &str instead of &String
+* can you remove the need to define new name mangled bindings?
+* remove declare typevars if possible??
 * make type constructor functions or macros that are easier to use than Type::Object(String::from(name), vec!())
-* unify defs in session?  You'll still need find_type_def/find_var_def functions because of the dual namespace of scopes, but you'll only have get_def/set_def as the direct lookups
 
 * should we be looking up classes/types/etc by ID?  Should we be unifying IDs during name binding??  Maybe when defining a variable, we store
   the ID of the AST in the info struct, rather than generate a new one or save the info id in the AST, so we don't have to make AST mut
