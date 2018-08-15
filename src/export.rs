@@ -88,7 +88,7 @@ pub fn unparse_type(scope: ScopeRef, ttype: Type) -> String {
             if var.is_none() || var.unwrap().get_varid().unwrap_or(UniqueID(0)) != id {
                 let gscope = Scope::global(scope.clone());
                 name = gscope.new_typevar_name();
-                gscope.define_type(name.clone(), Type::Variable(name.clone(), id)).unwrap();
+                gscope.define_type(name.clone(), Type::Variable(name.clone(), id), None).unwrap();
             }
             //format!("'v{}", id)
             format!("'{}", name)

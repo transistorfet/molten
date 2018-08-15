@@ -263,7 +263,7 @@ unsafe fn compile_module<'sess>(builtins: &Vec<BuiltinDef<'sess>>, session: &'se
     LLVMPositionBuilderAtEnd(builder, LLVMAppendBasicBlockInContext(context, function, label("entry")));
     compile_vec(data, function, None, scope.clone(), code);
     LLVMBuildRet(builder, LLVMConstInt(bool_type(data), 1, 0));
-    let id = scope.define(module_init_name.clone(), Some(ftype)).unwrap();
+    let id = scope.define(module_init_name.clone(), Some(ftype), None).unwrap();
     data.set_value(id, Box::new(Function(function)));
 
 
@@ -390,7 +390,7 @@ unsafe fn declare_globals(data: &LLVM, scope: ScopeRef) {
                 let global = LLVMAddGlobal(data.module, LLVMGetElementType(vtype), label(vname.as_str()));
                 LLVMSetInitializer(global, LLVMConstNamedStruct(vtype, methods.as_mut_ptr(), methods.len() as u32));
                 LLVMSetLinkage(global, LLVMLinkage::LLVMLinkOnceAnyLinkage);
-                let id = scope.define(vname.clone(), Some(Type::Object(format!("{}_vtable", cident.name), vec!()))).unwrap();
+                let id = scope.define(vname.clone(), Some(Type::Object(format!("{}_vtable", cident.name), vec!())), None).unwrap();
                 data.set_value(id, Box::new(Global(global)));
             }
         }
@@ -439,7 +439,7 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
                 // Compile the first argument of a method access only once for the method lookup and the argument evalution
                 AST::Accessor(ref id, ref pos, _, ref ident, ref otype) => {
                     let tname = format!("{}", UniqueID::generate());
-                    let id = scope.define(tname.clone(), otype.clone()).unwrap();
+                    let id = scope.define(tname.clone(), otype.clone(), None).unwrap();
                     data.set_value(id, from_type(otype.as_ref().unwrap(), largs[0]));
                     compile_node(data, func, unwind, scope.clone(), &AST::make_access(pos.clone(), Box::new(AST::make_recall(pos.clone(), Ident::new(pos.clone(), tname))), ident.clone(), otype.clone()))
                 },
@@ -879,7 +879,7 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
             if LLVMGetNamedFunction(data.module, label(module_init_name.as_str())).is_null() {
                 let lftype = LLVMFunctionType(bool_type(data), &mut [].as_mut_ptr(), 0, false as i32);
                 let function = LLVMAddFunction(data.module, label(module_init_name.as_str()), lftype);
-                let id = scope.define(module_init_name.clone(), Some(ftype.clone())).unwrap();
+                let id = scope.define(module_init_name.clone(), Some(ftype.clone()), None).unwrap();
                 data.set_value(id, Box::new(Function(function)));
             }
             compile_node(data, func, None, scope.clone(), &AST::make_invoke(pos.clone(), Box::new(AST::make_ident(pos.clone(), Ident::new(pos.clone(), String::from(module_init_name)))), vec!(), Some(ftype)));
@@ -1252,7 +1252,7 @@ pub unsafe fn build_class_type(data: &LLVM, scope: ScopeRef, name: &String, clas
         let vtname = format!("{}_vtable", name);
         let vttype = LLVMStructCreateNamed(data.context, label(vtname.as_str()));
         let pvttype = LLVMPointerType(vttype, 0);
-        let id = scope.define_type(vtname.clone(), Type::Object(vtname.clone(), vec!())).unwrap();
+        let id = scope.define_type(vtname.clone(), Type::Object(vtname.clone(), vec!()), None).unwrap();
         data.set_type(id, TypeValue { value: pvttype, vttype: None });
         (Some(vttype), Some(pvttype))
     } else {

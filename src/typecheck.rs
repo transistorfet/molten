@@ -78,8 +78,7 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &mut 
                 let dname = ident.as_ref().unwrap().name.clone();
                 let fname = abi.mangle_name(dname.as_str(), &tupleargs, dscope.num_funcdefs(session, &dname));
                 if !dscope.contains(&fname) {
-                    dscope.define(fname.clone(), Some(nftype.clone()))?;
-                    dscope.set_var_def(&fname, *id);
+                    dscope.define(fname.clone(), Some(nftype.clone()), Some(*id))?;
                     ident.as_mut().unwrap().name = fname;
                 }
                 Scope::add_func_variant(session, dscope, &dname, scope, nftype.clone())?;

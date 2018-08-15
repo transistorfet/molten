@@ -53,16 +53,15 @@ impl ClassDef {
         tscope.set_basename(name.clone());
 
         // Define Self and Super, and check for typevars in the type params
-        tscope.define_type(String::from("Self"), classtype.clone())?;
+        tscope.define_type(String::from("Self"), classtype.clone(), Some(id))?;
         if let Some(ref ptype) = parenttype {
-            tscope.define_type(String::from("Super"), ptype.clone())?;
+            tscope.define_type(String::from("Super"), ptype.clone(), scope.get_var_def(&ptype.get_name()?))?;
         }
 
         let classdef = Self::create_class(session, scope.clone(), id, classtype.clone(), parenttype)?;
 
         // Define the class in the local scope
-        scope.define_type(name.clone(), classtype)?;
-        scope.set_type_def(&name, id);
+        scope.define_type(name.clone(), classtype, Some(id))?;
         session.set_def(id, Def::Class(classdef.clone()));
         // TODO i don't like this type == Class thing, but i don't know how i'll do struct types yet either
         //scope.define(name.clone(), Some(Type::Object(name.clone(), vec!())))?;
@@ -213,7 +212,8 @@ impl StructDef {
 
     #[must_use]
     pub fn add_field(&self, name: &str, ttype: Type) -> Result<(), Error> {
-        self.vars.define(String::from(name), Some(ttype.clone()))?;
+        // TODO this should be assigned a Var or something...
+        self.vars.define(String::from(name), Some(ttype.clone()), None)?;
         self.structdef.borrow_mut().push((String::from(name), ttype));
         Ok(())
     }

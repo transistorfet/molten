@@ -40,8 +40,7 @@ impl VarDef {
 
     pub fn set_var_def(session: &Session, scope: ScopeRef, id: NodeID, name: &String, def: Def, ttype: Option<Type>) -> Result<(), Error> {
         let dscope = Scope::target(session, scope.clone());
-        dscope.define(name.clone(), ttype)?;
-        dscope.set_var_def(&name, id);
+        dscope.define(name.clone(), ttype, Some(id))?;
         session.set_def(id, def.clone());
         Ok(())
     }

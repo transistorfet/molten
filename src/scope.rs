@@ -111,7 +111,7 @@ impl Scope {
     ///// Variable Functions /////
 
     #[must_use]
-    pub fn define(&self, name: String, ttype: Option<Type>) -> Result<BindID, Error> {
+    pub fn define(&self, name: String, ttype: Option<Type>, defid: Option<NodeID>) -> Result<BindID, Error> {
         let mut names = self.names.borrow_mut();
         match names.contains_key(&name) {
             true => Err(Error::new(format!("NameError: variable is already defined; {:?}", name))),
@@ -120,7 +120,7 @@ impl Scope {
                 names.insert(name, VarInfo {
                     id: id,
                     ttype: ttype,
-                    defid: None,
+                    defid: defid,
                 });
                 Ok(id)
             },
@@ -314,7 +314,7 @@ impl Scope {
     ///// Type Functions /////
 
     #[must_use]
-    pub fn define_type(&self, name: String, ttype: Type) -> Result<BindID, Error> {
+    pub fn define_type(&self, name: String, ttype: Type, defid: Option<NodeID>) -> Result<BindID, Error> {
         let mut types = self.types.borrow_mut();
         match types.contains_key(&name) {
             true => Err(Error::new(format!("NameError: type is already defined; {:?}", name))),
@@ -323,7 +323,7 @@ impl Scope {
                 types.insert(name, TypeInfo {
                     id: id,
                     ttype: ttype,
-                    defid: None,
+                    defid: defid,
                 });
                 Ok(id)
             },
@@ -515,10 +515,10 @@ impl Scope {
 
         //self.define_type(name, ttype.clone()).unwrap();
         if self.is_global() {
-            self.define_type(id.to_string(), ttype.clone()).unwrap();
+            self.define_type(id.to_string(), ttype.clone(), None).unwrap();
         } else {
             let gscope = Scope::global(self.parent.clone().unwrap());
-            gscope.define_type(id.to_string(), ttype.clone()).unwrap();
+            gscope.define_type(id.to_string(), ttype.clone(), None).unwrap();
         }
         debug!("NEW TYPEVAR: {:?} {:?}", self.get_basename(), ttype);
         ttype

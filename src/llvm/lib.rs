@@ -109,8 +109,7 @@ pub unsafe fn declare_builtins_node<'sess>(data: &mut LLVM<'sess>, objtype: LLVM
                     let sftype = scope.get_variable_type(data.session, &name).unwrap();
                     name = ftype.get_abi().unwrap_or(ABI::Molten).mangle_name(&name, ftype.get_argtypes().unwrap(), sftype.num_funcdefs());
                     if !scope.contains(&name) {
-                        scope.define(name.clone(), Some(ftype.clone())).unwrap();
-                        scope.set_var_def(&name, *id);
+                        scope.define(name.clone(), Some(ftype.clone()), Some(*id)).unwrap();
                     }
                     let fname = scope.get_full_name(&Some(Ident::new(Pos::empty(), name.clone())), UniqueID(0));
                     data.set_value(scope.variable_id(&name).unwrap(), from_type(&ftype, func(data, fname.as_str(), objtype)));
@@ -120,8 +119,7 @@ pub unsafe fn declare_builtins_node<'sess>(data: &mut LLVM<'sess>, objtype: LLVM
                     let sftype = scope.get_variable_type(data.session, &name).unwrap();
                     name = ftype.get_abi().unwrap_or(ABI::Molten).mangle_name(&name, ftype.get_argtypes().unwrap(), sftype.num_funcdefs());
                     if !scope.contains(&name) {
-                        scope.define(name.clone(), Some(ftype.clone())).unwrap();
-                        scope.set_var_def(&name, *id);
+                        scope.define(name.clone(), Some(ftype.clone()), Some(*id)).unwrap();
                     }
                     data.set_value(scope.variable_id(&name).unwrap(), Box::new(Builtin(BuiltinFunction(func), ftype)));
                 },

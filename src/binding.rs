@@ -53,8 +53,7 @@ fn bind_names_node_or_error(session: &Session, scope: ScopeRef, node: &mut AST) 
             //}
 
             for ref arg in args.iter() {
-                //fscope.define(arg.ident.name.clone(), arg.ttype.clone())?;
-                //fscope.set_var_def(&arg.ident.name, arg.id);
+                //fscope.define(arg.ident.name.clone(), arg.ttype.clone(), Some(arg.id))?;
                 VarDef::define_var(session, fscope.clone(), arg.id, &arg.ident.name, arg.ttype.clone())?;
             }
 
@@ -260,9 +259,9 @@ pub fn declare_typevars(scope: ScopeRef, ttype: Option<&mut Type>, always_new: b
                     _ => {
                         *id = UniqueID::generate();
                         let gscope = Scope::global(scope.clone());
-                        gscope.define_type(id.to_string(), Type::Variable(name.clone(), *id))?;
+                        gscope.define_type(id.to_string(), Type::Variable(name.clone(), *id), None)?;
                         if !scope.contains_type_local(name) && !scope.is_primative() {
-                            scope.define_type(name.clone(), Type::Variable(name.clone(), *id))?;
+                            scope.define_type(name.clone(), Type::Variable(name.clone(), *id), None)?;
                         }
                     }
                 }
