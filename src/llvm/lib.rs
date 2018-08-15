@@ -110,6 +110,7 @@ pub unsafe fn declare_builtins_node<'sess>(data: &mut LLVM<'sess>, objtype: LLVM
                     name = ftype.get_abi().unwrap_or(ABI::Molten).mangle_name(&name, ftype.get_argtypes().unwrap(), sftype.num_funcdefs());
                     if !scope.contains(&name) {
                         scope.define(name.clone(), Some(ftype.clone())).unwrap();
+                        scope.set_var_def(&name, *id);
                     }
                     let fname = scope.get_full_name(&Some(Ident::new(Pos::empty(), name.clone())), UniqueID(0));
                     data.set_value(scope.variable_id(&name).unwrap(), from_type(&ftype, func(data, fname.as_str(), objtype)));
@@ -120,6 +121,7 @@ pub unsafe fn declare_builtins_node<'sess>(data: &mut LLVM<'sess>, objtype: LLVM
                     name = ftype.get_abi().unwrap_or(ABI::Molten).mangle_name(&name, ftype.get_argtypes().unwrap(), sftype.num_funcdefs());
                     if !scope.contains(&name) {
                         scope.define(name.clone(), Some(ftype.clone())).unwrap();
+                        scope.set_var_def(&name, *id);
                     }
                     data.set_value(scope.variable_id(&name).unwrap(), Box::new(Builtin(BuiltinFunction(func), ftype)));
                 },
@@ -128,7 +130,7 @@ pub unsafe fn declare_builtins_node<'sess>(data: &mut LLVM<'sess>, objtype: LLVM
         },
         BuiltinDef::Class(ref id, ref name, _, ref structdef, ref entries) => {
             let cname = String::from(*name);
-            let classdef = data.session.find_type_def(scope.clone(), &String::from(*name)).unwrap().as_class().unwrap();
+            let classdef = scope.find_type_def(data.session, &String::from(*name)).unwrap().as_class().unwrap();
 
             let lltype = if structdef.len() > 0 {
                 *classdef.structdef.borrow_mut() = structdef.clone();

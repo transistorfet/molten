@@ -79,6 +79,7 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &mut 
                 let fname = abi.mangle_name(dname.as_str(), &tupleargs, dscope.num_funcdefs(session, &dname));
                 if !dscope.contains(&fname) {
                     dscope.define(fname.clone(), Some(nftype.clone()))?;
+                    dscope.set_var_def(&fname, *id);
                     ident.as_mut().unwrap().name = fname;
                 }
                 Scope::add_func_variant(session, dscope, &dname, scope, nftype.clone())?;
@@ -282,7 +283,7 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &mut 
                 _ => return Err(Error::new(format!("SyntaxError: left-hand side of scope resolver must be identifier")))
             };
 
-            let classvars = session.find_type_def(scope.clone(), &ltype.get_name()?)?.as_class()?.classvars.clone();
+            let classvars = scope.find_type_def(session, &ltype.get_name()?)?.as_class()?.classvars.clone();
             classvars.get_variable_type(session, &field.name).unwrap_or_else(|| expected.unwrap_or_else(|| scope.new_typevar()))
         },
 
@@ -290,7 +291,7 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &mut 
             let ltype = resolve_type(scope.clone(), check_types_node(session, scope.clone(), left, None));
             *stype = Some(ltype.clone());
 
-            let classvars = session.find_type_def(scope.clone(), &ltype.get_name()?)?.as_class()?.classvars.clone();
+            let classvars = scope.find_type_def(session, &ltype.get_name()?)?.as_class()?.classvars.clone();
             classvars.get_variable_type(session, &field.name).unwrap_or_else(|| expected.unwrap_or_else(|| scope.new_typevar()))
         },
 
@@ -324,13 +325,13 @@ pub fn get_accessor_name(session: &Session, scope: ScopeRef, fexpr: &mut AST, et
                 _ => return Err(Error::new(format!("SyntaxError: left-hand side of scope resolver must be identifier")))
             };
 
-            let classvars = session.find_type_def(scope.clone(), &ltype.get_name()?)?.as_class()?.classvars.clone();
+            let classvars = scope.find_type_def(session, &ltype.get_name()?)?.as_class()?.classvars.clone();
 debug!("!!!: {:?}", classvars.get_variable_type(session, &ident.name));
             let funcdefs = classvars.num_funcdefs(session, &ident.name);
             funcdefs
         },
         AST::Accessor(ref id, _, _, ref mut ident, ref ltype) => {
-            let classvars = session.find_type_def(scope.clone(), &ltype.as_ref().unwrap().get_name()?)?.as_class()?.classvars.clone();
+            let classvars = scope.find_type_def(session, &ltype.as_ref().unwrap().get_name()?)?.as_class()?.classvars.clone();
             let funcdefs = classvars.num_funcdefs(session, &ident.name);
             funcdefs
         },

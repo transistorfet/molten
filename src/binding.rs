@@ -2,7 +2,7 @@
 
 use abi::ABI;
 use types::Type;
-use ast::{ NodeID, ClassSpec, AST };
+use ast::{ NodeID, Ident, ClassSpec, AST };
 use session::{ Session, Error };
 use scope::{ Scope, ScopeRef };
 use utils::UniqueID;
@@ -53,7 +53,9 @@ fn bind_names_node_or_error(session: &Session, scope: ScopeRef, node: &mut AST) 
             //}
 
             for ref arg in args.iter() {
-                fscope.define(arg.ident.name.clone(), arg.ttype.clone())?;
+                //fscope.define(arg.ident.name.clone(), arg.ttype.clone())?;
+                //fscope.set_var_def(&arg.ident.name, arg.id);
+                VarDef::define_var(session, fscope.clone(), arg.id, &arg.ident.name, arg.ttype.clone())?;
             }
 
             bind_names_node(session, fscope, body)
@@ -129,7 +131,8 @@ fn bind_names_node_or_error(session: &Session, scope: ScopeRef, node: &mut AST) 
 
         AST::For(ref id, _, ref ident, ref mut cond, ref mut body) => {
             let lscope = session.map.add(*id, Some(scope.clone()));
-            lscope.define(ident.name.clone(), None)?;
+            //lscope.define(ident.name.clone(), None)?;
+            VarDef::define_var(session, lscope.clone(), *id, &ident.name, None)?;
             bind_names_node(session, lscope.clone(), cond);
             bind_names_node(session, lscope, body);
         },
@@ -154,8 +157,9 @@ fn bind_names_node_or_error(session: &Session, scope: ScopeRef, node: &mut AST) 
             classspec.types.iter_mut().map(|ref mut ttype| declare_typevars(tscope.clone(), Some(ttype), true).unwrap()).count();
             for field in fields {
                 //let dscope = Scope::target(session, scope.clone());
-                scope.define(field.ident.name.clone(), field.ttype.clone())?;
                 declare_typevars(scope.clone(), field.ttype.as_mut(), true)?;
+                //scope.define(field.ident.name.clone(), field.ttype.clone())?;
+                VarDef::define_var(session, scope.clone(), *id, &field.ident.name, field.ttype.clone())?;
             }
         },
 

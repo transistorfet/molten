@@ -9,6 +9,7 @@ use types::Type;
 use ast::{ NodeID, Ident };
 use session::{ Session, Error };
 use utils::UniqueID;
+use defs::Def;
 
 
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -102,7 +103,7 @@ impl Scope {
 
     pub fn target(session: &Session, scope: ScopeRef) -> ScopeRef {
         match scope.context.get() {
-            Context::Redirect => session.find_type_def(scope.clone(), &scope.basename.borrow()).unwrap().as_class().unwrap().classvars.clone(),
+            Context::Redirect => scope.find_type_def(session, &scope.basename.borrow()).unwrap().as_class().unwrap().classvars.clone(),
             _ => scope,
         }
     }
@@ -237,6 +238,15 @@ impl Scope {
             }
         })
     }
+
+    pub fn find_var_def(&self, session: &Session, name: &String) -> Result<Def, Error> {
+        session.get_def(self.get_var_def(name).ok_or(Error::new(format!("VarError: definition not set for {:?}", name)))?)
+    }
+
+    pub fn find_type_def(&self, session: &Session, name: &String) -> Result<Def, Error> {
+        session.get_def(self.get_type_def(name).ok_or(Error::new(format!("TypeError: definition not set for {:?}", name)))?)
+    }
+
 
     pub fn get_variable_type_full(&self, session: &Session, name: &String, local: bool) -> Option<Type> {
         let otype = self._search(name, |sym| {

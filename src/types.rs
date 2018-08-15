@@ -435,7 +435,7 @@ fn is_subclass_of(session: &Session, scope: ScopeRef, adef: (&String, &Vec<Type>
             //return Ok(tscope.unmap_typevars(&mut names, Type::Object(adef.0, ptypes)));
         }
 
-        let classdef = session.find_type_def(scope.clone(), &adef.0)?.as_class()?;
+        let classdef = scope.find_type_def(session, &adef.0)?.as_class()?;
         if classdef.parenttype.is_none() {
             return Err(Error::new(format!("TypeError: type mismatch, expected {} but found {}", Type::Object(adef.0.clone(), adef.1), Type::Object(bdef.0.clone(), bdef.1.clone()))));
         }

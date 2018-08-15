@@ -4,7 +4,7 @@ use session::Session;
 use types::{ resolve_type };
 use typecheck::{ update_scope_variable_types };
 use ast::{ Argument, AST };
-use scope::{ ScopeRef };
+use scope::{ Scope, ScopeRef };
 
 
 pub fn precompile(session: &Session, code: Vec<AST>) -> Vec<AST> {
@@ -25,15 +25,23 @@ pub fn precompile_node(session: &Session, scope: ScopeRef, node: AST) -> AST {
         AST::Block(id, pos, code) => { AST::Block(id, pos, precompile_vec(session, scope, code)) },
 
         AST::Definition(id, pos, name, ttype, code) => {
+let dscope = Scope::target(session, scope.clone());
+println!("{} {} -> {:?} {:?}", scope.get_basename(), name.name, dscope.get_var_def(&name.name), dscope.find_var_def(session, &name.name));
             AST::Definition(id, pos, name, Some(resolve_type(scope.clone(), ttype.unwrap())), Box::new(precompile_node(session, scope.clone(), *code)))
         },
 
         AST::Declare(id, pos, name, ttype) => {
+let dscope = Scope::target(session, scope.clone());
+println!("{} {} -> {:?} {:?}", scope.get_basename(), name.name, dscope.get_var_def(&name.name), dscope.find_var_def(session, &name.name));
             AST::Declare(id, pos, name, resolve_type(scope, ttype))
         },
 
         AST::Function(id, pos, name, args, ret, body, abi) => {
             let fscope = session.map.get(&id);
+let dscope = Scope::target(session, scope.clone());
+if name.is_some() {
+println!("{} {} -> {:?} {:?}", scope.get_basename(), name.as_ref().unwrap().name, dscope.get_var_def(&name.as_ref().unwrap().name), dscope.find_var_def(session, &name.as_ref().unwrap().name));
+}
             update_scope_variable_types(session, fscope.clone());
 
             // Mangle names of overloaded functions

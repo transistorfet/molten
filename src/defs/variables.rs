@@ -15,11 +15,17 @@ pub struct VarDef {
 
 }
 
+// TODO Mutable vs Immutable should be expressed as a field instead of it's own type
 pub type VarDefRef = Rc<VarDef>;
 
 impl VarDef {
     pub fn define_var(session: &Session, scope: ScopeRef, id: NodeID, name: &String, ttype: Option<Type>) -> Result<Def, Error> {
+        // TODO should you have a different one for Global, given that it'll compile to something different, until you remove it via closures...
+        //if scope.is_redirect() {
+        //  FieldDef::define(session, scope, id, name, ttype);
+        //} else {
         VarDef::define(session, scope, id, name, ttype)
+        //}
     }
 
     pub fn define(session: &Session, scope: ScopeRef, id: NodeID, name: &String, ttype: Option<Type>) -> Result<Def, Error> {
@@ -41,5 +47,16 @@ impl VarDef {
     }
 }
 
-// TODO should you have ConstDef?  FieldDef?
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct FieldDef {
+
+}
+
+pub type FieldDefRef = Rc<FieldDef>;
+
+impl FieldDef {
+
+}
+
 

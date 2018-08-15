@@ -45,7 +45,9 @@ impl FuncDef {
         Ok(def)
     }
 
+    #[must_use]
     pub fn set_func_def(session: &Session, scope: ScopeRef, id: NodeID, name: &Option<String>, def: Def, ttype: Option<Type>) -> Result<(), Error> {
+        session.set_def(id, def.clone());
         if let Some(name) = name {
             let dscope = Scope::target(session, scope.clone());
             if let Some(previd) = dscope.get_var_def(&name) {
@@ -55,7 +57,6 @@ impl FuncDef {
                 dscope.set_var_def(&name, id);
             }
         }
-        session.set_def(id, def.clone());
         Ok(())
     }
 }

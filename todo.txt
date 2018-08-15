@@ -1,4 +1,9 @@
 
+* it might make more sense to keep the "find_var_def" functions inside scope, so you'd call scope.find_var_def(session, name) -> Result<Def, Error>
+* make sure all variables have a def, and then you can use the defid to store the type
+
+* do you need a BuiltinDef type?
+* do you need a GlobalVarDef type?  or a ConstDef or FieldDef/PropertyDef/etc
 * can you remove the need to define new name mangled bindings?
 * remove declare typevars if possible??
 * make type constructor functions or macros that are easier to use than Type::Object(String::from(name), vec!())

@@ -99,30 +99,6 @@ impl Session {
     pub fn set_def(&self, id: NodeID, def: Def) {
         self.defs.borrow_mut().insert(id, def);
     }
-
-    #[must_use]
-    pub fn define(&self, scope: ScopeRef, name: &String, id: NodeID) -> Result<(), Error> {
-        let dscope = Scope::target(self, scope.clone());
-        dscope.define(name.clone(), None)?;
-        dscope.set_var_def(name, id);
-        Ok(())
-    }
-
-    pub fn find_def(&self, scope: ScopeRef, name: &String) -> Result<Def, Error> {
-        self.get_def(scope.get_var_def(name).ok_or(Error::new(format!("VarError: definition not set for {:?}", name)))?)
-    }
-
-    #[must_use]
-    pub fn define_type(&self, scope: ScopeRef, name: &String, ttype: Type, id: NodeID) -> Result<(), Error> {
-        let dscope = Scope::target(self, scope.clone());
-        dscope.define_type(name.clone(), ttype)?;
-        dscope.set_type_def(name, id);
-        Ok(())
-    }
-
-    pub fn find_type_def(&self, scope: ScopeRef, name: &String) -> Result<Def, Error> {
-        self.get_def(scope.get_type_def(name).ok_or(Error::new(format!("TypeError: definition not set for {:?}", name)))?)
-    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
