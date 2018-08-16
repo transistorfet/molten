@@ -94,9 +94,13 @@ fn bind_names_node_or_error(session: &Session, scope: ScopeRef, node: &mut AST) 
 
         AST::Recall(ref id, _, ref ident) |
         AST::Identifier(ref id, _, ref ident) => {
-            if !scope.contains(&ident.name) {
-                return Err(Error::new(format!("NameError: undefined identifier {:?}", ident.name)));
+            match scope.get_var_def(&ident.name) {
+                Some(defid) => session.set_ref(*id, defid),
+                None => return Err(Error::new(format!("NameError: undefined identifier {:?}", ident.name)))
             }
+            //if !scope.contains(&ident.name) {
+            //    return Err(Error::new(format!("NameError: undefined identifier {:?}", ident.name)));
+            //}
         },
 
         AST::SideEffect(ref id, _, _, ref mut args) => {
@@ -170,9 +174,13 @@ fn bind_names_node_or_error(session: &Session, scope: ScopeRef, node: &mut AST) 
 
         AST::New(ref id, _, ref mut classspec) => {
             classspec.types.iter_mut().map(|ref mut ttype| declare_typevars(scope.clone(), Some(ttype), false).unwrap()).count();
-            if scope.find_type(&classspec.ident.name).is_none() {
-                return Err(Error::new(format!("NameError: undefined identifier {:?}", classspec.ident.name)));
+            match scope.get_type_def(&classspec.ident.name) {
+                Some(defid) => session.set_ref(*id, defid),
+                None => return Err(Error::new(format!("NameError: undefined identifier {:?}", classspec.ident.name)))
             }
+            //if scope.find_type(&classspec.ident.name).is_none() {
+            //    return Err(Error::new(format!("NameError: undefined identifier {:?}", classspec.ident.name)));
+            //}
         },
 
         AST::Class(ref id, _, ref mut classspec, ref mut parentspec, ref mut body) => {
@@ -198,9 +206,13 @@ fn bind_names_node_or_error(session: &Session, scope: ScopeRef, node: &mut AST) 
             //bind_names_node(session, scope, left);
             match **left {
                 AST::Identifier(_, _, ref ident) => {
-                    if scope.find_type(&ident.name).is_none() {
-                        return Err(Error::new(format!("NameError: undefined type {:?}", ident.name)));
+                    match scope.get_type_def(&ident.name) {
+                        Some(defid) => session.set_ref(*id, defid),
+                        None => return Err(Error::new(format!("NameError: undefined type {:?}", ident.name)))
                     }
+                    //if scope.find_type(&ident.name).is_none() {
+                    //    return Err(Error::new(format!("NameError: undefined type {:?}", ident.name)));
+                    //}
                 },
                 _ => { return Err(Error::new(format!("SyntaxError: left-hand side of scope resolver must be identifier"))); }
             }

@@ -99,6 +99,7 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &mut 
                 Type::Variable(_, _) => dtype.clone(),
                 _ => tscope.map_all_typevars(dtype.clone()),
             };
+            // TODO how will you find the actual def id of the variant you select, and then set the invoke id reference to that def
             let etype = match etype.is_overloaded() {
                 true => find_variant(session, tscope.clone(), etype, Type::Tuple(atypes.clone()), Check::Def)?,
                 false => etype,
@@ -106,16 +107,6 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &mut 
 
             let ftype = match etype {
                 Type::Function(ref args, _, ref abi) => {
-                    /*
-                    match **fexpr {
-                        AST::Resolver(_, _, _, ref mut name) |
-                        AST::Accessor(_, _, _, ref mut name, _) |
-                        AST::Identifier(_, _, ref mut name) => {
-                            *name = etype.get_abi().unwrap_or(ABI::Molten).mangle_name(name, args, dtype.num_funcdefs());
-                        },
-                        _ =>  { } //return Err(Error::new(format!("OverloadError: calling an overloaded function must be by name: not {:?}", fexpr))),
-                    }
-                    */
                     get_accessor_name(session, tscope.clone(), fexpr.as_mut(), &etype)?;
 
                     //let ftype = expect_type(session, tscope.clone(), Some(etype.clone()), Some(Type::Function(Box::new(Type::Tuple(atypes)), Box::new(expected.unwrap_or_else(|| tscope.new_typevar())), abi)), Check::Update)?;
@@ -127,7 +118,6 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &mut 
                 },
                 Type::Variable(_, ref id) => {
                     let ftype = Type::Function(Box::new(Type::Tuple(atypes.clone())), Box::new(expected.unwrap_or_else(|| tscope.new_typevar())), ABI::Unknown);
-                    // TODO This is suspect... we might be updating type without checking for a conflict
                     // TODO we also aren't handling other function types, like accessor and resolve
                     //if let AST::Identifier(ref id, ref fname) = **fexpr {
                     //    update_type(scope.clone(), fname, ftype.clone());

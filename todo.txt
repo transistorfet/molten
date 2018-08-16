@@ -1,12 +1,11 @@
 
-* it might make more sense to keep the "find_var_def" functions inside scope, so you'd call scope.find_var_def(session, name) -> Result<Def, Error>
-* make sure all variables have a def, and then you can use the defid to store the type
+* make type constructor functions or macros that are easier to use than Type::Object(String::from(name), vec!())
 
+* how will you set the ref in invoke for overloaded functions
 * do you need a BuiltinDef type?
 * do you need a GlobalVarDef type?  or a ConstDef or FieldDef/PropertyDef/etc
 * can you remove the need to define new name mangled bindings?
 * remove declare typevars if possible??
-* make type constructor functions or macros that are easier to use than Type::Object(String::from(name), vec!())
 
 * should we be looking up classes/types/etc by ID?  Should we be unifying IDs during name binding??  Maybe when defining a variable, we store
   the ID of the AST in the info struct, rather than generate a new one or save the info id in the AST, so we don't have to make AST mut

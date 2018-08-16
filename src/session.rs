@@ -23,6 +23,7 @@ pub struct Session {
     pub files: RefCell<Vec<(String, String)>>,
     pub map: ScopeMapRef,
     pub defs: RefCell<HashMap<NodeID, Def>>,
+    pub refs: RefCell<HashMap<NodeID, NodeID>>,
     pub target: String,
     pub errors: Cell<u32>,
 }
@@ -35,6 +36,7 @@ impl Session {
             files: RefCell::new(vec!()),
             map: ScopeMapRef::new(),
             defs: RefCell::new(HashMap::new()),
+            refs: RefCell::new(HashMap::new()),
             target: String::from(""),
             errors: Cell::new(0),
         }
@@ -89,6 +91,10 @@ impl Session {
         err
     }
 
+    pub fn set_def(&self, id: NodeID, def: Def) {
+        self.defs.borrow_mut().insert(id, def);
+    }
+
     pub fn get_def(&self, id: NodeID) -> Result<Def, Error> {
         match self.defs.borrow().get(&id) {
             Some(def) => Ok(def.clone()),
@@ -96,8 +102,24 @@ impl Session {
         }
     }
 
-    pub fn set_def(&self, id: NodeID, def: Def) {
-        self.defs.borrow_mut().insert(id, def);
+
+    pub fn set_ref(&self, id: NodeID, defid: NodeID) {
+        self.refs.borrow_mut().insert(id, defid);
+    }
+
+    pub fn get_ref(&self, id: NodeID) -> Result<NodeID, Error> {
+        match self.refs.borrow().get(&id) {
+            Some(defid) => Ok(defid.clone()),
+            None => Err(Error::new(format!("ReferenceError: reference not set for {:?}", id))),
+        }
+    }
+
+
+    pub fn get_def_from_ref(&self, id: NodeID) -> Result<Def, Error> {
+        match self.refs.borrow().get(&id) {
+            Some(defid) => self.get_def(*defid),
+            None => Err(Error::new(format!("ReferenceError: reference not set for {:?}", id))),
+        }
     }
 }
 
