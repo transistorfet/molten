@@ -21,11 +21,12 @@ use scope::{ Scope, ScopeRef, ScopeMapRef };
 pub struct Session {
     pub name: String,
     pub files: RefCell<Vec<(String, String)>>,
+    pub target: String,
+    pub errors: Cell<u32>,
     pub map: ScopeMapRef,
     pub defs: RefCell<HashMap<NodeID, Def>>,
     pub refs: RefCell<HashMap<NodeID, NodeID>>,
-    pub target: String,
-    pub errors: Cell<u32>,
+    pub types: RefCell<HashMap<NodeID, Type>>,
 }
 
 
@@ -34,11 +35,12 @@ impl Session {
         Session {
             name: String::from(""),
             files: RefCell::new(vec!()),
+            target: String::from(""),
+            errors: Cell::new(0),
             map: ScopeMapRef::new(),
             defs: RefCell::new(HashMap::new()),
             refs: RefCell::new(HashMap::new()),
-            target: String::from(""),
-            errors: Cell::new(0),
+            types: RefCell::new(HashMap::new()),
         }
     }
 
@@ -121,23 +123,15 @@ impl Session {
             None => Err(Error::new(format!("ReferenceError: reference not set for {:?}", id))),
         }
     }
-}
 
-#[derive(Clone, Debug, PartialEq)]
-pub struct TypeTable(RefCell<HashMap<NodeID, Type>>);
-
-impl TypeTable {
-    pub fn new() -> Self {
-        TypeTable(RefCell::new(HashMap::new()))
+    pub fn set_type(&self, id: NodeID, ttype: Type) {
+        self.types.borrow_mut().insert(id, ttype);
     }
 
-    pub fn set(&self, id: NodeID, ttype: Type) {
-        self.0.borrow_mut().insert(id, ttype);
+    pub fn get_type(&self, id: NodeID) -> Option<Type> {
+        self.types.borrow().get(&id).map(|ttype| ttype.clone())
     }
 
-    pub fn get_def(&self, id: NodeID) -> Option<Type> {
-        self.0.borrow().get(&id).map(|ttype| ttype.clone())
-    }
 }
 
 

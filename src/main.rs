@@ -97,6 +97,11 @@ fn compile_file(input: &str, output: Option<&str>) {
     code = precompiler::precompile(&session, code);
 
     compiler::compile(&builtins, &session, name, &mut code);
+
+    println!("Types:");
+    for (ref id, ref ttype) in session.types.borrow().iter() {
+        println!("{:?} -> {:?}", id, ttype);
+    }
 }
 
 

@@ -1,5 +1,6 @@
 
 
+use defs::Def;
 use ast::{ ClassSpec, AST };
 use session::{ Session, Error };
 use scope::{ Scope, ScopeRef };
@@ -92,6 +93,7 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &mut 
             for ref mut value in args {
                 atypes.push(check_types_node(session, scope.clone(), value, None));
             }
+            let atypes = Type::Tuple(atypes);
 
             let tscope = Scope::new_ref(Some(scope.clone()));
             let dtype = check_types_node(session, scope.clone(), fexpr, None);
@@ -101,7 +103,7 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &mut 
             };
             // TODO how will you find the actual def id of the variant you select, and then set the invoke id reference to that def
             let etype = match etype.is_overloaded() {
-                true => find_variant(session, tscope.clone(), etype, Type::Tuple(atypes.clone()), Check::Def)?,
+                true => find_variant(session, tscope.clone(), etype, atypes.clone(), Check::Def)?,
                 false => etype,
             };
 
@@ -109,15 +111,15 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &mut 
                 Type::Function(ref args, _, ref abi) => {
                     get_accessor_name(session, tscope.clone(), fexpr.as_mut(), &etype)?;
 
-                    //let ftype = expect_type(session, tscope.clone(), Some(etype.clone()), Some(Type::Function(Box::new(Type::Tuple(atypes)), Box::new(expected.unwrap_or_else(|| tscope.new_typevar())), abi)), Check::Update)?;
-                    let ftype = expect_type(session, tscope.clone(), Some(etype.clone()), Some(Type::Function(Box::new(Type::Tuple(atypes)), Box::new(etype.get_rettype()?.clone()), *abi)), Check::Def)?;
+                    //let ftype = expect_type(session, tscope.clone(), Some(etype.clone()), Some(Type::Function(Box::new(atypes), Box::new(expected.unwrap_or_else(|| tscope.new_typevar())), abi)), Check::Update)?;
+                    let ftype = expect_type(session, tscope.clone(), Some(etype.clone()), Some(Type::Function(Box::new(atypes), Box::new(etype.get_rettype()?.clone()), *abi)), Check::Def)?;
                     // TODO should this actually be another expect, so type resolutions that occur in later args affect earlier args?  Might not be needed unless you add typevar constraints
                     let ftype = resolve_type(tscope, ftype);        // NOTE This ensures the early arguments are resolved despite typevars not being assigned until later in the signature
 
                     ftype
                 },
                 Type::Variable(_, ref id) => {
-                    let ftype = Type::Function(Box::new(Type::Tuple(atypes.clone())), Box::new(expected.unwrap_or_else(|| tscope.new_typevar())), ABI::Unknown);
+                    let ftype = Type::Function(Box::new(atypes), Box::new(expected.unwrap_or_else(|| tscope.new_typevar())), ABI::Unknown);
                     // TODO we also aren't handling other function types, like accessor and resolve
                     //if let AST::Identifier(ref id, ref fname) = **fexpr {
                     //    update_type(scope.clone(), fname, ftype.clone());
@@ -129,6 +131,7 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &mut 
                 _ => return Err(Error::new(format!("NotAFunction: {:?}", fexpr))),
             };
 
+            session.set_type(*id, ftype.clone()); 
             *stype = Some(ftype.clone());
             ftype.get_rettype()?.clone()
         },
@@ -146,6 +149,7 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &mut 
             let btype = expect_type(session, scope.clone(), ttype.clone(), Some(check_types_node(session, scope.clone(), body, ttype.clone())), Check::Def)?;
             //dscope.set_variable_type(&ident.name, btype.clone());
             Type::update_variable_type(session, scope, &ident.name, btype.clone());
+            session.set_type(*id, btype.clone()); 
             *ttype = Some(btype.clone());
             btype
         },
@@ -305,6 +309,26 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &mut 
 }
 
 pub fn get_accessor_name(session: &Session, scope: ScopeRef, fexpr: &mut AST, etype: &Type) -> Result<i32, Error> {
+    /*
+    let did = match *fexpr {
+        AST::Resolver(ref id, _, _, _) |
+        AST::Accessor(ref id, _, _, _, _) |
+        AST::Identifier(ref id, _, _) => Some(*id),
+        _ => None
+    };
+
+    //let did = session.get_ref(*id);
+    if let Some(did) = did {
+        let def = session.get_def(did)?;
+        let (fid, etype) = match def {
+            Def::Overload(ref ol) => ol.find_variant(session, scope.clone(), etype.get_argtypes()?.clone())?,
+            _ => (did, etype.clone())
+        };
+        println!("&&&: {:?} {:?}", fid, etype);
+    }
+    */
+
+
     let funcdefs = match *fexpr {
         AST::Resolver(ref id, _, ref left, ref mut ident) => {
             let ltype = match **left {

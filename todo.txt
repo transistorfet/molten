@@ -1,7 +1,14 @@
 
+* the new overload find_variant function should check for ambiguous types, and warn
+* the overload variant adder should check that the defined function doesn't have the same signature any other def, unless the other def is in a parent scope??
+
 * make type constructor functions or macros that are easier to use than Type::Object(String::from(name), vec!())
 
 * how will you set the ref in invoke for overloaded functions
+* how can you use all the new things to make closures...
+* you could check during binding if an identifier is a closure context ref, and bind the ref there
+* you might not be making sure that non-closure functions don't access variables outside their scope (methods are never closures)
+* make sure that you don't overload different types of functions (closures, functions, and methods must all be the same type to allow overloading)
 * do you need a BuiltinDef type?
 * do you need a GlobalVarDef type?  or a ConstDef or FieldDef/PropertyDef/etc
 * can you remove the need to define new name mangled bindings?

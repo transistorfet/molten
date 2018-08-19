@@ -63,7 +63,7 @@ pub fn register_builtins_node<'sess>(session: &Session, scope: ScopeRef, tscope:
         BuiltinDef::Func(ref id, ref name, ref ftype, ref func) => {
             let mut ftype = parse_type(ftype);
             declare_typevars(tscope.clone(), ftype.as_mut(), false).unwrap();
-            let abi = match func {
+            let abi = match *func {
                 Func::External => ABI::C,
                 _ => ABI::Molten,
             };

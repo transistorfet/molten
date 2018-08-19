@@ -22,11 +22,19 @@ pub enum Def {
     CFunc(CFuncDefRef)
 }
 
+
 impl Def {
     pub fn as_class(&self) -> Result<ClassDefRef, Error> {
-        match self {
-            Def::Class(class) => Ok(class.clone()),
+        match *self {
+            Def::Class(ref class) => Ok(class.clone()),
             _ => Err(Error::new(format!("DefError: expected class def but found {:#?}", self))),
+        }
+    }
+
+    pub fn as_overload(&self) -> Result<OverloadDefRef, Error> {
+        match *self {
+            Def::Overload(ref class) => Ok(class.clone()),
+            _ => Err(Error::new(format!("DefError: expected overload def but found {:#?}", self))),
         }
     }
 
@@ -41,10 +49,10 @@ impl Def {
     */
 
     pub fn num_variants(&self, session: &Session) -> i32 {
-        match self {
+        match *self {
             Def::Func(_) |
             Def::Method(_) => 1,
-            Def::Overload(def) => def.num_variants(session),
+            Def::Overload(ref def) => def.num_variants(session),
             _ => 0
         }
     }

@@ -48,7 +48,7 @@ impl FuncDef {
     #[must_use]
     pub fn set_func_def(session: &Session, scope: ScopeRef, id: NodeID, name: &Option<String>, def: Def, ttype: Option<Type>) -> Result<(), Error> {
         session.set_def(id, def.clone());
-        if let Some(name) = name {
+        if let Some(ref name) = *name {
             let dscope = Scope::target(session, scope.clone());
             if let Some(previd) = dscope.get_var_def(&name) {
                 OverloadDef::define(session, scope.clone(), &name, id, previd, ttype)?;
@@ -114,6 +114,10 @@ impl OverloadDef {
         Ok(())
     }
 
+    pub fn add_variant(&self, id: NodeID) {
+        self.variants.borrow_mut().push(id);
+    }
+
     pub fn num_variants(&self, session: &Session) -> i32 {
         let prev = match self.parent {
             Some(id) => session.get_def(id).unwrap().num_variants(session),
@@ -122,8 +126,25 @@ impl OverloadDef {
         prev + self.variants.borrow().len() as i32
     }
 
-    pub fn add_variant(&self, id: NodeID) {
-        self.variants.borrow_mut().push(id);
+    pub fn find_variant(&self, session: &Session, scope: ScopeRef, atypes: Type) -> Result<(NodeID, Type), Error> {
+        for id in self.variants.borrow().iter() {
+            let ttype = session.get_type(*id);
+            match ttype {
+                Some(Type::Function(ref btypes, _, _)) => {
+                    match check_type(session, scope.clone(), Some(*btypes.clone()), Some(atypes.clone()), Check::Def, false) {
+                        Ok(_) => return Ok((*id, ttype.clone().unwrap())),
+                        Err(err) => return Err(err)
+                    }
+                },
+                _ => panic!("FUCK"),
+            }
+        }
+
+        match self.parent {
+            Some(ref id) => session.get_def(*id)?.as_overload()?.find_variant(session, scope, atypes),
+            //_ => Err(Error::new(format!("OverloadError: No valid variant found for {}\n\tout of [{}]", atypes, Type::display_vec(&variants)))),
+            _ => Err(Error::new(format!("OverloadError: No valid variant found for {}", atypes))),
+        }
     }
 }
 
