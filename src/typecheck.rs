@@ -107,7 +107,7 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &mut 
                 false => etype,
             };
 
-            println!("!!!!!!: {:?}", session_find_variant(session, tscope.clone(), fexpr.as_mut(), &etype));
+            //println!("!!!!!!: {:?}", session_find_variant(session, tscope.clone(), fexpr.as_mut(), &etype));
 
             let ftype = match etype {
                 Type::Function(ref args, _, ref abi) => {
