@@ -277,7 +277,7 @@ pub fn expect_type(session: &Session, scope: ScopeRef, odtype: Option<Type>, oct
 // dtype < ctype: ie. ctype will be downcast to match dtype, but not the inverse
 //
 pub fn check_type(session: &Session, scope: ScopeRef, odtype: Option<Type>, octype: Option<Type>, mode: Check, update: bool) -> Result<Type, Error> {
-    debug!("TYPECHECK: {:?} {:?}", odtype, octype);
+    //debug!("TYPECHECK: {:?} {:?}", odtype, octype);
     if odtype.is_none() {
         // TODO should the else case just be Nil... 
         match octype {

@@ -82,9 +82,10 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &mut 
                     dscope.define(fname.clone(), Some(nftype.clone()), Some(*id))?;
                     ident.as_mut().unwrap().name = fname;
                 }
-                Scope::add_func_variant(session, dscope, &dname, scope, nftype.clone())?;
+                Scope::add_func_variant(session, dscope, &dname, scope.clone(), nftype.clone())?;
             }
             // TODO build closure context from body (all references)
+            session.update_type(scope.clone(), *id, nftype.clone())?;
             nftype
         },
 
@@ -110,7 +111,6 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &mut 
                 true => find_variant(session, tscope.clone(), etype, atypes.clone(), Check::Def)?,
                 false => etype,
             };
-
             let ftype = match etype {
                 Type::Function(ref args, _, ref abi) => {
                     get_accessor_name(session, tscope.clone(), fexpr.as_mut(), &etype)?;
@@ -317,10 +317,21 @@ pub fn session_find_variant(session: &Session, scope: ScopeRef, rid: NodeID, fex
         },
         AST::Accessor(ref id, _, ref mut left, ref mut field, ref mut stype) => {
             let ltype = resolve_type(session, scope.clone(), check_types_node(session, scope.clone(), left, None));
-            //*stype = Some(ltype.clone());
+            *stype = Some(ltype.clone());
 
             let classvars = scope.find_type_def(session, &ltype.get_name()?)?.as_class()?.classvars.clone();
             classvars.get_var_def(&field.name).ok_or(Error::new(format!("VarError: definition not set for {:?}", field.name)))?
+        },
+        AST::Resolver(ref id, _, ref mut left, ref mut field) => {
+            let ltype = match **left {
+                // TODO this caused an issue with types that have typevars that aren't declared (ie. Buffer['item])
+                //AST::Identifier(_, ref ident) => resolve_type(session, scope.clone(), scope.find_type(&ident.name).unwrap().clone()),
+                AST::Identifier(_, _, ref ident) => scope.find_type(&ident.name).unwrap().clone(),
+                _ => return Err(Error::new(format!("SyntaxError: left-hand side of scope resolver must be identifier")))
+            };
+
+            let classvars = scope.find_type_def(session, &ltype.get_name()?)?.as_class()?.classvars.clone();
+            classvars.get_var_def(&field.name).unwrap()
         },
         _ => { return check_types_node_or_error(session, scope.clone(), fexpr, None); },
     };

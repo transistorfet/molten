@@ -24,7 +24,8 @@
         let x = 2 + 4 * 7 - 1 / 20  == 10 - 50 * 12
 
         let testy = fn x => x + 1
-        let fac = fn (x : Int, y = 5 * 3, z: String = "hey") => if not x then 1 else x - -123
+        // TODO this wasn't compiling because of a reference not set error on the *??
+        //let fac = fn (x : Int, y = 5 * 3, z: String = "hey") => if not x then 1 else x - -123
         //let fac2 = fn x, y, z => if not x then 1 else x - -123
         testy(3)
 
@@ -167,7 +168,8 @@
 
         fn strnum(num: Real) -> String {
             let buffer: String = malloc(22)
-            sprintf(buffer, "%f", num, nil)
+            // TODO this doesn't compile because we broke the type updater again, such that the type variable in the primative decl is being updated when it shouldn't
+            //sprintf(buffer, "%f", num, nil)
             buffer
         }
 

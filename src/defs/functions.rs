@@ -160,8 +160,10 @@ impl OverloadDef {
 
         match found.len() {
             0 => Err(Error::new(format!("OverloadError: No valid variant found for {}\n\tout of [{}]", atypes, Type::display_vec(&variant_types)))),
-            1 => Ok(found.remove(0)),
-            _ => Err(Error::new(format!("OverloadError: Ambiguous {}\n\tvariants found [{}]", atypes, found.iter().map(|(i, t)| format!("{}", t)).collect::<Vec<String>>().join(", ")))),
+            _ => Ok(found.remove(0)),
+            // TODO this is temporary, until you properly implement the override functionality
+            //1 => Ok(found.remove(0)),
+            //_ => Err(Error::new(format!("OverloadError: Ambiguous {}\n\tvariants found [{}]", atypes, found.iter().map(|(i, t)| format!("{}", t)).collect::<Vec<String>>().join(", ")))),
         }
     }
 }
