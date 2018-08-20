@@ -61,8 +61,9 @@ impl ClassDef {
         let classdef = Self::create_class(session, scope.clone(), id, classtype.clone(), parenttype)?;
 
         // Define the class in the local scope
-        scope.define_type(name.clone(), classtype, Some(id))?;
+        scope.define_type(name.clone(), classtype.clone(), Some(id))?;
         session.set_def(id, Def::Class(classdef.clone()));
+        session.set_type(id, classtype);
         // TODO i don't like this type == Class thing, but i don't know how i'll do struct types yet either
         //scope.define(name.clone(), Some(Type::Object(name.clone(), vec!())))?;
 

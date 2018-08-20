@@ -1,7 +1,7 @@
 
 
 use defs::Def;
-use ast::{ ClassSpec, AST };
+use ast::{ NodeID, ClassSpec, AST };
 use session::{ Session, Error };
 use scope::{ Scope, ScopeRef };
 use types::{ Type, Check, ABI, expect_type, resolve_type, find_variant, check_type_params };
@@ -96,6 +96,10 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &mut 
             let atypes = Type::Tuple(atypes);
 
             let tscope = Scope::new_ref(Some(scope.clone()));
+
+            //println!("!!!!!!: {:?}", session_find_variant(session, tscope.clone(), fexpr.as_mut(), &atypes));
+            //let etype = session_find_variant(session, tscope.clone(), *id, fexpr.as_mut(), &atypes)?;
+
             let dtype = check_types_node(session, scope.clone(), fexpr, None);
             let etype = match dtype {
                 Type::Variable(_, _) => dtype.clone(),
@@ -106,8 +110,6 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &mut 
                 true => find_variant(session, tscope.clone(), etype, atypes.clone(), Check::Def)?,
                 false => etype,
             };
-
-            //println!("!!!!!!: {:?}", session_find_variant(session, tscope.clone(), fexpr.as_mut(), &etype));
 
             let ftype = match etype {
                 Type::Function(ref args, _, ref abi) => {
@@ -264,6 +266,15 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &mut 
                 None => return Err(Error::new(format!("TypeError: undefined type {:?}", ident.name))),
             };
             Type::Object(ident.name.clone(), types.clone())
+
+            /*
+            //let odtype = scope.find_type(&ident.name);
+            let dtype = session.get_type_from_ref(*id)?;
+            let tscope = Scope::new_ref(Some(scope.clone()));
+            let mtype = tscope.map_all_typevars(session, dtype.clone());
+            check_type_params(session, scope, &mtype.get_params()?, types, Check::Def, false)?;
+            Type::Object(ident.name.clone(), types.clone())
+            */
         },
 
         AST::Class(ref id, _, _, _, ref mut body) => {
@@ -313,27 +324,33 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &mut 
     Ok(rtype)
 }
 
-pub fn session_find_variant(session: &Session, scope: ScopeRef, fexpr: &mut AST, etype: &Type) -> Result<i32, Error> {
-    let rid = match *fexpr {
-        AST::Resolver(ref id, _, _, _) |
-        AST::Accessor(ref id, _, _, _, _) |
-        AST::Identifier(ref id, _, _) => Some(*id),
-        _ => None
+pub fn session_find_variant(session: &Session, scope: ScopeRef, rid: NodeID, fexpr: &mut AST, argtypes: &Type) -> Result<Type, Error> {
+    let did = match fexpr {
+        AST::Recall(ref id, _, _) |
+        AST::Identifier(ref id, _, _) => {
+            session.get_ref(*id)?
+        },
+        AST::Accessor(ref id, _, ref mut left, ref mut field, ref mut stype) => {
+            let ltype = resolve_type(scope.clone(), check_types_node(session, scope.clone(), left, None));
+            //*stype = Some(ltype.clone());
+
+            let classvars = scope.find_type_def(session, &ltype.get_name()?)?.as_class()?.classvars.clone();
+            classvars.get_var_def(&field.name).ok_or(Error::new(format!("VarError: definition not set for {:?}", field.name)))?
+        },
+        _ => { return check_types_node_or_error(session, scope.clone(), fexpr, None); },
     };
 
-    println!("***: {:?}", rid);
-    //let did = session.get_ref(*id);
-    if let Some(rid) = rid {
-        let did = session.get_ref(rid)?;
-        let def = session.get_def(did)?;
-        let (fid, etype) = match def {
-            Def::Overload(ref ol) => ol.find_variant(session, scope.clone(), etype.get_argtypes()?.clone())?,
-            _ => (did, etype.clone())
-        };
-        println!("&&&: {:?} {:?}", fid, etype);
-    }
 
-    Ok(1)
+    println!("***: {:?}", did);
+    let def = session.get_def(did)?;
+    let (fid, ftype) = match def {
+        Def::Overload(ref ol) => ol.find_variant(session, scope.clone(), argtypes.clone())?,
+        _ => (did, session.get_type(did).unwrap_or_else(|| scope.new_typevar(session)))
+    };
+    println!("&&&: {:?} {:?}", fid, ftype);
+
+    session.set_ref(rid, fid);
+    Ok(ftype)
 }
 
 

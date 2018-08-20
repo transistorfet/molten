@@ -125,10 +125,6 @@ impl Session {
 
     pub fn get_type_from_ref(&self, id: NodeID) -> Result<Type, Error> {
         let defid = self.get_ref(id)?;
-match self.get_def(defid) {
-    Ok(Def::Overload(ol)) => println!("////: {:?}", ol),
-    _ => { }
-}
         self.get_type(defid).ok_or(Error::new(format!("DefinitionError: no type is set for {:?}", defid)))
     }
 

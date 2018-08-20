@@ -136,24 +136,26 @@ impl OverloadDef {
         variants
     }
 
-    pub fn find_variant(&self, session: &Session, scope: ScopeRef, atypes: Type) -> Result<(NodeID, Type), Error> {
+    pub fn find_variant(&self, session: &Session, tscope: ScopeRef, atypes: Type) -> Result<(NodeID, Type), Error> {
         let variants = self.get_variants(session);
 
         let mut found = vec!();
         let mut variant_types = vec!();
         for id in variants {
-            let ttype = session.get_type(id);
-            match ttype {
-                Some(ttype) => {
-                    if let Type::Function(ref btypes, _, _) = ttype {
-                        if check_type(session, scope.clone(), Some(*btypes.clone()), Some(atypes.clone()), Check::Def, false).is_ok() {
-                            found.push((id, ttype.clone()));
-                        }
-                    }
-                    variant_types.push(ttype);
-                },
-                None => return Err(Error::new(format!("OverloadError: variant is not typechecked or is not a function type: {:?}", ttype))),
+            // Fetch the variant's type and map its typevars if necessary
+            let ttype = match session.get_type(id) {
+                Some(vtype @ Type::Variable(_, _)) => vtype,
+                Some(ttype) => tscope.map_all_typevars(session, ttype),
+                None => tscope.new_typevar(session)
+            };
+            //let ttype = session.get_type(id);
+
+            if let Type::Function(ref btypes, _, _) = ttype {
+                if check_type(session, tscope.clone(), Some(*btypes.clone()), Some(atypes.clone()), Check::Def, false).is_ok() {
+                    found.push((id, ttype.clone()));
+                }
             }
+            variant_types.push(ttype);
         }
 
         match found.len() {
