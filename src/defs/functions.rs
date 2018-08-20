@@ -48,15 +48,17 @@ impl FuncDef {
     #[must_use]
     pub fn set_func_def(session: &Session, scope: ScopeRef, id: NodeID, name: &Option<String>, def: Def, ttype: Option<Type>) -> Result<(), Error> {
         session.set_def(id, def.clone());
+
+        if let Some(ref ttype) = ttype {
+            session.update_type(scope.clone(), id, ttype.clone())?;
+        }
+
         if let Some(ref name) = *name {
             let dscope = Scope::target(session, scope.clone());
             if let Some(previd) = dscope.get_var_def(&name) {
                 OverloadDef::define(session, scope.clone(), &name, id, previd, ttype)?;
             } else {
-                dscope.define(name.clone(), ttype.clone(), Some(id))?;
-                if let Some(ttype) = ttype {
-                    session.update_type(scope.clone(), id, ttype)?;
-                }
+                dscope.define(name.clone(), ttype, Some(id))?;
             }
         }
         Ok(())
@@ -121,32 +123,43 @@ impl OverloadDef {
         self.variants.borrow_mut().push(id);
     }
 
-    pub fn num_variants(&self, session: &Session) -> i32 {
-        let prev = match self.parent {
-            Some(id) => session.get_def(id).unwrap().num_variants(session),
-            _ => 0,
+    pub fn get_variants(&self, session: &Session) -> Vec<NodeID> {
+        let mut variants = self.variants.borrow().clone();
+        let mut prev = match self.parent {
+            Some(id) => match session.get_def(id) {
+                Ok(Def::Overload(ol)) => ol.get_variants(session),
+                _ => vec!(id)
+            },
+            _ => vec!(),
         };
-        prev + self.variants.borrow().len() as i32
+        variants.extend(prev.iter());
+        variants
     }
 
     pub fn find_variant(&self, session: &Session, scope: ScopeRef, atypes: Type) -> Result<(NodeID, Type), Error> {
-        for id in self.variants.borrow().iter() {
-            let ttype = session.get_type(*id);
+        let variants = self.get_variants(session);
+
+        let mut found = vec!();
+        let mut variant_types = vec!();
+        for id in variants {
+            let ttype = session.get_type(id);
             match ttype {
-                Some(Type::Function(ref btypes, _, _)) => {
-                    match check_type(session, scope.clone(), Some(*btypes.clone()), Some(atypes.clone()), Check::Def, false) {
-                        Ok(_) => return Ok((*id, ttype.clone().unwrap())),
-                        Err(err) => return Err(err)
+                Some(ttype) => {
+                    if let Type::Function(ref btypes, _, _) = ttype {
+                        if check_type(session, scope.clone(), Some(*btypes.clone()), Some(atypes.clone()), Check::Def, false).is_ok() {
+                            found.push((id, ttype.clone()));
+                        }
                     }
+                    variant_types.push(ttype);
                 },
-                _ => return Err(Error::new(format!("OverloadError: variant is not typechecked or is not a function type: {:?}", ttype))),
+                None => return Err(Error::new(format!("OverloadError: variant is not typechecked or is not a function type: {:?}", ttype))),
             }
         }
 
-        match self.parent {
-            Some(ref id) => session.get_def(*id)?.as_overload()?.find_variant(session, scope, atypes),
-            //_ => Err(Error::new(format!("OverloadError: No valid variant found for {}\n\tout of [{}]", atypes, Type::display_vec(&variants)))),
-            _ => Err(Error::new(format!("OverloadError: No valid variant found for {}", atypes))),
+        match found.len() {
+            0 => Err(Error::new(format!("OverloadError: No valid variant found for {}\n\tout of [{}]", atypes, Type::display_vec(&variant_types)))),
+            1 => Ok(found.remove(0)),
+            _ => Err(Error::new(format!("OverloadError: Ambiguous {}\n\tvariants found [{}]", atypes, found.iter().map(|(i, t)| format!("{}", t)).collect::<Vec<String>>().join(", ")))),
         }
     }
 }

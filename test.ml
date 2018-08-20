@@ -184,6 +184,23 @@
         }
         overload()
 
+        /*
+        // TODO these don't work because it cannot be disambiguated during the recursive invoke
+        fn recoverload(x) {
+            if x <= 0 then
+                1
+            else
+                recoverload(x - 1)
+        }
+
+        fn recoverload(x) {
+            if x <= 0.0 then
+                1.0
+            else
+                recoverload(x - 1.0)
+        }
+        */
+
 	println("thing" + "stuff\n")
         println("STUFF".push(" things"))
         println(strnum(12))

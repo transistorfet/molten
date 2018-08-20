@@ -163,6 +163,7 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &mut 
 
         AST::Recall(ref id, _, ref ident) |
         AST::Identifier(ref id, _, ref ident) => {
+            //session.get_type_from_ref(*id)?;
             scope.get_variable_type(session, &ident.name).unwrap_or_else(|| expected.unwrap_or_else(|| scope.new_typevar(session)))
         },
 

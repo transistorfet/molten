@@ -116,13 +116,22 @@ impl Session {
         }
     }
 
-
     pub fn get_def_from_ref(&self, id: NodeID) -> Result<Def, Error> {
         match self.refs.borrow().get(&id) {
             Some(defid) => self.get_def(*defid),
             None => Err(Error::new(format!("ReferenceError: reference not set for {:?}", id))),
         }
     }
+
+    pub fn get_type_from_ref(&self, id: NodeID) -> Result<Type, Error> {
+        let defid = self.get_ref(id)?;
+match self.get_def(defid) {
+    Ok(Def::Overload(ol)) => println!("////: {:?}", ol),
+    _ => { }
+}
+        self.get_type(defid).ok_or(Error::new(format!("DefinitionError: no type is set for {:?}", defid)))
+    }
+
 
     pub fn set_type(&self, id: NodeID, ttype: Type) {
         self.types.borrow_mut().insert(id, ttype);
@@ -138,7 +147,7 @@ impl Session {
 
         let etype = self.get_type(id);
         match types::check_type(self, scope.clone(), etype.clone(), Some(ttype.clone()), types::Check::Def, false) {
-            Ok(ntype) => self.set_type(id, ntype),
+            Ok(ntype) => Ok(self.set_type(id, ntype)),
             Err(err) => Err(err)
         }
     }

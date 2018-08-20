@@ -52,7 +52,7 @@ impl Def {
         match *self {
             Def::Func(_) |
             Def::Method(_) => 1,
-            Def::Overload(ref def) => def.num_variants(session),
+            Def::Overload(ref def) => def.get_variants(session).len() as i32,
             _ => 0
         }
     }
