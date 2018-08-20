@@ -55,7 +55,7 @@ impl FuncDef {
             } else {
                 dscope.define(name.clone(), ttype.clone(), Some(id))?;
                 if let Some(ttype) = ttype {
-                    session.set_type(id, ttype);
+                    session.update_type(scope.clone(), id, ttype)?;
                 }
             }
         }

@@ -169,12 +169,6 @@ impl Type {
                 Ok(ntype) => {
                     //let ntype = check_type(session, scope, Some(ttype.clone()), Some(ntype.clone()), Check::Def, false).unwrap();
                     pscope.update_type(idname, ntype.clone());
-                    //if ntype.is_variable() {
-                    //    match ttype {
-                    //        Type::Variable(ref name, ref id) if &id.to_string() != idname => { println!("$$$$: {:?} {:?}", id, ntype); scope.update_type(&id.to_string(), ntype.clone()) },
-                    //        _ => { },
-                    //    }
-                    //}
                     match otype {
                         Some(Type::Variable(_, ref id)) if &id.to_string() != idname => Type::update_type(session, scope.clone(), &id.to_string(), ntype),
                         _ => { },
@@ -308,10 +302,9 @@ pub fn check_type(session: &Session, scope: ScopeRef, odtype: Option<Type>, octy
     debug!("TYPECHECK: {:?} {:?}", odtype, octype);
     if odtype.is_none() {
         // TODO should the else case just be Nil... 
-        //Ok(octype.unwrap_or_else(|| scope.new_typevar()))
         match octype {
             Some(ctype) => Ok(resolve_type(scope, ctype)),
-            None => Ok(scope.new_typevar()),
+            None => Ok(scope.new_typevar(session)),
         }
     } else if octype.is_none() {
         Ok(odtype.unwrap())
@@ -418,7 +411,7 @@ fn is_subclass_of(session: &Session, scope: ScopeRef, adef: (&String, &Vec<Type>
 
     loop {
         let mut class = scope.find_type(&adef.0).unwrap();
-        class = tscope.map_typevars(&mut names, class);
+        class = tscope.map_typevars(session, &mut names, class);
         adef.1 = check_type_params(session, tscope.clone(), &class.get_params()?, &adef.1, mode.clone(), true)?;
 
         if *bdef.0 == adef.0 {
@@ -429,17 +422,17 @@ fn is_subclass_of(session: &Session, scope: ScopeRef, adef: (&String, &Vec<Type>
             };
             //let rtype = Type::Object(adef.0, ptypes);
             //let rtype = resolve_type(&tscope, Type::Object(adef.0, ptypes));
-            let rtype = resolve_type(tscope.clone(), tscope.unmap_typevars(&mut names, Type::Object(adef.0, ptypes)));
+            let rtype = resolve_type(tscope.clone(), tscope.unmap_typevars(session, &mut names, Type::Object(adef.0, ptypes)));
             debug!("DONE SUBCLASS: {:?}", rtype);
             return Ok(rtype);
-            //return Ok(tscope.unmap_typevars(&mut names, Type::Object(adef.0, ptypes)));
+            //return Ok(tscope.unmap_typevars(session, &mut names, Type::Object(adef.0, ptypes)));
         }
 
         let classdef = scope.find_type_def(session, &adef.0)?.as_class()?;
         if classdef.parenttype.is_none() {
             return Err(Error::new(format!("TypeError: type mismatch, expected {} but found {}", Type::Object(adef.0.clone(), adef.1), Type::Object(bdef.0.clone(), bdef.1.clone()))));
         }
-        let parent = tscope.map_typevars(&mut names, classdef.parenttype.clone().unwrap());
+        let parent = tscope.map_typevars(session, &mut names, classdef.parenttype.clone().unwrap());
         match resolve_type(tscope.clone(), parent) {
             Type::Object(name, params) => adef = (name, params),
             ttype @ _ => return Err(Error::new(format!("TypeError: expected Object but found {}", ttype))),

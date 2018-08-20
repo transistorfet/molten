@@ -132,6 +132,16 @@ impl Session {
         self.types.borrow().get(&id).map(|ttype| ttype.clone())
     }
 
+    #[must_use]
+    pub fn update_type(&self, scope: ScopeRef, id: NodeID, ttype: Type) -> Result<(), Error> {
+        use types;
+
+        let etype = self.get_type(id);
+        match types::check_type(self, scope.clone(), etype.clone(), Some(ttype.clone()), types::Check::Def, false) {
+            Ok(ntype) => self.set_type(id, ntype),
+            Err(err) => Err(err)
+        }
+    }
 }
 
 

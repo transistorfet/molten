@@ -440,17 +440,17 @@ impl Scope {
 
     ////// Type Variable Functions //////
 
-    pub fn map_all_typevars(&self, ttype: Type) -> Type {
+    pub fn map_all_typevars(&self, session: &Session, ttype: Type) -> Type {
         let mut varmap = Scope::map_new();
         debug!("MAPPING ALL: {:?}", ttype);
-        self.map_typevars(&mut varmap, ttype)
+        self.map_typevars(session, &mut varmap, ttype)
     }
 
     pub fn map_new() -> HashMap<UniqueID, Type> {
         HashMap::new()
     }
 
-    pub fn map_typevars(&self, varmap: &mut HashMap<UniqueID, Type>, ttype: Type) -> Type {
+    pub fn map_typevars(&self, session: &Session, varmap: &mut HashMap<UniqueID, Type>, ttype: Type) -> Type {
         match ttype {
             Type::Variable(name, id) => {
                 match varmap.get(&id).map(|x| x.clone()) {
@@ -461,7 +461,7 @@ impl Scope {
                         match etype {
                             Some(Type::Variable(_, ref eid)) if *eid == id => etype.clone().unwrap(),
                             None | Some(Type::Variable(_, _)) => {
-                                let v = self.new_typevar();
+                                let v = self.new_typevar(session);
                                 varmap.insert(id, v.clone());
                                 debug!("MAPPED from {:?} to {:?}", Type::Variable(name.clone(), id), v);
                                 v
@@ -471,20 +471,20 @@ impl Scope {
                     }
                 }
             },
-            Type::Function(args, ret, abi) => Type::Function(Box::new(self.map_typevars(varmap, *args)), Box::new(self.map_typevars(varmap, *ret)), abi),
+            Type::Function(args, ret, abi) => Type::Function(Box::new(self.map_typevars(session, varmap, *args)), Box::new(self.map_typevars(session, varmap, *ret)), abi),
             // TODO why did I do this?  Was it because of a bug or just to reduce typevars, because it caused another bug with constructors
-            //Type::Function(args, ret, abi) => Type::Function(Box::new(self.map_typevars(varmap, *args)), ret, abi),
-            Type::Tuple(types) => Type::Tuple(self.map_typevars_vec(varmap, types)),
-            Type::Overload(variants) => Type::Overload(self.map_typevars_vec(varmap, variants)),
-            Type::Object(name, types) => Type::Object(name.clone(), self.map_typevars_vec(varmap, types)),
+            //Type::Function(args, ret, abi) => Type::Function(Box::new(self.map_typevars(session, varmap, *args)), ret, abi),
+            Type::Tuple(types) => Type::Tuple(self.map_typevars_vec(session, varmap, types)),
+            Type::Overload(variants) => Type::Overload(self.map_typevars_vec(session, varmap, variants)),
+            Type::Object(name, types) => Type::Object(name.clone(), self.map_typevars_vec(session, varmap, types)),
         }
     }
 
-    pub fn map_typevars_vec(&self, varmap: &mut HashMap<UniqueID, Type>, types: Vec<Type>) -> Vec<Type> {
-        types.into_iter().map(|vtype| self.map_typevars(varmap, vtype)).collect()
+    pub fn map_typevars_vec(&self, session: &Session, varmap: &mut HashMap<UniqueID, Type>, types: Vec<Type>) -> Vec<Type> {
+        types.into_iter().map(|vtype| self.map_typevars(session, varmap, vtype)).collect()
     }
 
-    pub fn unmap_typevars(&self, varmap: &mut HashMap<UniqueID, Type>, ttype: Type) -> Type {
+    pub fn unmap_typevars(&self, session: &Session, varmap: &mut HashMap<UniqueID, Type>, ttype: Type) -> Type {
         match ttype {
             Type::Variable(name, id) => {
                 for (oid, mtype) in varmap.iter() {
@@ -495,20 +495,20 @@ impl Scope {
                 }
                 Type::Variable(name, id)
             },
-            Type::Function(args, ret, abi) => Type::Function(Box::new(self.unmap_typevars(varmap, *args)), Box::new(self.unmap_typevars(varmap, *ret)), abi),
+            Type::Function(args, ret, abi) => Type::Function(Box::new(self.unmap_typevars(session, varmap, *args)), Box::new(self.unmap_typevars(session, varmap, *ret)), abi),
             // TODO why did I do this?  Was it because of a bug or just to reduce typevars, because it caused another bug with constructors
-            //Type::Function(args, ret, abi) => Type::Function(Box::new(self.map_typevars(varmap, *args)), ret, abi),
-            Type::Tuple(types) => Type::Tuple(self.unmap_typevars_vec(varmap, types)),
-            Type::Overload(variants) => Type::Overload(self.unmap_typevars_vec(varmap, variants)),
-            Type::Object(name, types) => Type::Object(name.clone(), self.unmap_typevars_vec(varmap, types)),
+            //Type::Function(args, ret, abi) => Type::Function(Box::new(self.map_typevars(session, varmap, *args)), ret, abi),
+            Type::Tuple(types) => Type::Tuple(self.unmap_typevars_vec(session, varmap, types)),
+            Type::Overload(variants) => Type::Overload(self.unmap_typevars_vec(session, varmap, variants)),
+            Type::Object(name, types) => Type::Object(name.clone(), self.unmap_typevars_vec(session, varmap, types)),
         }
     }
 
-    pub fn unmap_typevars_vec(&self, varmap: &mut HashMap<UniqueID, Type>, types: Vec<Type>) -> Vec<Type> {
-        types.into_iter().map(|vtype| self.unmap_typevars(varmap, vtype)).collect()
+    pub fn unmap_typevars_vec(&self, session: &Session, varmap: &mut HashMap<UniqueID, Type>, types: Vec<Type>) -> Vec<Type> {
+        types.into_iter().map(|vtype| self.unmap_typevars(session, varmap, vtype)).collect()
     }
 
-    pub fn new_typevar(&self) -> Type {
+    pub fn new_typevar(&self, session: &Session) -> Type {
         let id = UniqueID::generate();
         let name = self.new_typevar_name();
         let ttype = Type::Variable(name.clone(), id);

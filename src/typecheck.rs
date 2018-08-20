@@ -30,7 +30,7 @@ pub fn check_types_node(session: &Session, scope: ScopeRef, node: &mut AST, expe
 
             session.print_error(err.add_pos(&node.get_pos()));
             //Type::Object(String::from("Nil"), vec!())
-            scope.new_typevar()
+            scope.new_typevar(session)
         }
     }
 }
@@ -51,7 +51,7 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &mut 
                 let mut atype = expect_type(session, fscope.clone(), arg.ttype.clone(), vtype, Check::Def)?;
                 if &arg.ident.name[..] == "self" {
                     let mut stype = fscope.find_type(&String::from("Self")).unwrap();
-                    stype = fscope.map_all_typevars(stype);
+                    stype = fscope.map_all_typevars(session, stype);
                     atype = expect_type(session, fscope.clone(), Some(atype), Some(stype), Check::Def)?;
                 }
                 //fscope.set_variable_type(&arg.ident.name, atype.clone());
@@ -99,7 +99,7 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &mut 
             let dtype = check_types_node(session, scope.clone(), fexpr, None);
             let etype = match dtype {
                 Type::Variable(_, _) => dtype.clone(),
-                _ => tscope.map_all_typevars(dtype.clone()),
+                _ => tscope.map_all_typevars(session, dtype.clone()),
             };
             // TODO how will you find the actual def id of the variant you select, and then set the invoke id reference to that def
             let etype = match etype.is_overloaded() {
@@ -121,7 +121,7 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &mut 
                     ftype
                 },
                 Type::Variable(_, ref id) => {
-                    let ftype = Type::Function(Box::new(atypes), Box::new(expected.unwrap_or_else(|| tscope.new_typevar())), ABI::Unknown);
+                    let ftype = Type::Function(Box::new(atypes), Box::new(expected.unwrap_or_else(|| tscope.new_typevar(session))), ABI::Unknown);
                     // TODO we also aren't handling other function types, like accessor and resolve
                     //if let AST::Identifier(ref id, ref fname) = **fexpr {
                     //    update_type(scope.clone(), fname, ftype.clone());
@@ -133,7 +133,7 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &mut 
                 _ => return Err(Error::new(format!("NotAFunction: {:?}", fexpr))),
             };
 
-            session.set_type(*id, ftype.clone()); 
+            session.update_type(scope.clone(), *id, ftype.clone())?;
             *stype = Some(ftype.clone());
             ftype.get_rettype()?.clone()
         },
@@ -150,20 +150,20 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &mut 
             //let dscope = Scope::target(session, scope);
             let btype = expect_type(session, scope.clone(), ttype.clone(), Some(check_types_node(session, scope.clone(), body, ttype.clone())), Check::Def)?;
             //dscope.set_variable_type(&ident.name, btype.clone());
-            Type::update_variable_type(session, scope, &ident.name, btype.clone());
-            session.set_type(*id, btype.clone()); 
+            Type::update_variable_type(session, scope.clone(), &ident.name, btype.clone());
+            session.update_type(scope.clone(), *id, btype.clone())?;
             *ttype = Some(btype.clone());
             btype
         },
 
         AST::Declare(ref id, _, ref _ident, ref ttype) => {
-            session.set_type(*id, ttype.clone()); 
+            session.update_type(scope.clone(), *id, ttype.clone())?;
             ttype.clone()
         },
 
         AST::Recall(ref id, _, ref ident) |
         AST::Identifier(ref id, _, ref ident) => {
-            scope.get_variable_type(session, &ident.name).unwrap_or_else(|| expected.unwrap_or_else(|| scope.new_typevar()))
+            scope.get_variable_type(session, &ident.name).unwrap_or_else(|| expected.unwrap_or_else(|| scope.new_typevar(session)))
         },
 
         AST::Block(ref id, _, ref mut body) => check_types_vec(session, scope, body),
@@ -202,7 +202,7 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &mut 
 
         AST::For(ref id, _, ref ident, ref mut list, ref mut body) => {
             let lscope = session.map.get(id);
-            let itype = lscope.get_variable_type(session, &ident.name).unwrap_or_else(|| expected.unwrap_or_else(|| scope.new_typevar()));
+            let itype = lscope.get_variable_type(session, &ident.name).unwrap_or_else(|| expected.unwrap_or_else(|| scope.new_typevar(session)));
             let etype = Some(Type::Object(String::from("List"), vec!(itype)));
             let ltype = expect_type(session, lscope.clone(), etype.clone(), Some(check_types_node(session, lscope.clone(), list, etype.clone())), Check::Def)?;
             //lscope.set_variable_type(&ident.name, ltype.get_params()[0].clone());
@@ -211,7 +211,7 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &mut 
         },
 
         AST::Nil(ref mut ttype) => {
-            *ttype = Some(expected.unwrap_or_else(|| scope.new_typevar()));
+            *ttype = Some(expected.unwrap_or_else(|| scope.new_typevar(session)));
             ttype.clone().unwrap()
         },
 
@@ -237,7 +237,7 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &mut 
             for ref mut expr in items {
                 ltype = Some(expect_type(session, scope.clone(), ltype.clone(), Some(check_types_node(session, scope.clone(), expr, ltype.clone())), Check::List)?);
             }
-            let ltype = ltype.unwrap_or_else(|| expected.unwrap_or_else(|| scope.new_typevar()));
+            let ltype = ltype.unwrap_or_else(|| expected.unwrap_or_else(|| scope.new_typevar(session)));
             *stype = Some(ltype.clone());
             Type::Object(String::from("List"), vec!(ltype))
         },
@@ -257,7 +257,7 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &mut 
             match odtype {
                 Some(dtype) => {
                     let tscope = Scope::new_ref(Some(scope.clone()));
-                    let mtype = tscope.map_all_typevars(dtype.clone());
+                    let mtype = tscope.map_all_typevars(session, dtype.clone());
                     check_type_params(session, scope, &mtype.get_params()?, types, Check::Def, false)?;
                 },
                 None => return Err(Error::new(format!("TypeError: undefined type {:?}", ident.name))),
@@ -280,7 +280,7 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &mut 
             };
 
             let classvars = scope.find_type_def(session, &ltype.get_name()?)?.as_class()?.classvars.clone();
-            classvars.get_variable_type(session, &field.name).unwrap_or_else(|| expected.unwrap_or_else(|| scope.new_typevar()))
+            classvars.get_variable_type(session, &field.name).unwrap_or_else(|| expected.unwrap_or_else(|| scope.new_typevar(session)))
         },
 
         AST::Accessor(ref id, _, ref mut left, ref mut field, ref mut stype) => {
@@ -289,7 +289,7 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &mut 
 
             let classvars = scope.find_type_def(session, &ltype.get_name()?)?.as_class()?.classvars.clone();
             session.set_ref(*id, classvars.get_var_def(&field.name).unwrap());
-            classvars.get_variable_type(session, &field.name).unwrap_or_else(|| expected.unwrap_or_else(|| scope.new_typevar()))
+            classvars.get_variable_type(session, &field.name).unwrap_or_else(|| expected.unwrap_or_else(|| scope.new_typevar(session)))
         },
 
         AST::Assignment(ref id, _, ref mut left, ref mut right) => {
@@ -303,7 +303,7 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &mut 
             Type::Object(String::from("Nil"), vec!())
         },
 
-        AST::Underscore => expected.unwrap_or_else(|| scope.new_typevar()),
+        AST::Underscore => expected.unwrap_or_else(|| scope.new_typevar(session)),
 
         AST::Index(ref id, _, _, _, _) => panic!("InternalError: ast element shouldn't appear at this late phase: {:?}", node),
     };
