@@ -514,14 +514,6 @@ impl Scope {
         let ttype = Type::Variable(name.clone(), id);
 
         //self.define_type(name, ttype.clone()).unwrap();
-        /*
-        if self.is_global() {
-            self.define_type(id.to_string(), ttype.clone(), None).unwrap();
-        } else {
-            let gscope = Scope::global(self.parent.clone().unwrap());
-            gscope.define_type(id.to_string(), ttype.clone(), None).unwrap();
-        }
-        */
         session.set_type(id, ttype.clone());
         debug!("NEW TYPEVAR: {:?} {:?}", self.get_basename(), ttype);
         ttype

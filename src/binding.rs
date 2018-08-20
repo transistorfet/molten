@@ -271,10 +271,6 @@ pub fn declare_typevars(session: &Session, scope: ScopeRef, ttype: Option<&mut T
                     _ => {
                         *id = UniqueID::generate();
                         let ttype = Type::Variable(name.clone(), *id);
-                        /*
-                        let gscope = Scope::global(scope.clone());
-                        gscope.define_type(id.to_string(), ttype, *id), None)?;
-                        */
                         if !scope.contains_type_local(name) && !scope.is_primative() {
                             scope.define_type(name.clone(), ttype.clone(), None)?;
                         }
@@ -309,11 +305,10 @@ pub fn declare_typevars(session: &Session, scope: ScopeRef, ttype: Type, always_
                     Some(Type::Variable(_, ref eid)) => *id = *eid,
                     _ => {
                         *id = UniqueID::generate();
-                        let gscope = Scope::global(scope.clone());
-                        gscope.define_type(id.to_string(), Type::Variable(name.clone(), *id))?;
                         if !scope.contains_type_local(name) && !scope.is_primative() {
                             scope.define_type(name.clone(), Type::Variable(name.clone(), *id))?;
                         }
+                        session.set_type(*id, ttype);
                     }
                 }
             },

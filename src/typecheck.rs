@@ -124,12 +124,6 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &mut 
                 },
                 Type::Variable(_, ref id) => {
                     let ftype = Type::Function(Box::new(atypes), Box::new(expected.unwrap_or_else(|| tscope.new_typevar(session))), ABI::Unknown);
-                    // TODO we also aren't handling other function types, like accessor and resolve
-                    //if let AST::Identifier(ref id, ref fname) = **fexpr {
-                    //    update_type(scope.clone(), fname, ftype.clone());
-                    //}
-                    //tscope.update_type(name, ftype.clone());
-                    //Type::update_type(session, tscope, &id.to_string(), ftype.clone());
                     session.update_type(tscope, *id, ftype.clone());
                     ftype
                 },

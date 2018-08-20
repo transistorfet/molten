@@ -186,28 +186,6 @@ impl Type {
     }
 
     /*
-    pub fn move_typevars(scope: ScopeRef, fscope: ScopeRef, ttype: Type) -> Type {
-        match ttype {
-            Type::Variable(name, id) => {
-                if !scope.contains(&name) {
-                    let vtype = scope.new_typevar();
-                    //fscope.types.remove(&name);
-                    let pscope = Scope::locate_type(fscope, &id.to_string()).unwrap();
-                    Type::update_type(pscope, &id.to_string(), vtype.clone());
-                    vtype
-                } else {
-                    Type::Variable(name, id)
-                }
-            },
-            Type::Function(args, ret, abi) => Type::Function(args.into_iter().map(|ttype| Type::move_typevars(scope, fscope, ttype)).collect(), Box::new(Type::move_typevars(scope, fscope, *ret)), abi),
-            Type::Overload(variants) => Type::Overload(variants.into_iter().map(|ttype| Type::move_typevars(scope, fscope, ttype)).collect()),
-            Type::Object(name, types) => Type::Object(name, types.into_iter().map(|ttype| Type::move_typevars(scope, fscope, ttype)).collect()),
-        }
-    }
-    */
-
-
-    /*
     pub fn convert<F>(self, f: &F) -> Type where F: FnOnce(Type) -> Type {
         let ttype = match self {
             Type::Object(name, types) => {
@@ -462,8 +440,6 @@ pub fn resolve_type(session: &Session, scope: ScopeRef, ttype: Type) -> Type {
             }
         },
         Type::Variable(_, ref id) => {
-            //debug!("VARIABLE: in {:?}: {:?} resolves to {:?}", scope.get_full_name(&Some(String::from("")), UniqueID(0)), ttype, scope.find_type(&id.to_string()));
-            //match scope.find_type(&id.to_string()) {
             match session.get_type(*id) {
                 Some(vtype) => {
                     match vtype {
