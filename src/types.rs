@@ -159,7 +159,7 @@ impl Type {
     }
 
     pub fn update_type(session: &Session, scope: ScopeRef, idname: &String, ttype: Type) {
-        let ttype = resolve_type(scope.clone(), ttype);
+        let ttype = resolve_type(session, scope.clone(), ttype);
         let pscope = Scope::locate_type(scope.clone(), idname).unwrap();
         let otype = pscope.find_type(idname).clone();
         debug!("UPDATE TYPE: from {:?} to {:?}", otype, ttype);
@@ -170,7 +170,7 @@ impl Type {
                     //let ntype = check_type(session, scope, Some(ttype.clone()), Some(ntype.clone()), Check::Def, false).unwrap();
                     pscope.update_type(idname, ntype.clone());
                     match otype {
-                        Some(Type::Variable(_, ref id)) if &id.to_string() != idname => Type::update_type(session, scope.clone(), &id.to_string(), ntype),
+                        Some(Type::Variable(_, ref id)) if &id.to_string() != idname => { session.update_type(scope.clone(), *id, ntype); },
                         _ => { },
                     }
                 },
@@ -303,14 +303,14 @@ pub fn check_type(session: &Session, scope: ScopeRef, odtype: Option<Type>, octy
     if odtype.is_none() {
         // TODO should the else case just be Nil... 
         match octype {
-            Some(ctype) => Ok(resolve_type(scope, ctype)),
+            Some(ctype) => Ok(resolve_type(session, scope, ctype)),
             None => Ok(scope.new_typevar(session)),
         }
     } else if octype.is_none() {
         Ok(odtype.unwrap())
     } else {
-        let dtype = resolve_type(scope.clone(), odtype.unwrap());
-        let ctype = resolve_type(scope.clone(), octype.unwrap());
+        let dtype = resolve_type(session, scope.clone(), odtype.unwrap());
+        let ctype = resolve_type(session, scope.clone(), octype.unwrap());
 
 
 /*
@@ -319,43 +319,40 @@ pub fn check_type(session: &Session, scope: ScopeRef, odtype: Option<Type>, octy
             if dtype.is_variable() && !scope.contains_type(&dtype.get_varname().unwrap()) {
             //if dtype.is_variable() && !scope.contains_type(name) {
                 if update { Type::update_type(scope, &dtype.get_varid().unwrap().to_string(), ctype.clone()); }
-                //if update { scope.update_type(&dtype.get_varid().unwrap().to_string(), ctype.clone()); }
-                Ok(resolve_type(scope, ctype.clone()))
+                Ok(resolve_type(session, scope, ctype.clone()))
             } else {
-                if update { Type::update_type(scope, &id.to_string(), dtype.clone()); }
-                //if update { scope.update_type(&id.to_string(), dtype.clone()); }
-                Ok(resolve_type(scope, dtype))
+                if update { session.update_type(scope, *id, dtype.clone()); }
+                Ok(resolve_type(session, scope, dtype))
             }
         } else if let Type::Variable(_, ref id) = dtype {
-            if update { Type::update_type(scope, &id.to_string(), ctype.clone()); }
-            //if update { scope.update_type(&id.to_string(), ctype.clone()); }
-            Ok(resolve_type(scope, ctype))
+            if update { session.update_type(scope, *id, ctype.clone()); }
+            Ok(resolve_type(session, scope, ctype))
         } else {
 */
         if let Type::Variable(ref _dname, ref did) = dtype {
 
             if let Type::Variable(ref cname, ref cid) = ctype {
                 if scope.contains_type(cname) {
-                    if update { scope.update_type(&did.to_string(), ctype.clone()); }
-                    Ok(resolve_type(scope, ctype.clone()))
+                    if update { session.set_type(*did, ctype.clone()); }
+                    Ok(resolve_type(session, scope, ctype.clone()))
                 } else {
-                    if update { scope.update_type(&cid.to_string(), dtype.clone()); }
-                    Ok(resolve_type(scope, dtype.clone()))
+                    if update { session.set_type(*cid, dtype.clone()); }
+                    Ok(resolve_type(session, scope, dtype.clone()))
                 }
             } else {
                 if update {
-                    Type::update_type(session, scope.clone(), &did.to_string(), ctype.clone());
-                    Ok(resolve_type(scope, dtype.clone()))
+                    session.update_type(scope.clone(), *did, ctype.clone());
+                    Ok(resolve_type(session, scope, dtype.clone()))
                 } else {
-                    Ok(resolve_type(scope, ctype.clone()))
+                    Ok(resolve_type(session, scope, ctype.clone()))
                 }
             }
         } else if let Type::Variable(_, ref cid) = ctype {
                 if update {
-                    Type::update_type(session, scope.clone(), &cid.to_string(), dtype.clone());
-                    Ok(resolve_type(scope, ctype.clone()))
+                    session.update_type(scope.clone(), *cid, dtype.clone());
+                    Ok(resolve_type(session, scope, ctype.clone()))
                 } else {
-                    Ok(resolve_type(scope, dtype.clone()))
+                    Ok(resolve_type(session, scope, dtype.clone()))
                 }
         } else {
             match (dtype.clone(), ctype.clone()) {
@@ -421,8 +418,8 @@ fn is_subclass_of(session: &Session, scope: ScopeRef, adef: (&String, &Vec<Type>
                 vec!()
             };
             //let rtype = Type::Object(adef.0, ptypes);
-            //let rtype = resolve_type(&tscope, Type::Object(adef.0, ptypes));
-            let rtype = resolve_type(tscope.clone(), tscope.unmap_typevars(session, &mut names, Type::Object(adef.0, ptypes)));
+            //let rtype = resolve_type(session, &tscope, Type::Object(adef.0, ptypes));
+            let rtype = resolve_type(session, tscope.clone(), tscope.unmap_typevars(session, &mut names, Type::Object(adef.0, ptypes)));
             debug!("DONE SUBCLASS: {:?}", rtype);
             return Ok(rtype);
             //return Ok(tscope.unmap_typevars(session, &mut names, Type::Object(adef.0, ptypes)));
@@ -433,7 +430,7 @@ fn is_subclass_of(session: &Session, scope: ScopeRef, adef: (&String, &Vec<Type>
             return Err(Error::new(format!("TypeError: type mismatch, expected {} but found {}", Type::Object(adef.0.clone(), adef.1), Type::Object(bdef.0.clone(), bdef.1.clone()))));
         }
         let parent = tscope.map_typevars(session, &mut names, classdef.parenttype.clone().unwrap());
-        match resolve_type(tscope.clone(), parent) {
+        match resolve_type(session, tscope.clone(), parent) {
             Type::Object(name, params) => adef = (name, params),
             ttype @ _ => return Err(Error::new(format!("TypeError: expected Object but found {}", ttype))),
         }
@@ -452,12 +449,12 @@ pub fn check_type_params(session: &Session, scope: ScopeRef, dtypes: &Vec<Type>,
     }
 }
 
-pub fn resolve_type(scope: ScopeRef, ttype: Type) -> Type {
+pub fn resolve_type(session: &Session, scope: ScopeRef, ttype: Type) -> Type {
     match ttype {
         Type::Object(ref name, ref types) => {
             match scope.find_type(name) {
                 Some(_) => {
-                    let params = types.iter().map(|ptype| resolve_type(scope.clone(), ptype.clone())).collect();
+                    let params = types.iter().map(|ptype| resolve_type(session, scope.clone(), ptype.clone())).collect();
                     // TODO we are purposely returning the original type here so as not to over-resolve types... but we should probably still fully resolve for checking purposes
                     Type::Object(name.clone(), params)
                 },
@@ -466,25 +463,26 @@ pub fn resolve_type(scope: ScopeRef, ttype: Type) -> Type {
         },
         Type::Variable(_, ref id) => {
             //debug!("VARIABLE: in {:?}: {:?} resolves to {:?}", scope.get_full_name(&Some(String::from("")), UniqueID(0)), ttype, scope.find_type(&id.to_string()));
-            match scope.find_type(&id.to_string()) {
+            //match scope.find_type(&id.to_string()) {
+            match session.get_type(*id) {
                 Some(vtype) => {
                     match vtype {
                         Type::Variable(_, ref eid) if eid == id => vtype.clone(),
-                        _ => resolve_type(scope, vtype),
+                        _ => resolve_type(session, scope, vtype),
                     }
                 },
                 None => panic!("TypeError: undefined type variable {}", ttype),
             }
         },
         Type::Tuple(ref types) => {
-            let types = types.iter().map(|ttype| resolve_type(scope.clone(), ttype.clone())).collect();
+            let types = types.iter().map(|ttype| resolve_type(session, scope.clone(), ttype.clone())).collect();
             Type::Tuple(types)
         },
         Type::Function(ref args, ref ret, ref abi) => {
-            Type::Function(Box::new(resolve_type(scope.clone(), *args.clone())), Box::new(resolve_type(scope, *ret.clone())), *abi)
+            Type::Function(Box::new(resolve_type(session, scope.clone(), *args.clone())), Box::new(resolve_type(session, scope, *ret.clone())), *abi)
         },
         Type::Overload(ref variants) => {
-            let newvars = variants.iter().map(|variant| resolve_type(scope.clone(), variant.clone())).collect();
+            let newvars = variants.iter().map(|variant| resolve_type(session, scope.clone(), variant.clone())).collect();
             Type::Overload(newvars)
         },
     }

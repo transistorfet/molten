@@ -62,7 +62,7 @@ pub fn register_builtins_node<'sess>(session: &Session, scope: ScopeRef, tscope:
     match *node {
         BuiltinDef::Func(ref id, ref name, ref ftype, ref func) => {
             let mut ftype = parse_type(ftype);
-            declare_typevars(tscope.clone(), ftype.as_mut(), false).unwrap();
+            declare_typevars(session, tscope.clone(), ftype.as_mut(), false).unwrap();
             let abi = match *func {
                 Func::External => ABI::C,
                 _ => ABI::Molten,
@@ -73,7 +73,7 @@ pub fn register_builtins_node<'sess>(session: &Session, scope: ScopeRef, tscope:
         BuiltinDef::Class(ref id, ref name, ref params, _, ref entries) => {
             let tscope = ClassDef::create_class_scope(session, scope.clone(), *id);
             let mut ttype = Type::Object(String::from(*name), params.clone());
-            declare_typevars(tscope.clone(), Some(&mut ttype), true).unwrap();
+            declare_typevars(session, tscope.clone(), Some(&mut ttype), true).unwrap();
             let classdef = ClassDef::define_class(session, scope.clone(), *id, ttype, None).unwrap();
 
             register_builtins_vec(session, classdef.classvars.clone(), tscope.clone(), entries);

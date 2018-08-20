@@ -27,13 +27,13 @@ pub fn precompile_node(session: &Session, scope: ScopeRef, node: AST) -> AST {
         AST::Definition(id, pos, name, ttype, code) => {
 let dscope = Scope::target(session, scope.clone());
 println!("{} {} -> {:?} {:?}", scope.get_basename(), name.name, dscope.get_var_def(&name.name), dscope.find_var_def(session, &name.name));
-            AST::Definition(id, pos, name, Some(resolve_type(scope.clone(), ttype.unwrap())), Box::new(precompile_node(session, scope.clone(), *code)))
+            AST::Definition(id, pos, name, Some(resolve_type(session, scope.clone(), ttype.unwrap())), Box::new(precompile_node(session, scope.clone(), *code)))
         },
 
         AST::Declare(id, pos, name, ttype) => {
 let dscope = Scope::target(session, scope.clone());
 println!("{} {} -> {:?} {:?}", scope.get_basename(), name.name, dscope.get_var_def(&name.name), dscope.find_var_def(session, &name.name));
-            AST::Declare(id, pos, name, resolve_type(scope, ttype))
+            AST::Declare(id, pos, name, resolve_type(session, scope, ttype))
         },
 
         AST::Function(id, pos, name, args, ret, body, abi) => {
@@ -114,8 +114,8 @@ println!("{} {} -> {:?} {:?}", scope.get_basename(), name.as_ref().unwrap().name
                 AST::Block(id, pos.clone(), code)
             } else {
             */
-            let args = args.into_iter().map(|arg| Argument::new(arg.pos, arg.ident, arg.ttype.map(|atype| resolve_type(fscope.clone(), atype)), arg.default)).collect();
-            AST::Function(id, pos, name, args, Some(resolve_type(fscope.clone(), ret.unwrap())), Box::new(precompile_node(session, fscope.clone(), *body)), abi)
+            let args = args.into_iter().map(|arg| Argument::new(arg.pos, arg.ident, arg.ttype.map(|atype| resolve_type(session, fscope.clone(), atype)), arg.default)).collect();
+            AST::Function(id, pos, name, args, Some(resolve_type(session, fscope.clone(), ret.unwrap())), Box::new(precompile_node(session, fscope.clone(), *body)), abi)
             //}
         },
 
@@ -127,7 +127,7 @@ println!("{} {} -> {:?} {:?}", scope.get_basename(), name.as_ref().unwrap().name
             // Mangle names of overloaded functions
             //typecheck::get_accessor_name(scope.clone(), &mut fexpr.as_mut(), stype.as_ref().unwrap()).unwrap();
 
-            AST::Invoke(id, pos, Box::new(precompile_node(session, scope.clone(), *fexpr)), precompile_vec(session, scope.clone(), args), Some(resolve_type(scope.clone(), stype.unwrap())))
+            AST::Invoke(id, pos, Box::new(precompile_node(session, scope.clone(), *fexpr)), precompile_vec(session, scope.clone(), args), Some(resolve_type(session, scope.clone(), stype.unwrap())))
         },
 
         AST::Recall(_, _, _) => node,
@@ -255,7 +255,7 @@ println!("{} {} -> {:?} {:?}", scope.get_basename(), name.as_ref().unwrap().name
         },
 
         AST::Accessor(id, pos, left, right, stype) => {
-            AST::Accessor(id, pos, Box::new(precompile_node(session, scope.clone(), *left)), right, Some(resolve_type(scope.clone(), stype.unwrap())))
+            AST::Accessor(id, pos, Box::new(precompile_node(session, scope.clone(), *left)), right, Some(resolve_type(session, scope.clone(), stype.unwrap())))
         },
 
         AST::Assignment(id, pos, left, right) => {
@@ -266,11 +266,11 @@ println!("{} {} -> {:?} {:?}", scope.get_basename(), name.as_ref().unwrap().name
             AST::Import(id, pos, name, precompile_vec(session, scope.clone(), decls))
         },
 
-        AST::Nil(stype) => { AST::Nil(Some(resolve_type(scope.clone(), stype.unwrap()))) },
+        AST::Nil(stype) => { AST::Nil(Some(resolve_type(session, scope.clone(), stype.unwrap()))) },
 
         AST::TypeDef(id, pos, classspec, fields) => {
             AST::TypeDef(id, pos, classspec, fields.into_iter().map(|mut f| {
-                f.ttype = f.ttype.map(|t| resolve_type(scope.clone(), t));
+                f.ttype = f.ttype.map(|t| resolve_type(session, scope.clone(), t));
                 f
             }).collect())
         },
