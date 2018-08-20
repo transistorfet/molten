@@ -53,7 +53,10 @@ impl FuncDef {
             if let Some(previd) = dscope.get_var_def(&name) {
                 OverloadDef::define(session, scope.clone(), &name, id, previd, ttype)?;
             } else {
-                dscope.define(name.clone(), ttype, Some(id))?;
+                dscope.define(name.clone(), ttype.clone(), Some(id))?;
+                if let Some(ttype) = ttype {
+                    session.set_type(id, ttype);
+                }
             }
         }
         Ok(())
@@ -136,7 +139,7 @@ impl OverloadDef {
                         Err(err) => return Err(err)
                     }
                 },
-                _ => panic!("FUCK"),
+                _ => return Err(Error::new(format!("OverloadError: variant is not typechecked or is not a function type: {:?}", ttype))),
             }
         }
 

@@ -107,6 +107,8 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &mut 
                 false => etype,
             };
 
+            println!("!!!!!!: {:?}", session_find_variant(session, tscope.clone(), fexpr.as_mut(), &etype));
+
             let ftype = match etype {
                 Type::Function(ref args, _, ref abi) => {
                     get_accessor_name(session, tscope.clone(), fexpr.as_mut(), &etype)?;
@@ -155,6 +157,7 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &mut 
         },
 
         AST::Declare(ref id, _, ref _ident, ref ttype) => {
+            session.set_type(*id, ttype.clone()); 
             ttype.clone()
         },
 
@@ -285,6 +288,7 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &mut 
             *stype = Some(ltype.clone());
 
             let classvars = scope.find_type_def(session, &ltype.get_name()?)?.as_class()?.classvars.clone();
+            session.set_ref(*id, classvars.get_var_def(&field.name).unwrap());
             classvars.get_variable_type(session, &field.name).unwrap_or_else(|| expected.unwrap_or_else(|| scope.new_typevar()))
         },
 
@@ -308,17 +312,18 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &mut 
     Ok(rtype)
 }
 
-pub fn get_accessor_name(session: &Session, scope: ScopeRef, fexpr: &mut AST, etype: &Type) -> Result<i32, Error> {
-    /*
-    let did = match *fexpr {
+pub fn session_find_variant(session: &Session, scope: ScopeRef, fexpr: &mut AST, etype: &Type) -> Result<i32, Error> {
+    let rid = match *fexpr {
         AST::Resolver(ref id, _, _, _) |
         AST::Accessor(ref id, _, _, _, _) |
         AST::Identifier(ref id, _, _) => Some(*id),
         _ => None
     };
 
+    println!("***: {:?}", rid);
     //let did = session.get_ref(*id);
-    if let Some(did) = did {
+    if let Some(rid) = rid {
+        let did = session.get_ref(rid)?;
         let def = session.get_def(did)?;
         let (fid, etype) = match def {
             Def::Overload(ref ol) => ol.find_variant(session, scope.clone(), etype.get_argtypes()?.clone())?,
@@ -326,9 +331,12 @@ pub fn get_accessor_name(session: &Session, scope: ScopeRef, fexpr: &mut AST, et
         };
         println!("&&&: {:?} {:?}", fid, etype);
     }
-    */
+
+    Ok(1)
+}
 
 
+pub fn get_accessor_name(session: &Session, scope: ScopeRef, fexpr: &mut AST, etype: &Type) -> Result<i32, Error> {
     let funcdefs = match *fexpr {
         AST::Resolver(ref id, _, ref left, ref mut ident) => {
             let ltype = match **left {
