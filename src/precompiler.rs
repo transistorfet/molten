@@ -36,7 +36,7 @@ debug!("{} {} -> {:?} {:?}", scope.get_basename(), name.name, dscope.get_var_def
             AST::Declare(id, pos, name, resolve_type(session, scope, ttype))
         },
 
-        AST::Function(id, pos, name, args, ret, body, abi) => {
+        AST::Function(id, pos, name, args, _, body, abi) => {
             let fscope = session.map.get(&id);
 let dscope = Scope::target(session, scope.clone());
 if name.is_some() {
@@ -115,11 +115,11 @@ debug!("{} {} -> {:?} {:?}", scope.get_basename(), name.as_ref().unwrap().name, 
             } else {
             */
             //let args = args.into_iter().map(|arg| Argument::new(arg.pos, arg.ident, arg.ttype.map(|atype| resolve_type(session, fscope.clone(), atype)), arg.default)).collect();
-            AST::Function(id, pos, name, args, ret.map(|ret| resolve_type(session, fscope.clone(), ret)), Box::new(precompile_node(session, fscope.clone(), *body)), abi)
+            AST::Function(id, pos, name, args, None, Box::new(precompile_node(session, fscope.clone(), *body)), abi)
             //}
         },
 
-        AST::Invoke(id, pos, fexpr, args, stype) => {
+        AST::Invoke(id, pos, fexpr, args, _) => {
             //if stype.as_ref().unwrap().get_abi().unwrap() == ABI::Molten {
             //    args.insert(0, precompile_node(session, scope.clone() *fexpr));
             //}
@@ -127,7 +127,7 @@ debug!("{} {} -> {:?} {:?}", scope.get_basename(), name.as_ref().unwrap().name, 
             // Mangle names of overloaded functions
             //typecheck::get_accessor_name(scope.clone(), &mut fexpr.as_mut(), stype.as_ref().unwrap()).unwrap();
 
-            AST::Invoke(id, pos, Box::new(precompile_node(session, scope.clone(), *fexpr)), precompile_vec(session, scope.clone(), args), stype.map(|stype| resolve_type(session, scope.clone(), stype)))
+            AST::Invoke(id, pos, Box::new(precompile_node(session, scope.clone(), *fexpr)), precompile_vec(session, scope.clone(), args), None)
         },
 
         AST::Recall(_, _) => node,
@@ -178,7 +178,7 @@ debug!("{} {} -> {:?} {:?}", scope.get_basename(), name.as_ref().unwrap().name, 
             AST::For(id, pos, name, Box::new(precompile_node(session, lscope.clone(), *cond)), Box::new(precompile_node(session, lscope.clone(), *body)))
         },
 
-        AST::Tuple(id, pos, code, ttype) => { AST::Tuple(id, pos, precompile_vec(session, scope.clone(), code), ttype) },
+        AST::Tuple(id, pos, code, _) => { AST::Tuple(id, pos, precompile_vec(session, scope.clone(), code), None) },
 
         AST::List(id, pos, code, ttype) => { AST::List(id, pos, precompile_vec(session, scope.clone(), code), ttype) },
         /*

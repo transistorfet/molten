@@ -97,49 +97,6 @@ impl ClassDef {
             self.vtable.borrow_mut().inherit(&*parentclass.vtable.borrow());
         }
         self.vtable.borrow_mut().build_vtable(session, scope, body);
-
-/*
-        let mut vtable = self.vtable.borrow_mut();
-        //let mut vtable = parentclass.map_or(vec!(), |c| c.vtable.borrow().clone());
-        *vtable = parentclass.map_or(vec!(), |c| c.vtable.borrow().clone());
-
-        for ref node in body.iter() {
-            match **node {
-                AST::Function(ref id, _, ref fident, ref args, ref rtype, _, ref abi) => {
-                    if let Some(Ident { ref name, .. }) = fident {
-                        //let uname = abi.unmangle_name(&name).unwrap_or(fname.clone());
-                        //if parent.contains(&uname) {
-                        debug!("***************: {:?}:{:?}", self.classname, name);
-                        //if let Some(index) = vtable.iter().position(|ref r| r.1.as_str() == name.as_str()) {
-                        if let Some(index) = self.get_vtable_index(name.as_str()) {
-                            vtable[index].0 = *id;
-                        } else {
-                            vtable.push((*id, name.clone(), session.get_type(*id).unwrap()));
-                        }
-                    }
-                },
-                AST::Declare(ref id, _, ref fident, _) => {
-                    let ttype = session.get_type(*id).unwrap();
-                    match ttype {
-                        Type::Function(_, _, _) => {
-                            let name = &fident.name;
-
-                            debug!("***************: {:?}:{:?}", self.classname, name);
-                            if let Some(index) = vtable.iter().position(|ref r| r.1.as_str() == name.as_str()) {
-                                vtable[index].0 = *id;
-                            } else {
-                                vtable.push((*id, name.clone(), ttype));
-                            }
-                        },
-                        _ => { },
-                    }
-                },
-                _ => { }
-            }
-        }
-
-        // *self.vtable.borrow_mut() = vtable;
-*/
     }
 
     pub fn build_structdef(&self, session: &Session, scope: ScopeRef, body: &Vec<AST>) {
@@ -158,7 +115,7 @@ impl ClassDef {
         }
         for ref node in body.iter() {
             match **node {
-                AST::Definition(_, _, ref ident, ref ttype, ref value) => {
+                AST::Definition(ref id, _, ref ident, ref ttype, ref value) => {
                     structdef.push((ident.name.clone(), ttype.clone().unwrap()));
                 },
                 _ => { }

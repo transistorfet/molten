@@ -216,6 +216,31 @@ impl MethodDef {
     }
 }
 
+mod llvm {
+    use llvm::compiler as llvm;
+
+    /*
+    impl CompileInvoke for MethodDef {
+        fn compile(&self, ) -> Box<Compilable> {
+            // this is a method, so a method call
+            let lfunc = llvm::compile(session, 
+        }
+    }
+    */
+
+    /*
+    impl Compilable for MethodDef {
+        fn box_clone(&self) -> Box<Compilable> {
+            Box::new((*self).clone())
+        }
+
+        fn get_ref(&self) -> LLVMValueRef {
+            self.0
+        }
+    }
+    */
+}
+
 
 
 #[derive(Clone, Debug, PartialEq)]

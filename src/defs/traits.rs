@@ -18,3 +18,6 @@ trait Invokable {
 }
 
 
+trait CompileInvoke {
+    fn compile(&self, args: Vec<LLVMValueRef>) -> LLVMValueRef;
+}

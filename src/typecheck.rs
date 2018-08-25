@@ -217,7 +217,7 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &mut 
             ttype.clone().unwrap()
         },
 
-        AST::Tuple(ref id, _, ref mut items, ref mut stype) => {
+        AST::Tuple(ref id, _, ref mut items, _) => {
             let etypes = match expected {
                 Some(ref e) => e.get_types()?.iter().map(|i| Some(i.clone())).collect(),
                 None => vec![None; items.len()]
@@ -230,7 +230,7 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &mut 
             for (ref mut expr, etype) in items.iter_mut().zip(etypes.iter()) {
                 types.push(expect_type(session, scope.clone(), etype.clone(), Some(check_types_node(session, scope.clone(), expr, etype.clone())), Check::List)?);
             }
-            *stype = Some(Type::Tuple(types.clone()));
+            session.set_type(*id, Type::Tuple(types.clone()));
             Type::Tuple(types)
         },
 

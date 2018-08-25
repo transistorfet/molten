@@ -420,7 +420,7 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
 
         AST::Block(ref id, _, ref body) => { compile_vec(data, func, unwind, scope.clone(), body) },
 
-        AST::Invoke(ref id, _, ref fexpr, ref args, ref stype) => {
+        AST::Invoke(ref id, _, ref fexpr, ref args, _) => {
             let ftype = data.session.get_type(*id).unwrap();
             let (atypes, rtype, abi) = match ftype.clone() {
                 Type::Function(atypes, rtype, abi) => (atypes, *rtype, abi),
@@ -529,8 +529,9 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
             //pointer
         },
 
-        AST::Definition(ref id, _, ref ident, ref ttype, ref value) => {
-            let ltype = get_type(data, scope.clone(), ttype.clone().unwrap(), true);
+        AST::Definition(ref id, _, ref ident, _, ref value) => {
+            let ttype = data.session.get_type(*id).unwrap();
+            let ltype = get_type(data, scope.clone(), ttype, true);
             let pointer: Value = if scope.is_global() {
                 //LLVMAddGlobal(data.module, ltype, label(ident.name.as_str()))
                 //let global = LLVMGetNamedGlobal(data.module, label(ident.name.as_str()));
@@ -548,6 +549,7 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
         // might be an issue when you call a function one level down, and pass it the same unwind locations... it might effect all
         // functions, all the way down
         AST::Try(ref id, _, ref body, ref cases, ref condtype) => {
+// TODO replace use of condtype
             /*
             // TODO need to add multiple cases, and also it doesn't work
             let try_block = LLVMAppendBasicBlockInContext(data.context, func, label("try"));
@@ -644,6 +646,7 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
         },
 
         AST::Match(ref id, _, ref cond, ref cases, ref condtype) => {
+// TODO replace use of condtype
             let mut cond_blocks = vec!();
             let mut do_blocks = vec!();
             for _ in 0 .. cases.len() {
@@ -761,6 +764,8 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
         },
 
         AST::List(ref id, ref pos, ref items, ref stype) => {
+            // TODO this was desugared out eariler
+            /*
             let itype = stype.as_ref().unwrap();
             let ltype = Type::Object(format!("List"), vec!(itype.clone()));
             let newfunc = get_method(data, scope.clone(), "List", "new", vec!(ltype.clone()));
@@ -775,10 +780,13 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
                 pushfunc.invoke(data, unwind, vec!(list, value));
             }
             Box::new(Data(list))
+            */
+            Box::new(Data(null_value(str_type(data))))
         },
 
-        AST::Tuple(ref id, ref pos, ref items, ref stype) => {
-            let ltype = get_type(data, scope.clone(), stype.clone().unwrap(), true);
+        AST::Tuple(ref id, ref pos, ref items, _) => {
+            let ttype = data.session.get_type(*id).unwrap();
+            let ltype = get_type(data, scope.clone(), ttype, true);
             let tuple = LLVMBuildAlloca(data.builder, ltype, label("tuple"));
             for (index, item) in items.iter().enumerate() {
                 let value = compile_node(data, func, unwind, scope.clone(), item).get_ref();
@@ -845,11 +853,12 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
             }
         },
 
-        AST::Accessor(ref id, _, ref left, ref right, ref ltype) => {
+        AST::Accessor(ref id, _, ref left, ref right, ref otype) => {
             let object = compile_node(data, func, unwind, scope.clone(), left).get_ref();
 
+// TODO replace use of otype
             let ttype = data.session.get_type_from_ref(*id).unwrap();
-            let name = ltype.clone().unwrap().get_name().unwrap();
+            let name = otype.clone().unwrap().get_name().unwrap();
             let classdef = scope.find_type_def(data.session, &name).unwrap().as_class().unwrap();
             debug!("*ACCESS: {:?} {:?} {:?}", *id, right, classdef);
 
@@ -877,8 +886,9 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
         AST::Assignment(ref id, _, ref left, ref right) => {
             let value = compile_node(data, func, unwind, scope.clone(), right);
             match **left {
-                AST::Accessor(ref id, _, ref left, ref right, ref ltype) => {
-                    let name = ltype.clone().unwrap().get_name().unwrap();
+                AST::Accessor(ref id, _, ref left, ref right, ref otype) => {
+// TODO replace use of otype
+                    let name = otype.clone().unwrap().get_name().unwrap();
                     let object = compile_node(data, func, unwind, scope.clone(), left).get_ref();
                     let classdef = scope.find_type_def(data.session, &name).unwrap().as_class().unwrap();
                     let pointer = build_struct_access(data, classdef, &right.name, object);
@@ -927,11 +937,10 @@ unsafe fn collect_functions_vec<'sess>(data: &mut LLVM<'sess>, scope: ScopeRef, 
 
 unsafe fn collect_functions_node<'sess>(data: &mut LLVM<'sess>, scope: ScopeRef, node: &'sess AST) -> Option<Value> {
     match *node {
-        AST::Function(ref id, _, ref ident, ref args, ref rtype, ref body, ref abi) => {
+        AST::Function(ref id, _, ref ident, ref args, _, ref body, ref abi) => {
             let fscope = data.map.get(id);
             let fname = scope.get_full_name(ident, *id);
 
-            //let lftype = get_type(data, scope.clone(), Type::Function(Box::new(Type::Tuple(args.iter().map(|arg| arg.ttype.clone().unwrap()).collect())), Box::new(rtype.clone().unwrap()), abi.clone()), false);
             let lftype = get_type(data, scope.clone(), data.session.get_type(*id).unwrap(), false);
             let function = build_function_start(data, scope.clone(), *id, ident, lftype, args.len(), *abi);
             //LLVMSetGC(function, label("shadow-stack"));
@@ -967,9 +976,10 @@ unsafe fn collect_functions_node<'sess>(data: &mut LLVM<'sess>, scope: ScopeRef,
             }
         },
 
-        AST::Declare(ref id, _, ref ident, ref ttype) => {
+        AST::Declare(ref id, _, ref ident, _) => {
             // TODO what to do about abi??
-            if let &Type::Function(ref argtypes, _, _) = ttype {
+            let ttype = data.session.get_type(*id).unwrap();
+            if let Type::Function(ref argtypes, _, _) = ttype {
                 let argcount = match **argtypes {
                     Type::Tuple(ref args) => args.len(),
                     _ => 1,
