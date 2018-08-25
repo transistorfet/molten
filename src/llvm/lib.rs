@@ -100,35 +100,12 @@ pub unsafe fn define_builtins_node<'sess>(data: &mut LLVM<'sess>, objtype: LLVMT
             match *func {
                 Func::External => {
                     let func = LLVMAddFunction(data.module, label(name.as_str()), get_type(data, scope.clone(), ftype.clone(), false));
-                    if scope.contains(&name) {
-                        //data.set_value(scope.variable_id(&name).unwrap(), from_abi(&ftype.get_abi().unwrap(), func));
-                        data.set_value(*id, from_abi(&ftype.get_abi().unwrap(), func));
-                    }
+                    data.set_value(*id, from_abi(&ftype.get_abi().unwrap(), func));
                 },
                 Func::Runtime(func) => {
-                    //let sftype = scope.get_variable_type(data.session, &name).unwrap();
-                    //let dscope = Scope::target(data.session, scope);
-                    //let defid = dscope.get_var_def(&name).unwrap();
-                    //let def = data.session.get_def(defid).unwrap();
-
-                    //let sftype = data.session.get_type(*id).unwrap();
-                    //name = ftype.get_abi().unwrap_or(ABI::Molten).mangle_name(&name, ftype.get_argtypes().unwrap(), def.num_variants(data.session));
-                    //if !scope.contains(&name) {
-                    //    scope.define(name.clone(), Some(ftype.clone()), Some(*id)).unwrap();
-                    //}
-                    //let fname = dscope.get_full_name(&Some(Ident::new(Pos::empty(), name.clone())), UniqueID(0));
-//debug!("!!!!!!!!!: {:?} {:?} {:?}", id, name, fname);
-                    //data.set_value(scope.variable_id(&name).unwrap(), from_type(&ftype, func(data, fname.as_str(), objtype)));
                     data.set_value(*id, from_type(&ftype, func(data, scope.clone(), *id, name.as_str(), objtype)));
                 },
                 Func::Comptime(func) => {
-                    //data.builtins.add(sname, func, ftype.clone());
-                    //let sftype = scope.get_variable_type(data.session, &name).unwrap();
-                    //name = ftype.get_abi().unwrap_or(ABI::Molten).mangle_name(&name, ftype.get_argtypes().unwrap(), sftype.num_funcdefs());
-                    //if !scope.contains(&name) {
-                    //    scope.define(name.clone(), Some(ftype.clone()), Some(*id)).unwrap();
-                    //}
-                    //data.set_value(scope.variable_id(&name).unwrap(), Box::new(Builtin(BuiltinFunction(func), ftype)));
                     data.set_value(*id, Box::new(Builtin(BuiltinFunction(func), ftype)));
                 },
                 Func::Undefined => { },

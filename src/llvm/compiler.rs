@@ -383,13 +383,6 @@ unsafe fn declare_globals(data: &LLVM, scope: ScopeRef) {
             if classdef.has_vtable() {
                 let mut methods = vec!();
                 for (index, &(ref id, ref name, ref ttype)) in classdef.vtable.borrow().0.iter().enumerate() {
-                    //let mut dtype = classdef.classvars.get_variable_type(data.session, &name).unwrap();
-                    //if dtype.is_overloaded() {
-                    //    dtype = types::find_variant(data.session, tscope.clone(), dtype, ttype.get_argtypes().unwrap().clone(), types::Check::List).unwrap();
-                    //}
-                    //let name = ttype.get_abi().unwrap().mangle_name(name, dtype.get_argtypes().unwrap(), classdef.classvars.num_funcdefs(data.session, &name));
-                    //debug!("VTABLE INIT: {:?} {:?} {:?}", cident.name, name, index);
-                    //methods.push(build_generic_cast(data, classdef.borrow().get_variable_value(&name).unwrap().get_ref(), get_type(data, tscope.clone(), ttype.clone(), true)));
                     let dtype = data.session.get_type(*id).unwrap();
                     debug!("VTABLE INIT: {:?} {:?} {:?}", cident.name, id, index);
                     methods.push(build_generic_cast(data, data.get_value(*id).unwrap().get_ref(), get_type(data, tscope.clone(), ttype.clone(), true)));
@@ -450,11 +443,6 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
             let function = match **fexpr {
                 // Compile the first argument of a method access only once for the method lookup and the argument evalution
                 AST::Accessor(ref id, ref pos, _, ref field, ref otype) => {
-                    // TODO FIX THIS SOON
-                    //let tname = format!("{}", UniqueID::generate());
-                    //let id = scope.define(tname.clone(), otype.clone(), None).unwrap();
-                    //data.set_value(id, from_type(otype.as_ref().unwrap(), largs[0]));
-                    //compile_node(data, func, unwind, scope.clone(), &AST::make_access(pos.clone(), Box::new(AST::make_recall(pos.clone(), Ident::new(pos.clone(), tname))), ident.clone(), otype.clone()))
                     let oid = NodeID::generate();
                     let classvars = scope.find_type_def(data.session, &otype.clone().unwrap().get_name().unwrap()).unwrap().as_class().unwrap().classvars.clone();
                     let defid = classvars.get_var_def(&field.name).unwrap();
@@ -944,7 +932,6 @@ unsafe fn collect_functions_node<'sess>(data: &mut LLVM<'sess>, scope: ScopeRef,
             let fname = scope.get_full_name(ident, *id);
 
             let lftype = get_type(data, scope.clone(), Type::Function(Box::new(Type::Tuple(args.iter().map(|arg| arg.ttype.clone().unwrap()).collect())), Box::new(rtype.clone().unwrap()), abi.clone()), false);
-            //let function = LLVMAddFunction(data.module, label(fname.as_str()), lftype);
             let function = build_function_start(data, scope.clone(), *id, ident, lftype, args.len(), *abi);
             //LLVMSetGC(function, label("shadow-stack"));
             //LLVMSetPersonalityFn(function, LLVMGetNamedFunction(data.module, label("__gxx_personality_v0")));
@@ -982,15 +969,12 @@ unsafe fn collect_functions_node<'sess>(data: &mut LLVM<'sess>, scope: ScopeRef,
         AST::Declare(ref id, _, ref ident, ref ttype) => {
             // TODO what to do about abi??
             if let &Type::Function(ref argtypes, _, _) = ttype {
-                //let fname = scope.get_full_name(&Some(ident.clone()), UniqueID(0));
-                //let function = LLVMAddFunction(data.module, label(fname.as_str()), get_type(data, scope.clone(), ttype.clone(), false));
                 let argcount = match **argtypes {
                     Type::Tuple(ref args) => args.len(),
                     _ => 1,
                 };
                 let lftype = get_type(data, scope.clone(), ttype.clone(), false);
-                let function = build_function_start(data, scope.clone(), *id, &Some(ident.clone()), lftype, argcount, ttype.get_abi().unwrap());
-
+                build_function_start(data, scope.clone(), *id, &Some(ident.clone()), lftype, argcount, ttype.get_abi().unwrap());
             }
         },
 
@@ -1206,9 +1190,6 @@ unsafe fn build_function_body(data: &LLVM, node: &AST) {
     if let AST::Function(ref id, _, ref ident, _, _, ref body, _) = *node {
         // TODO do you need to take into account abi?
         let fscope = data.map.get(id);
-        //let pscope = fscope.get_parent().unwrap();
-        //let fname = pscope.get_full_name(ident, *id);
-        //let function = LLVMGetNamedFunction(data.module, label(fname.as_str()));
         let function = data.get_value(*id).unwrap().get_ref();
 
         let bb = LLVMAppendBasicBlockInContext(data.context, function, label("entry"));
