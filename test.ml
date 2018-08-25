@@ -231,13 +231,11 @@
         //list3[1] = 123
         //println(str(list3[1]))
 
-/*
         let list: List<'thing> = [ 1, 2, 3 ]
-        list[1] = 5
+        //list[1] = 5
         println(str(list[1]))
         println(str("Thing"[2]))
-        let list2 = [ new TestClass(), new Stuff(), new TestClass() ]
-*/
+        //let list2 = [ new TestClass(), new Stuff(), new TestClass() ]
 
         class NumList<'a> extends List<Int> {
             let x: 'a = nil

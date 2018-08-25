@@ -61,7 +61,7 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &mut 
             }
 
             let rettype = expect_type(session, fscope.clone(), rtype.clone(), Some(check_types_node(session, fscope.clone(), body, rtype.clone())), Check::Def)?;
-            *rtype = Some(rettype.clone());
+            //*rtype = Some(rettype.clone());
 
             // Resolve type variables that can be
             for i in 0 .. argtypes.len() {
@@ -132,7 +132,7 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &mut 
                 _ => return Err(Error::new(format!("NotAFunction: {:?}", fexpr))),
             };
 
-            *stype = Some(ftype.clone());
+            //*stype = Some(ftype.clone());
             // TODO this is temporary, because of sprintf/variadic C functions
             //match **fexpr {
             //    AST::Identifier(_, _, ref ident) => if ident.as_str() == "sprintf" {
@@ -240,7 +240,7 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &mut 
                 ltype = Some(expect_type(session, scope.clone(), ltype.clone(), Some(check_types_node(session, scope.clone(), expr, ltype.clone())), Check::List)?);
             }
             let ltype = ltype.unwrap_or_else(|| expected.unwrap_or_else(|| scope.new_typevar(session)));
-            *stype = Some(ltype.clone());
+            //*stype = Some(ltype.clone());
             Type::Object(String::from("List"), vec!(ltype))
         },
 
@@ -282,9 +282,9 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &mut 
             classvars.get_variable_type(session, &field.name).unwrap_or_else(|| expected.unwrap_or_else(|| scope.new_typevar(session)))
         },
 
-        AST::Accessor(ref id, _, ref mut left, ref mut field, ref mut stype) => {
+        AST::Accessor(ref id, _, ref mut left, ref mut field, ref mut otype) => {
             let ltype = resolve_type(session, scope.clone(), check_types_node(session, scope.clone(), left, None));
-            *stype = Some(ltype.clone());
+            *otype = Some(ltype.clone());
 
             let classvars = scope.find_type_def(session, &ltype.get_name()?)?.as_class()?.classvars.clone();
             let defid = classvars.get_var_def(&field.name).unwrap();
@@ -318,9 +318,9 @@ pub fn session_find_variant(session: &Session, scope: ScopeRef, invid: NodeID, f
         AST::Identifier(ref id, _, _) => {
             (*id, session.get_ref(*id)?)
         },
-        AST::Accessor(ref id, _, ref mut left, ref mut field, ref mut stype) => {
+        AST::Accessor(ref id, _, ref mut left, ref mut field, ref mut otype) => {
             let ltype = resolve_type(session, scope.clone(), check_types_node(session, scope.clone(), left, None));
-            *stype = Some(ltype.clone());
+            *otype = Some(ltype.clone());
 
             let classvars = scope.find_type_def(session, &ltype.get_name()?)?.as_class()?.classvars.clone();
             (*id, classvars.get_var_def(&field.name).ok_or(Error::new(format!("VarError: definition not set for {:?}", field.name)))?)

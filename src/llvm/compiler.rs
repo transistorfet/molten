@@ -931,7 +931,8 @@ unsafe fn collect_functions_node<'sess>(data: &mut LLVM<'sess>, scope: ScopeRef,
             let fscope = data.map.get(id);
             let fname = scope.get_full_name(ident, *id);
 
-            let lftype = get_type(data, scope.clone(), Type::Function(Box::new(Type::Tuple(args.iter().map(|arg| arg.ttype.clone().unwrap()).collect())), Box::new(rtype.clone().unwrap()), abi.clone()), false);
+            //let lftype = get_type(data, scope.clone(), Type::Function(Box::new(Type::Tuple(args.iter().map(|arg| arg.ttype.clone().unwrap()).collect())), Box::new(rtype.clone().unwrap()), abi.clone()), false);
+            let lftype = get_type(data, scope.clone(), data.session.get_type(*id).unwrap(), false);
             let function = build_function_start(data, scope.clone(), *id, ident, lftype, args.len(), *abi);
             //LLVMSetGC(function, label("shadow-stack"));
             //LLVMSetPersonalityFn(function, LLVMGetNamedFunction(data.module, label("__gxx_personality_v0")));

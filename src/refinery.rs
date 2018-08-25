@@ -75,8 +75,7 @@ pub fn refine_node(node: AST) -> AST {
         },
 
         AST::Tuple(id, pos, code, ttype) => { AST::Tuple(id, pos, refine_vec(code), ttype) },
-        AST::List(id, pos, code, ttype) => { AST::List(id, pos, refine_vec(code), ttype) },
-        /*
+        //AST::List(id, pos, code, ttype) => { AST::List(id, pos, refine_vec(code), ttype) },
         AST::List(id, pos, code, stype) => {
             use abi::ABI;
             let mut block = vec!();
@@ -94,12 +93,11 @@ pub fn refine_node(node: AST) -> AST {
             for item in code {
                 block.push(AST::make_invoke(pos.clone(),
                     Box::new(AST::make_access(pos.clone(), Box::new(AST::make_ident(pos.clone(), Ident::new(pos.clone(), tmplist.clone()))), Ident::from_str("push"), None)),
-                    vec!(AST::make_ident(pos.clone(), Ident::new(pos.clone(), tmplist.clone())), item), None));
+                    vec!(item), None));
             }
             block.push(AST::make_ident(pos.clone(), Ident::new(pos.clone(), tmplist.clone())));
             AST::make_block(pos.clone(), refine_vec(block))
         },
-        */
 
         AST::Class(id, pos, classspec, parentspec, body) => {
             // Make sure constructors take "self" as the first argument, and return "self" at the end

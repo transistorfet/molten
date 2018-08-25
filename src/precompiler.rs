@@ -115,7 +115,7 @@ debug!("{} {} -> {:?} {:?}", scope.get_basename(), name.as_ref().unwrap().name, 
             } else {
             */
             //let args = args.into_iter().map(|arg| Argument::new(arg.pos, arg.ident, arg.ttype.map(|atype| resolve_type(session, fscope.clone(), atype)), arg.default)).collect();
-            AST::Function(id, pos, name, args, Some(resolve_type(session, fscope.clone(), ret.unwrap())), Box::new(precompile_node(session, fscope.clone(), *body)), abi)
+            AST::Function(id, pos, name, args, ret.map(|ret| resolve_type(session, fscope.clone(), ret)), Box::new(precompile_node(session, fscope.clone(), *body)), abi)
             //}
         },
 
@@ -127,7 +127,7 @@ debug!("{} {} -> {:?} {:?}", scope.get_basename(), name.as_ref().unwrap().name, 
             // Mangle names of overloaded functions
             //typecheck::get_accessor_name(scope.clone(), &mut fexpr.as_mut(), stype.as_ref().unwrap()).unwrap();
 
-            AST::Invoke(id, pos, Box::new(precompile_node(session, scope.clone(), *fexpr)), precompile_vec(session, scope.clone(), args), Some(resolve_type(session, scope.clone(), stype.unwrap())))
+            AST::Invoke(id, pos, Box::new(precompile_node(session, scope.clone(), *fexpr)), precompile_vec(session, scope.clone(), args), stype.map(|stype| resolve_type(session, scope.clone(), stype)))
         },
 
         AST::Recall(_, _) => node,
@@ -255,7 +255,7 @@ debug!("{} {} -> {:?} {:?}", scope.get_basename(), name.as_ref().unwrap().name, 
         },
 
         AST::Accessor(id, pos, left, right, stype) => {
-            AST::Accessor(id, pos, Box::new(precompile_node(session, scope.clone(), *left)), right, Some(resolve_type(session, scope.clone(), stype.unwrap())))
+            AST::Accessor(id, pos, Box::new(precompile_node(session, scope.clone(), *left)), right, stype.map(|stype| resolve_type(session, scope.clone(), stype)))
         },
 
         AST::Assignment(id, pos, left, right) => {
@@ -266,7 +266,7 @@ debug!("{} {} -> {:?} {:?}", scope.get_basename(), name.as_ref().unwrap().name, 
             AST::Import(id, pos, name, precompile_vec(session, scope.clone(), decls))
         },
 
-        AST::Nil(stype) => { AST::Nil(Some(resolve_type(session, scope.clone(), stype.unwrap()))) },
+        AST::Nil(stype) => { AST::Nil(stype.map(|stype| resolve_type(session, scope.clone(), stype))) },
 
         AST::TypeDef(id, pos, classspec, fields) => {
             AST::TypeDef(id, pos, classspec, fields.into_iter().map(|mut f| {
