@@ -24,7 +24,7 @@ use defs::functions::FuncDef;
 use llvm::compiler::*;
 
 
-pub type RuntimeFunction = unsafe fn(&LLVM, &str, LLVMTypeRef) -> LLVMValueRef;
+pub type RuntimeFunction = unsafe fn(&LLVM, ScopeRef, NodeID, &str, LLVMTypeRef) -> LLVMValueRef;
 pub type ComptimeFunction = unsafe fn(&LLVM, Vec<LLVMValueRef>) -> LLVMValueRef;
 
 #[derive(Clone)]
@@ -46,54 +46,53 @@ pub fn make_global<'sess>(session: &Session, builtins: &Vec<BuiltinDef<'sess>>) 
     let primatives = session.map.add(ScopeMapRef::PRIMATIVE, None);
     primatives.set_context(Context::Primative);
 
-    register_builtins_vec(session, primatives.clone(), primatives.clone(), builtins);
+    declare_builtins_vec(session, primatives.clone(), builtins);
 
     let global = session.map.add(ScopeMapRef::GLOBAL, Some(primatives));
     global.set_context(Context::Global);
 }
  
-pub fn register_builtins_vec<'sess>(session: &Session, scope: ScopeRef, tscope: ScopeRef, entries: &Vec<BuiltinDef<'sess>>) {
+pub fn declare_builtins_vec<'sess>(session: &Session, scope: ScopeRef, entries: &Vec<BuiltinDef<'sess>>) {
     for node in entries {
-        register_builtins_node(session, scope.clone(), tscope.clone(), node);
+        declare_builtins_node(session, scope.clone(), node);
     }
 }
 
-pub fn register_builtins_node<'sess>(session: &Session, scope: ScopeRef, tscope: ScopeRef, node: &BuiltinDef<'sess>) {
+pub fn declare_builtins_node<'sess>(session: &Session, scope: ScopeRef, node: &BuiltinDef<'sess>) {
     match *node {
         BuiltinDef::Func(ref id, ref name, ref ftype, ref func) => {
             let mut ftype = parse_type(ftype);
-            declare_typevars(session, tscope.clone(), ftype.as_mut(), false).unwrap();
+            declare_typevars(session, scope.clone(), ftype.as_mut(), false).unwrap();
             let abi = match *func {
                 Func::External => ABI::C,
                 _ => ABI::Molten,
             };
-            FuncDef::define_func(session, tscope.clone(), *id, &Some(String::from(*name)), abi, ftype.clone()).unwrap();
-            //Scope::define_func_variant(session, scope, String::from(*name), tscope.clone(), ftype.clone().unwrap()).unwrap();
+            FuncDef::define_func(session, scope.clone(), *id, &Some(String::from(*name)), abi, ftype.clone()).unwrap();
         },
         BuiltinDef::Class(ref id, ref name, ref params, _, ref entries) => {
             let tscope = ClassDef::create_class_scope(session, scope.clone(), *id);
             let mut ttype = Type::Object(String::from(*name), params.clone());
-            declare_typevars(session, tscope.clone(), Some(&mut ttype), true).unwrap();
+            declare_typevars(session, scope.clone(), Some(&mut ttype), true).unwrap();
             let classdef = ClassDef::define_class(session, scope.clone(), *id, ttype, None).unwrap();
 
-            register_builtins_vec(session, classdef.classvars.clone(), tscope.clone(), entries);
+            declare_builtins_vec(session, tscope.clone(), entries);
         },
     }
 }
 
 pub unsafe fn initialize_builtins<'sess>(data: &mut LLVM<'sess>, scope: ScopeRef, entries: &Vec<BuiltinDef<'sess>>) {
     let pscope = scope.get_parent().unwrap();
-    declare_builtins_vec(data, ptr::null_mut(), pscope.clone(), scope.clone(), entries);
+    define_builtins_vec(data, ptr::null_mut(), pscope.clone(), scope.clone(), entries);
     declare_irregular_functions(data, pscope.clone());
 }
 
-pub unsafe fn declare_builtins_vec<'sess>(data: &mut LLVM<'sess>, objtype: LLVMTypeRef, scope: ScopeRef, tscope: ScopeRef, entries: &Vec<BuiltinDef<'sess>>) {
+pub unsafe fn define_builtins_vec<'sess>(data: &mut LLVM<'sess>, objtype: LLVMTypeRef, scope: ScopeRef, tscope: ScopeRef, entries: &Vec<BuiltinDef<'sess>>) {
     for node in entries {
-        declare_builtins_node(data, objtype, scope.clone(), tscope.clone(), node);
+        define_builtins_node(data, objtype, scope.clone(), tscope.clone(), node);
     }
 }
 
-pub unsafe fn declare_builtins_node<'sess>(data: &mut LLVM<'sess>, objtype: LLVMTypeRef, scope: ScopeRef, tscope: ScopeRef, node: &BuiltinDef<'sess>) {
+pub unsafe fn define_builtins_node<'sess>(data: &mut LLVM<'sess>, objtype: LLVMTypeRef, scope: ScopeRef, tscope: ScopeRef, node: &BuiltinDef<'sess>) {
     match *node {
         BuiltinDef::Func(ref id, ref sname, ref types, ref func) => {
             let mut name = String::from(*sname);
@@ -102,44 +101,55 @@ pub unsafe fn declare_builtins_node<'sess>(data: &mut LLVM<'sess>, objtype: LLVM
                 Func::External => {
                     let func = LLVMAddFunction(data.module, label(name.as_str()), get_type(data, scope.clone(), ftype.clone(), false));
                     if scope.contains(&name) {
-                        data.set_value(scope.variable_id(&name).unwrap(), from_abi(&ftype.get_abi().unwrap(), func));
+                        //data.set_value(scope.variable_id(&name).unwrap(), from_abi(&ftype.get_abi().unwrap(), func));
+                        data.set_value(*id, from_abi(&ftype.get_abi().unwrap(), func));
                     }
                 },
                 Func::Runtime(func) => {
-                    let sftype = scope.get_variable_type(data.session, &name).unwrap();
-                    name = ftype.get_abi().unwrap_or(ABI::Molten).mangle_name(&name, ftype.get_argtypes().unwrap(), sftype.num_funcdefs());
-                    if !scope.contains(&name) {
-                        scope.define(name.clone(), Some(ftype.clone()), Some(*id)).unwrap();
-                    }
-                    let fname = scope.get_full_name(&Some(Ident::new(Pos::empty(), name.clone())), UniqueID(0));
-                    data.set_value(scope.variable_id(&name).unwrap(), from_type(&ftype, func(data, fname.as_str(), objtype)));
+                    //let sftype = scope.get_variable_type(data.session, &name).unwrap();
+                    //let dscope = Scope::target(data.session, scope);
+                    //let defid = dscope.get_var_def(&name).unwrap();
+                    //let def = data.session.get_def(defid).unwrap();
+
+                    //let sftype = data.session.get_type(*id).unwrap();
+                    //name = ftype.get_abi().unwrap_or(ABI::Molten).mangle_name(&name, ftype.get_argtypes().unwrap(), def.num_variants(data.session));
+                    //if !scope.contains(&name) {
+                    //    scope.define(name.clone(), Some(ftype.clone()), Some(*id)).unwrap();
+                    //}
+                    //let fname = dscope.get_full_name(&Some(Ident::new(Pos::empty(), name.clone())), UniqueID(0));
+//debug!("!!!!!!!!!: {:?} {:?} {:?}", id, name, fname);
+                    //data.set_value(scope.variable_id(&name).unwrap(), from_type(&ftype, func(data, fname.as_str(), objtype)));
+                    data.set_value(*id, from_type(&ftype, func(data, scope.clone(), *id, name.as_str(), objtype)));
                 },
                 Func::Comptime(func) => {
                     //data.builtins.add(sname, func, ftype.clone());
-                    let sftype = scope.get_variable_type(data.session, &name).unwrap();
-                    name = ftype.get_abi().unwrap_or(ABI::Molten).mangle_name(&name, ftype.get_argtypes().unwrap(), sftype.num_funcdefs());
-                    if !scope.contains(&name) {
-                        scope.define(name.clone(), Some(ftype.clone()), Some(*id)).unwrap();
-                    }
-                    data.set_value(scope.variable_id(&name).unwrap(), Box::new(Builtin(BuiltinFunction(func), ftype)));
+                    //let sftype = scope.get_variable_type(data.session, &name).unwrap();
+                    //name = ftype.get_abi().unwrap_or(ABI::Molten).mangle_name(&name, ftype.get_argtypes().unwrap(), sftype.num_funcdefs());
+                    //if !scope.contains(&name) {
+                    //    scope.define(name.clone(), Some(ftype.clone()), Some(*id)).unwrap();
+                    //}
+                    //data.set_value(scope.variable_id(&name).unwrap(), Box::new(Builtin(BuiltinFunction(func), ftype)));
+                    data.set_value(*id, Box::new(Builtin(BuiltinFunction(func), ftype)));
                 },
                 Func::Undefined => { },
             }
         },
         BuiltinDef::Class(ref id, ref name, _, ref structdef, ref entries) => {
+            let tscope = data.session.map.get(id);
             let cname = String::from(*name);
             let classdef = scope.find_type_def(data.session, &String::from(*name)).unwrap().as_class().unwrap();
 
             let lltype = if structdef.len() > 0 {
-                *classdef.structdef.borrow_mut() = structdef.clone();
-                build_class_type(data, scope.clone(), &cname, classdef.clone())
+                classdef.structdef.borrow_mut().clear();
+                classdef.structdef.borrow_mut().extend(structdef.clone());
+                build_class_type(data, scope.clone(), *id, &cname, classdef.clone())
             } else {
-                let lltype = get_type(data, scope.clone(), scope.find_type(&cname).unwrap(), true);
-                data.set_type(scope.type_id(&cname).unwrap(), TypeValue { value: lltype, vttype: None });
+                let lltype = get_type(data, scope.clone(), scope.find_type(data.session, &cname).unwrap(), true);
+                data.set_type(*id, TypeValue { value: lltype, vttype: None });
                 lltype
             };
 
-            declare_builtins_vec(data, lltype, classdef.classvars.clone(), tscope.clone(), entries);
+            define_builtins_vec(data, lltype, tscope.clone(), tscope.clone(), entries);
         },
     }
 }
@@ -222,7 +232,8 @@ pub fn get_builtins<'sess>() -> Vec<BuiltinDef<'sess>> {
         BuiltinDef::Func(id(), "gets",       "(String) -> String / C",        Func::External),
         BuiltinDef::Func(id(), "strlen",     "(String) -> Int / C",           Func::External),
         //BuiltinDef::Func(id(), "sprintf",    "'tmp",                          Func::Undefined),
-        BuiltinDef::Func(id(), "sprintf",    "(String, String, 'sess1, 'sess2) -> Nil / C", Func::Undefined),
+        //BuiltinDef::Func(id(), "sprintf",    "(String, String, 'sess1, 'sess2) -> Nil / C", Func::Undefined),
+        BuiltinDef::Func(id(), "sprintf",    "(String, String, 'sess1, 'sess2) -> Nil / C", Func::Comptime(sprintf)),
 
         BuiltinDef::Func(id(), "println",    "(String) -> Nil / C",           Func::Runtime(build_lib_println)),
         BuiltinDef::Func(id(), "readline",   "() -> String / C",              Func::Runtime(build_lib_readline)),
@@ -312,16 +323,22 @@ fn eq_bool(data: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVM
 fn ne_bool(data: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildICmp(data.builder, llvm::LLVMIntPredicate::LLVMIntNE, args[0], args[1], label("tmp")) } }
 fn not_bool(data: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildNot(data.builder, args[0], label("tmp")) } }
 
+fn sprintf(data: &LLVM, mut args: Vec<LLVMValueRef>) -> LLVMValueRef {
+    unsafe {
+        build_c_call(data, "sprintf", &mut args)
+    }
+}
 
-unsafe fn build_buffer_allocator(data: &LLVM, name: &str, objtype: LLVMTypeRef) -> LLVMValueRef {
-    let function = build_function_start(data, name, vec!(), objtype);
+
+unsafe fn build_buffer_allocator(data: &LLVM, scope: ScopeRef, id: NodeID, name: &str, objtype: LLVMTypeRef) -> LLVMValueRef {
+    let function = build_function_start_lib(data, scope, id, name, vec!(), objtype);
     LLVMSetLinkage(function, llvm::LLVMLinkage::LLVMLinkOnceAnyLinkage);
     LLVMBuildRet(data.builder, null_value(objtype));
     function
 }
 
-unsafe fn build_buffer_constructor(data: &LLVM, name: &str, objtype: LLVMTypeRef) -> LLVMValueRef {
-    let function = build_function_start(data, name, vec!(objtype, int_type(data)), objtype);
+unsafe fn build_buffer_constructor(data: &LLVM, scope: ScopeRef, id: NodeID, name: &str, objtype: LLVMTypeRef) -> LLVMValueRef {
+    let function = build_function_start_lib(data, scope, id, name, vec!(objtype, int_type(data)), objtype);
     LLVMSetLinkage(function, llvm::LLVMLinkage::LLVMLinkOnceAnyLinkage);
 
     let ptr = LLVMBuildArrayMalloc(data.builder, LLVMInt64TypeInContext(data.context), LLVMGetParam(function, 1), label("tmp"));
@@ -330,8 +347,8 @@ unsafe fn build_buffer_constructor(data: &LLVM, name: &str, objtype: LLVMTypeRef
     function
 }
 
-unsafe fn build_buffer_resize(data: &LLVM, name: &str, objtype: LLVMTypeRef) -> LLVMValueRef {
-    let function = build_function_start(data, name, vec!(objtype, int_type(data)), objtype);
+unsafe fn build_buffer_resize(data: &LLVM, scope: ScopeRef, id: NodeID, name: &str, objtype: LLVMTypeRef) -> LLVMValueRef {
+    let function = build_function_start_lib(data, scope, id, name, vec!(objtype, int_type(data)), objtype);
     LLVMSetLinkage(function, llvm::LLVMLinkage::LLVMLinkOnceAnyLinkage);
 
     let buffer = LLVMBuildPointerCast(data.builder, LLVMGetParam(function, 0), str_type(data), label("tmp"));
@@ -342,8 +359,8 @@ unsafe fn build_buffer_resize(data: &LLVM, name: &str, objtype: LLVMTypeRef) -> 
     function
 }
 
-unsafe fn build_buffer_get(data: &LLVM, name: &str, objtype: LLVMTypeRef) -> LLVMValueRef {
-    let function = build_function_start(data, name, vec!(objtype, int_type(data)), str_type(data));
+unsafe fn build_buffer_get(data: &LLVM, scope: ScopeRef, id: NodeID, name: &str, objtype: LLVMTypeRef) -> LLVMValueRef {
+    let function = build_function_start_lib(data, scope, id, name, vec!(objtype, int_type(data)), str_type(data));
     LLVMSetLinkage(function, llvm::LLVMLinkage::LLVMLinkOnceAnyLinkage);
 
     let buffer = LLVMGetParam(function, 0);
@@ -357,8 +374,8 @@ unsafe fn build_buffer_get(data: &LLVM, name: &str, objtype: LLVMTypeRef) -> LLV
     function
 }
 
-unsafe fn build_buffer_set(data: &LLVM, name: &str, objtype: LLVMTypeRef) -> LLVMValueRef {
-    let function = build_function_start(data, name, vec!(objtype, int_type(data), str_type(data)), str_type(data));
+unsafe fn build_buffer_set(data: &LLVM, scope: ScopeRef, id: NodeID, name: &str, objtype: LLVMTypeRef) -> LLVMValueRef {
+    let function = build_function_start_lib(data, scope, id, name, vec!(objtype, int_type(data), str_type(data)), str_type(data));
     LLVMSetLinkage(function, llvm::LLVMLinkage::LLVMLinkOnceAnyLinkage);
 
     let buffer = LLVMGetParam(function, 0);
@@ -374,8 +391,8 @@ unsafe fn build_buffer_set(data: &LLVM, name: &str, objtype: LLVMTypeRef) -> LLV
 }
 
 
-unsafe fn build_string_get(data: &LLVM, name: &str, _objtype: LLVMTypeRef) -> LLVMValueRef {
-    let function = build_function_start(data, name, vec!(str_type(data), int_type(data)), int_type(data));
+unsafe fn build_string_get(data: &LLVM, scope: ScopeRef, id: NodeID, name: &str, _objtype: LLVMTypeRef) -> LLVMValueRef {
+    let function = build_function_start_lib(data, scope, id, name, vec!(str_type(data), int_type(data)), int_type(data));
     LLVMSetLinkage(function, llvm::LLVMLinkage::LLVMLinkOnceAnyLinkage);
 
     let string = LLVMGetParam(function, 0);
@@ -388,7 +405,7 @@ unsafe fn build_string_get(data: &LLVM, name: &str, _objtype: LLVMTypeRef) -> LL
     function
 }
 
-unsafe fn build_lib_add(data: &LLVM, name: &str, _objtype: LLVMTypeRef) -> LLVMValueRef {
+unsafe fn build_lib_add(data: &LLVM, scope: ScopeRef, id: NodeID, name: &str, _objtype: LLVMTypeRef) -> LLVMValueRef {
     let dtype = int_type(data);
     let mut atypes = vec!(dtype, dtype);
     let function = LLVMAddFunction(data.module, label("builtin.add"), LLVMFunctionType(dtype, atypes.as_mut_ptr(), atypes.len() as u32, false as i32));
@@ -402,8 +419,8 @@ unsafe fn build_lib_add(data: &LLVM, name: &str, _objtype: LLVMTypeRef) -> LLVMV
 
 
 
-unsafe fn build_lib_println(data: &LLVM, name: &str, _objtype: LLVMTypeRef) -> LLVMValueRef {
-    let function = build_function_start(data, name, vec!(str_type(data)), str_type(data));
+unsafe fn build_lib_println(data: &LLVM, scope: ScopeRef, id: NodeID, name: &str, _objtype: LLVMTypeRef) -> LLVMValueRef {
+    let function = build_function_start_lib(data, scope, id, name, vec!(str_type(data)), str_type(data));
     LLVMSetLinkage(function, llvm::LLVMLinkage::LLVMLinkOnceAnyLinkage);
 
     let value = build_c_call(data, "puts", &mut vec!(LLVMGetParam(function, 0)));
@@ -411,8 +428,8 @@ unsafe fn build_lib_println(data: &LLVM, name: &str, _objtype: LLVMTypeRef) -> L
     function
 }
 
-unsafe fn build_lib_readline(data: &LLVM, name: &str, _objtype: LLVMTypeRef) -> LLVMValueRef {
-    let function = build_function_start(data, name, vec!(), str_type(data));
+unsafe fn build_lib_readline(data: &LLVM, scope: ScopeRef, id: NodeID, name: &str, _objtype: LLVMTypeRef) -> LLVMValueRef {
+    let function = build_function_start_lib(data, scope, id, name, vec!(), str_type(data));
     LLVMSetLinkage(function, llvm::LLVMLinkage::LLVMLinkOnceAnyLinkage);
 
     let buffer = build_c_call(data, "malloc", &mut vec!(int_value(data, 2048)));

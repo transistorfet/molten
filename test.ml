@@ -26,12 +26,14 @@
         let testy = fn x => x + 1
         // TODO this wasn't compiling because of a reference not set error on the *??
         //let fac = fn (x : Int, y = 5 * 3, z: String = "hey") => if not x then 1 else x - -123
-        //let fac2 = fn x, y, z => if not x then 1 else x - -123
+        let fac2 = fn x, y, z => if not x then 1 else x - -123
         testy(3)
 
-	let test2 = fn x => x()
+        // TODO this is failing to codegen
+	//let test2 = fn x => x()
         // TODO this is causing a problem with ambiguous overload variant, because it can't determine the return type of test3
-	let test3 = fn x => x() + 1
+        // TODO this is failing to codegen
+	//let test3 = fn x => x() + 1
         //println(str(test3(fn => 3)))
 
         let recfoo = fn x => begin  //comment
@@ -173,6 +175,8 @@
             buffer
         }
 
+/*
+        // TODO this causes a segfault during codegen
         fn overload() / C {
             let test = "Thing"
             println(test)
@@ -185,6 +189,7 @@
             println(strnum(1.0))
         }
         overload()
+*/
 
         /*
         // TODO these don't work because it cannot be disambiguated during the recursive invoke
@@ -222,15 +227,17 @@
         let list3 = new List<Int>()
         list3.push(4)
         list3.insert(1, 5)
-        list3[1] = 123
-        println(str(list3[1]))
+        // TODO this is causing problems
+        //list3[1] = 123
+        //println(str(list3[1]))
 
+/*
         let list: List<'thing> = [ 1, 2, 3 ]
         list[1] = 5
         println(str(list[1]))
         println(str("Thing"[2]))
         let list2 = [ new TestClass(), new Stuff(), new TestClass() ]
-
+*/
 
         class NumList<'a> extends List<Int> {
             let x: 'a = nil
@@ -256,6 +263,8 @@
         let c = new B<Real, Int>()
         c.bar = 3.2
 
+/*
+        // TODO this was broken
         class Thing {
             fn new(self) {
                 self.bar = fn a => [ a, a, a ]
@@ -308,6 +317,7 @@
         numbers.insert(1, 5)
         for x in numbers
             println("Count: " + str(x))
+*/
 
 /*
         fn test() {

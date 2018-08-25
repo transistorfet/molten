@@ -94,6 +94,7 @@ impl Session {
     }
 
     pub fn set_def(&self, id: NodeID, def: Def) {
+debug!("SET DEF: {:?} = {:?}", id, def);
         self.defs.borrow_mut().insert(id, def);
     }
 
@@ -106,6 +107,7 @@ impl Session {
 
 
     pub fn set_ref(&self, id: NodeID, defid: NodeID) {
+debug!("SET REF: {:?} -> {:?}", id, defid);
         self.refs.borrow_mut().insert(id, defid);
     }
 
@@ -142,10 +144,13 @@ impl Session {
         use types;
 
         let etype = self.get_type(id);
-        match types::check_type(self, scope.clone(), etype.clone(), Some(ttype.clone()), types::Check::Def, false) {
-            Ok(ntype) => Ok(self.set_type(id, ntype)),
-            Err(err) => Err(err)
-        }
+        let ntype = if etype.is_some() {
+            types::check_type(self, scope.clone(), etype, Some(ttype.clone()), types::Check::Def, false)?
+        } else {
+            ttype
+        };
+        self.set_type(id, ntype);
+        Ok(())
     }
 }
 

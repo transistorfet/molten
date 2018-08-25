@@ -90,17 +90,18 @@ fn compile_file(input: &str, output: Option<&str>) {
         let global = session.map.get_global();
         println!("\n{:?}\n", code);
         //println!("\n{:?}\n\n{:?}", &code, global);
-        debug::print_types(&session.map, global.clone(), &code);
-        debug::print_types_scope(global);
+        debug::print_types(&session, global.clone(), &code);
+        debug::print_types_scope(&session, global);
     }
 
     code = precompiler::precompile(&session, code);
 
     compiler::compile(&builtins, &session, name, &mut code);
 
-    println!("Types:");
-    for (ref id, ref ttype) in session.types.borrow().iter() {
-        println!("{:?} -> {:?}", id, ttype);
+    if Options::as_ref().debug {
+        for (ref id, ref ttype) in session.types.borrow().iter() {
+            println!("{:?} -> {:?}", id, ttype);
+        }
     }
 }
 

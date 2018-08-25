@@ -145,6 +145,7 @@ impl Type {
         Type::Object(classspec.ident.name, classspec.types)
     }
 
+    /*
     pub fn update_variable_type(session: &Session, scope: ScopeRef, name: &String, ttype: Type) {
         let dscope = Scope::target(session, scope.clone());
         let pscope = Scope::locate_variable(dscope.clone(), name).unwrap();
@@ -152,7 +153,12 @@ impl Type {
         if !pscope.is_primative() {
             let ntype = check_type(session, scope.clone(), otype.clone(), Some(ttype.clone()), Check::Def, false);
             match ntype {
-                Ok(utype) => dscope.set_variable_type(name, utype),
+                Ok(utype) => {
+                    match dscope.get_var_def(name) {
+                        Some(defid) => { session.update_type(scope.clone(), defid, utype).unwrap(); },
+                        None => { },
+                    }
+                },
                 Err(err) => panic!("while updating variable type {:?}:\n{:?}", name, err),
             }
         }
@@ -161,7 +167,7 @@ impl Type {
     pub fn update_type(session: &Session, scope: ScopeRef, idname: &String, ttype: Type) {
         let ttype = resolve_type(session, scope.clone(), ttype);
         let pscope = Scope::locate_type(scope.clone(), idname).unwrap();
-        let otype = pscope.find_type(idname).clone();
+        let otype = pscope.find_type(session, idname).clone();
         debug!("UPDATE TYPE: from {:?} to {:?}", otype, ttype);
         if !pscope.is_primative() {
             let entype = check_type(session, scope.clone(), otype.clone(), Some(ttype.clone()), Check::Def, false);
@@ -169,6 +175,7 @@ impl Type {
                 Ok(ntype) => {
                     //let ntype = check_type(session, scope, Some(ttype.clone()), Some(ntype.clone()), Check::Def, false).unwrap();
                     pscope.update_type(idname, ntype.clone());
+                    session.update_type(pscope.get_def_id(idname).unwrap(), ntype.clone());
                     match otype {
                         Some(Type::Variable(_, ref id)) if &id.to_string() != idname => { session.update_type(scope.clone(), *id, ntype); },
                         _ => { },
@@ -184,6 +191,7 @@ impl Type {
             //}
         }
     }
+    */
 
     /*
     pub fn convert<F>(self, f: &F) -> Type where F: FnOnce(Type) -> Type {
@@ -385,7 +393,7 @@ fn is_subclass_of(session: &Session, scope: ScopeRef, adef: (&String, &Vec<Type>
     let mut adef = (adef.0.clone(), adef.1.clone());
 
     loop {
-        let mut class = scope.find_type(&adef.0).unwrap();
+        let mut class = scope.find_type(session, &adef.0).unwrap();
         class = tscope.map_typevars(session, &mut names, class);
         adef.1 = check_type_params(session, tscope.clone(), &class.get_params()?, &adef.1, mode.clone(), true)?;
 
@@ -430,7 +438,7 @@ pub fn check_type_params(session: &Session, scope: ScopeRef, dtypes: &Vec<Type>,
 pub fn resolve_type(session: &Session, scope: ScopeRef, ttype: Type) -> Type {
     match ttype {
         Type::Object(ref name, ref types) => {
-            match scope.find_type(name) {
+            match scope.find_type(session, name) {
                 Some(_) => {
                     let params = types.iter().map(|ptype| resolve_type(session, scope.clone(), ptype.clone())).collect();
                     // TODO we are purposely returning the original type here so as not to over-resolve types... but we should probably still fully resolve for checking purposes

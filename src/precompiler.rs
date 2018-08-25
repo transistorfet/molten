@@ -26,13 +26,13 @@ pub fn precompile_node(session: &Session, scope: ScopeRef, node: AST) -> AST {
 
         AST::Definition(id, pos, name, ttype, code) => {
 let dscope = Scope::target(session, scope.clone());
-println!("{} {} -> {:?} {:?}", scope.get_basename(), name.name, dscope.get_var_def(&name.name), dscope.find_var_def(session, &name.name));
+debug!("{} {} -> {:?} {:?}", scope.get_basename(), name.name, dscope.get_var_def(&name.name), dscope.find_var_def(session, &name.name));
             AST::Definition(id, pos, name, Some(resolve_type(session, scope.clone(), ttype.unwrap())), Box::new(precompile_node(session, scope.clone(), *code)))
         },
 
         AST::Declare(id, pos, name, ttype) => {
 let dscope = Scope::target(session, scope.clone());
-println!("{} {} -> {:?} {:?}", scope.get_basename(), name.name, dscope.get_var_def(&name.name), dscope.find_var_def(session, &name.name));
+debug!("{} {} -> {:?} {:?}", scope.get_basename(), name.name, dscope.get_var_def(&name.name), dscope.find_var_def(session, &name.name));
             AST::Declare(id, pos, name, resolve_type(session, scope, ttype))
         },
 
@@ -40,7 +40,7 @@ println!("{} {} -> {:?} {:?}", scope.get_basename(), name.name, dscope.get_var_d
             let fscope = session.map.get(&id);
 let dscope = Scope::target(session, scope.clone());
 if name.is_some() {
-println!("{} {} -> {:?} {:?}", scope.get_basename(), name.as_ref().unwrap().name, dscope.get_var_def(&name.as_ref().unwrap().name), dscope.find_var_def(session, &name.as_ref().unwrap().name));
+debug!("{} {} -> {:?} {:?}", scope.get_basename(), name.as_ref().unwrap().name, dscope.get_var_def(&name.as_ref().unwrap().name), dscope.find_var_def(session, &name.as_ref().unwrap().name));
 }
             update_scope_variable_types(session, fscope.clone());
 
@@ -114,7 +114,7 @@ println!("{} {} -> {:?} {:?}", scope.get_basename(), name.as_ref().unwrap().name
                 AST::Block(id, pos.clone(), code)
             } else {
             */
-            let args = args.into_iter().map(|arg| Argument::new(arg.pos, arg.ident, arg.ttype.map(|atype| resolve_type(session, fscope.clone(), atype)), arg.default)).collect();
+            //let args = args.into_iter().map(|arg| Argument::new(arg.pos, arg.ident, arg.ttype.map(|atype| resolve_type(session, fscope.clone(), atype)), arg.default)).collect();
             AST::Function(id, pos, name, args, Some(resolve_type(session, fscope.clone(), ret.unwrap())), Box::new(precompile_node(session, fscope.clone(), *body)), abi)
             //}
         },
@@ -130,7 +130,7 @@ println!("{} {} -> {:?} {:?}", scope.get_basename(), name.as_ref().unwrap().name
             AST::Invoke(id, pos, Box::new(precompile_node(session, scope.clone(), *fexpr)), precompile_vec(session, scope.clone(), args), Some(resolve_type(session, scope.clone(), stype.unwrap())))
         },
 
-        AST::Recall(_, _, _) => node,
+        AST::Recall(_, _) => node,
 
         AST::Identifier(id, pos, name) => {
             /*

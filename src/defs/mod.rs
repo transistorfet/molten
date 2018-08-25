@@ -6,8 +6,8 @@ pub mod classes;
 pub mod variables;
 pub mod functions;
 
-use defs::classes::ClassDefRef;
 use defs::variables::VarDefRef;
+use defs::classes::{ ClassDefRef, StructDefRef };
 use defs::functions::{ FuncDefRef, OverloadDefRef, ClosureDefRef, MethodDefRef, CFuncDefRef };
 
 
@@ -15,6 +15,7 @@ use defs::functions::{ FuncDefRef, OverloadDefRef, ClosureDefRef, MethodDefRef, 
 pub enum Def {
     Var(VarDefRef),
     Class(ClassDefRef),
+    Struct(StructDefRef),
     Func(FuncDefRef),
     Overload(OverloadDefRef),
     Closure(ClosureDefRef),

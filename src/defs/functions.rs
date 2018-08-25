@@ -58,7 +58,7 @@ impl FuncDef {
             if let Some(previd) = dscope.get_var_def(&name) {
                 OverloadDef::define(session, scope.clone(), &name, id, previd, ttype)?;
             } else {
-                dscope.define(name.clone(), ttype, Some(id))?;
+                dscope.define(name.clone(), Some(id))?;
             }
         }
         Ok(())
@@ -113,9 +113,9 @@ impl OverloadDef {
                 },
             };
             let defid = OverloadDef::create(session, Some(parentid), vec!(id));
-            dscope.define(name.clone(), dscope.get_variable_type(session, &name), Some(defid))?;
+            dscope.define(name.clone(), Some(defid))?;
         }
-        ttype.map(|ttype| Scope::add_func_variant(session, dscope.clone(), name, scope.clone(), ttype).unwrap());
+        //ttype.map(|ttype| Scope::add_func_variant(session, dscope.clone(), name, scope.clone(), ttype).unwrap());
         Ok(())
     }
 
@@ -152,6 +152,7 @@ impl OverloadDef {
 
             if let Type::Function(ref btypes, _, _) = ttype {
                 if check_type(session, tscope.clone(), Some(*btypes.clone()), Some(atypes.clone()), Check::Def, false).is_ok() {
+                    debug!("??????: {:?} {:?}", id, ttype);
                     found.push((id, ttype.clone()));
                 }
             }
@@ -240,8 +241,11 @@ impl CFuncDef {
 
         }));
 
-        scope.define(name.clone(), ttype, Some(id))?;
+        scope.define(name.clone(), Some(id))?;
         session.set_def(id, def.clone());
+        if let Some(ttype) = ttype {
+            session.set_type(id, ttype);
+        }
         Ok(def)
     }
 }

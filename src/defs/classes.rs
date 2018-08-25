@@ -4,7 +4,7 @@ use std::cell::RefCell;
  
 use types::Type;
 use defs::Def;
-use ast::{ NodeID, ClassSpec, AST };
+use ast::{ NodeID, Ident, ClassSpec, AST };
 use scope::{ Scope, ScopeRef };
 use session::{ Session, Error };
 
@@ -18,7 +18,7 @@ pub struct ClassDef {
     pub parenttype: Option<Type>,
     pub classvars: ClassVars,
     pub structdef: RefCell<Vec<(String, Type)>>,
-    pub vtable: RefCell<Vec<(String, Type)>>,
+    pub vtable: RefCell<Vtable>,
 }
 
 pub type ClassDefRef = Rc<ClassDef>;
@@ -32,7 +32,7 @@ impl ClassDef {
             parenttype: parenttype,
             classvars: classvars,
             structdef: RefCell::new(vec!()),
-            vtable: RefCell::new(vec!()),
+            vtable: RefCell::new(Vtable::new()),
         }
     }
 
@@ -53,15 +53,15 @@ impl ClassDef {
         tscope.set_basename(name.clone());
 
         // Define Self and Super, and check for typevars in the type params
-        tscope.define_type(String::from("Self"), classtype.clone(), Some(id))?;
+        tscope.define_type(String::from("Self"), Some(id))?;
         if let Some(ref ptype) = parenttype {
-            tscope.define_type(String::from("Super"), ptype.clone(), scope.get_var_def(&ptype.get_name()?))?;
+            tscope.define_type(String::from("Super"), scope.get_type_def(&ptype.get_name()?))?;
         }
 
         let classdef = Self::create_class(session, scope.clone(), id, classtype.clone(), parenttype)?;
 
         // Define the class in the local scope
-        scope.define_type(name.clone(), classtype.clone(), Some(id))?;
+        scope.define_type(name.clone(), Some(id))?;
         session.set_def(id, Def::Class(classdef.clone()));
         session.set_type(id, classtype);
         // TODO i don't like this type == Class thing, but i don't know how i'll do struct types yet either
@@ -88,31 +88,48 @@ impl ClassDef {
 
     pub fn build_vtable(&self, session: &Session, scope: ScopeRef, body: &Vec<AST>) {
         let parentclass = match self.parenttype {
+            // TODO this needs to be fixed
             Some(ref ptype) => Some(scope.find_type_def(session, &ptype.get_name().unwrap()).unwrap().as_class().unwrap()),
             None => None,
         };
-        let mut vtable = parentclass.map_or(vec!(), |c| c.vtable.borrow().clone());
+
+        if let Some(parentclass) = parentclass {
+            self.vtable.borrow_mut().inherit(&*parentclass.vtable.borrow());
+        }
+        self.vtable.borrow_mut().build_vtable(session, scope, body);
+
+/*
+        let mut vtable = self.vtable.borrow_mut();
+        //let mut vtable = parentclass.map_or(vec!(), |c| c.vtable.borrow().clone());
+        *vtable = parentclass.map_or(vec!(), |c| c.vtable.borrow().clone());
 
         for ref node in body.iter() {
             match **node {
-                AST::Function(_, _, ref fident, ref args, ref rtype, _, ref abi) => {
-                    if fident.is_some() {
-                        let fname = &fident.as_ref().unwrap().name;
-                        let uname = abi.unmangle_name(&fname).unwrap_or(fname.clone());
+                AST::Function(ref id, _, ref fident, ref args, ref rtype, _, ref abi) => {
+                    if let Some(Ident { ref name, .. }) = fident {
+                        //let uname = abi.unmangle_name(&name).unwrap_or(fname.clone());
                         //if parent.contains(&uname) {
-                            debug!("***************: {:?}:{:?}", self.classname, uname);
-                            vtable.push((uname, Type::Function(Box::new(Type::Tuple(args.iter().map(|arg| arg.ttype.clone().unwrap()).collect())), Box::new(rtype.clone().unwrap()), *abi)));
-                        //}
+                        debug!("***************: {:?}:{:?}", self.classname, name);
+                        //if let Some(index) = vtable.iter().position(|ref r| r.1.as_str() == name.as_str()) {
+                        if let Some(index) = self.get_vtable_index(name.as_str()) {
+                            vtable[index].0 = *id;
+                        } else {
+                            vtable.push((*id, name.clone(), session.get_type(*id).unwrap()));
+                        }
                     }
                 },
-                AST::Declare(_, _, ref fident, ref ttype) => {
-                    match *ttype {
-                        Type::Function(_, _, ref abi) => {
-                            let uname = abi.unmangle_name(fident.name.as_ref()).unwrap_or(fident.name.clone());
-                            //if parent.contains(&uname) {
-                                debug!("+++++++++++++++: {:?}:{:?}", self.classname, uname);
-                                vtable.push((uname.clone(), ttype.clone()))
-                            //}
+                AST::Declare(ref id, _, ref fident, _) => {
+                    let ttype = session.get_type(*id).unwrap();
+                    match ttype {
+                        Type::Function(_, _, _) => {
+                            let name = &fident.name;
+
+                            debug!("***************: {:?}:{:?}", self.classname, name);
+                            if let Some(index) = vtable.iter().position(|ref r| r.1.as_str() == name.as_str()) {
+                                vtable[index].0 = *id;
+                            } else {
+                                vtable.push((*id, name.clone(), ttype));
+                            }
                         },
                         _ => { },
                     }
@@ -121,7 +138,8 @@ impl ClassDef {
             }
         }
 
-        *self.vtable.borrow_mut() = vtable;
+        // *self.vtable.borrow_mut() = vtable;
+*/
     }
 
     pub fn build_structdef(&self, session: &Session, scope: ScopeRef, body: &Vec<AST>) {
@@ -162,12 +180,14 @@ impl ClassDef {
         self.structdef.borrow()[index].1.clone()
     }
 
-    pub fn get_vtable_index(&self, field: &str) -> Option<usize> {
-        self.vtable.borrow().iter().position(|ref r| r.0.as_str() == field)
+    pub fn get_vtable_index(&self, field: &str, ftype: &Type) -> Option<usize> {
+        //self.vtable.borrow().iter().position(|ref r| r.1.as_str() == field)
+        self.vtable.borrow().get_index(field, ftype)
     }
 
     pub fn get_vtable_type(&self, index: usize) -> Type {
-        self.vtable.borrow()[index].1.clone()
+        //self.vtable.borrow()[index].2.clone()
+        self.vtable.borrow().get_type(index)
     }
 
     pub fn has_vtable(&self) -> bool {
@@ -214,7 +234,7 @@ impl StructDef {
     #[must_use]
     pub fn add_field(&self, name: &str, ttype: Type) -> Result<(), Error> {
         // TODO this should be assigned a Var or something...
-        self.vars.define(String::from(name), Some(ttype.clone()), None)?;
+        self.vars.define(String::from(name), None)?;
         self.structdef.borrow_mut().push((String::from(name), ttype));
         Ok(())
     }
@@ -228,15 +248,78 @@ impl StructDef {
     }
 
 
-    pub fn define_struct(scope: ScopeRef, classspec: &ClassSpec, parent: Option<ScopeRef>) -> Result<StructDefRef, Error> {
-        let &ClassSpec { ref ident, ref types, .. } = classspec;
+    pub fn define_struct(session: &Session, scope: ScopeRef, id: NodeID, ttype: Type, parent: Option<ScopeRef>) -> Result<StructDefRef, Error> {
+        let structdef = StructDef::new_ref(ttype.clone(), None);
 
-        let structdef = StructDef::new_ref(Type::from_spec(classspec.clone()), None);
-
-        // Define the class in the local scope
-        //scope.define_type(ident.name.clone(), Type::Object(ident.name.clone(), types.clone()))?;
-        //scope.set_type_def(&ident.name, Def::Struct(structdef.clone()));
+        scope.define_type(ttype.get_name()?, Some(id))?;
+        session.set_def(id, Def::Struct(structdef.clone()));
+        session.set_type(id, ttype);
         Ok(structdef)
     }
 }
+
+
+
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct Vtable(pub Vec<(NodeID, String, Type)>);
+
+impl Vtable {
+    pub fn new() -> Self {
+        Vtable(vec!())
+    }
+
+    pub fn inherit(&mut self, inherit: &Vtable) {
+        self.0 = inherit.0.clone();
+    }
+
+    pub fn build_vtable(&mut self, session: &Session, scope: ScopeRef, body: &Vec<AST>) {
+        for ref node in body.iter() {
+            match **node {
+                AST::Function(ref id, _, ref ident, ref args, ref rtype, _, ref abi) => {
+                    if let Some(Ident { ref name, .. }) = ident {
+                        self.add_entry(*id, name.as_str(), session.get_type(*id).unwrap());
+                    }
+                },
+                AST::Declare(ref id, _, ref ident, _) => {
+                    let ttype = session.get_type(*id).unwrap();
+                    match ttype {
+                        Type::Function(_, _, _) => {
+                            self.add_entry(*id, ident.as_str(), ttype);
+                        },
+                        _ => { },
+                    }
+                },
+                _ => { }
+            }
+        }
+
+        //*self.vtable.borrow_mut() = vtable;
+    }
+
+    pub fn add_entry(&mut self, id: NodeID, name: &str, ftype: Type) {
+        debug!("***************: {:?} {:?}", name, ftype);
+        if let Some(index) = self.get_index(name, &ftype) {
+            self.0[index].0 = id;
+        } else {
+            self.0.push((id, String::from(name), ftype));
+        }
+    }
+
+
+    pub fn get_index(&self, name: &str, ftype: &Type) -> Option<usize> {
+        // TODO check types for overloaded match
+        self.0.iter().position(|ref r| r.1.as_str() == name)
+    }
+
+    pub fn get_type(&self, index: usize) -> Type {
+        self.0[index].2.clone()
+    }
+
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+}
+
+
 

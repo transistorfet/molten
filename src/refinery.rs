@@ -1,7 +1,8 @@
 
 
+use types::Type;
 use utils::UniqueID;
-use ast::{ AST, Ident };
+use ast::{ NodeID, AST, Ident, ClassSpec };
 
 pub fn refine(code: Vec<AST>) -> Vec<AST> {
     refine_vec(code)
@@ -73,8 +74,32 @@ pub fn refine_node(node: AST) -> AST {
             AST::For(id, pos, ident, Box::new(refine_node(*cond)), Box::new(refine_node(*body)))
         },
 
-        AST::List(id, pos, code, ttype) => { AST::List(id, pos, refine_vec(code), ttype) },
         AST::Tuple(id, pos, code, ttype) => { AST::Tuple(id, pos, refine_vec(code), ttype) },
+        AST::List(id, pos, code, ttype) => { AST::List(id, pos, refine_vec(code), ttype) },
+        /*
+        AST::List(id, pos, code, stype) => {
+            use abi::ABI;
+            let mut block = vec!();
+            //let itype = stype.unwrap();
+            //let ltype = Type::Object(format!("List"), vec!(itype.clone()));
+            let tmplist = format!("{}", UniqueID::generate());
+
+            block.push(AST::make_def(pos.clone(), Ident::new(pos.clone(), tmplist.clone()), None,
+                Box::new(AST::make_invoke(pos.clone(),
+                    Box::new(AST::make_resolve(pos.clone(), Box::new(AST::make_ident(pos.clone(), Ident::from_str("List"))), Ident::from_str("new"))),
+                    vec!(
+                        AST::make_new(pos.clone(), ClassSpec::new(pos.clone(), Ident::from_str("List"), vec!(Type::Variable(String::from("rl"), UniqueID(0)))))
+                        /*, AST::Integer(code.len() as isize)*/
+                    ), None))));
+            for item in code {
+                block.push(AST::make_invoke(pos.clone(),
+                    Box::new(AST::make_access(pos.clone(), Box::new(AST::make_ident(pos.clone(), Ident::new(pos.clone(), tmplist.clone()))), Ident::from_str("push"), None)),
+                    vec!(AST::make_ident(pos.clone(), Ident::new(pos.clone(), tmplist.clone())), item), None));
+            }
+            block.push(AST::make_ident(pos.clone(), Ident::new(pos.clone(), tmplist.clone())));
+            AST::make_block(pos.clone(), refine_vec(block))
+        },
+        */
 
         AST::Class(id, pos, classspec, parentspec, body) => {
             // Make sure constructors take "self" as the first argument, and return "self" at the end
@@ -85,7 +110,7 @@ pub fn refine_node(node: AST) -> AST {
                         if ident.as_ref().map(|i| i.name.as_str()) == Some("new") {
                             has_new = true;
                             if args.len() > 0 && args[0].ident.as_str() == "self" {
-                                body = Box::new(AST::Block(id, pos.clone(), vec!(*body, AST::Identifier(id, pos.clone(), Ident::new(pos.clone(), String::from("self"))))));
+                                body = Box::new(AST::Block(NodeID::generate(), pos.clone(), vec!(*body, AST::Identifier(NodeID::generate(), pos.clone(), Ident::new(pos.clone(), String::from("self"))))));
                             } else {
                                 panic!("SyntaxError: the \"new\" method on a class must have \"self\" as its first parameter");
                             }
@@ -110,7 +135,7 @@ pub fn refine_node(node: AST) -> AST {
 
         AST::Index(id, pos, base, index, _) => {
             //AST::Index(id, pos, Box::new(refine_node(*base)), Box::new(refine_node(*index)), stype)
-            refine_node(AST::Invoke(id, pos.clone(), Box::new(AST::Accessor(id, pos.clone(), base, Ident::new(pos.clone(), String::from("[]")), None)), vec!(*index), None))
+            refine_node(AST::Invoke(id, pos.clone(), Box::new(AST::Accessor(NodeID::generate(), pos.clone(), base, Ident::new(pos.clone(), String::from("[]")), None)), vec!(*index), None))
         },
 
         AST::Resolver(id, pos, left, right) => {
@@ -155,7 +180,7 @@ pub fn refine_node(node: AST) -> AST {
         AST::String(_) => { node },
         AST::Nil(_) => { node },
         AST::PtrCast(_, _) => { node },
-        AST::Recall(_, _, _) => { node },
+        AST::Recall(_, _) => { node },
         AST::Identifier(_, _, _) => { node },
         AST::New(_, _, _) => { node },
         AST::TypeDef(_, _, _, _) => { node },

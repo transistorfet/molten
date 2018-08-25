@@ -26,14 +26,12 @@ pub type BindID = UniqueID;
 #[derive(Clone, Debug, PartialEq)]
 pub struct VarInfo {
     pub id: BindID,
-    pub ttype: Option<Type>,
     pub defid: Option<NodeID>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct TypeInfo {
     pub id: BindID,
-    pub ttype: Type,
     pub defid: Option<NodeID>,
 }
 
@@ -111,7 +109,7 @@ impl Scope {
     ///// Variable Functions /////
 
     #[must_use]
-    pub fn define(&self, name: String, ttype: Option<Type>, defid: Option<NodeID>) -> Result<BindID, Error> {
+    pub fn define(&self, name: String, defid: Option<NodeID>) -> Result<BindID, Error> {
         let mut names = self.names.borrow_mut();
         match names.contains_key(&name) {
             true => Err(Error::new(format!("NameError: variable is already defined; {:?}", name))),
@@ -119,7 +117,6 @@ impl Scope {
                 let id = BindID::generate();
                 names.insert(name, VarInfo {
                     id: id,
-                    ttype: ttype,
                     defid: defid,
                 });
                 Ok(id)
@@ -210,6 +207,8 @@ impl Scope {
         self.names.borrow().contains_key(name)
     }
 
+    /*
+    */
     pub fn variable_id(&self, name: &String) -> Result<BindID, Error> {
         match self._search(name, |sym| Some(sym.id)) {
             Some(id) => Ok(id),
@@ -217,6 +216,15 @@ impl Scope {
         }
     }
 
+    pub fn get_variable_type(&self, session: &Session, name: &String) -> Option<Type> {
+        //self.get_variable_type_full(session, name, false)
+        match self.get_var_def(name) {
+            Some(defid) => session.get_type(defid),
+            None => None,
+        }
+    }
+
+    /*
     pub fn set_variable_type(&self, name: &String, ttype: Type) {
         self.modify_local(name, move |sym| sym.ttype = Some(ttype.clone()))
     }
@@ -224,6 +232,7 @@ impl Scope {
     pub fn get_variable_type(&self, session: &Session, name: &String) -> Option<Type> {
         self.get_variable_type_full(session, name, false)
     }
+    */
 
     pub fn set_var_def(&self, name: &String, defid: NodeID) {
         self.modify_local(name, move |sym| { sym.defid = Some(defid.clone()); })
@@ -247,7 +256,7 @@ impl Scope {
         session.get_def(self.get_type_def(name).ok_or(Error::new(format!("TypeError: definition not set for {:?}", name)))?)
     }
 
-
+    /*
     pub fn get_variable_type_full(&self, session: &Session, name: &String, local: bool) -> Option<Type> {
         let otype = self._search(name, |sym| {
             if sym.defid.and_then(|id| session.get_def(id).ok()).and_then(|def| Some(def.num_variants(session))).unwrap_or(1) > 1 {
@@ -280,6 +289,7 @@ impl Scope {
         dscope.set_variable_type(name, ftype.clone());
         Ok(())
     }
+    */
 
     pub fn num_funcdefs(&self, session: &Session, name: &String) -> i32 {
         self._search(name, |sym| {
@@ -314,7 +324,7 @@ impl Scope {
     ///// Type Functions /////
 
     #[must_use]
-    pub fn define_type(&self, name: String, ttype: Type, defid: Option<NodeID>) -> Result<BindID, Error> {
+    pub fn define_type(&self, name: String, defid: Option<NodeID>) -> Result<BindID, Error> {
         let mut types = self.types.borrow_mut();
         match types.contains_key(&name) {
             true => Err(Error::new(format!("NameError: type is already defined; {:?}", name))),
@@ -322,7 +332,6 @@ impl Scope {
                 let id = BindID::generate();
                 types.insert(name, TypeInfo {
                     id: id,
-                    ttype: ttype,
                     defid: defid,
                 });
                 Ok(id)
@@ -355,10 +364,11 @@ impl Scope {
 
     fn _search_type<F, U>(&self, name: &String, f: F) -> Option<U> where F: Fn(&TypeInfo) -> Option<U> {
         if let Some(ref info) = self.types.borrow().get(name) {
-            match info.ttype {
-                Type::Object(ref sname, _) if sname != name => self._search_type(sname, f),
-                _ => f(info),
-            }
+            //match info.ttype {
+            //    Type::Object(ref sname, _) if sname != name => self._search_type(sname, f),
+            //    _ => f(info),
+            //}
+            f(info)
         } else if let Some(ref parent) = self.parent {
             parent._search_type(name, f)
         } else {
@@ -366,7 +376,21 @@ impl Scope {
         }
     }
 
+    pub fn find_type(&self, session: &Session, name: &String) -> Option<Type> {
+        match self.get_type_def(name) {
+            Some(defid) => session.get_type(defid),
+            None => None,
+        }
+    }
 
+    pub fn find_type_local(&self, session: &Session, name: &String) -> Option<Type> {
+        match self.types.borrow().get(name).map(|info| info.defid) {
+            Some(Some(defid)) => session.get_type(defid),
+            _ => None,
+        }
+    }
+
+    /*
     pub fn find_type(&self, name: &String) -> Option<Type> {
         self._search_type(name, |info| Some(info.ttype.clone()))
     }
@@ -381,6 +405,7 @@ impl Scope {
             info.ttype = ttype.clone()
         })
     }
+    */
 
     pub fn set_type_def(&self, name: &String, defid: NodeID) {
         self.modify_type(name, move |info| {
@@ -398,12 +423,14 @@ impl Scope {
         })
     }
 
+    /*
     pub fn type_id(&self, name: &String) -> Result<BindID, Error> {
         match self._search_type(name, |info| Some(info.id)) {
             Some(id) => Ok(id),
             None => Err(Error::new(format!("NameError: type is undefined; {:?}", name))),
         }
     }
+    */
 
     pub fn locate_variable(scope: ScopeRef, name: &String) -> Option<ScopeRef> {
         if let Some(_) = scope.names.borrow().get(name) {
@@ -456,7 +483,7 @@ impl Scope {
                 match varmap.get(&id).map(|x| x.clone()) {
                     Some(ptype) => ptype,
                     None => {
-                        let etype = self.find_type(&name);
+                        let etype = self.find_type(session, &name);
                         debug!("EXISTING TYPEVAR for {:?}: {:?} vs {:?}", name, etype, id);
                         match etype {
                             Some(Type::Variable(_, ref eid)) if *eid == id => etype.clone().unwrap(),
@@ -524,7 +551,7 @@ impl Scope {
             let name = if ch1 == b'`' { String::from("") } else { (ch1 as char).to_string() };
             for ch2 in b'a' .. b'z' + 1 {
                 let name = name.clone() + &(ch2 as char).to_string();
-                if self.find_type(&name).is_none() {
+                if !self.contains_type(&name) {
                     return name;
                 }
             }

@@ -63,7 +63,7 @@ pub enum AST {
     Tuple(NodeID, Pos, Vec<AST>, Option<Type>),
     List(NodeID, Pos, Vec<AST>, Option<Type>),
 
-    Recall(NodeID, Pos, Ident),
+    Recall(NodeID, Pos),
     Identifier(NodeID, Pos, Ident),
     Index(NodeID, Pos, Box<AST>, Box<AST>, Option<Type>),
     Resolver(NodeID, Pos, Box<AST>, Ident),
@@ -193,7 +193,7 @@ impl AST {
         match *self {
             AST::Tuple(_, ref pos, _, _) |
             AST::List(_, ref pos, _, _) |
-            AST::Recall(_, ref pos, _) |
+            AST::Recall(_, ref pos) |
             AST::Identifier(_, ref pos, _) |
             AST::Index(_, ref pos, _, _, _) |
             AST::Resolver(_, ref pos, _, _) |
@@ -227,8 +227,8 @@ impl AST {
         AST::List(NodeID::generate(), pos, items, ttype)
     }
 
-    pub fn make_recall(pos: Pos, ident: Ident) -> AST {
-        AST::Recall(NodeID::generate(), pos, ident)
+    pub fn make_recall(pos: Pos) -> AST {
+        AST::Recall(NodeID::generate(), pos)
     }
 
     pub fn make_ident(pos: Pos, ident: Ident) -> AST {

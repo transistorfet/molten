@@ -49,19 +49,19 @@ fn str(num: Bool) -> String {
 
 fn str(num: Int) -> String {
     let buffer: String = malloc(22)
-    sprintf(buffer, "%ld", num, nil)
+    //sprintf(buffer, "%ld", num, nil)
     buffer
 }
 
 fn hex(num: Int) -> String {
     let buffer: String = malloc(22)
-    sprintf(buffer, "0x%lX", num, nil)
+    //sprintf(buffer, "0x%lX", num, nil)
     buffer
 }
 
 fn str(num: Real) -> String {
     let buffer: String = malloc(22)
-    sprintf(buffer, "%f", num, nil)
+    //sprintf(buffer, "%f", num, nil)
     buffer
 }
 
@@ -134,6 +134,8 @@ class List<'item> {
     fn insert(self, index: Int, item: 'item) {
         if index >= self.length then {
             self.push(item)
+            // TODO this is here because of a bug during the type refactor that was creating invalid IR fur the return type
+            nil
         } else {
             let cur = self.data[index]
             self.data[index] = item
