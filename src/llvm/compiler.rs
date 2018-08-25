@@ -412,7 +412,7 @@ unsafe fn compile_vec(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: Sc
 unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: ScopeRef, node: &AST) -> Value {
     debug!("COMPILE: {:?}", node);
     match *node {
-        AST::Nil(ref ttype) => Box::new(Data(null_value(get_type(data, scope.clone(), ttype.clone().unwrap(), true)))),
+        AST::Nil(ref id) => Box::new(Data(null_value(get_type(data, scope.clone(), data.session.get_type(*id).unwrap(), true)))),
         AST::Boolean(ref num) => Box::new(Data(LLVMConstInt(bool_type(data), *num as u64, 0))),
         AST::Integer(ref num) => Box::new(Data(LLVMConstInt(int_type(data), *num as u64, 0))),
         AST::Real(ref num) => Box::new(Data(LLVMConstReal(real_type(data), *num))),

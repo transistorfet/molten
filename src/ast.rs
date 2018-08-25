@@ -57,7 +57,7 @@ pub enum AST {
     Integer(isize),
     Real(f64),
     String(String),
-    Nil(Option<Type>),
+    Nil(NodeID),
     PtrCast(Type, Box<AST>),
 
     Tuple(NodeID, Pos, Vec<AST>, Option<Type>),
@@ -217,6 +217,10 @@ impl AST {
             AST::TypeDef(_, ref pos, _, _) => { pos.clone() }
             _ => Pos::empty(),
         }
+    }
+
+    pub fn make_nil() -> AST {
+        AST::Nil(NodeID::generate())
     }
 
     pub fn make_tuple(pos: Pos, items: Vec<AST>, ttype: Option<Type>) -> AST {

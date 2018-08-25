@@ -266,7 +266,7 @@ debug!("{} {} -> {:?} {:?}", scope.get_basename(), name.as_ref().unwrap().name, 
             AST::Import(id, pos, name, precompile_vec(session, scope.clone(), decls))
         },
 
-        AST::Nil(stype) => { AST::Nil(stype.map(|stype| resolve_type(session, scope.clone(), stype))) },
+        AST::Nil(id) => AST::Nil(id),
 
         AST::TypeDef(id, pos, classspec, fields) => {
             AST::TypeDef(id, pos, classspec, fields.into_iter().map(|mut f| {

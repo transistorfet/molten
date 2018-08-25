@@ -20,7 +20,7 @@ pub fn refine_node(node: AST) -> AST {
     match node {
         AST::Block(id, pos, mut code) => {
             if code.len() == 0 {
-                code.push(AST::Nil(None))
+                code.push(AST::make_nil())
             }
             AST::Block(id, pos, refine_vec(code))
         },

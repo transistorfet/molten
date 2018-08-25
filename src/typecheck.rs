@@ -212,9 +212,10 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &mut 
             check_types_node(session, lscope, body, None)
         },
 
-        AST::Nil(ref mut ttype) => {
-            *ttype = Some(expected.unwrap_or_else(|| scope.new_typevar(session)));
-            ttype.clone().unwrap()
+        AST::Nil(ref id) => {
+            let ttype = expected.unwrap_or_else(|| scope.new_typevar(session));
+            session.set_type(*id, ttype.clone());
+            ttype
         },
 
         AST::Tuple(ref id, _, ref mut items, _) => {

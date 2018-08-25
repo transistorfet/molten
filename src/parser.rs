@@ -143,7 +143,7 @@ named!(definition(Span) -> AST,
             wscom!(tag!("=")),
             expression
         )) >>
-        (AST::make_def(Pos::new(pos), i.1, i.2, Box::new(if e.is_some() { e.unwrap() } else { AST::Nil(None) })))
+        (AST::make_def(Pos::new(pos), i.1, i.2, Box::new(if e.is_some() { e.unwrap() } else { AST::make_nil() })))
     )
 );
 
@@ -247,7 +247,7 @@ named!(ifexpr(Span) -> AST,
             wscom!(tag_word!("else")),
             expression
         )) >>
-        (AST::make_if(Pos::new(pos), Box::new(c), Box::new(t), Box::new(if f.is_some() { f.unwrap() } else { AST::Nil(None) })))
+        (AST::make_if(Pos::new(pos), Box::new(c), Box::new(t), Box::new(if f.is_some() { f.unwrap() } else { AST::make_nil() })))
     )
 );
 
@@ -673,7 +673,7 @@ named!(literal(Span) -> AST,
 );
 
 named!(nil(Span) -> AST,
-    value!(AST::Nil(None), tag_word!("nil"))
+    value!(AST::make_nil(), tag_word!("nil"))
 );
 
 named!(boolean(Span) -> AST,
