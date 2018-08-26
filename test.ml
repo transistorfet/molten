@@ -297,7 +297,6 @@
         thing.arr[1]
         get_thing().arr[2]
 
-/*
         thing.baz(521)
         get_thing().baz(985)
         thing.bar()[1]
@@ -313,12 +312,14 @@
         // TODO this probably shouldn't parse without a ; or \n, but it does
         thing "things"
 
+
         let numbers = [ 1, 2, 3 ]
         numbers.insert(1, 5)
         for x in numbers
             println("Count: " + str(x))
-*/
 
+
+        /// Closures
 /*
         fn test() {
             let a = 98899
@@ -331,6 +332,8 @@
 */
 
     /*
+
+        /// Random things from parser testing
 
         while a > 0     //things
             recfoo(5)

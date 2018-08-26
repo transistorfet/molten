@@ -4,9 +4,10 @@ use std::cell::RefCell;
  
 use types::Type;
 use defs::Def;
-use ast::{ NodeID, Ident, ClassSpec, AST };
 use scope::{ Scope, ScopeRef };
 use session::{ Session, Error };
+use types::{ check_type, Check };
+use ast::{ NodeID, Ident, ClassSpec, AST };
 
 
 pub type ClassVars = ScopeRef;
@@ -139,9 +140,9 @@ impl ClassDef {
         self.structdef.borrow()[index].1.clone()
     }
 
-    pub fn get_vtable_index(&self, field: &str, ftype: &Type) -> Option<usize> {
+    pub fn get_vtable_index(&self, session: &Session, scope: ScopeRef, field: &str, ftype: &Type) -> Option<usize> {
         //self.vtable.borrow().iter().position(|ref r| r.1.as_str() == field)
-        self.vtable.borrow().get_index(field, ftype)
+        self.vtable.borrow().get_index(session, scope, field, ftype)
     }
 
     pub fn get_vtable_type(&self, index: usize) -> Type {
@@ -243,14 +244,14 @@ impl Vtable {
             match **node {
                 AST::Function(ref id, _, ref ident, ref args, ref rtype, _, ref abi) => {
                     if let Some(Ident { ref name, .. }) = ident {
-                        self.add_entry(*id, name.as_str(), session.get_type(*id).unwrap());
+                        self.add_entry(session, scope.clone(), *id, name.as_str(), session.get_type(*id).unwrap());
                     }
                 },
                 AST::Declare(ref id, _, ref ident, _) => {
                     let ttype = session.get_type(*id).unwrap();
                     match ttype {
                         Type::Function(_, _, _) => {
-                            self.add_entry(*id, ident.as_str(), ttype);
+                            self.add_entry(session, scope.clone(), *id, ident.as_str(), ttype);
                         },
                         _ => { },
                     }
@@ -262,9 +263,10 @@ impl Vtable {
         //*self.vtable.borrow_mut() = vtable;
     }
 
-    pub fn add_entry(&mut self, id: NodeID, name: &str, ftype: Type) {
+    // TODO can we eliminated Scope here
+    pub fn add_entry(&mut self, session: &Session, scope: ScopeRef, id: NodeID, name: &str, ftype: Type) {
         debug!("***************: {:?} {:?}", name, ftype);
-        if let Some(index) = self.get_index(name, &ftype) {
+        if let Some(index) = self.get_index(session, scope, name, &ftype) {
             self.table[index].0 = id;
         } else {
             self.table.push((id, String::from(name), ftype));
@@ -272,9 +274,11 @@ impl Vtable {
     }
 
 
-    pub fn get_index(&self, name: &str, ftype: &Type) -> Option<usize> {
+    pub fn get_index(&self, session: &Session, scope: ScopeRef, name: &str, ftype: &Type) -> Option<usize> {
         // TODO check types for overloaded match
-        self.table.iter().position(|ref r| r.1.as_str() == name)
+        self.table.iter().position(|(_, ref ename, ref etype)| {
+            ename.as_str() == name && check_type(session, scope.clone(), Some(etype.clone()), Some(ftype.clone()), Check::Def, false).is_ok()
+        })
     }
 
     pub fn get_type(&self, index: usize) -> Type {

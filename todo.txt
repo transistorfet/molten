@@ -3,6 +3,8 @@
   cannot resolve the types in the table because resolve needs a scope... You can replace the need for a scope by adding an ID to Type::Object, but that will be a much
   bigger task
 
+* you need to make sure there are no ambiguous overloaded variants that might overlap each other, to prevent that being a silent error during vtable construction
+
 * the new overload find_variant function should check for ambiguous types, and warn
 * the overload variant adder should check that the defined function doesn't have the same signature any other def, unless the other def is in a parent scope??
 

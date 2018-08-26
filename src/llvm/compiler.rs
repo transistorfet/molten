@@ -866,7 +866,7 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
                 debug!(">>ACCESS STRUCT: {:?} {:?}", structindex, classdef.get_struct_type(structindex));
                 let pointer = build_struct_access(data, classdef.clone(), &right.name, object);
                 from_type(&classdef.get_struct_type(structindex), LLVMBuildLoad(data.builder, pointer, label("tmp")))
-            } else if let Some(vtableindex) = classdef.get_vtable_index(right.as_str(), &ttype) {
+            } else if let Some(vtableindex) = classdef.get_vtable_index(data.session, scope.clone(), right.as_str(), &ttype) {
                 debug!(">>ACCESS VTABLE: {:?} {:?}", vtableindex, classdef.get_vtable_type(vtableindex));
                 //debug!("TABLE: {:#?}", classdef.vtable);
                 let vindex = classdef.get_struct_vtable_index().unwrap();
