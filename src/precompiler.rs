@@ -3,7 +3,7 @@
 use session::Session;
 use types::{ resolve_type };
 use typecheck::{ update_scope_variable_types };
-use ast::{ Argument, AST };
+use ast::{ Literal, Argument, AST };
 use scope::{ Scope, ScopeRef };
 
 
@@ -119,7 +119,7 @@ debug!("{} {} -> {:?} {:?}", scope.get_basename(), name.as_ref().unwrap().name, 
             //}
         },
 
-        AST::Invoke(id, pos, fexpr, args, _) => {
+        AST::Invoke(id, pos, fexpr, args) => {
             //if stype.as_ref().unwrap().get_abi().unwrap() == ABI::Molten {
             //    args.insert(0, precompile_node(session, scope.clone() *fexpr));
             //}
@@ -127,7 +127,7 @@ debug!("{} {} -> {:?} {:?}", scope.get_basename(), name.as_ref().unwrap().name, 
             // Mangle names of overloaded functions
             //typecheck::get_accessor_name(scope.clone(), &mut fexpr.as_mut(), stype.as_ref().unwrap()).unwrap();
 
-            AST::Invoke(id, pos, Box::new(precompile_node(session, scope.clone(), *fexpr)), precompile_vec(session, scope.clone(), args), None)
+            AST::Invoke(id, pos, Box::new(precompile_node(session, scope.clone(), *fexpr)), precompile_vec(session, scope.clone(), args))
         },
 
         AST::Recall(_, _) => node,
@@ -178,9 +178,9 @@ debug!("{} {} -> {:?} {:?}", scope.get_basename(), name.as_ref().unwrap().name, 
             AST::For(id, pos, name, Box::new(precompile_node(session, lscope.clone(), *cond)), Box::new(precompile_node(session, lscope.clone(), *body)))
         },
 
-        AST::Tuple(id, pos, code, _) => { AST::Tuple(id, pos, precompile_vec(session, scope.clone(), code), None) },
+        AST::Tuple(id, pos, code) => { AST::Tuple(id, pos, precompile_vec(session, scope.clone(), code)) },
 
-        AST::List(id, pos, code, ttype) => { AST::List(id, pos, precompile_vec(session, scope.clone(), code), ttype) },
+        AST::List(id, pos, code) => { AST::List(id, pos, precompile_vec(session, scope.clone(), code)) },
         /*
         AST::List(id, pos, code, stype) => {
             use abi::ABI;
@@ -276,10 +276,7 @@ debug!("{} {} -> {:?} {:?}", scope.get_basename(), name.as_ref().unwrap().name, 
         },
 
         AST::Underscore => { node },
-        AST::Boolean(_) => { node },
-        AST::Integer(_) => { node },
-        AST::Real(_) => { node },
-        AST::String(_) => { node },
+        AST::Literal(_, _) => { node },
 
         AST::Index(_, _, _, _, _) => panic!("InternalError: ast element shouldn't appear at this late phase: {:?}", node),
     }

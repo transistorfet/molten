@@ -56,7 +56,7 @@ fn bind_names_node_or_error(session: &Session, scope: ScopeRef, node: &mut AST) 
             bind_names_node(session, fscope, body)
         },
 
-        AST::Invoke(ref id, _, ref mut fexpr, ref mut args, _) => {
+        AST::Invoke(ref id, _, ref mut fexpr, ref mut args) => {
             bind_names_node(session, scope.clone(), fexpr);
             bind_names_vec(session, scope, args);
         },
@@ -116,8 +116,8 @@ fn bind_names_node_or_error(session: &Session, scope: ScopeRef, node: &mut AST) 
             bind_names_node(session, lscope, body);
         },
 
-        AST::Tuple(ref id, _, ref mut code, _) |
-        AST::List(ref id, _, ref mut code, _) |
+        AST::Tuple(ref id, _, ref mut code) |
+        AST::List(ref id, _, ref mut code) |
         AST::Block(ref id, _, ref mut code) => { bind_names_vec(session, scope, code); },
 
         AST::Index(ref id, _, ref mut base, ref mut index, _) => {
@@ -208,7 +208,7 @@ fn bind_names_node_or_error(session: &Session, scope: ScopeRef, node: &mut AST) 
 
         AST::Recall(_, _) |
         AST::Underscore | AST::Nil(_) |
-        AST::Boolean(_) | AST::Integer(_) | AST::Real(_) | AST::String(_) => { }
+        AST::Literal(_, _) => { }
     }
     Ok(())
 }

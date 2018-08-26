@@ -15,7 +15,7 @@ use std::str::FromStr;
 use abi::ABI;
 use types::Type;
 use utils::UniqueID;
-use ast::{ Pos, Ident, Argument, ClassSpec, Field, AST };
+use ast::{ Pos, Literal, Ident, Argument, ClassSpec, Field, AST };
 
 
 ///// Parsing Macros /////
@@ -317,7 +317,9 @@ named!(newclass(Span) -> AST,
             delimited!(tag!("("), expression_list, tag!(")")),
             |mut a| { a.insert(0, AST::make_new(Pos::new(pos), cs.clone())); a }
         ) >>
-        (AST::PtrCast(Type::Object(cs.ident.name.clone(), UniqueID(0), cs.types.clone()), Box::new(AST::make_invoke(Pos::new(pos), Box::new(AST::make_resolve(Pos::new(pos), Box::new(AST::make_ident(Pos::new(pos), cs.ident.clone())), Ident::from_str("new"))), a, None))))
+        (AST::PtrCast(
+            Type::Object(cs.ident.name.clone(), UniqueID(0), cs.types.clone()),
+            Box::new(AST::make_invoke(Pos::new(pos), Box::new(AST::make_resolve(Pos::new(pos), Box::new(AST::make_ident(Pos::new(pos), cs.ident.clone())), Ident::from_str("new"))), a))))
     )
 );
 
@@ -444,8 +446,8 @@ impl AST {
             "and" | "or" => AST::make_side_effect(pos, op, vec!(r1, r2)),
             _ => 
             //AST::Infix(pos, op, Box::new(r1), Box::new(r2))
-            AST::make_invoke(pos.clone(), Box::new(AST::make_ident(pos, op)), vec!(r1, r2), None)
-            //AST::make_invoke(pos, Box::new(AST::make_access(pos, Box::new(r1), op, None)), vec!(r2), None)
+            AST::make_invoke(pos.clone(), Box::new(AST::make_ident(pos, op)), vec!(r1, r2))
+            //AST::make_invoke(pos, Box::new(AST::make_access(pos, Box::new(r1), op, None)), vec!(r2))
         }
     }
 }
@@ -479,8 +481,8 @@ named!(prefix(Span) -> AST,
         op: prefix_op >>
         a: atomic >>
         //(AST::Prefix(op, Box::new(a)))
-        (AST::make_invoke(Pos::new(pos), Box::new(AST::make_ident(Pos::new(pos), op)), vec!(a), None))
-        //(AST::make_invoke(Box::new(AST::make_access(Pos::new(pos), Box::new(a), op, None)), vec!(), None))
+        (AST::make_invoke(Pos::new(pos), Box::new(AST::make_ident(Pos::new(pos), op)), vec!(a)))
+        //(AST::make_invoke(Box::new(AST::make_access(Pos::new(pos), Box::new(a), op, None)), vec!()))
     )
 );
 
@@ -510,7 +512,7 @@ impl AST {
         for op in operations {
             match op {
                 SubOP::Index(p, e) => ret = AST::make_index(p, Box::new(ret), Box::new(e), None),
-                SubOP::Invoke(p, e) => ret = AST::make_invoke(p, Box::new(ret), e, None),
+                SubOP::Invoke(p, e) => ret = AST::make_invoke(p, Box::new(ret), e),
                 SubOP::Accessor(p, name) => ret = AST::make_access(p, Box::new(ret), name.clone(), None),
                 SubOP::Resolver(p, name) => ret = AST::make_resolve(p, Box::new(ret), name.clone()),
             }
@@ -678,8 +680,8 @@ named!(nil(Span) -> AST,
 
 named!(boolean(Span) -> AST,
     alt!(
-        value!(AST::Boolean(true), tag_word!("true")) |
-        value!(AST::Boolean(false), tag_word!("false"))
+        value!(AST::make_lit(Literal::Boolean(true)), tag_word!("true")) |
+        value!(AST::make_lit(Literal::Boolean(false)), tag_word!("false"))
     )
 );
 
@@ -694,7 +696,7 @@ named!(string_contents(Span) -> AST,
                 tag!("t")  => { |_| &b"\t"[..] }
             )
         ),
-        |s| AST::String(String::from_utf8_lossy(&s).into_owned())
+        |s| AST::make_lit(Literal::String(String::from_utf8_lossy(&s).into_owned()))
     )
 );
 
@@ -703,7 +705,7 @@ named!(string(Span) -> AST,
         tag!("\""),
         alt!(
             string_contents |
-            value!(AST::String(String::new()), tag!(""))
+            value!(AST::make_lit(Literal::String(String::new())), tag!(""))
         ),
         tag!("\"")
     )
@@ -712,9 +714,9 @@ named!(string(Span) -> AST,
 
 named!(number(Span) -> AST,
     alt_complete!(
-        value!(AST::Real(std::f64::NEG_INFINITY), tag_word!("-Inf")) |
-        value!(AST::Real(std::f64::INFINITY), tag_word!("Inf")) |
-        value!(AST::Real(std::f64::NAN), tag_word!("NaN")) |
+        value!(AST::make_lit(Literal::Real(std::f64::NEG_INFINITY)), tag_word!("-Inf")) |
+        value!(AST::make_lit(Literal::Real(std::f64::INFINITY)), tag_word!("Inf")) |
+        value!(AST::make_lit(Literal::Real(std::f64::NAN)), tag_word!("NaN")) |
         oct_number |
         hex_number |
         int_or_float_number
@@ -724,14 +726,14 @@ named!(number(Span) -> AST,
 named!(hex_number(Span) -> AST,
     map!(
         preceded!(tag!("0x"), hex_digit),
-        |s| AST::Integer(isize::from_str_radix(str::from_utf8(&s.fragment).unwrap(), 16).unwrap())
+        |s| AST::make_lit(Literal::Integer(isize::from_str_radix(str::from_utf8(&s.fragment).unwrap(), 16).unwrap()))
     )
 );
 
 named!(oct_number(Span) -> AST,
     map!(
         preceded!(tag!("0"), oct_digit),
-        |s| AST::Integer(isize::from_str_radix(str::from_utf8(&s.fragment).unwrap(), 8).unwrap())
+        |s| AST::make_lit(Literal::Integer(isize::from_str_radix(str::from_utf8(&s.fragment).unwrap(), 8).unwrap()))
     )
 );
 
@@ -753,9 +755,9 @@ impl AST {
     fn number_from_utf8(s : &[u8]) -> Self {
         let n = str::from_utf8(s).unwrap();
         if let Ok(i) = isize::from_str_radix(n, 10) {
-            AST::Integer(i)
+            AST::make_lit(Literal::Integer(i))
         } else {
-            AST::Real(f64::from_str(n).unwrap())
+            AST::make_lit(Literal::Real(f64::from_str(n).unwrap()))
         }
     }
 }
@@ -768,7 +770,7 @@ named!(tuple(Span) -> AST,
             separated_list_complete!(wscom!(tag!(",")), expression),
             wscom!(tag!(")"))
         ) >>
-        (AST::make_tuple(Pos::new(pos), l, None))
+        (AST::make_tuple(Pos::new(pos), l))
     )
 );
 
@@ -780,7 +782,7 @@ named!(list(Span) -> AST,
             separated_list_complete!(wscom!(tag!(",")), expression),
             wscom!(tag!("]"))
         ) >>
-        (AST::make_list(Pos::new(pos), l, None))
+        (AST::make_list(Pos::new(pos), l))
     )
 );
 

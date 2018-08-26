@@ -21,10 +21,11 @@ use utils::UniqueID;
 use config::Options;
 use session::Session;
 use defs::Def;
-use defs::classes::{ ClassDefRef, StructDef };
-use defs::functions::FuncDef;
-use ast::{ NodeID, Pos, Ident, ClassSpec, AST };
 use scope::{ Scope, ScopeRef, ScopeMapRef };
+use ast::{ NodeID, Pos, Literal, Ident, ClassSpec, AST };
+
+use defs::functions::FuncDef;
+use defs::classes::{ ClassDefRef, StructDef };
 
 use llvm::lib::{ BuiltinDef, initialize_builtins };
 
@@ -413,14 +414,18 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
     debug!("COMPILE: {:?}", node);
     match *node {
         AST::Nil(ref id) => Box::new(Data(null_value(get_type(data, scope.clone(), data.session.get_type(*id).unwrap(), true)))),
-        AST::Boolean(ref num) => Box::new(Data(LLVMConstInt(bool_type(data), *num as u64, 0))),
-        AST::Integer(ref num) => Box::new(Data(LLVMConstInt(int_type(data), *num as u64, 0))),
-        AST::Real(ref num) => Box::new(Data(LLVMConstReal(real_type(data), *num))),
-        AST::String(ref string) => Box::new(Data(LLVMBuildGlobalStringPtr(data.builder, label(string.as_str()), label("strc")))),
+        AST::Literal(ref id, ref lit) => {
+            match lit {
+                Literal::Boolean(ref num) => Box::new(Data(LLVMConstInt(bool_type(data), *num as u64, 0))),
+                Literal::Integer(ref num) => Box::new(Data(LLVMConstInt(int_type(data), *num as u64, 0))),
+                Literal::Real(ref num) => Box::new(Data(LLVMConstReal(real_type(data), *num))),
+                Literal::String(ref string) => Box::new(Data(LLVMBuildGlobalStringPtr(data.builder, label(string.as_str()), label("strc")))),
+            }
+        },
 
         AST::Block(ref id, _, ref body) => { compile_vec(data, func, unwind, scope.clone(), body) },
 
-        AST::Invoke(ref id, _, ref fexpr, ref args, _) => {
+        AST::Invoke(ref id, _, ref fexpr, ref args) => {
             let ftype = data.session.get_type(*id).unwrap();
             let (atypes, rtype, abi) = match ftype.clone() {
                 Type::Function(atypes, rtype, abi) => (atypes, *rtype, abi),
@@ -764,7 +769,7 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
             Box::new(Data(body_value))
         },
 
-        AST::List(ref id, ref pos, ref items, ref stype) => {
+        AST::List(ref id, ref pos, ref items) => {
             // TODO this was desugared out eariler
             /*
             let itype = stype.as_ref().unwrap();
@@ -785,7 +790,7 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
             Box::new(Data(null_value(str_type(data))))
         },
 
-        AST::Tuple(ref id, ref pos, ref items, _) => {
+        AST::Tuple(ref id, ref pos, ref items) => {
             let ttype = data.session.get_type(*id).unwrap();
             let ltype = get_type(data, scope.clone(), ttype, true);
             let tuple = LLVMBuildAlloca(data.builder, ltype, label("tuple"));
@@ -858,7 +863,7 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
             let object = compile_node(data, func, unwind, scope.clone(), left).get_ref();
 // TODO replace use of otype
             //let otype = data.session.get_type_from_ref(left.get_id());
-            //debug!("####################: {:?} {:?}", ytype, data.session.get_type_from_ref(left.get_id()));
+            //debug!("####################: {:?} {:?}", otype, data.session.get_type_from_ref(left.get_id()));
 
             let ttype = data.session.get_type_from_ref(*id).unwrap();
             let name = otype.clone().unwrap().get_name().unwrap();
@@ -962,10 +967,10 @@ unsafe fn collect_functions_node<'sess>(data: &mut LLVM<'sess>, scope: ScopeRef,
             return Some(from_abi(abi, function));
         },
 
-        AST::Tuple(ref id, _, ref items, _) => { collect_functions_vec(data, scope.clone(), items); },
-        AST::List(ref id, _, ref items, _) => { collect_functions_vec(data, scope.clone(), items); },
+        AST::Tuple(ref id, _, ref items) => { collect_functions_vec(data, scope.clone(), items); },
+        AST::List(ref id, _, ref items) => { collect_functions_vec(data, scope.clone(), items); },
 
-        AST::Invoke(ref id, _, ref fexpr, ref args, _) => {
+        AST::Invoke(ref id, _, ref fexpr, ref args) => {
             collect_functions_node(data, scope.clone(), fexpr);
             collect_functions_vec(data, scope.clone(), args);
         },
@@ -1078,7 +1083,7 @@ unsafe fn collect_functions_node<'sess>(data: &mut LLVM<'sess>, scope: ScopeRef,
         AST::Recall(_, _) |
         AST::Identifier(_, _, _) |
         AST::Underscore | AST::Nil(_) |
-        AST::Boolean(_) | AST::Integer(_) | AST::Real(_) | AST::String(_) => { }
+        AST::Literal(_, _) => { }
     };
     None
 }

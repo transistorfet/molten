@@ -1,9 +1,9 @@
 
 
 use defs::Def;
-use ast::{ NodeID, ClassSpec, AST };
 use session::{ Session, Error };
 use scope::{ Scope, ScopeRef };
+use ast::{ NodeID, ClassSpec, Literal, AST };
 use types::{ Type, Check, ABI, expect_type, resolve_type, find_variant, check_type_params };
 
 
@@ -37,10 +37,14 @@ pub fn check_types_node(session: &Session, scope: ScopeRef, node: &mut AST, expe
 
 pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &mut AST, expected: Option<Type>) -> Result<Type, Error> {
     let rtype = match *node {
-        AST::Boolean(_) => scope.make_obj(session, String::from("Bool"), vec!())?,     //Type::Object(String::from("Bool"), vec!()),
-        AST::Integer(_) => scope.make_obj(session, String::from("Int"), vec!())?,     //Type::Object(String::from("Int"), vec!()),
-        AST::Real(_) => scope.make_obj(session, String::from("Real"), vec!())?,        //Type::Object(String::from("Real"), vec!()),
-        AST::String(_) => scope.make_obj(session, String::from("String"), vec!())?,      //Type::Object(String::from("String"), vec!()),
+        AST::Literal(ref id, ref literal) => {
+            match literal {
+                Literal::Boolean(_) => scope.make_obj(session, String::from("Bool"), vec!())?,
+                Literal::Integer(_) => scope.make_obj(session, String::from("Int"), vec!())?,
+                Literal::Real(_) => scope.make_obj(session, String::from("Real"), vec!())?,
+                Literal::String(_) => scope.make_obj(session, String::from("String"), vec!())?,
+            }
+        },
 
         AST::Function(ref id, _, ref mut ident, ref mut args, ref mut rtype, ref mut body, ref abi) => {
             let fscope = session.map.get(id);
@@ -94,7 +98,7 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &mut 
             nftype
         },
 
-        AST::Invoke(ref id, _, ref mut fexpr, ref mut args, ref mut stype) => {
+        AST::Invoke(ref id, _, ref mut fexpr, ref mut args) => {
             let mut atypes = vec!();
             for ref mut value in args {
                 atypes.push(check_types_node(session, scope.clone(), value, None));
@@ -138,7 +142,6 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &mut 
                 _ => return Err(Error::new(format!("NotAFunction: {:?}", fexpr))),
             };
 
-            //*stype = Some(ftype.clone());
             // TODO this is temporary, because of sprintf/variadic C functions
             //match **fexpr {
             //    AST::Identifier(_, _, ref ident) => if ident.as_str() == "sprintf" {
@@ -225,7 +228,7 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &mut 
             ttype
         },
 
-        AST::Tuple(ref id, _, ref mut items, _) => {
+        AST::Tuple(ref id, _, ref mut items) => {
             let etypes = match expected {
                 Some(ref e) => e.get_types()?.iter().map(|i| Some(i.clone())).collect(),
                 None => vec![None; items.len()]
@@ -242,14 +245,12 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &mut 
             Type::Tuple(types)
         },
 
-        AST::List(ref id, _, ref mut items, ref mut stype) => {
+        AST::List(ref id, _, ref mut items) => {
             let mut ltype = None;
             for ref mut expr in items {
                 ltype = Some(expect_type(session, scope.clone(), ltype.clone(), Some(check_types_node(session, scope.clone(), expr, ltype.clone())), Check::List)?);
             }
             let ltype = ltype.unwrap_or_else(|| expected.unwrap_or_else(|| scope.new_typevar(session)));
-            //*stype = Some(ltype.clone());
-            //Type::Object(String::from("List"), vec!(ltype))
             scope.make_obj(session, String::from("List"), vec!(ltype))?
         },
 

@@ -38,11 +38,11 @@ pub fn refine_node(node: AST) -> AST {
             AST::Function(id, pos, ident, args, ret, Box::new(refine_node(*body)), abi)
         },
 
-        AST::Invoke(id, pos, fexpr, mut args, ttype) => {
+        AST::Invoke(id, pos, fexpr, mut args) => {
             if let AST::Accessor(_, _, ref expr, _, _) = *fexpr {
                 args.insert(0, *expr.clone());
             }
-            AST::Invoke(id, pos, Box::new(refine_node(*fexpr)), refine_vec(args), ttype)
+            AST::Invoke(id, pos, Box::new(refine_node(*fexpr)), refine_vec(args))
         },
 
         AST::SideEffect(id, pos, op, args) => {
@@ -75,13 +75,11 @@ pub fn refine_node(node: AST) -> AST {
             AST::For(id, pos, ident, Box::new(refine_node(*cond)), Box::new(refine_node(*body)))
         },
 
-        AST::Tuple(id, pos, code, ttype) => { AST::Tuple(id, pos, refine_vec(code), ttype) },
+        AST::Tuple(id, pos, code) => { AST::Tuple(id, pos, refine_vec(code)) },
         //AST::List(id, pos, code, ttype) => { AST::List(id, pos, refine_vec(code), ttype) },
-        AST::List(id, pos, code, stype) => {
+        AST::List(id, pos, code) => {
             use abi::ABI;
             let mut block = vec!();
-            //let itype = stype.unwrap();
-            //let ltype = Type::Object(format!("List"), vec!(itype.clone()));
             let tmplist = format!("{}", UniqueID::generate());
             let typevar = rand::random::<i32>();
 
@@ -91,11 +89,11 @@ pub fn refine_node(node: AST) -> AST {
                     vec!(
                         AST::make_new(pos.clone(), ClassSpec::new(pos.clone(), Ident::from_str("List"), vec!(Type::Variable(typevar.to_string(), UniqueID(0)))))
                         /*, AST::Integer(code.len() as isize)*/
-                    ), None))));
+                    )))));
             for item in code {
                 block.push(AST::make_invoke(pos.clone(),
                     Box::new(AST::make_access(pos.clone(), Box::new(AST::make_ident(pos.clone(), Ident::new(pos.clone(), tmplist.clone()))), Ident::from_str("push"), None)),
-                    vec!(item), None));
+                    vec!(item)));
             }
             block.push(AST::make_ident(pos.clone(), Ident::new(pos.clone(), tmplist.clone())));
             AST::make_block(pos.clone(), refine_vec(block))
@@ -135,7 +133,7 @@ pub fn refine_node(node: AST) -> AST {
 
         AST::Index(id, pos, base, index, _) => {
             //AST::Index(id, pos, Box::new(refine_node(*base)), Box::new(refine_node(*index)), stype)
-            refine_node(AST::Invoke(id, pos.clone(), Box::new(AST::Accessor(NodeID::generate(), pos.clone(), base, Ident::new(pos.clone(), String::from("[]")), None)), vec!(*index), None))
+            refine_node(AST::Invoke(id, pos.clone(), Box::new(AST::Accessor(NodeID::generate(), pos.clone(), base, Ident::new(pos.clone(), String::from("[]")), None)), vec!(*index)))
         },
 
         AST::Resolver(id, pos, left, right) => {
@@ -158,7 +156,7 @@ pub fn refine_node(node: AST) -> AST {
                     AST::Assignment(id, pos, Box::new(refine_node(left)), Box::new(refine_node(*right)))
                 },
                 AST::Index(iid, ipos, base, index, _) => {
-                    refine_node(AST::Invoke(id, pos, Box::new(AST::Accessor(iid, ipos.clone(), base, Ident::new(ipos.clone(), String::from("[]")), None)), vec!(*index, *right), None))
+                    refine_node(AST::Invoke(id, pos, Box::new(AST::Accessor(iid, ipos.clone(), base, Ident::new(ipos.clone(), String::from("[]")), None)), vec!(*index, *right)))
                 },
                 _ => panic!("SyntaxError: assignment to something other than a list or class element: {:?}", left),
             }
@@ -174,10 +172,7 @@ pub fn refine_node(node: AST) -> AST {
         //},
 
         AST::Underscore => { node },
-        AST::Boolean(_) => { node },
-        AST::Integer(_) => { node },
-        AST::Real(_) => { node },
-        AST::String(_) => { node },
+        AST::Literal(_, _) => { node },
         AST::Nil(_) => { node },
         AST::PtrCast(_, _) => { node },
         AST::Recall(_, _) => { node },

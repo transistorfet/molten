@@ -20,6 +20,14 @@ pub struct Pos {
 
 
 #[derive(Clone, Debug, PartialEq)]
+pub enum Literal {
+    Boolean(bool),
+    Integer(isize),
+    Real(f64),
+    String(String),
+}
+
+#[derive(Clone, Debug, PartialEq)]
 pub struct Ident {
     pub pos: Pos,
     pub name: String,
@@ -48,27 +56,25 @@ pub struct Field {
     pub ttype: Option<Type>
 }
 
+
 #[derive(Clone, Debug, PartialEq)]
 pub enum AST {
     //Comment(String),
 
     Underscore,
-    Boolean(bool),
-    Integer(isize),
-    Real(f64),
-    String(String),
+    Literal(NodeID, Literal),
     Nil(NodeID),
     PtrCast(Type, Box<AST>),
 
-    Tuple(NodeID, Pos, Vec<AST>, Option<Type>),
-    List(NodeID, Pos, Vec<AST>, Option<Type>),
+    Tuple(NodeID, Pos, Vec<AST>),
+    List(NodeID, Pos, Vec<AST>),
 
     Recall(NodeID, Pos),
     Identifier(NodeID, Pos, Ident),
     Index(NodeID, Pos, Box<AST>, Box<AST>, Option<Type>),
     Resolver(NodeID, Pos, Box<AST>, Ident),
     Accessor(NodeID, Pos, Box<AST>, Ident, Option<Type>),
-    Invoke(NodeID, Pos, Box<AST>, Vec<AST>, Option<Type>),
+    Invoke(NodeID, Pos, Box<AST>, Vec<AST>),
     SideEffect(NodeID, Pos, Ident, Vec<AST>),
     //Prefix(NodeID, Pos, Ident, Box<AST>),
     //Infix(NodeID, Pos, Ident, Box<AST>, Box<AST>),
@@ -191,14 +197,14 @@ impl Field {
 impl AST {
     pub fn get_pos(&self) -> Pos {
         match *self {
-            AST::Tuple(_, ref pos, _, _) |
-            AST::List(_, ref pos, _, _) |
+            AST::Tuple(_, ref pos, _) |
+            AST::List(_, ref pos, _) |
             AST::Recall(_, ref pos) |
             AST::Identifier(_, ref pos, _) |
             AST::Index(_, ref pos, _, _, _) |
             AST::Resolver(_, ref pos, _, _) |
             AST::Accessor(_, ref pos, _, _, _) |
-            AST::Invoke(_, ref pos, _, _, _) |
+            AST::Invoke(_, ref pos, _, _) |
             AST::SideEffect(_, ref pos, _, _) |
             AST::Block(_, ref pos, _) |
             AST::If(_, ref pos, _, _, _) |
@@ -221,15 +227,16 @@ impl AST {
 
     pub fn get_id(&self) -> NodeID {
         match *self {
+            AST::Literal(ref id, _) |
             AST::Nil(ref id) |
-            AST::Tuple(ref id, _, _, _) |
-            AST::List(ref id, _, _, _) |
+            AST::Tuple(ref id, _, _) |
+            AST::List(ref id, _, _) |
             AST::Recall(ref id, _) |
             AST::Identifier(ref id, _, _) |
             AST::Index(ref id, _, _, _, _) |
             AST::Resolver(ref id, _, _, _) |
             AST::Accessor(ref id, _, _, _, _) |
-            AST::Invoke(ref id, _, _, _, _) |
+            AST::Invoke(ref id, _, _, _) |
             AST::SideEffect(ref id, _, _, _) |
             AST::Block(ref id, _, _) |
             AST::If(ref id, _, _, _, _) |
@@ -250,16 +257,20 @@ impl AST {
         }
     }
 
+    pub fn make_lit(literal: Literal) -> AST {
+        AST::Literal(NodeID::generate(), literal)
+    }
+
     pub fn make_nil() -> AST {
         AST::Nil(NodeID::generate())
     }
 
-    pub fn make_tuple(pos: Pos, items: Vec<AST>, ttype: Option<Type>) -> AST {
-        AST::Tuple(NodeID::generate(), pos, items, ttype)
+    pub fn make_tuple(pos: Pos, items: Vec<AST>) -> AST {
+        AST::Tuple(NodeID::generate(), pos, items)
     }
 
-    pub fn make_list(pos: Pos, items: Vec<AST>, ttype: Option<Type>) -> AST {
-        AST::List(NodeID::generate(), pos, items, ttype)
+    pub fn make_list(pos: Pos, items: Vec<AST>) -> AST {
+        AST::List(NodeID::generate(), pos, items)
     }
 
     pub fn make_recall(pos: Pos) -> AST {
@@ -282,8 +293,8 @@ impl AST {
         AST::Accessor(NodeID::generate(), pos, object, ident, ttype)
     }
 
-    pub fn make_invoke(pos: Pos, fexpr: Box<AST>, args: Vec<AST>, ttype: Option<Type>) -> AST {
-        AST::Invoke(NodeID::generate(), pos, fexpr, args, ttype)
+    pub fn make_invoke(pos: Pos, fexpr: Box<AST>, args: Vec<AST>) -> AST {
+        AST::Invoke(NodeID::generate(), pos, fexpr, args)
     }
 
     pub fn make_side_effect(pos: Pos, ident: Ident, args: Vec<AST>) -> AST {
