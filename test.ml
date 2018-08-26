@@ -29,12 +29,9 @@
         let fac2 = fn x, y, z => if not x then 1 else x - -123
         testy(3)
 
-        // TODO this is failing to codegen
-	//let test2 = fn x => x()
-        // TODO this is causing a problem with ambiguous overload variant, because it can't determine the return type of test3
-        // TODO this is failing to codegen
-	//let test3 = fn x => x() + 1
-        //println(str(test3(fn => 3)))
+	let test2 = fn x => x()
+	let test3 = fn x => x() + 1
+        println(str(test3(fn => 3)))
 
         let recfoo = fn x => begin  //comment
             if x < 1 then           //comment
@@ -227,14 +224,14 @@
         let list3 = new List<Int>()
         list3.push(4)
         list3.insert(1, 5)
-        // TODO this is causing problems
-        //list3[1] = 123
-        //println(str(list3[1]))
+        list3[1] = 123
+        println(str(list3[1]))
 
         let list: List<'thing> = [ 1, 2, 3 ]
-        //list[1] = 5
+        list[1] = 5
         println(str(list[1]))
         println(str("Thing"[2]))
+        // TODO this isn't compiling correctly (expected Stuff found TestClass, seems odd)
         //let list2 = [ new TestClass(), new Stuff(), new TestClass() ]
 
         class NumList<'a> extends List<Int> {
@@ -263,7 +260,6 @@
 
         let ftest = [ fn x => x * 16, fn x => x * 100 ]
 
-        // TODO this is not typechecking properly with the lists
         class Thing {
             fn new(self) {
                 self.bar = fn a => [ a, a, a ]

@@ -11,7 +11,7 @@ class Object {
 
     fn new(self) { }
 
-    // NOTE the type annotations are required here because we don't have constricted types yet
+    // NOTE the type annotations are required here because we don't have constrained types yet
     fn multiply(x: Int, y: Int) {
         x * y
     }

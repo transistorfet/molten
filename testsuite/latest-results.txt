@@ -1,5 +1,5 @@
-Wed Aug  8 21:30:24 PDT 2018
-[01/40] basic/abi-across-exprs.mol......................................success
+Sun Aug 26 15:08:14 PDT 2018
+[01/40] basic/abi-across-exprs.mol......................................FAIL
 [02/40] basic/block-assign.mol..........................................success
 [03/40] basic/block-invoke.mol..........................................success
 [04/40] basic/conditionals-bool.mol.....................................success
@@ -22,8 +22,8 @@ Wed Aug  8 21:30:24 PDT 2018
 [21/40] basic/string-escapes.mol........................................success
 [22/40] basic/whileloops.mol............................................success
 [23/40] binding/definition-fail.mol.....................................success
-[24/40] binding/function-fail.mol.......................................success
-[25/40] binding/method-fail.mol.........................................success
+[24/40] binding/function-fail.mol.......................................FAIL
+[25/40] binding/method-fail.mol.........................................FAIL
 [26/40] binding/overload-c-fail.mol.....................................success
 [27/40] binding/overload.mol............................................success
 [28/40] objects/basic.mol...............................................success
@@ -34,9 +34,9 @@ Wed Aug  8 21:30:24 PDT 2018
 [33/40] objects/inheritence-third.mol...................................success
 [34/40] objects/inheritence-vtable.mol..................................success
 [35/40] objects/inheritence.mol.........................................success
-[36/40] objects/interface.mol...........................................success
+[36/40] objects/interface.mol...........................................FAIL
 [37/40] typecheck/basic.mol.............................................success
 [38/40] typecheck/definition-fail.mol...................................success
 [39/40] typecheck/infer-arg-as-typevar.mol..............................FAIL
 [40/40] typecheck/infer-forward-method.mol..............................FAIL
-36 tests passed, 4 tests failed, 40 total
+32 tests passed, 8 tests failed, 40 total

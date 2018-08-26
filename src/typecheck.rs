@@ -130,8 +130,10 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &mut 
 
                     ftype
                 },
-                Type::Variable(_, ref id) => {
-                    Type::Function(Box::new(atypes), Box::new(expected.unwrap_or_else(|| tscope.new_typevar(session))), ABI::Unknown)
+                Type::Variable(_, ref vid) => {
+                    let ftype = Type::Function(Box::new(atypes), Box::new(expected.unwrap_or_else(|| tscope.new_typevar(session))), ABI::Unknown);
+                    session.update_type(tscope, *vid, ftype.clone());
+                    ftype
                 },
                 _ => return Err(Error::new(format!("NotAFunction: {:?}", fexpr))),
             };
