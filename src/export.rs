@@ -47,9 +47,9 @@ fn build_index_node(index: &mut String, session: &Session, scope: ScopeRef, node
         AST::Class(ref id, _, ref classspec, ref parentspec, ref body) => {
             let tscope = session.map.get(&id);
             //let classdef = scope.find_type_def(session, &classspec.ident.name).unwrap().as_class().unwrap();
-            let namespec = unparse_type(session, tscope.clone(), Type::from_spec(classspec.clone()));
+            let namespec = unparse_type(session, tscope.clone(), Type::from_spec(classspec.clone(), UniqueID(0)));
             let fullspec = if parentspec.is_some() {
-                format!("{} extends {}", namespec, unparse_type(session, tscope.clone(), Type::from_spec(parentspec.clone().unwrap())))
+                format!("{} extends {}", namespec, unparse_type(session, tscope.clone(), Type::from_spec(parentspec.clone().unwrap(), UniqueID(0))))
             } else {
                 namespec.clone()
             };
@@ -85,13 +85,13 @@ fn build_index_node(index: &mut String, session: &Session, scope: ScopeRef, node
 
 pub fn unparse_type(session: &Session, scope: ScopeRef, ttype: Type) -> String {
     match ttype {
-        Type::Object(name, types) => {
+        Type::Object(name, _, types) => {
             let params = if types.len() > 0 { format!("<{}>", types.iter().map(|p| unparse_type(session, scope.clone(), p.clone())).collect::<Vec<String>>().join(", ")) } else { String::from("") };
             name.clone() + &params
         },
         Type::Variable(mut name, id) => {
             let var = scope.find_type(session, &name);
-            if var.is_none() || var.unwrap().get_varid().unwrap_or(UniqueID(0)) != id {
+            if var.is_none() || var.unwrap().get_id().unwrap_or(UniqueID(0)) != id {
                 let gscope = Scope::global(scope.clone());
                 name = gscope.new_typevar_name();
                 // TODO there is no def tied to the defid, but is it needed?

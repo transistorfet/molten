@@ -47,6 +47,7 @@ impl ClassDef {
     }
 
     pub fn define_class(session: &Session, scope: ScopeRef, id: NodeID, classtype: Type, parenttype: Option<Type>) -> Result<ClassDefRef, Error> {
+        debug!("DEF CLASS: {:?}", classtype);
         let name = classtype.get_name()?;
         let tscope = session.map.get(&id);
         tscope.set_redirect(true);
@@ -73,7 +74,7 @@ impl ClassDef {
     pub fn create_class(session: &Session, scope: ScopeRef, id: NodeID, classtype: Type, parenttype: Option<Type>) -> Result<ClassDefRef, Error> {
         // Find the parent class definitions, which the new class will inherit from
         let parentclass = match parenttype {
-            Some(Type::Object(ref pname, _)) => Some(scope.find_type_def(session, &pname)?.as_class()?),
+            Some(Type::Object(ref pname, _, _)) => Some(scope.find_type_def(session, &pname)?.as_class()?),
             _ => None
         };
 
@@ -81,6 +82,7 @@ impl ClassDef {
         let classvars = Scope::new_ref(parentclass.map(|p| p.classvars.clone()));
         classvars.set_basename(classtype.get_name()?);
 
+        session.set_type(id, classtype.clone());
         let classdef = ClassDef::new_ref(classtype.get_name()?, classtype, parenttype, classvars);
         Ok(classdef)
     }
@@ -108,9 +110,9 @@ impl ClassDef {
 
         if self.has_vtable() {
             if let Some(index) = structdef.iter().position(|ref r| r.0.as_str() == "__vtable__") {
-                structdef[index].1 = Type::Object(format!("{}_vtable", self.classname), vec!());
+                structdef[index].1 = Type::Object(format!("{}_vtable", self.classname), self.vtable.borrow().id, vec!());
             } else {
-                structdef.push((String::from("__vtable__"), Type::Object(format!("{}_vtable", self.classname), vec!())));
+                structdef.push((String::from("__vtable__"), Type::Object(format!("{}_vtable", self.classname), self.vtable.borrow().id, vec!())));
             }
         }
         for ref node in body.iter() {
@@ -219,15 +221,21 @@ impl StructDef {
 
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct Vtable(pub Vec<(NodeID, String, Type)>);
+pub struct Vtable {
+    pub id: NodeID,
+    pub table: Vec<(NodeID, String, Type)>,
+}
 
 impl Vtable {
     pub fn new() -> Self {
-        Vtable(vec!())
+        Vtable {
+            id: NodeID::generate(),
+            table: vec!(),
+        }
     }
 
     pub fn inherit(&mut self, inherit: &Vtable) {
-        self.0 = inherit.0.clone();
+        self.table = inherit.table.clone();
     }
 
     pub fn build_vtable(&mut self, session: &Session, scope: ScopeRef, body: &Vec<AST>) {
@@ -257,24 +265,24 @@ impl Vtable {
     pub fn add_entry(&mut self, id: NodeID, name: &str, ftype: Type) {
         debug!("***************: {:?} {:?}", name, ftype);
         if let Some(index) = self.get_index(name, &ftype) {
-            self.0[index].0 = id;
+            self.table[index].0 = id;
         } else {
-            self.0.push((id, String::from(name), ftype));
+            self.table.push((id, String::from(name), ftype));
         }
     }
 
 
     pub fn get_index(&self, name: &str, ftype: &Type) -> Option<usize> {
         // TODO check types for overloaded match
-        self.0.iter().position(|ref r| r.1.as_str() == name)
+        self.table.iter().position(|ref r| r.1.as_str() == name)
     }
 
     pub fn get_type(&self, index: usize) -> Type {
-        self.0[index].2.clone()
+        self.table[index].2.clone()
     }
 
     pub fn len(&self) -> usize {
-        self.0.len()
+        self.table.len()
     }
 }
 

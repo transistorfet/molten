@@ -317,7 +317,7 @@ named!(newclass(Span) -> AST,
             delimited!(tag!("("), expression_list, tag!(")")),
             |mut a| { a.insert(0, AST::make_new(Pos::new(pos), cs.clone())); a }
         ) >>
-        (AST::PtrCast(Type::from_spec(cs.clone()), Box::new(AST::make_invoke(Pos::new(pos), Box::new(AST::make_resolve(Pos::new(pos), Box::new(AST::make_ident(Pos::new(pos), cs.ident.clone())), Ident::from_str("new"))), a, None))))
+        (AST::PtrCast(Type::Object(cs.ident.name.clone(), UniqueID(0), cs.types.clone()), Box::new(AST::make_invoke(Pos::new(pos), Box::new(AST::make_resolve(Pos::new(pos), Box::new(AST::make_ident(Pos::new(pos), cs.ident.clone())), Ident::from_str("new"))), a, None))))
     )
 );
 
@@ -600,7 +600,7 @@ named!(type_description(Span) -> Type,
 named!(type_object(Span) -> Type,
     do_parse!(
         cs: class_spec >>
-        (Type::from_spec(cs))
+        (Type::Object(cs.ident.name.clone(), UniqueID(0), cs.types.clone()))
     )
 );
 

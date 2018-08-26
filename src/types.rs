@@ -11,7 +11,7 @@ pub use abi::ABI;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Type {
-    Object(String, Vec<Type>),
+    Object(String, UniqueID, Vec<Type>),
     Variable(String, UniqueID),
     Function(Box<Type>, Box<Type>, ABI),
     Tuple(Vec<Type>),
@@ -23,18 +23,17 @@ pub enum Type {
 impl Type {
     pub fn get_name(&self) -> Result<String, Error> {
         match *self {
-            Type::Object(ref name, _) => Ok(name.clone()),
+            Type::Object(ref name, _, _) => Ok(name.clone()),
             _ => Err(Error::new(format!("TypeError: expected a class or concrete type, found {:?}", self))),
         }
     }
 
     pub fn get_params(&self) -> Result<Vec<Type>, Error> {
         match *self {
-            Type::Object(_, ref params) => Ok(params.clone()),
+            Type::Object(_, _, ref params) => Ok(params.clone()),
             _ => Err(Error::new(format!("TypeError: expected a class or concrete type, found {:?}", self))),
         }
     }
-
 
     pub fn is_tuple(&self) -> bool {
         match *self {
@@ -95,8 +94,9 @@ impl Type {
         }
     }
 
-    pub fn get_varid(&self) -> Result<UniqueID, Error> {
+    pub fn get_id(&self) -> Result<UniqueID, Error> {
         match self {
+            &Type::Object(_, ref id, _) => Ok(*id),
             &Type::Variable(_, ref id) => Ok(*id),
             _ => Err(Error::new(format!("TypeError: expected variable type, found {:?}", self))),
         }
@@ -109,6 +109,7 @@ impl Type {
         }
     }
 
+    /*
     pub fn get_variants(&self) -> Vec<Type> {
         match self {
             &Type::Overload(ref variants) => variants.clone(),
@@ -140,9 +141,10 @@ impl Type {
         };
         Ok(rtype)
     }
+    */
 
-    pub fn from_spec(classspec: ClassSpec) -> Type {
-        Type::Object(classspec.ident.name, classspec.types)
+    pub fn from_spec(classspec: ClassSpec, id: UniqueID) -> Type {
+        Type::Object(classspec.ident.name, id, classspec.types)
     }
 
     /*
@@ -196,11 +198,11 @@ impl Type {
     /*
     pub fn convert<F>(self, f: &F) -> Type where F: FnOnce(Type) -> Type {
         let ttype = match self {
-            Type::Object(name, types) => {
+            Type::Object(name, id, types) => {
                 let types = types.into_iter().map(move |ttype| {
                     ttype.convert(f)
                 }).collect();
-                Type::Object(name, types)
+                Type::Object(name, id, types)
             },
             Type::Overload(types) => {
                 let types = types.into_iter().map(move |ttype| {
@@ -236,7 +238,7 @@ impl Type {
 impl fmt::Display for Type {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            Type::Object(ref name, ref types) => {
+            Type::Object(ref name, ref _id, ref types) => {
                 let params = if types.len() > 0 { format!("<{}>", types.iter().map(|p| format!("{}", p)).collect::<Vec<String>>().join(", ")) } else { String::from("") };
                 write!(f, "{}{}", name, params)
             },
@@ -304,7 +306,7 @@ pub fn check_type(session: &Session, scope: ScopeRef, odtype: Option<Type>, octy
             //if mode == Check::Update && dtype.is_variable() {
             if dtype.is_variable() && !scope.contains_type(&dtype.get_varname().unwrap()) {
             //if dtype.is_variable() && !scope.contains_type(name) {
-                if update { Type::update_type(scope, &dtype.get_varid().unwrap().to_string(), ctype.clone()); }
+                if update { Type::update_type(scope, &dtype.get_id().unwrap().to_string(), ctype.clone()); }
                 Ok(resolve_type(session, scope, ctype.clone()))
             } else {
                 if update { session.update_type(scope, *id, dtype.clone()); }
@@ -362,11 +364,11 @@ pub fn check_type(session: &Session, scope: ScopeRef, odtype: Option<Type>, octy
                         Err(Error::new(format!("TypeError: type mismatch, expected {} but found {}", dtype, ctype)))
                     }
                 },
-                (Type::Object(ref aname, ref atypes), Type::Object(ref bname, ref btypes)) => {
-                    match is_subclass_of(session, scope.clone(), (bname, btypes), (aname, atypes), mode.clone()) {
+                (Type::Object(ref aname, ref aid, ref atypes), Type::Object(ref bname, ref bid, ref btypes)) => {
+                    match is_subclass_of(session, scope.clone(), (bname, *bid, btypes), (aname, *aid, atypes), mode.clone()) {
                         ok @ Ok(_) => ok,
                         err @ Err(_) => match mode {
-                            Check::List => is_subclass_of(session, scope, (aname, atypes), (bname, btypes), mode.clone()),
+                            Check::List => is_subclass_of(session, scope, (aname, *aid, atypes), (bname, *bid, btypes), mode.clone()),
                             _ => err,
                         }
                     }
@@ -386,38 +388,38 @@ pub fn check_type(session: &Session, scope: ScopeRef, odtype: Option<Type>, octy
 }
 
 
-fn is_subclass_of(session: &Session, scope: ScopeRef, adef: (&String, &Vec<Type>), bdef: (&String, &Vec<Type>), mode: Check) -> Result<Type, Error> {
+fn is_subclass_of(session: &Session, scope: ScopeRef, adef: (&String, UniqueID, &Vec<Type>), bdef: (&String, UniqueID, &Vec<Type>), mode: Check) -> Result<Type, Error> {
     debug!("IS SUBCLASS: {:?} of {:?}", adef, bdef);
     let tscope = Scope::new_ref(Some(scope.clone()));
     let mut names = Scope::map_new();
-    let mut adef = (adef.0.clone(), adef.1.clone());
+    let mut adef = (adef.0.clone(), adef.1, adef.2.clone());
 
     loop {
         let mut class = scope.find_type(session, &adef.0).unwrap();
         class = tscope.map_typevars(session, &mut names, class);
-        adef.1 = check_type_params(session, tscope.clone(), &class.get_params()?, &adef.1, mode.clone(), true)?;
+        adef.2 = check_type_params(session, tscope.clone(), &class.get_params()?, &adef.2, mode.clone(), true)?;
 
         if *bdef.0 == adef.0 {
-            let ptypes = if bdef.1.len() > 0 || adef.1.len() > 0 {
-                check_type_params(session, tscope.clone(), &adef.1, bdef.1, mode.clone(), true)?
+            let ptypes = if bdef.2.len() > 0 || adef.2.len() > 0 {
+                check_type_params(session, tscope.clone(), &adef.2, bdef.2, mode.clone(), true)?
             } else {
                 vec!()
             };
-            //let rtype = Type::Object(adef.0, ptypes);
-            //let rtype = resolve_type(session, &tscope, Type::Object(adef.0, ptypes));
-            let rtype = resolve_type(session, tscope.clone(), tscope.unmap_typevars(session, &mut names, Type::Object(adef.0, ptypes)));
+            //let rtype = Type::Object(adef.0, adef.1, ptypes);
+            //let rtype = resolve_type(session, &tscope, Type::Object(adef.0, adef.1, ptypes));
+            let rtype = resolve_type(session, tscope.clone(), tscope.unmap_typevars(session, &mut names, Type::Object(adef.0, adef.1, ptypes)));
             debug!("DONE SUBCLASS: {:?}", rtype);
             return Ok(rtype);
-            //return Ok(tscope.unmap_typevars(session, &mut names, Type::Object(adef.0, ptypes)));
+            //return Ok(tscope.unmap_typevars(session, &mut names, Type::Object(adef.0, adef.1, ptypes)));
         }
 
         let classdef = scope.find_type_def(session, &adef.0)?.as_class()?;
         if classdef.parenttype.is_none() {
-            return Err(Error::new(format!("TypeError: type mismatch, expected {} but found {}", Type::Object(adef.0.clone(), adef.1), Type::Object(bdef.0.clone(), bdef.1.clone()))));
+            return Err(Error::new(format!("TypeError: type mismatch, expected {} but found {}", Type::Object(adef.0.clone(), adef.1, adef.2), Type::Object(bdef.0.clone(), bdef.1, bdef.2.clone()))));
         }
         let parent = tscope.map_typevars(session, &mut names, classdef.parenttype.clone().unwrap());
         match resolve_type(session, tscope.clone(), parent) {
-            Type::Object(name, params) => adef = (name, params),
+            Type::Object(name, id, params) => adef = (name, id, params),
             ttype @ _ => return Err(Error::new(format!("TypeError: expected Object but found {}", ttype))),
         }
     }
@@ -437,12 +439,12 @@ pub fn check_type_params(session: &Session, scope: ScopeRef, dtypes: &Vec<Type>,
 
 pub fn resolve_type(session: &Session, scope: ScopeRef, ttype: Type) -> Type {
     match ttype {
-        Type::Object(ref name, ref types) => {
-            match scope.find_type(session, name) {
+        Type::Object(ref name, ref id, ref types) => {
+            match session.get_type(*id) {
                 Some(_) => {
                     let params = types.iter().map(|ptype| resolve_type(session, scope.clone(), ptype.clone())).collect();
                     // TODO we are purposely returning the original type here so as not to over-resolve types... but we should probably still fully resolve for checking purposes
-                    Type::Object(name.clone(), params)
+                    Type::Object(name.clone(), *id, params)
                 },
                 None => panic!("TypeError: undefined type {:?}", name),
             }

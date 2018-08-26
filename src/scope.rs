@@ -301,6 +301,19 @@ impl Scope {
         }
     }
 
+    pub fn make_obj(&self, session: &Session, name: String, params: Vec<Type>) -> Result<Type, Error> {
+        match self.find_type(session, &name) {
+            Some(Type::Object(ename, id, eparams)) => {
+                if eparams.len() != params.len() {
+                    return Err(Error::new(format!("TypeError: type parameters don't match.  Expected {:?} but found {:?}", eparams, params)));
+                }
+                Ok(Type::Object(name, id, params))
+            },
+            Some(ttype) => Err(Error::new(format!("TypeError: expected object type but found {:?}", ttype))),
+            None => Err(Error::new(format!("TypeError: type not found: {:?}", name)))
+        }
+    }
+
     pub fn set_type_def(&self, name: &String, defid: NodeID) {
         self.modify_type(name, move |info| {
             info.defid = Some(defid.clone());
@@ -397,7 +410,7 @@ impl Scope {
             //Type::Function(args, ret, abi) => Type::Function(Box::new(self.map_typevars(session, varmap, *args)), ret, abi),
             Type::Tuple(types) => Type::Tuple(self.map_typevars_vec(session, varmap, types)),
             Type::Overload(variants) => Type::Overload(self.map_typevars_vec(session, varmap, variants)),
-            Type::Object(name, types) => Type::Object(name.clone(), self.map_typevars_vec(session, varmap, types)),
+            Type::Object(name, id, types) => Type::Object(name.clone(), id, self.map_typevars_vec(session, varmap, types)),
         }
     }
 
@@ -421,7 +434,7 @@ impl Scope {
             //Type::Function(args, ret, abi) => Type::Function(Box::new(self.map_typevars(session, varmap, *args)), ret, abi),
             Type::Tuple(types) => Type::Tuple(self.unmap_typevars_vec(session, varmap, types)),
             Type::Overload(variants) => Type::Overload(self.unmap_typevars_vec(session, varmap, variants)),
-            Type::Object(name, types) => Type::Object(name.clone(), self.unmap_typevars_vec(session, varmap, types)),
+            Type::Object(name, id, types) => Type::Object(name.clone(), id, self.unmap_typevars_vec(session, varmap, types)),
         }
     }
 

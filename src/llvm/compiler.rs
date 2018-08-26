@@ -259,7 +259,7 @@ unsafe fn compile_module<'sess>(builtins: &Vec<BuiltinDef<'sess>>, session: &'se
     let module_init_name = format!("init.{}", module_name.replace("/", "."));
 
 
-    let ftype = Type::Function(Box::new(Type::Tuple(vec!())), Box::new(Type::Object(String::from("Bool"), vec!())), ABI::Molten);
+    let ftype = Type::Function(Box::new(Type::Tuple(vec!())), Box::new(scope.make_obj(data.session, String::from("Bool"), vec!()).unwrap()), ABI::Molten);
     let lftype = LLVMFunctionType(bool_type(data), ptr::null_mut(), 0, 0);
     let function = LLVMAddFunction(module, label(module_init_name.as_str()), lftype);
     //LLVMSetPersonalityFn(function, LLVMGetNamedFunction(data.module, label("__gxx_personality_v0")));
@@ -382,7 +382,7 @@ unsafe fn declare_globals(data: &LLVM, scope: ScopeRef) {
 
             if classdef.has_vtable() {
                 let mut methods = vec!();
-                for (index, &(ref id, ref name, ref ttype)) in classdef.vtable.borrow().0.iter().enumerate() {
+                for (index, &(ref id, ref name, ref ttype)) in classdef.vtable.borrow().table.iter().enumerate() {
                     let dtype = data.session.get_type(*id).unwrap();
                     debug!("VTABLE INIT: {:?} {:?} {:?}", cident.name, id, index);
                     methods.push(build_generic_cast(data, data.get_value(*id).unwrap().get_ref(), get_type(data, tscope.clone(), ttype.clone(), true)));
@@ -394,7 +394,7 @@ unsafe fn declare_globals(data: &LLVM, scope: ScopeRef) {
                 LLVMSetInitializer(global, LLVMConstNamedStruct(vtype, methods.as_mut_ptr(), methods.len() as u32));
                 LLVMSetLinkage(global, LLVMLinkage::LLVMLinkOnceAnyLinkage);
                 let id = scope.define(vname.clone(), None).unwrap();
-                data.session.set_type(id, Type::Object(format!("{}_vtable", cident.name), vec!()));
+                data.session.set_type(id, Type::Object(format!("{}_vtable", cident.name), classdef.vtable.borrow().id, vec!()));
                 data.set_value(id, Box::new(Global(global)));
             }
         }
@@ -868,7 +868,7 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
                 from_type(&classdef.get_struct_type(structindex), LLVMBuildLoad(data.builder, pointer, label("tmp")))
             } else if let Some(vtableindex) = classdef.get_vtable_index(right.as_str(), &ttype) {
                 debug!(">>ACCESS VTABLE: {:?} {:?}", vtableindex, classdef.get_vtable_type(vtableindex));
-                debug!("TABLE: {:#?}", classdef.vtable);
+                //debug!("TABLE: {:#?}", classdef.vtable);
                 let vindex = classdef.get_struct_vtable_index().unwrap();
                 let mut indices = vec!(i32_value(data, 0), i32_value(data, vindex));
                 let pointer = LLVMBuildGEP(data.builder, object, indices.as_mut_ptr(), indices.len() as u32, label("tmp"));
@@ -901,13 +901,13 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
 
         AST::Import(ref id, ref pos, ref ident, _) => {
             let module_init_name = format!("init.{}", &ident.name);
-            let ftype = Type::Function(Box::new(Type::Tuple(vec!())), Box::new(Type::Object(String::from("Bool"), vec!())), ABI::Molten);
             if LLVMGetNamedFunction(data.module, label(module_init_name.as_str())).is_null() {
                 let lftype = LLVMFunctionType(bool_type(data), &mut [].as_mut_ptr(), 0, false as i32);
                 let function = LLVMAddFunction(data.module, label(module_init_name.as_str()), lftype);
 
                 //let id = scope.define(module_init_name.clone(), Some(ftype.clone()), None).unwrap();
                 let id = NodeID::generate();
+                let ftype = Type::Function(Box::new(Type::Tuple(vec!())), Box::new(scope.make_obj(data.session, String::from("Bool"), vec!()).unwrap()), ABI::Molten);
                 FuncDef::define_func(data.session, scope.clone(), id, &Some(module_init_name.clone()), ABI::C, Some(ftype.clone())).unwrap();
                 data.set_value(id, Box::new(Function(function)));
             }
@@ -1288,9 +1288,9 @@ pub unsafe fn build_class_type(data: &LLVM, scope: ScopeRef, id: NodeID, name: &
         let vtname = format!("{}_vtable", name);
         let vttype = LLVMStructCreateNamed(data.context, label(vtname.as_str()));
         let pvttype = LLVMPointerType(vttype, 0);
-        let vid = NodeID::generate();
-        let structdef = StructDef::define_struct(data.session, scope.clone(), vid, Type::Object(vtname.clone(), vec!()), None).unwrap();
-        data.set_type(vid, TypeValue { value: pvttype, vttype: None });
+        let vtid = classdef.vtable.borrow().id;
+        let structdef = StructDef::define_struct(data.session, scope.clone(), vtid, Type::Object(vtname.clone(), vtid, vec!()), None).unwrap();
+        data.set_type(vtid, TypeValue { value: pvttype, vttype: None });
         (Some(vttype), Some(pvttype))
     } else {
         (None, None)
@@ -1307,7 +1307,7 @@ pub unsafe fn build_class_type(data: &LLVM, scope: ScopeRef, id: NodeID, name: &
 
     if let Some(vttype) = vttype {
         let mut types = vec!();
-        for &(_, _, ref ttype) in classdef.vtable.borrow().0.iter() {
+        for &(_, _, ref ttype) in classdef.vtable.borrow().table.iter() {
             types.push(get_type(data, scope.clone(), ttype.clone(), true))
         }
         LLVMStructSetBody(vttype, types.as_mut_ptr(), types.len() as u32, false as i32);
@@ -1318,7 +1318,7 @@ pub unsafe fn build_class_type(data: &LLVM, scope: ScopeRef, id: NodeID, name: &
 
 pub unsafe fn get_type(data: &LLVM, scope: ScopeRef, ttype: Type, use_fptrs: bool) -> LLVMTypeRef {
     match ttype {
-        Type::Object(ref tname, ref _ptypes) => match tname.as_str() {
+        Type::Object(ref tname, ref id, ref _ptypes) => match tname.as_str() {
             "Nil" => str_type(data),
             "Bool" => bool_type(data),
             "Byte" => LLVMInt8TypeInContext(data.context),
@@ -1327,7 +1327,8 @@ pub unsafe fn get_type(data: &LLVM, scope: ScopeRef, ttype: Type, use_fptrs: boo
             "String" => str_type(data),
             "Buffer" => ptr_type(data),
 
-            _ => match data.get_type(scope.get_type_def(tname).unwrap()) {
+            //_ => match data.get_type(scope.get_type_def(tname).unwrap()) {
+            _ => match data.get_type(*id) {
                 Some(typedata) => typedata.value,
                 // TODO this should panic...  but Nil doesn't have a value (because it needs to know the type of null pointer it should be)
                 //None => LLVMInt64TypeInContext(data.context),

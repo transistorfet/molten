@@ -152,6 +152,18 @@ debug!("SET REF: {:?} -> {:?}", id, defid);
         self.set_type(id, ntype);
         Ok(())
     }
+
+    pub fn resolve_types(&self) {
+        use types;
+
+        let keys: Vec<NodeID> = self.types.borrow().keys().map(|k| *k).collect();
+        for key in keys {
+            let ttype = self.get_type(key).unwrap();
+            let ntype = types::resolve_type(self, self.map.get(&ScopeMapRef::GLOBAL), ttype.clone());
+            debug!("$$$$$$$: {:?} {:?} {:?}", key, ttype, ntype);
+            self.set_type(key, ntype);
+        }
+    }
 }
 
 

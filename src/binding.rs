@@ -148,8 +148,10 @@ fn bind_names_node_or_error(session: &Session, scope: ScopeRef, node: &mut AST) 
                 declare_classspec_typevars(session, tscope.clone(), pspec, false)?;
             }
 
-            let classtype = Type::from_spec(classspec.clone());
-            let parenttype = parentspec.clone().map(|p| Type::from_spec(p));
+            let classtype = Type::Object(classspec.ident.name.clone(), *id, classspec.types.clone());
+            let parenttype = parentspec.clone().map(|p| scope.make_obj(session, p.ident.name.clone(), p.types).unwrap());
+            //let classtype = Type::from_spec(classspec.clone());
+            //let parenttype = parentspec.clone().map(|p| Type::from_spec(p));
 
             let classdef = ClassDef::define_class(session, scope, *id, classtype, parenttype)?;
             let tscope = session.map.get(id);
@@ -215,7 +217,16 @@ fn bind_names_node_or_error(session: &Session, scope: ScopeRef, node: &mut AST) 
 pub fn declare_typevars(session: &Session, scope: ScopeRef, ttype: Option<&mut Type>, always_new: bool) -> Result<(), Error> {
     match ttype {
         Some(ttype) => match ttype {
-            &mut Type::Object(_, ref mut types) => {
+            &mut Type::Object(ref name, ref mut id, ref mut types) => {
+                match scope.find_type(session, name) {
+                    Some(Type::Object(_, ref eid, _)) => *id = *eid,
+                    _ => if !always_new {
+                        panic!("UndefinedType: {:?}", name)
+                    } else if *id == UniqueID(0) {
+                        *id = UniqueID::generate();
+                    },
+                }
+
                 for ttype in types.iter_mut() {
                     declare_typevars(session, scope.clone(), Some(ttype), always_new)?;
                 }
@@ -235,12 +246,15 @@ pub fn declare_typevars(session: &Session, scope: ScopeRef, ttype: Option<&mut T
                     false => scope.find_type(session, name),
                 };
                 match vtype {
-                    Some(Type::Variable(_, ref eid)) => *id = *eid,
+                    Some(Type::Variable(_, ref eid)) => {
+                        *id = *eid
+                    },
                     _ => {
                         *id = UniqueID::generate();
                         let ttype = Type::Variable(name.clone(), *id);
+                        // TODO i think this contains check should be removable
                         if !scope.contains_type_local(name) && !scope.is_primative() {
-                            scope.define_type(name.clone(), None)?;
+                            scope.define_type(name.clone(), Some(*id))?;
                         }
                         session.set_type(*id, ttype);
                     }

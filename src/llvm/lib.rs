@@ -71,8 +71,8 @@ pub fn declare_builtins_node<'sess>(session: &Session, scope: ScopeRef, node: &B
         },
         BuiltinDef::Class(ref id, ref name, ref params, _, ref entries) => {
             let tscope = ClassDef::create_class_scope(session, scope.clone(), *id);
-            let mut ttype = Type::Object(String::from(*name), params.clone());
-            declare_typevars(session, scope.clone(), Some(&mut ttype), true).unwrap();
+            let mut ttype = Type::Object(String::from(*name), *id, params.clone());
+            declare_typevars(session, tscope.clone(), Some(&mut ttype), true).unwrap();
             let classdef = ClassDef::define_class(session, scope.clone(), *id, ttype, None).unwrap();
 
             declare_builtins_vec(session, tscope.clone(), entries);

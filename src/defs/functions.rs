@@ -125,7 +125,7 @@ impl OverloadDef {
 
     pub fn get_variants(&self, session: &Session) -> Vec<NodeID> {
         let mut variants = self.variants.borrow().clone();
-        let mut prev = match self.parent {
+        let prev = match self.parent {
             Some(id) => match session.get_def(id) {
                 Ok(Def::Overload(ol)) => ol.get_variants(session),
                 _ => vec!(id)

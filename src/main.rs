@@ -95,6 +95,7 @@ fn compile_file(input: &str, output: Option<&str>) {
     }
 
     code = precompiler::precompile(&session, code);
+    session.resolve_types();
 
     compiler::compile(&builtins, &session, name, &mut code);
 
