@@ -219,6 +219,37 @@ impl AST {
         }
     }
 
+    pub fn get_id(&self) -> NodeID {
+        match *self {
+            AST::Nil(ref id) |
+            AST::Tuple(ref id, _, _, _) |
+            AST::List(ref id, _, _, _) |
+            AST::Recall(ref id, _) |
+            AST::Identifier(ref id, _, _) |
+            AST::Index(ref id, _, _, _, _) |
+            AST::Resolver(ref id, _, _, _) |
+            AST::Accessor(ref id, _, _, _, _) |
+            AST::Invoke(ref id, _, _, _, _) |
+            AST::SideEffect(ref id, _, _, _) |
+            AST::Block(ref id, _, _) |
+            AST::If(ref id, _, _, _, _) |
+            AST::Raise(ref id, _, _) |
+            AST::Try(ref id, _, _, _, _) |
+            AST::Match(ref id, _, _, _, _) |
+            AST::For(ref id, _, _, _, _) |
+            AST::Declare(ref id, _, _, _) |
+            AST::Function(ref id, _, _, _, _, _, _) |
+            AST::New(ref id, _, _) |
+            AST::Class(ref id, _, _, _, _) |
+            AST::Import(ref id, _, _, _) |
+            AST::Definition(ref id, _, _, _, _) |
+            AST::Assignment(ref id, _, _, _) |
+            AST::While(ref id, _, _, _) |
+            AST::TypeDef(ref id, _, _, _) => { *id }
+            _ => UniqueID(0),
+        }
+    }
+
     pub fn make_nil() -> AST {
         AST::Nil(NodeID::generate())
     }

@@ -442,11 +442,14 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
             //let function = compile_node(data, func, unwind, scope.clone(), fexpr);
             let function = match **fexpr {
                 // Compile the first argument of a method access only once for the method lookup and the argument evalution
-                AST::Accessor(ref id, ref pos, _, ref field, ref otype) => {
-                    let oid = NodeID::generate();
-                    let classvars = scope.find_type_def(data.session, &otype.clone().unwrap().get_name().unwrap()).unwrap().as_class().unwrap().classvars.clone();
-                    let defid = classvars.get_var_def(&field.name).unwrap();
-                    data.session.set_ref(oid, defid);
+                AST::Accessor(ref id, ref pos, ref left, ref field, ref otype) => {
+                    let oid = left.get_id();
+                    //let oid = NodeID::generate();
+                    //let classvars = scope.find_type_def(data.session, &otype.clone().unwrap().get_name().unwrap()).unwrap().as_class().unwrap().classvars.clone();
+                    //let defid = classvars.get_var_def(&field.name).unwrap();
+                    //data.session.set_ref(oid, defid);
+
+// TODO replace use of otype
                     data.set_value(oid, from_type(otype.as_ref().unwrap(), largs[0]));
                     compile_node(data, func, unwind, scope.clone(), &AST::Accessor(*id, pos.clone(), Box::new(AST::Recall(oid, pos.clone())), field.clone(), otype.clone()))
                 },
@@ -489,11 +492,9 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
         },
 
         AST::Function(ref id, _, ref ident, _, _, _, ref abi) => {
-            let fname = scope.get_full_name(ident, *id);
-            //from_abi(abi, LLVMGetNamedFunction(data.module, label(fname.as_str())))
             match *ident {
                 Some(ref ident) => data.get_value(*id).unwrap(),
-                _ => from_abi(abi, LLVMGetNamedFunction(data.module, label(fname.as_str()))),
+                _ => from_abi(abi, LLVMGetNamedFunction(data.module, label(scope.get_full_name(ident, *id).as_str()))),
             }
         },
 
@@ -855,8 +856,10 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
 
         AST::Accessor(ref id, _, ref left, ref right, ref otype) => {
             let object = compile_node(data, func, unwind, scope.clone(), left).get_ref();
-
 // TODO replace use of otype
+            //let otype = data.session.get_type_from_ref(left.get_id());
+            //debug!("####################: {:?} {:?}", ytype, data.session.get_type_from_ref(left.get_id()));
+
             let ttype = data.session.get_type_from_ref(*id).unwrap();
             let name = otype.clone().unwrap().get_name().unwrap();
             let classdef = scope.find_type_def(data.session, &name).unwrap().as_class().unwrap();
