@@ -1,4 +1,5 @@
 
+use rand;
 
 use types::Type;
 use utils::UniqueID;
@@ -82,12 +83,13 @@ pub fn refine_node(node: AST) -> AST {
             //let itype = stype.unwrap();
             //let ltype = Type::Object(format!("List"), vec!(itype.clone()));
             let tmplist = format!("{}", UniqueID::generate());
+            let typevar = rand::random::<i32>();
 
             block.push(AST::make_def(pos.clone(), Ident::new(pos.clone(), tmplist.clone()), None,
                 Box::new(AST::make_invoke(pos.clone(),
                     Box::new(AST::make_resolve(pos.clone(), Box::new(AST::make_ident(pos.clone(), Ident::from_str("List"))), Ident::from_str("new"))),
                     vec!(
-                        AST::make_new(pos.clone(), ClassSpec::new(pos.clone(), Ident::from_str("List"), vec!(Type::Variable(String::from("rl"), UniqueID(0)))))
+                        AST::make_new(pos.clone(), ClassSpec::new(pos.clone(), Ident::from_str("List"), vec!(Type::Variable(typevar.to_string(), UniqueID(0)))))
                         /*, AST::Integer(code.len() as isize)*/
                     ), None))));
             for item in code {

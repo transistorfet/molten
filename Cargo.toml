@@ -9,4 +9,5 @@ nom = "^4.0"
 nom_locate = "^0.3"
 clap = "^2"
 llvm-sys = "50"
+rand = "^0.5"
 

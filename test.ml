@@ -24,7 +24,7 @@
         let x = 2 + 4 * 7 - 1 / 20  == 10 - 50 * 12
 
         let testy = fn x => x + 1
-        // TODO this wasn't compiling because of a reference not set error on the *??
+        // TODO this wasn't compiling because of the default arguments not being compiled correctly (possibly just missing atm?)
         //let fac = fn (x : Int, y = 5 * 3, z: String = "hey") => if not x then 1 else x - -123
         let fac2 = fn x, y, z => if not x then 1 else x - -123
         testy(3)
@@ -66,7 +66,7 @@
         println("0x00 | 0x20: " + str(0x00 | 0x20))
         println("Com: " + hex(~0x5555555555555555))
 
-        // NOTE this sorta causes a type error (actually an overload/no variant error), as it should
+        // NOTE this correctly causes a type error (actually an overload/no variant error)
         //let ab = 123.24 * 3
 
 
@@ -142,6 +142,7 @@
 	}
         println(str(r))
 
+        // TODO this doesn't work without brackets around the if statement
         //let h = 5 + if r > 4 then 5 else 10
 
         match x == true {
@@ -170,8 +171,7 @@
 
         fn strnum(num: Real) -> String {
             let buffer: String = malloc(22)
-            // TODO this doesn't compile because we broke the type updater again, such that the type variable in the primative decl is being updated when it shouldn't
-            //sprintf(buffer, "%f", num, nil)
+            sprintf(buffer, "%f", num, nil)
             buffer
         }
 
@@ -191,7 +191,7 @@
         overload()
 */
 
-        /*
+/*
         // TODO these don't work because it cannot be disambiguated during the recursive invoke
         fn recoverload(x) {
             if x <= 0 then
@@ -206,7 +206,7 @@
             else
                 recoverload(x - 1.0)
         }
-        */
+*/
 
 	println("thing" + "stuff\n")
         println("STUFF".push(" things"))
@@ -261,8 +261,9 @@
         let c = new B<Real, Int>()
         c.bar = 3.2
 
-/*
-        // TODO this was broken
+        let ftest = [ fn x => x * 16, fn x => x * 100 ]
+
+        // TODO this is not typechecking properly with the lists
         class Thing {
             fn new(self) {
                 self.bar = fn a => [ a, a, a ]
@@ -296,6 +297,7 @@
         thing.arr[1]
         get_thing().arr[2]
 
+/*
         thing.baz(521)
         get_thing().baz(985)
         thing.bar()[1]

@@ -1,6 +1,7 @@
 
 use std::str;
 
+extern crate rand;
 extern crate clap;
 use clap::{ App, Arg };
 
