@@ -120,7 +120,7 @@ fn bind_names_node_or_error(session: &Session, scope: ScopeRef, node: &mut AST) 
         AST::List(ref id, _, ref mut code) |
         AST::Block(ref id, _, ref mut code) => { bind_names_vec(session, scope, code); },
 
-        AST::Index(ref id, _, ref mut base, ref mut index, _) => {
+        AST::Index(ref id, _, ref mut base, ref mut index) => {
             bind_names_node(session, scope.clone(), base);
             bind_names_node(session, scope, index);
         },
@@ -193,7 +193,7 @@ fn bind_names_node_or_error(session: &Session, scope: ScopeRef, node: &mut AST) 
 
         AST::Assignment(ref id, _, ref mut left, ref mut right) => {
             match **left {
-                AST::Accessor(_, _, _, _, _) | AST::Index(_, _, _, _, _) => { },
+                AST::Accessor(_, _, _, _, _) | AST::Index(_, _, _, _) => { },
                 _ => return Err(Error::new(format!("SyntaxError: assignment to something other than a list or class element: {:?}", left))),
             };
             bind_names_node(session, scope.clone(), left);

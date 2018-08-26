@@ -71,7 +71,7 @@ pub enum AST {
 
     Recall(NodeID, Pos),
     Identifier(NodeID, Pos, Ident),
-    Index(NodeID, Pos, Box<AST>, Box<AST>, Option<Type>),
+    Index(NodeID, Pos, Box<AST>, Box<AST>),
     Resolver(NodeID, Pos, Box<AST>, Ident),
     Accessor(NodeID, Pos, Box<AST>, Ident, Option<Type>),
     Invoke(NodeID, Pos, Box<AST>, Vec<AST>),
@@ -81,8 +81,8 @@ pub enum AST {
     Block(NodeID, Pos, Vec<AST>),
     If(NodeID, Pos, Box<AST>, Box<AST>, Box<AST>),
     Raise(NodeID, Pos, Box<AST>),
-    Try(NodeID, Pos, Box<AST>, Vec<(AST, AST)>, Option<Type>),
-    Match(NodeID, Pos, Box<AST>, Vec<(AST, AST)>, Option<Type>),
+    Try(NodeID, Pos, Box<AST>, Vec<(AST, AST)>, NodeID),
+    Match(NodeID, Pos, Box<AST>, Vec<(AST, AST)>, NodeID),
     For(NodeID, Pos, Ident, Box<AST>, Box<AST>),
     Declare(NodeID, Pos, Ident, Type),
     Function(NodeID, Pos, Option<Ident>, Vec<Argument>, Option<Type>, Box<AST>, ABI),
@@ -201,7 +201,7 @@ impl AST {
             AST::List(_, ref pos, _) |
             AST::Recall(_, ref pos) |
             AST::Identifier(_, ref pos, _) |
-            AST::Index(_, ref pos, _, _, _) |
+            AST::Index(_, ref pos, _, _) |
             AST::Resolver(_, ref pos, _, _) |
             AST::Accessor(_, ref pos, _, _, _) |
             AST::Invoke(_, ref pos, _, _) |
@@ -233,7 +233,7 @@ impl AST {
             AST::List(ref id, _, _) |
             AST::Recall(ref id, _) |
             AST::Identifier(ref id, _, _) |
-            AST::Index(ref id, _, _, _, _) |
+            AST::Index(ref id, _, _, _) |
             AST::Resolver(ref id, _, _, _) |
             AST::Accessor(ref id, _, _, _, _) |
             AST::Invoke(ref id, _, _, _) |
@@ -281,8 +281,8 @@ impl AST {
         AST::Identifier(NodeID::generate(), pos, ident)
     }
 
-    pub fn make_index(pos: Pos, list: Box<AST>, index: Box<AST>, ttype: Option<Type>) -> AST {
-        AST::Index(NodeID::generate(), pos, list, index, ttype)
+    pub fn make_index(pos: Pos, list: Box<AST>, index: Box<AST>) -> AST {
+        AST::Index(NodeID::generate(), pos, list, index)
     }
 
     pub fn make_resolve(pos: Pos, object: Box<AST>, ident: Ident) -> AST {
@@ -313,12 +313,12 @@ impl AST {
         AST::Raise(NodeID::generate(), pos, expr)
     }
 
-    pub fn make_try(pos: Pos, cond: Box<AST>, cases: Vec<(AST, AST)>, ttype: Option<Type>) -> AST {
-        AST::Try(NodeID::generate(), pos, cond, cases, ttype)
+    pub fn make_try(pos: Pos, cond: Box<AST>, cases: Vec<(AST, AST)>) -> AST {
+        AST::Try(NodeID::generate(), pos, cond, cases, NodeID::generate())
     }
 
-    pub fn make_match(pos: Pos, cond: Box<AST>, cases: Vec<(AST, AST)>, ttype: Option<Type>) -> AST {
-        AST::Match(NodeID::generate(), pos, cond, cases, ttype)
+    pub fn make_match(pos: Pos, cond: Box<AST>, cases: Vec<(AST, AST)>) -> AST {
+        AST::Match(NodeID::generate(), pos, cond, cases, NodeID::generate())
     }
 
     pub fn make_for(pos: Pos, ident: Ident, list: Box<AST>, body: Box<AST>) -> AST {

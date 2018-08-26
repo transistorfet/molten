@@ -258,7 +258,7 @@ named!(trywith(Span) -> AST,
         c: expression >>
         wscom!(tag_word!("with")) >>
         l: caselist >>
-        (AST::make_try(Pos::new(pos), Box::new(c), l, None))
+        (AST::make_try(Pos::new(pos), Box::new(c), l))
     )
 );
 
@@ -279,7 +279,7 @@ named!(matchcase(Span) -> AST,
         //wscom!(tag_word!("with")) >>
         //l: caselist >>
         l: delimited!(wscom!(tag!("{")), caselist, wscom!(tag!("}"))) >>
-        (AST::make_match(Pos::new(pos), Box::new(c), l, None))
+        (AST::make_match(Pos::new(pos), Box::new(c), l))
     )
 );
 
@@ -511,7 +511,7 @@ impl AST {
         let mut ret = left;
         for op in operations {
             match op {
-                SubOP::Index(p, e) => ret = AST::make_index(p, Box::new(ret), Box::new(e), None),
+                SubOP::Index(p, e) => ret = AST::make_index(p, Box::new(ret), Box::new(e)),
                 SubOP::Invoke(p, e) => ret = AST::make_invoke(p, Box::new(ret), e),
                 SubOP::Accessor(p, name) => ret = AST::make_access(p, Box::new(ret), name.clone(), None),
                 SubOP::Resolver(p, name) => ret = AST::make_resolve(p, Box::new(ret), name.clone()),

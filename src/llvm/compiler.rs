@@ -554,8 +554,7 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
         // TODO you might need to create a new function to hold the body, so that it can be resumed from, and there also
         // might be an issue when you call a function one level down, and pass it the same unwind locations... it might effect all
         // functions, all the way down
-        AST::Try(ref id, _, ref body, ref cases, ref condtype) => {
-// TODO replace use of condtype
+        AST::Try(ref id, _, ref body, ref cases, ref cid) => {
             /*
             // TODO need to add multiple cases, and also it doesn't work
             let try_block = LLVMAppendBasicBlockInContext(data.context, func, label("try"));
@@ -651,8 +650,7 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
             Box::new(Data(phi))
         },
 
-        AST::Match(ref id, _, ref cond, ref cases, ref condtype) => {
-// TODO replace use of condtype
+        AST::Match(ref id, _, ref cond, ref cases, ref cid) => {
             let mut cond_blocks = vec!();
             let mut do_blocks = vec!();
             for _ in 0 .. cases.len() {
@@ -665,7 +663,7 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
             let cond_value = compile_node(data, func, unwind, scope.clone(), cond).get_ref();
             LLVMBuildBr(data.builder, cond_blocks[0]);
 
-            let ctype = condtype.as_ref().unwrap();
+            let ctype = data.session.get_type(*cid).unwrap();
             let mut values = vec!();
             for (i, &(ref case, ref expr)) in cases.iter().enumerate() {
                 LLVMPositionBuilderAtEnd(data.builder, cond_blocks[i]);
@@ -930,7 +928,7 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
         AST::TypeDef(ref id, _, _, _) => panic!("NotImplementedError: not yet supported, {:?}", node),
 
         AST::Underscore |
-        AST::Index(_, _, _, _, _) => panic!("InternalError: ast element shouldn't appear at this late phase: {:?}", node),
+        AST::Index(_, _, _, _) => panic!("InternalError: ast element shouldn't appear at this late phase: {:?}", node),
     }
 }
 
@@ -1057,7 +1055,7 @@ unsafe fn collect_functions_node<'sess>(data: &mut LLVM<'sess>, scope: ScopeRef,
             data.classes.push(node);
         },
 
-        AST::Index(ref id, _, ref left, ref right, _) => {
+        AST::Index(ref id, _, ref left, ref right) => {
             collect_functions_node(data, scope.clone(), left);
             collect_functions_node(data, scope, right);
         },

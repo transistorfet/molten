@@ -53,14 +53,14 @@ pub fn refine_node(node: AST) -> AST {
             AST::If(id, pos, Box::new(refine_node(*cond)), Box::new(refine_node(*texpr)), Box::new(refine_node(*fexpr)))
         },
 
-        AST::Match(id, pos, cond, cases, condtype) => {
+        AST::Match(id, pos, cond, cases, cid) => {
             let cases = cases.into_iter().map(move |(case, body)| ( refine_node(case), refine_node(body) )).collect();
-            AST::Match(id, pos, Box::new(refine_node(*cond)), cases, condtype)
+            AST::Match(id, pos, Box::new(refine_node(*cond)), cases, cid)
         },
 
-        AST::Try(id, pos, cond, cases, condtype) => {
+        AST::Try(id, pos, cond, cases, cid) => {
             let cases = cases.into_iter().map(move |(case, body)| ( refine_node(case), refine_node(body) )).collect();
-            AST::Try(id, pos, Box::new(refine_node(*cond)), cases, condtype)
+            AST::Try(id, pos, Box::new(refine_node(*cond)), cases, cid)
         },
 
         AST::Raise(id, pos, expr) => {
@@ -131,7 +131,7 @@ pub fn refine_node(node: AST) -> AST {
             AST::Class(id, pos, classspec, parentspec, refine_vec(body))
         },
 
-        AST::Index(id, pos, base, index, _) => {
+        AST::Index(id, pos, base, index) => {
             //AST::Index(id, pos, Box::new(refine_node(*base)), Box::new(refine_node(*index)), stype)
             refine_node(AST::Invoke(id, pos.clone(), Box::new(AST::Accessor(NodeID::generate(), pos.clone(), base, Ident::new(pos.clone(), String::from("[]")), None)), vec!(*index)))
         },
@@ -155,7 +155,7 @@ pub fn refine_node(node: AST) -> AST {
                 AST::Accessor(_, _, _, _, _) => {
                     AST::Assignment(id, pos, Box::new(refine_node(left)), Box::new(refine_node(*right)))
                 },
-                AST::Index(iid, ipos, base, index, _) => {
+                AST::Index(iid, ipos, base, index) => {
                     refine_node(AST::Invoke(id, pos, Box::new(AST::Accessor(iid, ipos.clone(), base, Ident::new(ipos.clone(), String::from("[]")), None)), vec!(*index, *right)))
                 },
                 _ => panic!("SyntaxError: assignment to something other than a list or class element: {:?}", left),

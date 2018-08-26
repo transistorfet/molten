@@ -188,15 +188,16 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &mut 
             expect_type(session, scope, Some(ttype), Some(ftype), Check::List)?
         },
 
-        AST::Try(ref id, _, ref mut cond, ref mut cases, ref mut condtype) |
-        AST::Match(ref id, _, ref mut cond, ref mut cases, ref mut condtype) => {
-            let mut ctype = Some(check_types_node(session, scope.clone(), cond, None));
+        AST::Try(ref id, _, ref mut cond, ref mut cases, ref cid) |
+        AST::Match(ref id, _, ref mut cond, ref mut cases, ref cid) => {
+            let mut ctype = check_types_node(session, scope.clone(), cond, None);
             let mut rtype = None;
             for &mut (ref mut case, ref mut expr) in cases {
-                ctype = Some(expect_type(session, scope.clone(), ctype.clone(), Some(check_types_node(session, scope.clone(), case, ctype.clone())), Check::List)?);
+                ctype = expect_type(session, scope.clone(), Some(ctype.clone()), Some(check_types_node(session, scope.clone(), case, Some(ctype.clone()))), Check::List)?;
                 rtype = Some(expect_type(session, scope.clone(), rtype.clone(), Some(check_types_node(session, scope.clone(), expr, rtype.clone())), Check::List)?);
             }
-            *condtype = ctype;
+            //*condtype = ctype;
+            session.set_type(*cid, ctype);
             rtype.unwrap()
         },
 
@@ -319,7 +320,7 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &mut 
         AST::Underscore => expected.unwrap_or_else(|| scope.new_typevar(session)),
 
         AST::Recall(ref id, _) => panic!("InternalError: Recall ast element shouldn't appear this early"),
-        AST::Index(ref id, _, _, _, _) => panic!("InternalError: ast element shouldn't appear at this late phase: {:?}", node),
+        AST::Index(ref id, _, _, _) => panic!("InternalError: ast element shouldn't appear at this late phase: {:?}", node),
     };
     
     debug!("CHECK: {:?} {:?}", rtype, node);

@@ -155,14 +155,14 @@ debug!("{} {} -> {:?} {:?}", scope.get_basename(), name.as_ref().unwrap().name, 
             AST::If(id, pos, Box::new(precompile_node(session, scope.clone(), *cond)), Box::new(precompile_node(session, scope.clone(), *texpr)), Box::new(precompile_node(session, scope.clone(), *fexpr)))
         },
 
-        AST::Match(id, pos, cond, cases, condtype) => {
+        AST::Match(id, pos, cond, cases, cid) => {
             let cases = cases.into_iter().map(|(case, body)| ( precompile_node(session, scope.clone(), case), precompile_node(session, scope.clone(), body) )).collect();
-            AST::Match(id, pos, Box::new(precompile_node(session, scope.clone(), *cond)), cases, condtype)
+            AST::Match(id, pos, Box::new(precompile_node(session, scope.clone(), *cond)), cases, cid)
         },
 
-        AST::Try(id, pos, cond, cases, condtype) => {
+        AST::Try(id, pos, cond, cases, cid) => {
             let cases = cases.into_iter().map(|(case, body)| ( precompile_node(session, scope.clone(), case), precompile_node(session, scope.clone(), body) )).collect();
-            AST::Try(id, pos, Box::new(precompile_node(session, scope.clone(), *cond)), cases, condtype)
+            AST::Try(id, pos, Box::new(precompile_node(session, scope.clone(), *cond)), cases, cid)
         },
 
         AST::Raise(id, pos, expr) => {
@@ -278,7 +278,7 @@ debug!("{} {} -> {:?} {:?}", scope.get_basename(), name.as_ref().unwrap().name, 
         AST::Underscore => { node },
         AST::Literal(_, _) => { node },
 
-        AST::Index(_, _, _, _, _) => panic!("InternalError: ast element shouldn't appear at this late phase: {:?}", node),
+        AST::Index(_, _, _, _) => panic!("InternalError: ast element shouldn't appear at this late phase: {:?}", node),
     }
 }
 
