@@ -118,8 +118,8 @@ impl ClassDef {
         }
         for ref node in body.iter() {
             match **node {
-                AST::Definition(ref id, _, ref ident, ref ttype, ref value) => {
-                    structdef.push((ident.name.clone(), ttype.clone().unwrap()));
+                AST::Definition(ref id, _, ref ident, _, ref value) => {
+                    structdef.push((ident.name.clone(), session.get_type(*id).unwrap()));
                 },
                 _ => { }
             }

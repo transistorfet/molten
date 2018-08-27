@@ -27,7 +27,6 @@ mod session;
 mod refinery;
 mod binding;
 mod typecheck;
-mod precompiler;
 mod defs;
 mod export;
 mod llvm;
@@ -95,7 +94,6 @@ fn compile_file(input: &str, output: Option<&str>) {
         debug::print_types_scope(&session, global);
     }
 
-    code = precompiler::precompile(&session, code);
     session.resolve_types();
 
     compiler::compile(&builtins, &session, name, &mut code);
