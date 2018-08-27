@@ -295,9 +295,9 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &mut 
             classvars.get_variable_type(session, &field.name).unwrap_or_else(|| expected.unwrap_or_else(|| scope.new_typevar(session)))
         },
 
-        AST::Accessor(ref id, _, ref mut left, ref mut field, ref mut otype) => {
+        AST::Accessor(ref id, _, ref mut left, ref mut field, ref oid) => {
             let ltype = resolve_type(session, scope.clone(), check_types_node(session, scope.clone(), left, None));
-            *otype = Some(ltype.clone());
+            session.set_type(*oid, ltype.clone());
 
             let classvars = scope.find_type_def(session, &ltype.get_name()?)?.as_class()?.classvars.clone();
             let defid = classvars.get_var_def(&field.name).unwrap();
@@ -332,9 +332,9 @@ pub fn session_find_variant(session: &Session, scope: ScopeRef, invid: NodeID, f
         AST::Identifier(ref id, _, _) => {
             (*id, session.get_ref(*id)?)
         },
-        AST::Accessor(ref id, _, ref mut left, ref mut field, ref mut otype) => {
+        AST::Accessor(ref id, _, ref mut left, ref mut field, ref oid) => {
             let ltype = resolve_type(session, scope.clone(), check_types_node(session, scope.clone(), left, None));
-            *otype = Some(ltype.clone());
+            session.set_type(*oid, ltype.clone());
 
             let classvars = scope.find_type_def(session, &ltype.get_name()?)?.as_class()?.classvars.clone();
             (*id, classvars.get_var_def(&field.name).ok_or(Error::new(format!("VarError: definition not set for {:?}", field.name)))?)

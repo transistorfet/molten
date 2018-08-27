@@ -73,7 +73,7 @@ pub enum AST {
     Identifier(NodeID, Pos, Ident),
     Index(NodeID, Pos, Box<AST>, Box<AST>),
     Resolver(NodeID, Pos, Box<AST>, Ident),
-    Accessor(NodeID, Pos, Box<AST>, Ident, Option<Type>),
+    Accessor(NodeID, Pos, Box<AST>, Ident, NodeID),
     Invoke(NodeID, Pos, Box<AST>, Vec<AST>),
     SideEffect(NodeID, Pos, Ident, Vec<AST>),
     //Prefix(NodeID, Pos, Ident, Box<AST>),
@@ -289,8 +289,8 @@ impl AST {
         AST::Resolver(NodeID::generate(), pos, object, ident)
     }
 
-    pub fn make_access(pos: Pos, object: Box<AST>, ident: Ident, ttype: Option<Type>) -> AST {
-        AST::Accessor(NodeID::generate(), pos, object, ident, ttype)
+    pub fn make_access(pos: Pos, object: Box<AST>, ident: Ident) -> AST {
+        AST::Accessor(NodeID::generate(), pos, object, ident, NodeID::generate())
     }
 
     pub fn make_invoke(pos: Pos, fexpr: Box<AST>, args: Vec<AST>) -> AST {

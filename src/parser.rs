@@ -447,7 +447,7 @@ impl AST {
             _ => 
             //AST::Infix(pos, op, Box::new(r1), Box::new(r2))
             AST::make_invoke(pos.clone(), Box::new(AST::make_ident(pos, op)), vec!(r1, r2))
-            //AST::make_invoke(pos, Box::new(AST::make_access(pos, Box::new(r1), op, None)), vec!(r2))
+            //AST::make_invoke(pos, Box::new(AST::make_access(pos, Box::new(r1), op)), vec!(r2))
         }
     }
 }
@@ -482,7 +482,7 @@ named!(prefix(Span) -> AST,
         a: atomic >>
         //(AST::Prefix(op, Box::new(a)))
         (AST::make_invoke(Pos::new(pos), Box::new(AST::make_ident(Pos::new(pos), op)), vec!(a)))
-        //(AST::make_invoke(Box::new(AST::make_access(Pos::new(pos), Box::new(a), op, None)), vec!()))
+        //(AST::make_invoke(Box::new(AST::make_access(Pos::new(pos), Box::new(a), op)), vec!()))
     )
 );
 
@@ -513,7 +513,7 @@ impl AST {
             match op {
                 SubOP::Index(p, e) => ret = AST::make_index(p, Box::new(ret), Box::new(e)),
                 SubOP::Invoke(p, e) => ret = AST::make_invoke(p, Box::new(ret), e),
-                SubOP::Accessor(p, name) => ret = AST::make_access(p, Box::new(ret), name.clone(), None),
+                SubOP::Accessor(p, name) => ret = AST::make_access(p, Box::new(ret), name.clone()),
                 SubOP::Resolver(p, name) => ret = AST::make_resolve(p, Box::new(ret), name.clone()),
             }
         }

@@ -447,16 +447,10 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
             //let function = compile_node(data, func, unwind, scope.clone(), fexpr);
             let function = match **fexpr {
                 // Compile the first argument of a method access only once for the method lookup and the argument evalution
-                AST::Accessor(ref id, ref pos, ref left, ref field, ref otype) => {
-                    let oid = left.get_id();
-                    //let oid = NodeID::generate();
-                    //let classvars = scope.find_type_def(data.session, &otype.clone().unwrap().get_name().unwrap()).unwrap().as_class().unwrap().classvars.clone();
-                    //let defid = classvars.get_var_def(&field.name).unwrap();
-                    //data.session.set_ref(oid, defid);
-
-// TODO replace use of otype
-                    data.set_value(oid, from_type(otype.as_ref().unwrap(), largs[0]));
-                    compile_node(data, func, unwind, scope.clone(), &AST::Accessor(*id, pos.clone(), Box::new(AST::Recall(oid, pos.clone())), field.clone(), otype.clone()))
+                AST::Accessor(ref id, ref pos, ref left, ref field, ref oid) => {
+                    let otype = data.session.get_type(*oid).unwrap();
+                    data.set_value(*oid, from_type(&otype, largs[0]));
+                    compile_node(data, func, unwind, scope.clone(), &AST::Accessor(*id, pos.clone(), Box::new(AST::Recall(*oid, pos.clone())), field.clone(), *oid))
                 },
                 _ => compile_node(data, func, unwind, scope.clone(), fexpr)
             };
@@ -857,9 +851,10 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
             }
         },
 
-        AST::Accessor(ref id, _, ref left, ref right, ref otype) => {
+        AST::Accessor(ref id, _, ref left, ref right, ref oid) => {
             let object = compile_node(data, func, unwind, scope.clone(), left).get_ref();
 // TODO replace use of otype
+            let otype = data.session.get_type(*oid);
             //let otype = data.session.get_type_from_ref(left.get_id());
             //debug!("####################: {:?} {:?}", otype, data.session.get_type_from_ref(left.get_id()));
 
@@ -892,9 +887,9 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
         AST::Assignment(ref id, _, ref left, ref right) => {
             let value = compile_node(data, func, unwind, scope.clone(), right);
             match **left {
-                AST::Accessor(ref id, _, ref left, ref right, ref otype) => {
-// TODO replace use of otype
-                    let name = otype.clone().unwrap().get_name().unwrap();
+                AST::Accessor(ref id, _, ref left, ref right, ref oid) => {
+                    let otype = data.session.get_type(*oid).unwrap();
+                    let name = otype.get_name().unwrap();
                     let object = compile_node(data, func, unwind, scope.clone(), left).get_ref();
                     let classdef = scope.find_type_def(data.session, &name).unwrap().as_class().unwrap();
                     let pointer = build_struct_access(data, classdef, &right.name, object);

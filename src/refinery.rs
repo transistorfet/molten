@@ -92,7 +92,7 @@ pub fn refine_node(node: AST) -> AST {
                     )))));
             for item in code {
                 block.push(AST::make_invoke(pos.clone(),
-                    Box::new(AST::make_access(pos.clone(), Box::new(AST::make_ident(pos.clone(), Ident::new(pos.clone(), tmplist.clone()))), Ident::from_str("push"), None)),
+                    Box::new(AST::make_access(pos.clone(), Box::new(AST::make_ident(pos.clone(), Ident::new(pos.clone(), tmplist.clone()))), Ident::from_str("push"))),
                     vec!(item)));
             }
             block.push(AST::make_ident(pos.clone(), Ident::new(pos.clone(), tmplist.clone())));
@@ -133,7 +133,7 @@ pub fn refine_node(node: AST) -> AST {
 
         AST::Index(id, pos, base, index) => {
             //AST::Index(id, pos, Box::new(refine_node(*base)), Box::new(refine_node(*index)), stype)
-            refine_node(AST::Invoke(id, pos.clone(), Box::new(AST::Accessor(NodeID::generate(), pos.clone(), base, Ident::new(pos.clone(), String::from("[]")), None)), vec!(*index)))
+            refine_node(AST::Invoke(id, pos.clone(), Box::new(AST::Accessor(NodeID::generate(), pos.clone(), base, Ident::new(pos.clone(), String::from("[]")), NodeID::generate())), vec!(*index)))
         },
 
         AST::Resolver(id, pos, left, right) => {
@@ -145,8 +145,8 @@ pub fn refine_node(node: AST) -> AST {
             AST::Resolver(id, pos, Box::new(refine_node(*left)), right)
         },
 
-        AST::Accessor(id, pos, left, right, stype) => {
-            AST::Accessor(id, pos, Box::new(refine_node(*left)), right, stype)
+        AST::Accessor(id, pos, left, right, oid) => {
+            AST::Accessor(id, pos, Box::new(refine_node(*left)), right, oid)
         },
 
         AST::Assignment(id, pos, left, right) => {
@@ -156,7 +156,7 @@ pub fn refine_node(node: AST) -> AST {
                     AST::Assignment(id, pos, Box::new(refine_node(left)), Box::new(refine_node(*right)))
                 },
                 AST::Index(iid, ipos, base, index) => {
-                    refine_node(AST::Invoke(id, pos, Box::new(AST::Accessor(iid, ipos.clone(), base, Ident::new(ipos.clone(), String::from("[]")), None)), vec!(*index, *right)))
+                    refine_node(AST::Invoke(id, pos, Box::new(AST::Accessor(iid, ipos.clone(), base, Ident::new(ipos.clone(), String::from("[]")), NodeID::generate())), vec!(*index, *right)))
                 },
                 _ => panic!("SyntaxError: assignment to something other than a list or class element: {:?}", left),
             }

@@ -254,8 +254,8 @@ debug!("{} {} -> {:?} {:?}", scope.get_basename(), name.as_ref().unwrap().name, 
             AST::Resolver(id, pos, Box::new(precompile_node(session, scope.clone(), *left)), right)
         },
 
-        AST::Accessor(id, pos, left, right, stype) => {
-            AST::Accessor(id, pos, Box::new(precompile_node(session, scope.clone(), *left)), right, stype.map(|stype| resolve_type(session, scope.clone(), stype)))
+        AST::Accessor(id, pos, left, right, oid) => {
+            AST::Accessor(id, pos, Box::new(precompile_node(session, scope.clone(), *left)), right, oid)
         },
 
         AST::Assignment(id, pos, left, right) => {
