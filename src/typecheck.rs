@@ -58,14 +58,11 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &mut 
                     stype = fscope.map_all_typevars(session, stype);
                     atype = expect_type(session, fscope.clone(), Some(atype), Some(stype), Check::Def)?;
                 }
-                //fscope.set_variable_type(&arg.ident.name, atype.clone());
-                //Type::update_variable_type(session, fscope.clone(), &arg.ident.name, atype.clone());
                 session.update_type(fscope.clone(), arg.id, atype.clone());
                 argtypes.push(atype);
             }
 
             let rettype = expect_type(session, fscope.clone(), rtype.clone(), Some(check_types_node(session, fscope.clone(), body, rtype.clone())), Check::Def)?;
-            //*rtype = Some(rettype.clone());
 
             // Resolve type variables that can be
             for i in 0 .. argtypes.len() {
@@ -84,18 +81,7 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &mut 
                     return Err(Error::new(format!("OverloadError: things {:?}", ident)));
                 }
             }
-            /*
-            if ident.is_some() {
-                let dscope = Scope::target(session, scope.clone());
-                let dname = ident.as_ref().unwrap().name.clone();
-                let fname = abi.mangle_name(dname.as_str(), &tupleargs, dscope.num_funcdefs(session, &dname));
-                if !dscope.contains(&fname) {
-                    dscope.define(fname.clone(), Some(nftype.clone()), Some(*id))?;
-                    ident.as_mut().unwrap().name = fname;
-                }
-                Scope::add_func_variant(session, dscope, &dname, scope.clone(), nftype.clone())?;
-            }
-            */
+
             // TODO build closure context from body (all references)
             session.update_type(scope.clone(), *id, nftype.clone())?;
             nftype
@@ -114,22 +100,9 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &mut 
                 Type::Variable(_, _) => dtype.clone(),
                 _ => tscope.map_all_typevars(session, dtype.clone()),
             };
-/*
-            let dtype = check_types_node(session, scope.clone(), fexpr, None);
-            let etype = match dtype {
-                Type::Variable(_, _) => dtype.clone(),
-                _ => tscope.map_all_typevars(session, dtype.clone()),
-            };
-            // TODO how will you find the actual def id of the variant you select, and then set the invoke id reference to that def
-            let etype = match etype.is_overloaded() {
-                true => find_variant(session, tscope.clone(), etype, atypes.clone(), Check::Def)?,
-                false => etype,
-            };
-*/
+
             let ftype = match etype {
                 Type::Function(ref args, _, ref abi) => {
-//                    get_accessor_name(session, tscope.clone(), fexpr.as_mut(), &etype)?;
-
                     //let ftype = expect_type(session, tscope.clone(), Some(etype.clone()), Some(Type::Function(Box::new(atypes), Box::new(expected.unwrap_or_else(|| tscope.new_typevar())), abi)), Check::Update)?;
                     let ftype = expect_type(session, tscope.clone(), Some(etype.clone()), Some(Type::Function(Box::new(atypes), Box::new(etype.get_rettype()?.clone()), *abi)), Check::Def)?;
                     // TODO should this actually be another expect, so type resolutions that occur in later args affect earlier args?  Might not be needed unless you add typevar constraints
@@ -145,13 +118,6 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &mut 
                 _ => return Err(Error::new(format!("NotAFunction: {:?}", fexpr))),
             };
 
-            // TODO this is temporary, because of sprintf/variadic C functions
-            //match **fexpr {
-            //    AST::Identifier(_, _, ref ident) => if ident.as_str() == "sprintf" {
-            //        return Ok(ftype.get_rettype()?.clone());
-            //    },
-            //    _ => { },
-            //}
             session.update_type(scope.clone(), *id, ftype.clone())?;
             ftype.get_rettype()?.clone()
         },
@@ -368,46 +334,6 @@ pub fn session_find_variant(session: &Session, scope: ScopeRef, invid: NodeID, f
     Ok(ftype)
 }
 
-/*
-pub fn get_accessor_name(session: &Session, scope: ScopeRef, fexpr: &mut AST, etype: &Type) -> Result<i32, Error> {
-    let funcdefs = match *fexpr {
-        AST::Resolver(ref id, _, ref left, ref mut ident) => {
-            let ltype = match **left {
-                // TODO this caused an issue with types that have typevars that aren't declared (ie. Buffer['item])
-                //AST::Identifier(ref id, _, ref ident) => resolve_type(session, scope.clone(), scope.find_type(session, &ident.name).unwrap().clone()),
-                AST::Identifier(ref id, _, ref ident) => scope.find_type(session, &ident.name).unwrap().clone(),
-                _ => return Err(Error::new(format!("SyntaxError: left-hand side of scope resolver must be identifier")))
-            };
-
-            let classvars = scope.find_type_def(session, &ltype.get_name()?)?.as_class()?.classvars.clone();
-debug!("!!!: {:?}", classvars.get_variable_type(session, &ident.name));
-            let funcdefs = classvars.num_funcdefs(session, &ident.name);
-            funcdefs
-        },
-        AST::Accessor(ref id, _, _, ref mut ident, ref ltype) => {
-            let classvars = scope.find_type_def(session, &ltype.as_ref().unwrap().get_name()?)?.as_class()?.classvars.clone();
-            let funcdefs = classvars.num_funcdefs(session, &ident.name);
-            funcdefs
-        },
-        AST::Identifier(ref id, _, ref mut ident) => {
-            scope.num_funcdefs(session, &ident.name)
-        },
-        _ =>  { 0 } //return Err(Error::new(format!("OverloadError: calling an overloaded function must be by &ident.name: not {:?}", fexpr))),
-    };
-
-    match *fexpr {
-        AST::Resolver(ref id, _, _, ref mut ident) |
-        AST::Accessor(ref id, _, _, ref mut ident, _) |
-        AST::Identifier(ref id, _, ref mut ident) => {
-            ident.name = etype.get_abi().unwrap_or(ABI::Molten).mangle_name(&ident.name, etype.get_argtypes()?, funcdefs);
-            debug!("^^^^^^^^^^ MANGLE NAME {:?} {:?} {:?}", &ident.name, funcdefs, etype);
-        },
-        _ => { } //return Err(Error::new(format!("OverloadError: calling an overloaded function must be by &ident.name: not {:?}", fexpr))),
-    }
-
-    Ok(funcdefs)
-}
-*/
 
 pub fn update_scope_variable_types(session: &Session, scope: ScopeRef) {
     let dscope = Scope::target(session, scope.clone());
