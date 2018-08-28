@@ -1232,27 +1232,8 @@ pub fn get_method(data: &LLVM, scope: ScopeRef, class: &str, method: &str, argty
         _ => (defid, data.session.get_type(defid).unwrap()),
     };
 
-    //let funcdefs = classdef.num_funcdefs(data.session, &name);
-    //let mname = ABI::Molten.mangle_name(&name, ftype.get_argtypes().unwrap(), funcdefs);
-    let function = data.get_value(defid).unwrap();
-    function
+    data.get_value(defid).unwrap()
 }
-
-/*
-pub unsafe fn build_invoke(data: &LLVM, scope: ScopeRef, unwind: Unwind, classdef: ScopeRef, name: &str, args: Vec<LLVMValueRef>) -> LLVMValueRef {
-    let mut dtype = classdef.get_variable_type(data.session, &name).unwrap();
-    if dtype.is_overloaded() {
-        dtype = types::find_variant(scope.clone(), dtype, ttype.get_argtypes().unwrap().clone(), types::Check::List).unwrap();
-    }
-    let name = ttype.get_abi().unwrap().mangle_name(name, dtype.get_argtypes().unwrap(), classdef.num_funcdefs(data.session, &name));
-    let function = data.get_value(classdef.get_var_def(&name).unwrap()).unwrap();
-    debug!("INVOKE: {:?} {:?} {:?}", cname, name, index);
-
-    //let (ttype, funcdefs, function) = scope.search(name, |sym| (sym.ttype.clone(), sym.funcdefs, sym.value.clone()));
-    //let name = ABI::Molten.mangle_name(name, argtypes, funcdefs);
-    build_cast_from_vartype(data, function.invoke(data, unwind, vec!(list_value, cond_value)), itype);
-}
-*/
 
 pub unsafe fn build_c_call(data: &LLVM, name: &str, largs: &mut Vec<LLVMValueRef>) -> LLVMValueRef {
     let function = LLVMGetNamedFunction(data.module, label(name));

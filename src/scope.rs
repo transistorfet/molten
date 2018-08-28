@@ -206,15 +206,6 @@ impl Scope {
         session.get_def(self.get_type_def(name).ok_or(Error::new(format!("TypeError: definition not set for {:?}", name)))?)
     }
 
-    pub fn num_funcdefs(&self, session: &Session, name: &String) -> i32 {
-        self._search(name, |sym| {
-            match sym.defid {
-                Some(id) => Some(session.get_def(id).unwrap().num_variants(session)),
-                _ => None
-            }
-        }).unwrap_or(0)
-    }
-
 
     pub fn is_closure_var(&self, name: &String) -> bool {
         if self.names.borrow().contains_key(name) {

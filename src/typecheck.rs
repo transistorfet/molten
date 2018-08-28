@@ -315,7 +315,7 @@ pub fn session_find_variant(session: &Session, scope: ScopeRef, invid: NodeID, f
             };
 
             let classvars = scope.find_type_def(session, &ltype.get_name()?)?.as_class()?.classvars.clone();
-            (*id, classvars.get_var_def(&field.name).unwrap())
+            (*id, classvars.get_var_def(&field.name).ok_or(Error::new(format!("VarError: definition not set for {:?}", field.name)))?)
         },
         _ => { return check_types_node_or_error(session, scope.clone(), fexpr, None); },
     };

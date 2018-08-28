@@ -117,14 +117,6 @@ impl Type {
         }
     }
 
-    pub fn num_funcdefs(&self) -> i32 {
-        match *self {
-            Type::Overload(ref variants) => variants.len() as i32,
-            Type::Function(_, _, _) => 1,
-            _ => 0
-        }
-    }
-
     pub fn add_variant(self, session: &Session, scope: ScopeRef, ntype: Type) -> Result<Type, Error> {
         let rtype = match self {
             Type::Overload(ref variants) => {
