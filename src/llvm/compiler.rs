@@ -1217,7 +1217,6 @@ unsafe fn build_function_body(data: &LLVM, node: &AST) {
 }
 
 pub fn get_method(data: &LLVM, scope: ScopeRef, class: &str, method: &str, argtypes: Vec<Type>) -> Box<Compilable> {
-    use types::{ find_variant, Check };
     let classdef = if class == "" {
         scope.clone()
     } else {
@@ -1225,7 +1224,6 @@ pub fn get_method(data: &LLVM, scope: ScopeRef, class: &str, method: &str, argty
     };
 
     let name = String::from(method);
-    //let ftype = find_variant(data.session, scope.clone(), classdef.get_variable_type(data.session, &name).unwrap(), Type::Tuple(argtypes), Check::Def).unwrap();
     let defid = classdef.get_var_def(&name).unwrap();
     let (defid, ftype) = match data.session.get_def(defid) {
         Ok(Def::Overload(ol)) => ol.find_variant(data.session, scope.clone(), Type::Tuple(argtypes)).unwrap(),

@@ -466,46 +466,4 @@ pub fn resolve_type(session: &Session, scope: ScopeRef, ttype: Type) -> Type {
     }
 }
 
-pub fn find_variant(session: &Session, scope: ScopeRef, otype: Type, atypes: Type, mode: Check) -> Result<Type, Error> {
-    match otype {
-        Type::Overload(variants) => {
-            let variants = remove_duplicates(session, scope.clone(), variants);
-            let mut found = vec!();
-            'outer: for variant in &variants {
-                if let Type::Function(ref otypes, _, _) = *variant {
-                    debug!("**CHECKING VARIANT: {:?} {:?}", otypes, atypes);
-                    if check_type(session, scope.clone(), Some(*otypes.clone()), Some(atypes.clone()), mode.clone(), false).is_err() {
-                        continue 'outer;
-                    }
-                    found.push(variant);
-                }
-            }
-
-            match found.len() {
-                0 => Err(Error::new(format!("OverloadError: No valid variant found for {}\n\tout of [{}]", atypes, Type::display_vec(&variants)))),
-                1 => Ok(found[0].clone()),
-                _ => Err(Error::new(format!("OverloadError: Ambiguous {}\n\tvariants found [{}]", atypes, found.iter().map(|t| format!("{}", t)).collect::<Vec<String>>().join(", ")))),
-            }
-        },
-        _ => Ok(otype.clone()),
-    }
-}
-
-// TODO this is sort of a hack that can maybe be integrated into get_variable_type instead
-pub fn remove_duplicates(session: &Session, scope: ScopeRef, mut variants: Vec<Type>) -> Vec<Type> {
-    let mut i = 1;
-
-    while i < variants.len() {
-        for j in 0 .. i {
-            if check_type(session, scope.clone(), Some(variants[i].clone()), Some(variants[j].clone()), Check::List, false).is_ok() {
-                variants.remove(i);
-                i -= 1;
-                break;
-            }
-        }
-        i += 1;
-    }
-    return variants;
-}
-
 
