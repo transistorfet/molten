@@ -1,44 +1,28 @@
 
-* in classes, build_structdef, Definition; you are taking the type from the node, but change it results in an unresolved type from the type table, however, you
-  cannot resolve the types in the table because resolve needs a scope... You can replace the need for a scope by adding an ID to Type::Object, but that will be a much
-  bigger task
+* remove name mangle stuff
+* refactor code that uses num_funcdefs
 
-* you need to make sure there are no ambiguous overloaded variants that might overlap each other, to prevent that being a silent error during vtable construction
+* should you store ClassSpec as Type::Object instead, given that we use it in many places where Pos necessarily make sense
+* one thing i'm seeing a lot of now is stuff like classspec.ident.name... can we prevent so many levels deep?
 
-* the new overload find_variant function should check for ambiguous types, and warn
-* the overload variant adder should check that the defined function doesn't have the same signature any other def, unless the other def is in a parent scope??
-
-* make type constructor functions or macros that are easier to use than Type::Object(String::from(name), vec!())
-
-* how will you set the ref in invoke for overloaded functions
 * how can you use all the new things to make closures...
 * you could check during binding if an identifier is a closure context ref, and bind the ref there
 * you might not be making sure that non-closure functions don't access variables outside their scope (methods are never closures)
 * make sure that you don't overload different types of functions (closures, functions, and methods must all be the same type to allow overloading)
+
 * do you need a BuiltinDef type?
 * do you need a GlobalVarDef type?  or a ConstDef or FieldDef/PropertyDef/etc
-* can you remove the need to define new name mangled bindings?
 * remove declare typevars if possible??
-
-* should we be looking up classes/types/etc by ID?  Should we be unifying IDs during name binding??  Maybe when defining a variable, we store
-  the ID of the AST in the info struct, rather than generate a new one or save the info id in the AST, so we don't have to make AST mut
-* this wouldn't work for overloaded functions and methods...  the IDs would be different, and right now, we are storing --- wait what if we stored the ID in the type, which is overloaded???
-* how can we separate out the name mangling?  Maybe Ident can have an optional mangled name that we store?  We can always use a refcell, but having one if it's not used sucks
 
 * there must be a way to fix the 'scope exceptions' (Scope::target) that we're doing to make class bodies work...
 * but actually... what if you had an argument that you sent to all the scoped functions that select the namespace?  This might be a refactor for later, once scopes only store def ids
 * add some helpful things to the AST::make_* functions, maybe we'd need a different name format for those?
 * add the .set_id() functions to simpliy ast builders
 
-
-* should you store ClassSpec as Type::Object instead, given that we use it in many places where Pos necessarily make sense
-* one thing i'm seeing a lot of now is stuff like classspec.ident.name... can we prevent so many levels deep?
 * eventually we want to make a visitor
 * improve storing of files and file data in the Pos structs (maybe rename to Span?); pass session to parsers
 * change parser to take session argument or something so it can record the file info, and maybe do other advanced things
 * remove extraneous Pos's with Ident/Arguments?
-
-* if you had a tuple type, you could use a typevar to represent a tuple of the arguments to a function: Type::Function(Type::Variable(..), Type::Variable(..)) or 'a -> 'b where 'a = ('c, 'd, 'e)
 
 * make common error printer, with fancy colours
 * there are poor error messages when deleting the "=" from a "let something = fn x => ..." both inside and outside classes.... shouldn't be doing this
@@ -48,7 +32,6 @@
 
 * add ast element like Struct... which does the same as class build type, but without the vtable stuff, and we can bypass some of the complexity...
   but!!!! could we also/instead factor out the vtables somehow... so that it's more modular/selectable
-* there is now an issue with typechecking of hashmap, which doesn't correctly tie the typevars together, and it's has something to do with mapping and the var's name
 
 
 * there's still a problem with typevars not resolving fully, where a function that should return a concrete returns a free typevar.... (recursion or forward definition)

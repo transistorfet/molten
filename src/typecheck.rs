@@ -4,7 +4,7 @@ use defs::Def;
 use session::{ Session, Error };
 use scope::{ Scope, ScopeRef };
 use ast::{ NodeID, ClassSpec, Literal, AST };
-use types::{ Type, Check, ABI, expect_type, resolve_type, find_variant, check_type_params };
+use types::{ Type, Check, ABI, expect_type, resolve_type, check_type_params };
 
 
 pub fn check_types(session: &Session, scope: ScopeRef, code: &mut Vec<AST>) -> Type {
@@ -70,17 +70,20 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &mut 
             // Resolve type variables that can be
             for i in 0 .. argtypes.len() {
                 argtypes[i] = resolve_type(session, fscope.clone(), argtypes[i].clone());
-                // TODO this is still not checking for type compatibility
-                //fscope.set_variable_type(&args[i].pos, argtypes[i].clone());
-                //Type::update_variable_type(session, fscope.clone(), &args[i].ident.name, argtypes[i].clone());
                 session.update_type(fscope.clone(), args[i].id, argtypes[i].clone());
                 args[i].ttype = Some(argtypes[i].clone());
             }
             // TODO is this needed?
-            update_scope_variable_types(session, fscope.clone());
+            //update_scope_variable_types(session, fscope.clone());
 
             let tupleargs = Type::Tuple(argtypes);
             let mut nftype = Type::Function(Box::new(tupleargs.clone()), Box::new(rettype), *abi);
+
+            if let Ok(Def::Overload(ol)) = session.get_def_from_ref(*id) {
+                if ol.find_local_variants(session, scope.clone(), tupleargs.clone()).0.len() > 0 {
+                    return Err(Error::new(format!("OverloadError: things {:?}", ident)));
+                }
+            }
             /*
             if ident.is_some() {
                 let dscope = Scope::target(session, scope.clone());
@@ -416,7 +419,8 @@ pub fn update_scope_variable_types(session: &Session, scope: ScopeRef) {
     for name in &names {
         match dscope.get_variable_type(session, name) {
             Some(otype) => {
-                let ntype = resolve_type(session, scope.clone(), otype);
+                let ntype = resolve_type(session, scope.clone(), otype.clone());
+if otype != ntype { println!("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!: {:?} {:?}", otype, ntype); }
                 match dscope.get_var_def(name) {
                     Some(defid) => { session.update_type(scope.clone(), defid, ntype).unwrap(); },
                     None => { },

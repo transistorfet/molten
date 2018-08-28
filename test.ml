@@ -26,7 +26,8 @@
         let testy = fn x => x + 1
         // TODO this wasn't compiling because of the default arguments not being compiled correctly (possibly just missing atm?)
         //let fac = fn (x : Int, y = 5 * 3, z: String = "hey") => if not x then 1 else x - -123
-        let fac2 = fn x, y, z => if not x then 1 else x - -123
+        // TODO this wasn't compiling because it could not resolve the type of x, so couldn't disambiguate "not"
+        //let fac2 = fn x, y, z => if not x then 1 else x - -123
         testy(3)
 
 	let test2 = fn x => x()

@@ -56,7 +56,7 @@ fn bind_names_node_or_error(session: &Session, scope: ScopeRef, node: &mut AST) 
             bind_names_node(session, fscope, body)
         },
 
-        AST::Invoke(ref id, _, ref mut fexpr, ref mut args) => {
+        AST::Invoke(_, _, ref mut fexpr, ref mut args) => {
             bind_names_node(session, scope.clone(), fexpr);
             bind_names_vec(session, scope, args);
         },
@@ -80,18 +80,18 @@ fn bind_names_node_or_error(session: &Session, scope: ScopeRef, node: &mut AST) 
             }
         },
 
-        AST::SideEffect(ref id, _, _, ref mut args) => {
+        AST::SideEffect(_, _, _, ref mut args) => {
             bind_names_vec(session, scope, args);
         },
 
-        AST::If(ref id, _, ref mut cond, ref mut texpr, ref mut fexpr) => {
+        AST::If(_, _, ref mut cond, ref mut texpr, ref mut fexpr) => {
             bind_names_node(session, scope.clone(), cond);
             bind_names_node(session, scope.clone(), texpr);
             bind_names_node(session, scope, fexpr);
         },
 
-        AST::Try(ref id, _, ref mut cond, ref mut cases, _) |
-        AST::Match(ref id, _, ref mut cond, ref mut cases, _) => {
+        AST::Try(_, _, ref mut cond, ref mut cases, _) |
+        AST::Match(_, _, ref mut cond, ref mut cases, _) => {
             bind_names_node(session, scope.clone(), cond);
             // TODO check to make sure AST::Underscore only occurs as the last case, if at all
             for &mut (ref mut case, ref mut body) in cases {
@@ -100,11 +100,11 @@ fn bind_names_node_or_error(session: &Session, scope: ScopeRef, node: &mut AST) 
             }
         },
 
-        AST::Raise(ref id, _, ref mut expr) => {
+        AST::Raise(_, _, ref mut expr) => {
             bind_names_node(session, scope, expr);
         },
 
-        AST::While(ref id, _, ref mut cond, ref mut body) => {
+        AST::While(_, _, ref mut cond, ref mut body) => {
             bind_names_node(session, scope.clone(), cond);
             bind_names_node(session, scope, body);
         },
@@ -116,11 +116,11 @@ fn bind_names_node_or_error(session: &Session, scope: ScopeRef, node: &mut AST) 
             bind_names_node(session, lscope, body);
         },
 
-        AST::Tuple(ref id, _, ref mut code) |
-        AST::List(ref id, _, ref mut code) |
-        AST::Block(ref id, _, ref mut code) => { bind_names_vec(session, scope, code); },
+        AST::Tuple(_, _, ref mut code) |
+        AST::List(_, _, ref mut code) |
+        AST::Block(_, _, ref mut code) => { bind_names_vec(session, scope, code); },
 
-        AST::Index(ref id, _, ref mut base, ref mut index) => {
+        AST::Index(_, _, ref mut base, ref mut index) => {
             bind_names_node(session, scope.clone(), base);
             bind_names_node(session, scope, index);
         },
@@ -159,7 +159,7 @@ fn bind_names_node_or_error(session: &Session, scope: ScopeRef, node: &mut AST) 
             bind_names_vec(session, tscope, body);
         },
 
-        AST::TypeDef(ref id, ref pos, ref mut classspec, ref mut fields) => {
+        AST::TypeDef(ref id, _, ref mut classspec, ref mut fields) => {
             //let mut types = vec!();
             // TODO this is nearly identical to class... these need to be separated
             let tscope = session.map.add(*id, None);
@@ -187,11 +187,11 @@ fn bind_names_node_or_error(session: &Session, scope: ScopeRef, node: &mut AST) 
             }
         },
 
-        AST::Accessor(ref id, _, ref mut left, _, _) => {
+        AST::Accessor(_, _, ref mut left, _, _) => {
             bind_names_node(session, scope, left);
         },
 
-        AST::Assignment(ref id, _, ref mut left, ref mut right) => {
+        AST::Assignment(_, _, ref mut left, ref mut right) => {
             match **left {
                 AST::Accessor(_, _, _, _, _) | AST::Index(_, _, _, _) => { },
                 _ => return Err(Error::new(format!("SyntaxError: assignment to something other than a list or class element: {:?}", left))),
@@ -200,7 +200,7 @@ fn bind_names_node_or_error(session: &Session, scope: ScopeRef, node: &mut AST) 
             bind_names_node(session, scope, right);
         },
 
-        AST::Import(ref id, _, ref ident, ref mut decls) => {
+        AST::Import(_, _, ref ident, ref mut decls) => {
             let path = ident.name.replace(".", "/") + ".dec";
             *decls = session.parse_file(path.as_str(), true);
             bind_names_vec(session, scope, decls);
@@ -269,7 +269,7 @@ pub fn declare_typevars(session: &Session, scope: ScopeRef, ttype: Option<&mut T
 
 #[must_use]
 pub fn declare_classspec_typevars(session: &Session, scope: ScopeRef, classspec: &mut ClassSpec, always_new: bool) -> Result<(), Error> {
-    let &mut ClassSpec { ref ident, ref mut types, .. } = classspec;
+    let &mut ClassSpec { ref mut types, .. } = classspec;
     types.iter_mut().map(|ref mut ttype| declare_typevars(session, scope.clone(), Some(ttype), always_new)).count();
     Ok(())
 }

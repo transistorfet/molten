@@ -93,7 +93,6 @@ pub fn parse_or_error(name: &str, text: &[u8]) -> Vec<AST> {
         Ok((rem, _)) if rem.fragment != CompleteByteSlice(&[]) => panic!("InternalError: unparsed input remaining: {:?}", rem),
         Ok((_, code)) => code,
         Err(err) => { print_error(name, span, err); panic!("") },
-        res @ _ => panic!("UnknownError: the parser returned an unknown result; {:?}", res),
     }
 }
 

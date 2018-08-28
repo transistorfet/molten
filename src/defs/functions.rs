@@ -78,12 +78,15 @@ pub type OverloadDefRef = Rc<OverloadDef>;
 impl OverloadDef {
     pub fn create(session: &Session, parent: Option<NodeID>, variants: Vec<NodeID>) -> NodeID {
         let defid = NodeID::generate();
-        let def = Def::Overload(Rc::new(OverloadDef {
+        let def = Rc::new(OverloadDef {
             id: defid,
             parent: parent,
-            variants: RefCell::new(variants)
-        }));
-        session.set_def(defid, def.clone());
+            variants: RefCell::new(vec!())
+        });
+        for variant in variants {
+            def.add_variant(session, variant);
+        }
+        session.set_def(defid, Def::Overload(def));
         defid
     }
 
@@ -93,7 +96,7 @@ impl OverloadDef {
         if dscope.contains_local(&name) {
             match session.get_def(previd) {
                 Ok(Def::Overload(prev)) => {
-                    prev.add_variant(id);
+                    prev.add_variant(session, id);
                 },
                 Ok(Def::Func(_)) |
                 Ok(Def::Method(_)) => {
@@ -103,42 +106,55 @@ impl OverloadDef {
                 _ => return Err(Error::new(format!("NameError: unable to overload {} because of a previous definitions", name)))
             }
         } else {
-            let parentid = match session.get_def(previd) {
-                Ok(Def::Overload(_)) => previd,
-                _ => {
-                    let newprev = OverloadDef::create(session, None, vec!(previd));
-                    let pscope = Scope::locate_variable(dscope.clone(), name).unwrap();
-                    pscope.set_var_def(name, newprev);
-                    newprev
-                },
-            };
-            let defid = OverloadDef::create(session, Some(parentid), vec!(id));
+            let defid = OverloadDef::create(session, Some(previd), vec!(id));
             dscope.define(name.clone(), Some(defid))?;
         }
-        //ttype.map(|ttype| Scope::add_func_variant(session, dscope.clone(), name, scope.clone(), ttype).unwrap());
         Ok(())
     }
 
-    pub fn add_variant(&self, id: NodeID) {
+    pub fn add_variant(&self, session: &Session, id: NodeID) {
+        session.set_ref(id, self.id);
         self.variants.borrow_mut().push(id);
     }
 
     pub fn get_variants(&self, session: &Session) -> Vec<NodeID> {
         let mut variants = self.variants.borrow().clone();
-        let prev = match self.parent {
-            Some(id) => match session.get_def(id) {
-                Ok(Def::Overload(ol)) => ol.get_variants(session),
-                _ => vec!(id)
-            },
-            _ => vec!(),
-        };
+        let prev = self.get_parent_variants(session);
         variants.extend(prev.iter());
         variants
     }
 
-    pub fn find_variant(&self, session: &Session, tscope: ScopeRef, atypes: Type) -> Result<(NodeID, Type), Error> {
-        let variants = self.get_variants(session);
+    pub fn get_parent_variants(&self, session: &Session) -> Vec<NodeID> {
+        match self.parent {
+            Some(id) => match session.get_def(id) {
+                Ok(Def::Overload(ol)) => ol.get_variants(session),
+                _ => vec!(id),
+            },
+            _ => vec!(),
+        }
+    }
 
+    pub fn find_variant(&self, session: &Session, tscope: ScopeRef, atypes: Type) -> Result<(NodeID, Type), Error> {
+        let (mut found, variant_types) = self.find_all_variants(session, tscope, atypes.clone());
+
+        match found.len() {
+            0 => Err(Error::new(format!("OverloadError: No valid variant found for {}\n\tout of [{}]", atypes, Type::display_vec(&variant_types)))),
+            1 => Ok(found.remove(0)),
+            _ => Err(Error::new(format!("OverloadError: Ambiguous {}\n\tvariants found [{}]", atypes, found.iter().map(|(i, t)| format!("{}", t)).collect::<Vec<String>>().join(", ")))),
+        }
+    }
+
+    pub fn find_all_variants(&self, session: &Session, tscope: ScopeRef, atypes: Type) -> (Vec<(NodeID, Type)>, Vec<Type>) {
+        let variants = self.get_variants(session);
+        self.find_variants_of(variants, session, tscope, atypes)
+    }
+
+    pub fn find_local_variants(&self, session: &Session, tscope: ScopeRef, atypes: Type) -> (Vec<(NodeID, Type)>, Vec<Type>) {
+        let variants = self.variants.borrow().clone();
+        self.find_variants_of(variants, session, tscope, atypes)
+    }
+
+    pub fn find_variants_of(&self, variants: Vec<NodeID>, session: &Session, tscope: ScopeRef, atypes: Type) -> (Vec<(NodeID, Type)>, Vec<Type>) {
         let mut found = vec!();
         let mut variant_types = vec!();
         for id in variants {
@@ -148,39 +164,19 @@ impl OverloadDef {
                 Some(ttype) => tscope.map_all_typevars(session, ttype),
                 None => tscope.new_typevar(session)
             };
-            //let ttype = session.get_type(id);
 
             if let Type::Function(ref btypes, _, _) = ttype {
                 if check_type(session, tscope.clone(), Some(*btypes.clone()), Some(atypes.clone()), Check::Def, false).is_ok() {
-                    debug!("??????: {:?} {:?}", id, ttype);
-                    found.push((id, ttype.clone()));
+                    if found.len() < 1 || self.variants.borrow().iter().position(|lid| *lid == id).is_some() {
+                        found.push((id, ttype.clone()));
+                    }
                 }
             }
             variant_types.push(ttype);
         }
-
-        match found.len() {
-            0 => Err(Error::new(format!("OverloadError: No valid variant found for {}\n\tout of [{}]", atypes, Type::display_vec(&variant_types)))),
-            _ => Ok(found.remove(0)),
-            // TODO this is temporary, until you properly implement the override functionality
-            //1 => Ok(found.remove(0)),
-            //_ => Err(Error::new(format!("OverloadError: Ambiguous {}\n\tvariants found [{}]", atypes, found.iter().map(|(i, t)| format!("{}", t)).collect::<Vec<String>>().join(", ")))),
-        }
+        (found, variant_types)
     }
 }
-
-
-/*
-impl Overloadable for Rc<FuncDef> {
-    fn num_variants(&self) -> i32 {
-        self.variants.borrow().len() as i32
-    }
-
-    fn add_variant(&self, id: NodeID) {
-        self.variants.borrow_mut().push(id);
-    }
-}
-*/
 
 
 #[derive(Clone, Debug, PartialEq)]

@@ -78,7 +78,6 @@ pub fn refine_node(node: AST) -> AST {
         AST::Tuple(id, pos, code) => { AST::Tuple(id, pos, refine_vec(code)) },
         //AST::List(id, pos, code, ttype) => { AST::List(id, pos, refine_vec(code), ttype) },
         AST::List(id, pos, code) => {
-            use abi::ABI;
             let mut block = vec!();
             let tmplist = format!("{}", UniqueID::generate());
             let typevar = rand::random::<i32>();
