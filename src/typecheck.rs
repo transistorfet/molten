@@ -7,7 +7,7 @@ use ast::{ NodeID, ClassSpec, Literal, AST };
 use types::{ Type, Check, ABI, expect_type, resolve_type, check_type_params };
 
 
-pub fn check_types(session: &Session, scope: ScopeRef, code: &mut Vec<AST>) -> Type {
+pub fn check_types(session: &Session, scope: ScopeRef, code: &Vec<AST>) -> Type {
     let ttype = check_types_vec(session, scope, code);
     if session.errors.get() > 0 {
         panic!("Exiting due to previous errors");
@@ -15,7 +15,7 @@ pub fn check_types(session: &Session, scope: ScopeRef, code: &mut Vec<AST>) -> T
     ttype
 }
 
-pub fn check_types_vec(session: &Session, scope: ScopeRef, code: &mut Vec<AST>) -> Type {
+pub fn check_types_vec(session: &Session, scope: ScopeRef, code: &Vec<AST>) -> Type {
     let mut last: Type = scope.make_obj(session, String::from("Nil"), vec!()).unwrap();
     for node in code {
         last = check_types_node(session, scope.clone(), node, None);
@@ -23,7 +23,7 @@ pub fn check_types_vec(session: &Session, scope: ScopeRef, code: &mut Vec<AST>) 
     last
 }
 
-pub fn check_types_node(session: &Session, scope: ScopeRef, node: &mut AST, expected: Option<Type>) -> Type {
+pub fn check_types_node(session: &Session, scope: ScopeRef, node: &AST, expected: Option<Type>) -> Type {
     match check_types_node_or_error(session, scope.clone(), node, expected) {
         Ok(ttype) => ttype,
         Err(err) => {
@@ -35,7 +35,7 @@ pub fn check_types_node(session: &Session, scope: ScopeRef, node: &mut AST, expe
     }
 }
 
-pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &mut AST, expected: Option<Type>) -> Result<Type, Error> {
+pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &AST, expected: Option<Type>) -> Result<Type, Error> {
     let rtype = match *node {
         AST::Literal(ref id, ref literal) => {
             match literal {
@@ -46,7 +46,7 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &mut 
             }
         },
 
-        AST::Function(ref id, _, ref mut ident, ref mut args, ref mut rtype, ref mut body, ref abi) => {
+        AST::Function(ref id, _, ref ident, ref args, ref rtype, ref body, ref abi) => {
             let fscope = session.map.get(id);
 
             let mut argtypes = vec!();
@@ -68,13 +68,12 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &mut 
             for i in 0 .. argtypes.len() {
                 argtypes[i] = resolve_type(session, fscope.clone(), argtypes[i].clone());
                 session.update_type(fscope.clone(), args[i].id, argtypes[i].clone());
-                args[i].ttype = Some(argtypes[i].clone());
             }
             // TODO is this needed?
             //update_scope_variable_types(session, fscope.clone());
 
             let tupleargs = Type::Tuple(argtypes);
-            let mut nftype = Type::Function(Box::new(tupleargs.clone()), Box::new(rettype), *abi);
+            let nftype = Type::Function(Box::new(tupleargs.clone()), Box::new(rettype), *abi);
 
             if let Ok(Def::Overload(ol)) = session.get_def_from_ref(*id) {
                 if ol.find_local_variants(session, scope.clone(), tupleargs.clone()).0.len() > 0 {
@@ -87,7 +86,7 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &mut 
             nftype
         },
 
-        AST::Invoke(ref id, _, ref mut fexpr, ref mut args) => {
+        AST::Invoke(ref id, _, ref fexpr, ref args) => {
             let mut atypes = vec!();
             for ref mut value in args {
                 atypes.push(check_types_node(session, scope.clone(), value, None));
@@ -95,7 +94,7 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &mut 
             let atypes = Type::Tuple(atypes);
 
             let tscope = Scope::new_ref(Some(scope.clone()));
-            let dtype = session_find_variant(session, tscope.clone(), *id, fexpr.as_mut(), &atypes)?;
+            let dtype = session_find_variant(session, tscope.clone(), *id, fexpr.as_ref(), &atypes)?;
             let etype = match dtype {
                 Type::Variable(_, _) => dtype.clone(),
                 _ => tscope.map_all_typevars(session, dtype.clone()),
@@ -122,7 +121,7 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &mut 
             ftype.get_rettype()?.clone()
         },
 
-        AST::SideEffect(ref id, _, _, ref mut args) => {
+        AST::SideEffect(ref id, _, _, ref args) => {
             let mut ltype = None;
             for ref mut expr in args {
                 ltype = Some(expect_type(session, scope.clone(), ltype.clone(), Some(check_types_node(session, scope.clone(), expr, ltype.clone())), Check::List)?);
@@ -130,10 +129,9 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &mut 
             ltype.unwrap()
         },
 
-        AST::Definition(ref id, _, ref ident, ref mut ttype, ref mut body) => {
+        AST::Definition(ref id, _, ref ident, ref ttype, ref body) => {
             let btype = expect_type(session, scope.clone(), ttype.clone(), Some(check_types_node(session, scope.clone(), body, ttype.clone())), Check::Def)?;
             session.update_type(scope.clone(), *id, btype.clone())?;
-            *ttype = Some(btype.clone());
             btype
         },
 
@@ -147,9 +145,9 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &mut 
             scope.get_variable_type(session, &ident.name).unwrap_or_else(|| expected.unwrap_or_else(|| scope.new_typevar(session)))
         },
 
-        AST::Block(ref id, _, ref mut body) => check_types_vec(session, scope, body),
+        AST::Block(ref id, _, ref body) => check_types_vec(session, scope, body),
 
-        AST::If(ref id, _, ref mut cond, ref mut texpr, ref mut fexpr) => {
+        AST::If(ref id, _, ref cond, ref texpr, ref fexpr) => {
             // TODO should this require the cond type to be Bool?
             check_types_node(session, scope.clone(), cond, None);
             let ttype = check_types_node(session, scope.clone(), texpr, None);
@@ -157,11 +155,11 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &mut 
             expect_type(session, scope, Some(ttype), Some(ftype), Check::List)?
         },
 
-        AST::Try(ref id, _, ref mut cond, ref mut cases, ref cid) |
-        AST::Match(ref id, _, ref mut cond, ref mut cases, ref cid) => {
+        AST::Try(ref id, _, ref cond, ref cases, ref cid) |
+        AST::Match(ref id, _, ref cond, ref cases, ref cid) => {
             let mut ctype = check_types_node(session, scope.clone(), cond, None);
             let mut rtype = None;
-            for &mut (ref mut case, ref mut expr) in cases {
+            for &(ref case, ref expr) in cases {
                 ctype = expect_type(session, scope.clone(), Some(ctype.clone()), Some(check_types_node(session, scope.clone(), case, Some(ctype.clone()))), Check::List)?;
                 rtype = Some(expect_type(session, scope.clone(), rtype.clone(), Some(check_types_node(session, scope.clone(), expr, rtype.clone())), Check::List)?);
             }
@@ -170,12 +168,12 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &mut 
             rtype.unwrap()
         },
 
-        AST::Raise(ref id, _, ref mut expr) => {
+        AST::Raise(ref id, _, ref expr) => {
             // TODO should you check for a special error/exception type?
             check_types_node(session, scope, expr, None)
         },
 
-        AST::While(ref id, _, ref mut cond, ref mut body) => {
+        AST::While(ref id, _, ref cond, ref body) => {
             // TODO should this require the cond type to be Bool?
             check_types_node(session, scope.clone(), cond, None);
             check_types_node(session, scope.clone(), body, None);
@@ -183,7 +181,7 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &mut 
             scope.make_obj(session, String::from("Nil"), vec!())?
         },
 
-        AST::For(ref id, _, ref ident, ref mut list, ref mut body) => {
+        AST::For(ref id, _, ref ident, ref list, ref body) => {
             let lscope = session.map.get(id);
             let itype = lscope.get_variable_type(session, &ident.name).unwrap_or_else(|| expected.unwrap_or_else(|| scope.new_typevar(session)));
             let etype = Some(scope.make_obj(session, String::from("List"), vec!(itype))?);
@@ -198,7 +196,7 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &mut 
             ttype
         },
 
-        AST::Tuple(ref id, _, ref mut items) => {
+        AST::Tuple(ref id, _, ref items) => {
             let etypes = match expected {
                 Some(ref e) => e.get_types()?.iter().map(|i| Some(i.clone())).collect(),
                 None => vec![None; items.len()]
@@ -208,16 +206,16 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &mut 
                 return Err(Error::new(format!("TypeError: number of tuple items don't match: expected {:?} with {} items but found {} items", expected, etypes.len(), items.len())));
             }
             let mut types = vec!();
-            for (ref mut expr, etype) in items.iter_mut().zip(etypes.iter()) {
+            for (ref expr, etype) in items.iter().zip(etypes.iter()) {
                 types.push(expect_type(session, scope.clone(), etype.clone(), Some(check_types_node(session, scope.clone(), expr, etype.clone())), Check::List)?);
             }
             session.set_type(*id, Type::Tuple(types.clone()));
             Type::Tuple(types)
         },
 
-        AST::List(ref id, _, ref mut items) => {
+        AST::List(ref id, _, ref items) => {
             let mut ltype = None;
-            for ref mut expr in items {
+            for ref expr in items {
                 ltype = Some(expect_type(session, scope.clone(), ltype.clone(), Some(check_types_node(session, scope.clone(), expr, ltype.clone())), Check::List)?);
             }
             let ltype = ltype.unwrap_or_else(|| expected.unwrap_or_else(|| scope.new_typevar(session)));
@@ -226,7 +224,7 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &mut 
 
         AST::TypeDef(ref id, _, _, _) => return Err(Error::new(format!("NotImplementedError: not yet supported, {:?}", node))),
 
-        AST::PtrCast(ref ttype, ref mut code) => {
+        AST::PtrCast(ref ttype, ref code) => {
             let ctype = check_types_node(session, scope.clone(), code, Some(ttype.clone()));
             debug!("PTRCAST: {:?} <- {:?}", ttype, ctype);
             // TODO is this quite right?
@@ -243,14 +241,14 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &mut 
             scope.make_obj(session, ident.name.clone(), types.clone())?
         },
 
-        AST::Class(ref id, _, _, _, ref mut body) => {
+        AST::Class(ref id, _, _, _, ref body) => {
             let tscope = session.map.get(id);
             check_types_vec(session, tscope.clone(), body);
             //Type::Object(String::from("Nil"), vec!())
             scope.make_obj(session, String::from("Nil"), vec!())?
         },
 
-        AST::Resolver(ref id, _, ref mut left, ref mut field) => {
+        AST::Resolver(ref id, _, ref left, ref field) => {
             let ltype = match **left {
                 // TODO this caused an issue with types that have typevars that aren't declared (ie. Buffer['item])
                 //AST::Identifier(_, ref ident) => resolve_type(session, scope.clone(), scope.find_type(session, &ident.name).unwrap().clone()),
@@ -264,7 +262,7 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &mut 
             classvars.get_variable_type(session, &field.name).unwrap_or_else(|| expected.unwrap_or_else(|| scope.new_typevar(session)))
         },
 
-        AST::Accessor(ref id, _, ref mut left, ref mut field, ref oid) => {
+        AST::Accessor(ref id, _, ref left, ref field, ref oid) => {
             let ltype = resolve_type(session, scope.clone(), check_types_node(session, scope.clone(), left, None));
             session.set_type(*oid, ltype.clone());
 
@@ -274,13 +272,13 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &mut 
             classvars.get_variable_type(session, &field.name).unwrap_or_else(|| expected.unwrap_or_else(|| scope.new_typevar(session)))
         },
 
-        AST::Assignment(ref id, _, ref mut left, ref mut right) => {
+        AST::Assignment(ref id, _, ref left, ref right) => {
             let ltype = check_types_node(session, scope.clone(), left, None);
             let rtype = check_types_node(session, scope.clone(), right, Some(ltype.clone()));
             expect_type(session, scope, Some(ltype), Some(rtype), Check::Def)?
         },
 
-        AST::Import(ref id, _, _, ref mut decls) => {
+        AST::Import(ref id, _, _, ref decls) => {
             check_types_vec(session, scope.clone(), decls);
             //Type::Object(String::from("Nil"), vec!())
             scope.make_obj(session, String::from("Nil"), vec!())?
@@ -296,19 +294,19 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &mut 
     Ok(rtype)
 }
 
-pub fn session_find_variant(session: &Session, scope: ScopeRef, invid: NodeID, fexpr: &mut AST, argtypes: &Type) -> Result<Type, Error> {
+pub fn session_find_variant(session: &Session, scope: ScopeRef, invid: NodeID, fexpr: &AST, argtypes: &Type) -> Result<Type, Error> {
     let (refid, defid) = match fexpr {
         AST::Identifier(ref id, _, _) => {
             (*id, session.get_ref(*id)?)
         },
-        AST::Accessor(ref id, _, ref mut left, ref mut field, ref oid) => {
+        AST::Accessor(ref id, _, ref left, ref field, ref oid) => {
             let ltype = resolve_type(session, scope.clone(), check_types_node(session, scope.clone(), left, None));
             session.set_type(*oid, ltype.clone());
 
             let classvars = scope.find_type_def(session, &ltype.get_name()?)?.as_class()?.classvars.clone();
             (*id, classvars.get_var_def(&field.name).ok_or(Error::new(format!("VarError: definition not set for {:?}", field.name)))?)
         },
-        AST::Resolver(ref id, _, ref mut left, ref mut field) => {
+        AST::Resolver(ref id, _, ref left, ref field) => {
             let ltype = match **left {
                 AST::Identifier(_, _, ref ident) => scope.find_type(session, &ident.name).unwrap().clone(),
                 _ => return Err(Error::new(format!("SyntaxError: left-hand side of scope resolver must be identifier")))
