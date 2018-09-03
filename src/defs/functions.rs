@@ -213,7 +213,7 @@ impl MethodDef {
 }
 
 mod llvm {
-    use llvm::compiler as llvm;
+    //use llvm::compiler as llvm;
 
     /*
     impl CompileInvoke for MethodDef {

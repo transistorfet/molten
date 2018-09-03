@@ -50,6 +50,24 @@ impl VarDef {
     }
 }
 
+#[derive(Clone, Debug, PartialEq)]
+pub struct ArgDef {
+
+}
+
+pub type ArgDefRef = Rc<ArgDef>;
+
+impl ArgDef {
+    pub fn define(session: &Session, scope: ScopeRef, id: NodeID, name: &String, ttype: Option<Type>) -> Result<Def, Error> {
+        let def = Def::Arg(Rc::new(ArgDef {
+
+        }));
+
+        VarDef::set_var_def(session, scope.clone(), id, name, def.clone(), ttype)?;
+        Ok(def)
+    }
+}
+
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct FieldDef {

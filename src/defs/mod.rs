@@ -6,7 +6,7 @@ pub mod classes;
 pub mod variables;
 pub mod functions;
 
-use defs::variables::VarDefRef;
+use defs::variables::{ VarDefRef, ArgDefRef };
 use defs::classes::{ ClassDefRef, StructDefRef };
 use defs::functions::{ FuncDefRef, OverloadDefRef, ClosureDefRef, MethodDefRef, CFuncDefRef };
 
@@ -14,6 +14,7 @@ use defs::functions::{ FuncDefRef, OverloadDefRef, ClosureDefRef, MethodDefRef, 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Def {
     Var(VarDefRef),
+    Arg(ArgDefRef),
     Class(ClassDefRef),
     Struct(StructDefRef),
     Func(FuncDefRef),

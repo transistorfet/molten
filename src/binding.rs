@@ -8,8 +8,8 @@ use scope::{ Scope, ScopeRef };
 use utils::UniqueID;
 
 use defs::classes::ClassDef;
-use defs::variables::VarDef;
 use defs::functions::FuncDef;
+use defs::variables::{ VarDef, ArgDef };
 
 
 pub fn bind_names(session: &Session, code: &mut Vec<AST>) {
@@ -49,8 +49,7 @@ fn bind_names_node_or_error(session: &Session, scope: ScopeRef, node: &mut AST) 
             FuncDef::define_func(session, scope.clone(), *id, &ident.as_ref().map(|ref ident| String::from(ident.as_str())), *abi, None)?;
 
             for ref arg in args.iter() {
-                //fscope.define(arg.ident.name.clone(), arg.ttype.clone(), Some(arg.id))?;
-                VarDef::define_var(session, fscope.clone(), arg.id, &arg.ident.name, arg.ttype.clone())?;
+                ArgDef::define(session, fscope.clone(), arg.id, &arg.ident.name, arg.ttype.clone())?;
             }
 
             bind_names_node(session, fscope, body)

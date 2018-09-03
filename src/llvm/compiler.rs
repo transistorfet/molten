@@ -359,7 +359,6 @@ unsafe fn write_module(data: &LLVM, filename: &str) {
 }
 
 unsafe fn declare_globals(data: &LLVM, scope: ScopeRef) {
-    let mut globals = vec!();
     for (name, sym) in scope.names.borrow().iter() {
         let did = sym.defid.unwrap();
         let def = data.session.get_def(did).unwrap();
@@ -367,12 +366,8 @@ unsafe fn declare_globals(data: &LLVM, scope: ScopeRef) {
             let ltype = get_type(data, scope.clone(), data.session.get_type(did).unwrap(), true);
             let global = LLVMAddGlobal(data.module, ltype, label(name.as_str()));
             LLVMSetInitializer(global, null_value(ltype));
-            globals.push((did, global));
+            data.set_value(did, Box::new(Global(global)));
         }
-    }
-
-    for (did, global) in globals {
-        data.set_value(did, Box::new(Global(global)));
     }
 
     for node in &data.classes {
@@ -491,10 +486,7 @@ unsafe fn compile_node(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: S
         },
 
         AST::Function(ref id, _, ref ident, _, _, _, ref abi) => {
-            match *ident {
-                Some(ref ident) => data.get_value(*id).unwrap(),
-                _ => from_abi(abi, LLVMGetNamedFunction(data.module, label(scope.get_full_name(ident, *id).as_str()))),
-            }
+            data.get_value(*id).unwrap()
         },
 
         AST::Recall(ref id, ref pos) => {

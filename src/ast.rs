@@ -74,26 +74,29 @@ pub enum AST {
     Index(NodeID, Pos, Box<AST>, Box<AST>),
     Resolver(NodeID, Pos, Box<AST>, Ident),
     Accessor(NodeID, Pos, Box<AST>, Ident, NodeID),
+
     Invoke(NodeID, Pos, Box<AST>, Vec<AST>),
     SideEffect(NodeID, Pos, Ident, Vec<AST>),
     //Prefix(NodeID, Pos, Ident, Box<AST>),
     //Infix(NodeID, Pos, Ident, Box<AST>, Box<AST>),
+
     Block(NodeID, Pos, Vec<AST>),
     If(NodeID, Pos, Box<AST>, Box<AST>, Box<AST>),
     Raise(NodeID, Pos, Box<AST>),
     Try(NodeID, Pos, Box<AST>, Vec<(AST, AST)>, NodeID),
     Match(NodeID, Pos, Box<AST>, Vec<(AST, AST)>, NodeID),
     For(NodeID, Pos, Ident, Box<AST>, Box<AST>),
+    While(NodeID, Pos, Box<AST>, Box<AST>),
+
     Declare(NodeID, Pos, Ident, Type),
     Function(NodeID, Pos, Option<Ident>, Vec<Argument>, Option<Type>, Box<AST>, ABI),
     New(NodeID, Pos, ClassSpec),
     Class(NodeID, Pos, ClassSpec, Option<ClassSpec>, Vec<AST>),
+    TypeDef(NodeID, Pos, ClassSpec, Vec<Field>),
 
     Import(NodeID, Pos, Ident, Vec<AST>),
     Definition(NodeID, Pos, Ident, Option<Type>, Box<AST>),
     Assignment(NodeID, Pos, Box<AST>, Box<AST>),
-    While(NodeID, Pos, Box<AST>, Box<AST>),
-    TypeDef(NodeID, Pos, ClassSpec, Vec<Field>),
 }
 
 

@@ -37,7 +37,7 @@ pub fn check_types_node(session: &Session, scope: ScopeRef, node: &AST, expected
 
 pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &AST, expected: Option<Type>) -> Result<Type, Error> {
     let rtype = match *node {
-        AST::Literal(ref id, ref literal) => {
+        AST::Literal(ref _id, ref literal) => {
             match literal {
                 Literal::Boolean(_) => scope.make_obj(session, String::from("Bool"), vec!())?,
                 Literal::Integer(_) => scope.make_obj(session, String::from("Int"), vec!())?,
@@ -51,7 +51,7 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &AST,
 
             let mut argtypes = vec!();
             for arg in args.iter() {
-                let vtype = arg.default.clone().map(|ref mut vexpr| check_types_node(session, scope.clone(), vexpr, arg.ttype.clone()));
+                let vtype = arg.default.clone().map(|ref vexpr| check_types_node(session, scope.clone(), vexpr, arg.ttype.clone()));
                 let mut atype = expect_type(session, fscope.clone(), arg.ttype.clone(), vtype, Check::Def)?;
                 if &arg.ident.name[..] == "self" {
                     let mut stype = fscope.find_type(session, &String::from("Self")).unwrap();
@@ -123,7 +123,7 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &AST,
 
         AST::SideEffect(ref id, _, _, ref args) => {
             let mut ltype = None;
-            for ref mut expr in args {
+            for ref expr in args {
                 ltype = Some(expect_type(session, scope.clone(), ltype.clone(), Some(check_types_node(session, scope.clone(), expr, ltype.clone())), Check::List)?);
             }
             ltype.unwrap()
@@ -400,8 +400,8 @@ mod tests {
         let result = parse(text);
         let mut code = result.unwrap().1;
         let session = Session::new();
-        let map: ScopeMapRef<()> = bind_names(&mut code);
-        check_types_vec(map, map.get_global(), &mut code)
+        let map: ScopeMapRef<()> = bind_names(&code);
+        check_types_vec(map, map.get_global(), &code)
     }
 }
 
