@@ -527,7 +527,7 @@ pub unsafe fn build_class_type(data: &LLVM, scope: ScopeRef, id: NodeID, name: &
         let vtname = format!("{}_vtable", name);
         let vttype = LLVMStructCreateNamed(data.context, label(vtname.as_str()));
         let pvttype = LLVMPointerType(vttype, 0);
-        let vtid = classdef.vtable.borrow().id;
+        let vtid = classdef.vtable.id;
         let structdef = StructDef::define_struct(data.session, scope.clone(), vtid, Type::Object(vtname.clone(), vtid, vec!()), None).unwrap();
         data.set_type(vtid, TypeValue { value: pvttype, vttype: None });
         (Some(vttype), Some(pvttype))
@@ -539,14 +539,14 @@ pub unsafe fn build_class_type(data: &LLVM, scope: ScopeRef, id: NodeID, name: &
     data.set_type(id, TypeValue { value: pltype, vttype: pvttype });
 
     let mut types = vec!();
-    for &(_, ref ttype) in classdef.structdef.borrow().iter() {
+    for &(_, ref ttype) in classdef.structdef.fields.borrow().iter() {
         types.push(get_ltype(data, ttype.clone(), true))
     }
     LLVMStructSetBody(lltype, types.as_mut_ptr(), types.len() as u32, false as i32);
 
     if let Some(vttype) = vttype {
         let mut types = vec!();
-        for &(_, _, ref ttype) in classdef.vtable.borrow().table.iter() {
+        for &(_, _, ref ttype) in classdef.vtable.table.borrow().iter() {
             types.push(get_ltype(data, ttype.clone(), true))
         }
         LLVMStructSetBody(vttype, types.as_mut_ptr(), types.len() as u32, false as i32);
@@ -616,9 +616,8 @@ pub unsafe fn generate_declarations(data: &LLVM, scope: ScopeRef, transform: &Ve
                 LLVMSetInitializer(global, null_value(ltype));
                 data.set_value(element.id, Box::new(Global(global)));
             },
-            TopKind::Func(ref name, ref args, _) => {
-                generate_func_start(data, scope.clone(), element.id, name.clone(), args);
-            },
+            TopKind::Func(ref name, ref args, _) |
+            TopKind::Closure(ref name, ref args, _) |
             TopKind::Method(ref name, ref args, _) => {
                 generate_func_start(data, scope.clone(), element.id, name.clone(), args);
             },
@@ -661,7 +660,7 @@ pub unsafe fn generate_vtables(data: &LLVM, scope: ScopeRef, transform: &Vec<Top
 
                 if classdef.has_vtable() {
                     let mut methods = vec!();
-                    for (index, &(ref id, ref name, ref ttype)) in classdef.vtable.borrow().table.iter().enumerate() {
+                    for (index, &(ref id, ref name, ref ttype)) in classdef.vtable.table.borrow().iter().enumerate() {
                         let dtype = data.session.get_type(*id).unwrap();
                         debug!("VTABLE INIT: {:?} {:?} {:?}", name, id, index);
                         methods.push(build_generic_cast(data, data.get_value(*id).unwrap().get_ref(), get_ltype(data, ttype.clone(), true)));
@@ -674,7 +673,7 @@ pub unsafe fn generate_vtables(data: &LLVM, scope: ScopeRef, transform: &Vec<Top
                     LLVMSetInitializer(global, LLVMConstNamedStruct(vtype, methods.as_mut_ptr(), methods.len() as u32));
                     LLVMSetLinkage(global, LLVMLinkage::LLVMLinkOnceAnyLinkage);
                     let id = scope.define(vname.clone(), None).unwrap();
-                    data.session.set_type(id, Type::Object(format!("{}_vtable", name), classdef.vtable.borrow().id, vec!()));
+                    data.session.set_type(id, Type::Object(format!("{}_vtable", name), classdef.vtable.id, vec!()));
                     data.set_value(id, Box::new(Global(global)));
                 }
             },
@@ -732,9 +731,10 @@ pub unsafe fn generate_expr(data: &LLVM, func: LLVMValueRef, unwind: Unwind, sco
                     //largs.insert(0, object);
                     generate_access_field(data, func, unwind, scope.clone(), expr.id, object, field, *oid)
                 },
+                InvokeKind::Closure(ref fexpr) => panic!("unsupported"),
                 InvokeKind::CFunc(ref fexpr) |
                 InvokeKind::Func(ref fexpr) => generate_expr(data, func, unwind, scope.clone(), fexpr),
-                InvokeKind::ByName(ref name) => Box::new(CFunction(LLVMGetNamedFunction(data.module, label(name.as_str())))),
+                InvokeKind::CByName(ref name) => Box::new(CFunction(LLVMGetNamedFunction(data.module, label(name.as_str())))),
             };
             //if !function.get_ref().is_null() { LLVMDumpValue(function.get_ref()); println!(""); }
 
@@ -745,7 +745,7 @@ pub unsafe fn generate_expr(data: &LLVM, func: LLVMValueRef, unwind: Unwind, sco
             //    InvokeKind::Method(_, _, _) => invoke_molten_function(data, function.get_ref(), unwind, largs),
             //
             //    InvokeKind::CFunc(_) |
-            //    InvokeKind::ByName(_) => invoke_c_function(data, function.get_ref(), unwind, largs),
+            //    InvokeKind::CByName(_) => invoke_c_function(data, function.get_ref(), unwind, largs),
             //};
             let value = generate_cast(data, rtype.clone(), value);
 

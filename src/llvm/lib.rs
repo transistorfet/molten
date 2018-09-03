@@ -117,8 +117,9 @@ pub unsafe fn define_builtins_node<'sess>(data: &mut LLVM<'sess>, objtype: LLVMT
             let classdef = scope.find_type_def(data.session, &String::from(*name)).unwrap().as_class().unwrap();
 
             let lltype = if structdef.len() > 0 {
-                classdef.structdef.borrow_mut().clear();
-                classdef.structdef.borrow_mut().extend(structdef.clone());
+                for (ref field, ref ttype) in structdef {
+                    classdef.structdef.add_field(field, ttype.clone());
+                }
                 build_class_type(data, scope.clone(), *id, &cname, classdef.clone())
             } else {
                 let lltype = get_ltype(data, scope.find_type(data.session, &cname).unwrap(), true);

@@ -22,8 +22,8 @@ pub enum TopKind {
     Global(String),
     Declare(String),
     Func(String, Vec<(NodeID, String)>, Expr),
+    Closure(String, Vec<(NodeID, String)>, Expr),
     Method(String, Vec<(NodeID, String)>, Expr),
-    //DeclMethod(String),
     ClassDef(String, Vec<Expr>),
 }
 
@@ -83,8 +83,9 @@ pub enum ExprKind {
 pub enum InvokeKind {
     Method(Box<Expr>, String, NodeID),
     Func(Box<Expr>),
+    Closure(Box<Expr>),
     CFunc(Box<Expr>),
-    ByName(String),
+    CByName(String),
 }
 
 
@@ -150,7 +151,11 @@ impl<'sess> Transform<'sess> {
                 //if this is a plain function, do this
                 //if this is a method, is there anything special??? (maybe call a transform method on the def??
                 //if this is a closure, we need to record that so we can closure convert identifier, and also do the other things?
-                self.add_function(*id, pos.clone(), name.clone(), self.transform_args(args), self.transform_expr(fscope.clone(), body));
+                self.set_context(CodeContext::Closure);
+                let body = self.transform_expr(fscope.clone(), body);
+                self.restore_context();
+
+                self.add_function(*id, pos.clone(), name.clone(), self.transform_args(args), body);
                 self.access_def(*id, pos.clone(), name.clone())
             },
 
@@ -262,7 +267,7 @@ impl<'sess> Transform<'sess> {
                 self.session.set_type(initid, inittype);
                 self.add_decl(initid, pos.clone(), module_init_name.clone());
                 decls.push(Expr::new(initid, pos.clone(), ExprKind::Invoke(
-                    InvokeKind::ByName(module_init_name),
+                    InvokeKind::CByName(module_init_name),
                     vec!()
                 )));
 
@@ -403,11 +408,19 @@ impl<'sess> Transform<'sess> {
     }
 
     pub fn transform_func_name(&self, scope: ScopeRef, ident: Option<&Ident>, id: NodeID) -> String {
-        scope.get_full_name(&ident.map(|ident| Ident::from_str(get_mangled_name(self.session, scope.clone(), &ident.name, id).as_str())), id)
+        scope.get_full_name(ident.map(|ident| get_mangled_name(self.session, scope.clone(), &ident.name, id)), id)
     }
 
     pub fn transform_def_name(&self, scope: ScopeRef, ident: &Ident) -> String {
         scope.get_basename() + &ident.name
+    }
+
+    pub fn set_context(&self, context: CodeContext) {
+        self.context.borrow_mut().push(context);
+    }
+
+    pub fn restore_context(&self) {
+        self.context.borrow_mut().pop();
     }
 }
 

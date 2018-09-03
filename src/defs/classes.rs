@@ -18,8 +18,8 @@ pub struct ClassDef {
     pub classtype: Type,
     pub parenttype: Option<Type>,
     pub classvars: ClassVars,
-    pub structdef: RefCell<Vec<(String, Type)>>,
-    pub vtable: RefCell<Vtable>,
+    pub structdef: StructDef,
+    pub vtable: Vtable,
 }
 
 pub type ClassDefRef = Rc<ClassDef>;
@@ -32,8 +32,8 @@ impl ClassDef {
             classtype: classtype,
             parenttype: parenttype,
             classvars: classvars,
-            structdef: RefCell::new(vec!()),
-            vtable: RefCell::new(Vtable::new()),
+            structdef: StructDef::new(),
+            vtable: Vtable::new(),
         }
     }
 
@@ -97,9 +97,9 @@ impl ClassDef {
         };
 
         if let Some(parentclass) = parentclass {
-            self.vtable.borrow_mut().inherit(&*parentclass.vtable.borrow());
+            self.vtable.inherit(&parentclass.vtable);
         }
-        self.vtable.borrow_mut().build_vtable(session, scope, body);
+        self.vtable.build_vtable(session, scope, body);
     }
 
     pub fn build_structdef(&self, session: &Session, scope: ScopeRef, body: &Vec<AST>) {
@@ -107,29 +107,29 @@ impl ClassDef {
             Some(ref ptype) => Some(scope.find_type_def(session, &ptype.get_name().unwrap()).unwrap().as_class().unwrap()),
             None => None,
         };
-        let mut structdef = parentclass.map_or(vec!(), |c| c.structdef.borrow().clone());
+        if let Some(cls) = parentclass {
+            self.structdef.inherit(&cls.structdef);
+        }
 
         if self.has_vtable() {
-            if let Some(index) = structdef.iter().position(|ref r| r.0.as_str() == "__vtable__") {
-                structdef[index].1 = Type::Object(format!("{}_vtable", self.classname), self.vtable.borrow().id, vec!());
+            if let Some(index) = self.structdef.get_index("__vtable__") {
+                self.structdef.fields.borrow_mut()[index].1 = Type::Object(format!("{}_vtable", self.classname), self.vtable.id, vec!());
             } else {
-                structdef.push((String::from("__vtable__"), Type::Object(format!("{}_vtable", self.classname), self.vtable.borrow().id, vec!())));
+                self.structdef.add_field("__vtable__", Type::Object(format!("{}_vtable", self.classname), self.vtable.id, vec!()));
             }
         }
         for ref node in body.iter() {
             match **node {
                 AST::Definition(ref id, _, ref ident, _, ref value) => {
-                    structdef.push((ident.name.clone(), session.get_type(*id).unwrap()));
+                    self.structdef.add_field(ident.name.as_str(), session.get_type(*id).unwrap());
                 },
                 _ => { }
             }
         }
-
-        *self.structdef.borrow_mut() = structdef;
     }
 
     pub fn get_struct_index(&self, field: &str) -> Option<usize> {
-        self.structdef.borrow().iter().position(|ref r| r.0.as_str() == field)
+        self.structdef.get_index(field)
     }
 
     pub fn get_struct_vtable_index(&self) -> Option<usize> {
@@ -137,21 +137,19 @@ impl ClassDef {
     }
 
     pub fn get_struct_type(&self, index: usize) -> Type {
-        self.structdef.borrow()[index].1.clone()
+        self.structdef.get_type(index)
     }
 
     pub fn get_vtable_index(&self, session: &Session, scope: ScopeRef, field: &str, ftype: &Type) -> Option<usize> {
-        //self.vtable.borrow().iter().position(|ref r| r.1.as_str() == field)
-        self.vtable.borrow().get_index(session, scope, field, ftype)
+        self.vtable.get_index(session, scope, field, ftype)
     }
 
     pub fn get_vtable_type(&self, index: usize) -> Type {
-        //self.vtable.borrow()[index].2.clone()
-        self.vtable.borrow().get_type(index)
+        self.vtable.get_type(index)
     }
 
     pub fn has_vtable(&self) -> bool {
-        self.vtable.borrow().len() > 0
+        self.vtable.len() > 0
     }
 }
 
@@ -168,48 +166,43 @@ pub mod llvm {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct StructDef {
-    pub ttype: Type,
-    pub vars: ScopeRef,
-    pub structdef: RefCell<Vec<(String, Type)>>,
+    pub fields: RefCell<Vec<(String, Type)>>,
 }
 
 pub type StructDefRef = Rc<StructDef>;
 
 impl StructDef {
-    pub fn new(ttype: Type, parent: Option<ScopeRef>) -> Self {
-        let vars = Scope::new_ref(parent);
-        vars.set_basename(ttype.get_name().unwrap());
-
+    pub fn new() -> Self {
         Self {
-            ttype: ttype,
-            vars: vars,
-            structdef: RefCell::new(vec!()),
+            fields: RefCell::new(vec!()),
         }
     }
 
-    pub fn new_ref(ttype: Type, parent: Option<ScopeRef>) -> StructDefRef {
-        Rc::new(Self::new(ttype, parent))
+    pub fn new_ref() -> StructDefRef {
+        Rc::new(Self::new())
+    }
+
+    pub fn inherit(&self, inherit: &StructDef) {
+        *self.fields.borrow_mut() = inherit.fields.borrow().clone();
     }
 
     #[must_use]
     pub fn add_field(&self, name: &str, ttype: Type) -> Result<(), Error> {
-        // TODO this should be assigned a Var or something...
-        self.vars.define(String::from(name), None)?;
-        self.structdef.borrow_mut().push((String::from(name), ttype));
+        self.fields.borrow_mut().push((String::from(name), ttype));
         Ok(())
     }
 
-    pub fn get_struct_index(&self, field: &str) -> Option<usize> {
-        self.structdef.borrow().iter().position(|ref r| r.0.as_str() == field)
+    pub fn get_index(&self, field: &str) -> Option<usize> {
+        self.fields.borrow().iter().position(|ref r| r.0.as_str() == field)
     }
 
-    pub fn get_struct_type(&self, index: usize) -> Type {
-        self.structdef.borrow()[index].1.clone()
+    pub fn get_type(&self, index: usize) -> Type {
+        self.fields.borrow()[index].1.clone()
     }
 
 
     pub fn define_struct(session: &Session, scope: ScopeRef, id: NodeID, ttype: Type, parent: Option<ScopeRef>) -> Result<StructDefRef, Error> {
-        let structdef = StructDef::new_ref(ttype.clone(), None);
+        let structdef = StructDef::new_ref();
 
         scope.define_type(ttype.get_name()?, Some(id))?;
         session.set_def(id, Def::Struct(structdef.clone()));
@@ -224,22 +217,22 @@ impl StructDef {
 #[derive(Clone, Debug, PartialEq)]
 pub struct Vtable {
     pub id: NodeID,
-    pub table: Vec<(NodeID, String, Type)>,
+    pub table: RefCell<Vec<(NodeID, String, Type)>>,
 }
 
 impl Vtable {
     pub fn new() -> Self {
         Vtable {
             id: NodeID::generate(),
-            table: vec!(),
+            table: RefCell::new(vec!()),
         }
     }
 
-    pub fn inherit(&mut self, inherit: &Vtable) {
-        self.table = inherit.table.clone();
+    pub fn inherit(&self, inherit: &Vtable) {
+        *self.table.borrow_mut() = inherit.table.borrow().clone();
     }
 
-    pub fn build_vtable(&mut self, session: &Session, scope: ScopeRef, body: &Vec<AST>) {
+    pub fn build_vtable(&self, session: &Session, scope: ScopeRef, body: &Vec<AST>) {
         for ref node in body.iter() {
             match **node {
                 AST::Function(ref id, _, ref ident, ref args, ref rtype, _, ref abi) => {
@@ -259,34 +252,31 @@ impl Vtable {
                 _ => { }
             }
         }
-
-        //*self.vtable.borrow_mut() = vtable;
     }
 
-    // TODO can we eliminated Scope here
-    pub fn add_entry(&mut self, session: &Session, scope: ScopeRef, id: NodeID, name: &str, ftype: Type) {
+    pub fn add_entry(&self, session: &Session, scope: ScopeRef, id: NodeID, name: &str, ftype: Type) {
         debug!("***************: {:?} {:?}", name, ftype);
         if let Some(index) = self.get_index(session, scope, name, &ftype) {
-            self.table[index].0 = id;
+            self.table.borrow_mut()[index].0 = id;
         } else {
-            self.table.push((id, String::from(name), ftype));
+            self.table.borrow_mut().push((id, String::from(name), ftype));
         }
     }
 
 
     pub fn get_index(&self, session: &Session, scope: ScopeRef, name: &str, ftype: &Type) -> Option<usize> {
         // TODO check types for overloaded match
-        self.table.iter().position(|(_, ref ename, ref etype)| {
+        self.table.borrow().iter().position(|(_, ref ename, ref etype)| {
             ename.as_str() == name && check_type(session, scope.clone(), Some(etype.clone()), Some(ftype.clone()), Check::Def, false).is_ok()
         })
     }
 
     pub fn get_type(&self, index: usize) -> Type {
-        self.table[index].2.clone()
+        self.table.borrow()[index].2.clone()
     }
 
     pub fn len(&self) -> usize {
-        self.table.len()
+        self.table.borrow().len()
     }
 }
 

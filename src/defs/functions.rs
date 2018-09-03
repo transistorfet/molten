@@ -28,7 +28,8 @@ impl FuncDef {
                 if scope.is_redirect() && name.is_some() {
                     MethodDef::define(session, scope.clone(), id, name, ttype)
                 } else {
-                    FuncDef::define(session, scope.clone(), id, name, ttype)
+                    //FuncDef::define(session, scope.clone(), id, name, ttype)
+                    ClosureDef::define(session, scope.clone(), id, name, ttype)
                 }
             },
             _ => return Err(Error::new(format!("DefError: unsupported ABI {:?}", abi))),
@@ -99,6 +100,7 @@ impl OverloadDef {
                     prev.add_variant(session, id);
                 },
                 Ok(Def::Func(_)) |
+                Ok(Def::Closure(_)) |
                 Ok(Def::Method(_)) => {
                     let defid = OverloadDef::create(session, None, vec!(previd, id));
                     dscope.set_var_def(&name, defid);
@@ -188,7 +190,20 @@ pub struct ClosureDef {
 pub type ClosureDefRef = Rc<ClosureDef>;
 
 impl ClosureDef {
+    pub fn define(session: &Session, scope: ScopeRef, id: NodeID, name: &Option<String>, ttype: Option<Type>) -> Result<Def, Error> {
 
+        let fname = scope.get_full_name(name.clone(), id);
+        let cid = NodeID::generate();
+        let ctype = Type::Object(String::from(format!("{}_context", fname)), cid, vec!());
+        // TODO do you need to set the context type
+        let def = Def::Closure(Rc::new(ClosureDef {
+            id: id,
+            context: StructDef::new_ref(),
+        }));
+
+        FuncDef::set_func_def(session, scope.clone(), id, name, def.clone(), ttype)?;
+        Ok(def)
+    }
 
 }
 

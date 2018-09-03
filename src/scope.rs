@@ -463,12 +463,12 @@ impl Scope {
         *self.basename.borrow_mut() = name;
     }
 
-    pub fn get_full_name(&self, ident: &Option<Ident>, id: UniqueID) -> String {
+    pub fn get_full_name(&self, name: Option<String>, id: UniqueID) -> String {
         let mut base = self.get_basename();
         if base.as_str() != "" {
             base = base + &"_";
         }
-        base + &ident.as_ref().map_or_else(|| format!("anon{}", id), |ident| ident.name.clone())
+        base + &name.unwrap_or_else(|| format!("anon{}", id))
     }
 
     pub fn get_basename(&self) -> String {
