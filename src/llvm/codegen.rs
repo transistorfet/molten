@@ -14,7 +14,6 @@ use self::llvm_sys::target::*;
 use self::llvm_sys::target_machine::*;
 use self::llvm_sys::transforms::pass_manager_builder::*;
 
-use export;
 use abi::ABI;
 use types::{ self, Type };
 use utils::UniqueID;
@@ -274,16 +273,13 @@ unsafe fn generate_module<'sess>(builtins: &Vec<BuiltinDef<'sess>>, session: &'s
 
     // Output to a file, and also a string for debugging
     //format!("{}.ll", module_name)
-    LLVMPrintModuleToFile(module, label(session.target.as_str()), ptr::null_mut());
+    LLVMPrintModuleToFile(module, label(format!("{}.ll", session.target).as_str()), ptr::null_mut());
 
     if Options::as_ref().debug {
         println!("{}\n", CString::from_raw(LLVMPrintModuleToString(module)).into_string().unwrap());
     }
 
-    let export_name = session.target.rsplitn(2, '.').collect::<Vec<&str>>()[1];
-    // TODO fix exports to use transform???
-    //export::write_exports(session, session.map.get_global(), format!("{}.dec", export_name).as_str(), transform);
-    //write_module(data, format!("{}.o", export_name).as_str());
+    //write_module(data, format!("{}.o", session.target).as_str());
 
     LLVMDisposeBuilder(builder);
     LLVMDisposeModule(module);
@@ -544,14 +540,14 @@ pub unsafe fn build_class_type(data: &LLVM, scope: ScopeRef, id: NodeID, name: &
 
     let mut types = vec!();
     for &(_, ref ttype) in classdef.structdef.borrow().iter() {
-        types.push(get_type(data, ttype.clone(), true))
+        types.push(get_ltype(data, ttype.clone(), true))
     }
     LLVMStructSetBody(lltype, types.as_mut_ptr(), types.len() as u32, false as i32);
 
     if let Some(vttype) = vttype {
         let mut types = vec!();
         for &(_, _, ref ttype) in classdef.vtable.borrow().table.iter() {
-            types.push(get_type(data, ttype.clone(), true))
+            types.push(get_ltype(data, ttype.clone(), true))
         }
         LLVMStructSetBody(vttype, types.as_mut_ptr(), types.len() as u32, false as i32);
     }
@@ -559,8 +555,7 @@ pub unsafe fn build_class_type(data: &LLVM, scope: ScopeRef, id: NodeID, name: &
     pltype
 }
 
-// TODO can you remove scope from this??
-pub unsafe fn get_type(data: &LLVM, ttype: Type, use_fptrs: bool) -> LLVMTypeRef {
+pub unsafe fn get_ltype(data: &LLVM, ttype: Type, use_fptrs: bool) -> LLVMTypeRef {
     match ttype {
         Type::Object(ref tname, ref id, ref _ptypes) => match tname.as_str() {
             "Nil" => str_type(data),
@@ -581,7 +576,7 @@ pub unsafe fn get_type(data: &LLVM, ttype: Type, use_fptrs: bool) -> LLVMTypeRef
         Type::Tuple(ref types) => {
             let mut ltypes = vec!();
             for ttype in types {
-                ltypes.push(get_type(data, ttype.clone(), true));
+                ltypes.push(get_ltype(data, ttype.clone(), true));
             }
             LLVMStructType(ltypes.as_mut_ptr(), ltypes.len() as u32, false as i32)
         },
@@ -589,9 +584,9 @@ pub unsafe fn get_type(data: &LLVM, ttype: Type, use_fptrs: bool) -> LLVMTypeRef
             // TODO should you incorporate abi??
             let mut atypes = vec!();
             for ttype in args.get_types().unwrap() {
-                atypes.push(get_type(data, ttype.clone(), true));
+                atypes.push(get_ltype(data, ttype.clone(), true));
             }
-            let rtype = get_type(data, *ret.clone(), true);
+            let rtype = get_ltype(data, *ret.clone(), true);
             let ftype = LLVMFunctionType(rtype, atypes.as_mut_ptr(), atypes.len() as u32, false as i32);
             if use_fptrs {
                 LLVMPointerType(ftype, 0)
@@ -616,7 +611,7 @@ pub unsafe fn generate_declarations(data: &LLVM, scope: ScopeRef, transform: &Ve
     for element in transform {
         match element.kind {
             TopKind::Global(ref name) => {
-                let ltype = get_type(data, data.session.get_type(element.id).unwrap(), true);
+                let ltype = get_ltype(data, data.session.get_type(element.id).unwrap(), true);
                 let global = LLVMAddGlobal(data.module, ltype, label(name.as_str()));
                 LLVMSetInitializer(global, null_value(ltype));
                 data.set_value(element.id, Box::new(Global(global)));
@@ -634,7 +629,7 @@ pub unsafe fn generate_declarations(data: &LLVM, scope: ScopeRef, transform: &Ve
                         Type::Tuple(ref args) => args.len(),
                         _ => 1,
                     };
-                    let lftype = get_type(data, ttype.clone(), false);
+                    let lftype = get_ltype(data, ttype.clone(), false);
                     build_function_start(data, element.id, name.clone(), lftype, argcount, ttype.get_abi().unwrap());
                 }
             },
@@ -669,7 +664,7 @@ pub unsafe fn generate_vtables(data: &LLVM, scope: ScopeRef, transform: &Vec<Top
                     for (index, &(ref id, ref name, ref ttype)) in classdef.vtable.borrow().table.iter().enumerate() {
                         let dtype = data.session.get_type(*id).unwrap();
                         debug!("VTABLE INIT: {:?} {:?} {:?}", name, id, index);
-                        methods.push(build_generic_cast(data, data.get_value(*id).unwrap().get_ref(), get_type(data, ttype.clone(), true)));
+                        methods.push(build_generic_cast(data, data.get_value(*id).unwrap().get_ref(), get_ltype(data, ttype.clone(), true)));
                     }
 
                     let value = data.get_type(element.id).unwrap();
@@ -713,7 +708,7 @@ pub unsafe fn generate_expr_vec(data: &LLVM, func: LLVMValueRef, unwind: Unwind,
 pub unsafe fn generate_expr(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: ScopeRef, expr: &Expr) -> Value {
     debug!("CODEGEN: {:?}", expr);
     match expr.kind {
-        ExprKind::Nil => Box::new(Data(null_value(get_type(data, data.session.get_type(expr.id).unwrap(), true)))),
+        ExprKind::Nil => Box::new(Data(null_value(get_ltype(data, data.session.get_type(expr.id).unwrap(), true)))),
         ExprKind::Literal(ref lit) => {
             match lit {
                 Literal::Boolean(ref num) => Box::new(Data(LLVMConstInt(bool_type(data), *num as u64, 0))),
@@ -743,8 +738,15 @@ pub unsafe fn generate_expr(data: &LLVM, func: LLVMValueRef, unwind: Unwind, sco
             };
             //if !function.get_ref().is_null() { LLVMDumpValue(function.get_ref()); println!(""); }
 
-            generate_cast_args(data, &function, &mut largs);
+            generate_cast_args(data, function.get_ref(), &mut largs);
             let value = function.invoke(data, unwind, largs);
+            //let value = match invoke {
+            //    InvokeKind::Func(_) |
+            //    InvokeKind::Method(_, _, _) => invoke_molten_function(data, function.get_ref(), unwind, largs),
+            //
+            //    InvokeKind::CFunc(_) |
+            //    InvokeKind::ByName(_) => invoke_c_function(data, function.get_ref(), unwind, largs),
+            //};
             let value = generate_cast(data, rtype.clone(), value);
 
             from_type(&rtype, value)
@@ -754,7 +756,7 @@ pub unsafe fn generate_expr(data: &LLVM, func: LLVMValueRef, unwind: Unwind, sco
         /////// Variables ///////
 
         ExprKind::DefVar(ref name, ref value) => {
-            let ltype = get_type(data, data.session.get_type(expr.id).unwrap(), true);
+            let ltype = get_ltype(data, data.session.get_type(expr.id).unwrap(), true);
             let pointer = Box::new(Var(LLVMBuildAlloca(data.builder, ltype, label(name.as_str()))));
             data.set_value(expr.id, pointer.clone());
 
@@ -766,7 +768,7 @@ pub unsafe fn generate_expr(data: &LLVM, func: LLVMValueRef, unwind: Unwind, sco
         ExprKind::DefGlobal(ref name, ref value) => {
             let pointer = data.get_value(expr.id).unwrap();
 
-            let ltype = get_type(data, data.session.get_type(expr.id).unwrap(), true);
+            let ltype = get_ltype(data, data.session.get_type(expr.id).unwrap(), true);
             let value = generate_expr(data, func, unwind, scope.clone(), value);
             LLVMBuildStore(data.builder, build_generic_cast(data, value.get_ref(), ltype), pointer.get_ref());
             value
@@ -917,7 +919,7 @@ pub unsafe fn generate_expr(data: &LLVM, func: LLVMValueRef, unwind: Unwind, sco
             let inc = LLVMBuildAlloca(data.builder, int_type(data), label("inc"));
             LLVMBuildStore(data.builder, zero_int(data), inc);
 
-            let itype = get_type(data, lscope.get_variable_type(data.session, &name).unwrap(), true);
+            let itype = get_ltype(data, lscope.get_variable_type(data.session, &name).unwrap(), true);
             let item = LLVMBuildAlloca(data.builder, itype, label("item"));
             data.set_value(expr.id, Box::new(Var(item)));
 
@@ -1073,7 +1075,7 @@ pub unsafe fn generate_expr(data: &LLVM, func: LLVMValueRef, unwind: Unwind, sco
 
         ExprKind::Tuple(ref items) => {
             let ttype = data.session.get_type(expr.id).unwrap();
-            let ltype = get_type(data, ttype, true);
+            let ltype = get_ltype(data, ttype, true);
             let tuple = LLVMBuildAlloca(data.builder, ltype, label("tuple"));
             for (index, item) in items.iter().enumerate() {
                 let value = generate_expr(data, func, unwind, scope.clone(), item).get_ref();
@@ -1086,7 +1088,7 @@ pub unsafe fn generate_expr(data: &LLVM, func: LLVMValueRef, unwind: Unwind, sco
 
         ExprKind::PtrCast(ref ttype, ref code) => {
             let mut value = generate_expr(data, func, unwind, scope.clone(), code).get_ref();
-            let ltype = get_type(data, ttype.clone(), true);
+            let ltype = get_ltype(data, ttype.clone(), true);
             value = build_generic_cast(data, value, ltype);
             from_type(ttype, value)
         },
@@ -1097,7 +1099,7 @@ pub unsafe fn generate_expr(data: &LLVM, func: LLVMValueRef, unwind: Unwind, sco
 
 pub unsafe fn generate_func_start(data: &LLVM, scope: ScopeRef, id: NodeID, name: String, args: &Vec<(NodeID, String)>) -> Value {
     let ttype = data.session.get_type(id).unwrap();
-    let lftype = get_type(data, ttype.clone(), false);
+    let lftype = get_ltype(data, ttype.clone(), false);
     let abi = ttype.get_abi().unwrap();
     let function = build_function_start(data, id, name, lftype, args.len(), abi);
     //LLVMSetGC(function, label("shadow-stack"));
@@ -1158,7 +1160,7 @@ pub unsafe fn generate_invoke_args(data: &LLVM, func: LLVMValueRef, unwind: Unwi
     // TODO this forces the function arg type to be a tuple
     for (ttype, arg) in atypes.get_types().unwrap().iter().zip(args.iter()) {
         let mut larg = generate_expr(data, func, unwind, scope.clone(), arg).get_ref();
-        let ltype = get_type(data, ttype.clone(), true);
+        let ltype = get_ltype(data, ttype.clone(), true);
         if ltype != LLVMTypeOf(larg) {
             // TODO this seems to cast to int as well as pointers, so maybe it's doing too much, at least without checking that it's supposed to
             larg = LLVMBuildPointerCast(data.builder, larg, ltype, label("ptr"));
@@ -1168,10 +1170,10 @@ pub unsafe fn generate_invoke_args(data: &LLVM, func: LLVMValueRef, unwind: Unwi
     largs
 }
 
-pub unsafe fn generate_cast_args(data: &LLVM, function: &Value, largs: &mut Vec<LLVMValueRef>) {
-    if !function.get_ref().is_null() {
+pub unsafe fn generate_cast_args(data: &LLVM, function: LLVMValueRef, largs: &mut Vec<LLVMValueRef>) {
+    if !function.is_null() {
         // Cast values to the function's declared type; this is a hack for typevar/generic arguments
-        let mut lftype = LLVMTypeOf(function.get_ref());
+        let mut lftype = LLVMTypeOf(function);
         if LLVMGetTypeKind(lftype) == LLVMTypeKind::LLVMPointerTypeKind {
             lftype = LLVMGetElementType(lftype);
         }
@@ -1185,7 +1187,22 @@ pub unsafe fn generate_cast_args(data: &LLVM, function: &Value, largs: &mut Vec<
 }
 
 pub unsafe fn generate_cast(data: &LLVM, rtype: Type, value: LLVMValueRef) -> LLVMValueRef {
-    let lrtype = get_type(data, rtype, true);
+    let lrtype = get_ltype(data, rtype, true);
     build_generic_cast(data, value, lrtype)
+}
+
+pub unsafe fn invoke_molten_function(data: &LLVM, func: LLVMValueRef, unwind: Unwind, mut largs: Vec<LLVMValueRef>) -> LLVMValueRef {
+    //LLVMBuildCall(data.builder, self.0, largs.as_mut_ptr(), largs.len() as u32, label("tmp"))
+    match unwind {
+        None => LLVMBuildCall(data.builder, func, largs.as_mut_ptr(), largs.len() as u32, label("thingies")),
+        Some((then, catch)) => {
+            LLVMBuildInvoke(data.builder, func, largs.as_mut_ptr(), largs.len() as u32, then, catch, label("tmp"))
+            //LLVMSetUnwindDest(invoke, unwind.unwrap());
+        }
+    }
+}
+
+pub unsafe fn invoke_c_function(data: &LLVM, func: LLVMValueRef, unwind: Unwind, mut largs: Vec<LLVMValueRef>) -> LLVMValueRef {
+    LLVMBuildCall(data.builder, func, largs.as_mut_ptr(), largs.len() as u32, label("tmp"))
 }
 

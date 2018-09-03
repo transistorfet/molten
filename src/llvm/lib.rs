@@ -99,7 +99,7 @@ pub unsafe fn define_builtins_node<'sess>(data: &mut LLVM<'sess>, objtype: LLVMT
             let ftype = parse_type(types).unwrap();
             match *func {
                 Func::External => {
-                    let func = LLVMAddFunction(data.module, label(name.as_str()), get_type(data, ftype.clone(), false));
+                    let func = LLVMAddFunction(data.module, label(name.as_str()), get_ltype(data, ftype.clone(), false));
                     data.set_value(*id, from_abi(&ftype.get_abi().unwrap(), func));
                 },
                 Func::Runtime(func) => {
@@ -121,7 +121,7 @@ pub unsafe fn define_builtins_node<'sess>(data: &mut LLVM<'sess>, objtype: LLVMT
                 classdef.structdef.borrow_mut().extend(structdef.clone());
                 build_class_type(data, scope.clone(), *id, &cname, classdef.clone())
             } else {
-                let lltype = get_type(data, scope.find_type(data.session, &cname).unwrap(), true);
+                let lltype = get_ltype(data, scope.find_type(data.session, &cname).unwrap(), true);
                 data.set_type(*id, TypeValue { value: lltype, vttype: None });
                 lltype
             };

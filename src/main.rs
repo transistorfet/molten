@@ -78,7 +78,7 @@ fn compile_file(input: &str, output: Option<&str>) {
     let mut session = session::Session::new();
     let source = input.rsplitn(2, '.').collect::<Vec<&str>>()[1];
     session.name = source.replace("/", ".");
-    session.target = output.map(|s| String::from(s)).unwrap_or_else(|| format!("{}.ll", source));
+    session.target = output.map(|s| String::from(s)).unwrap_or_else(|| String::from(source));
 
     let builtins = lib::get_builtins();
     lib::make_global(&session, &builtins);
@@ -102,6 +102,7 @@ fn compile_file(input: &str, output: Option<&str>) {
     transform.transform_program(session.map.get_global(), &code);
     //println!("TRANSFORM:\n{:#?}", &*transform.toplevel.borrow());
     codegen::generate(&builtins, &session, &*transform.toplevel.borrow());
+    export::write_exports(&session, session.map.get_global(), format!("{}.dec", session.target).as_str(), &code);
 
     if Options::as_ref().debug {
         for (ref id, ref ttype) in session.types.borrow().iter() {

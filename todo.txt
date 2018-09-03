@@ -1,4 +1,7 @@
 
+* make a proper patterns tree
+* make the top level module function be a closure instead of using global vars?? there were a bunch of errors
+
 * should you add session to refinery and process imports there
 * refactor code that uses num_funcdefs
 
