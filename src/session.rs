@@ -19,8 +19,8 @@ use scope::{ Scope, ScopeRef, ScopeMapRef };
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Session {
-    pub name: String,
     pub files: RefCell<Vec<(String, String)>>,
+    pub name: String,
     pub target: String,
     pub errors: Cell<u32>,
     pub map: ScopeMapRef,
@@ -33,8 +33,8 @@ pub struct Session {
 impl Session {
     pub fn new() -> Self {
         Session {
-            name: String::from(""),
             files: RefCell::new(vec!()),
+            name: String::from(""),
             target: String::from(""),
             errors: Cell::new(0),
             map: ScopeMapRef::new(),

@@ -21,7 +21,7 @@ use utils::UniqueID;
 use defs::classes::ClassDef;
 use defs::functions::FuncDef;
 
-use llvm::compiler::*;
+use llvm::codegen::*;
 
 
 pub type RuntimeFunction = unsafe fn(&LLVM, ScopeRef, NodeID, &str, LLVMTypeRef) -> LLVMValueRef;
@@ -81,18 +81,18 @@ pub fn declare_builtins_node<'sess>(session: &Session, scope: ScopeRef, node: &B
 }
 
 pub unsafe fn initialize_builtins<'sess>(data: &mut LLVM<'sess>, scope: ScopeRef, entries: &Vec<BuiltinDef<'sess>>) {
+    define_builtins_vec(data, ptr::null_mut(), scope.clone(), entries);
     let pscope = scope.get_parent().unwrap();
-    define_builtins_vec(data, ptr::null_mut(), pscope.clone(), scope.clone(), entries);
     declare_irregular_functions(data, pscope.clone());
 }
 
-pub unsafe fn define_builtins_vec<'sess>(data: &mut LLVM<'sess>, objtype: LLVMTypeRef, scope: ScopeRef, tscope: ScopeRef, entries: &Vec<BuiltinDef<'sess>>) {
+pub unsafe fn define_builtins_vec<'sess>(data: &mut LLVM<'sess>, objtype: LLVMTypeRef, scope: ScopeRef, entries: &Vec<BuiltinDef<'sess>>) {
     for node in entries {
-        define_builtins_node(data, objtype, scope.clone(), tscope.clone(), node);
+        define_builtins_node(data, objtype, scope.clone(), node);
     }
 }
 
-pub unsafe fn define_builtins_node<'sess>(data: &mut LLVM<'sess>, objtype: LLVMTypeRef, scope: ScopeRef, tscope: ScopeRef, node: &BuiltinDef<'sess>) {
+pub unsafe fn define_builtins_node<'sess>(data: &mut LLVM<'sess>, objtype: LLVMTypeRef, scope: ScopeRef, node: &BuiltinDef<'sess>) {
     match *node {
         BuiltinDef::Func(ref id, ref sname, ref types, ref func) => {
             let mut name = String::from(*sname);
@@ -126,7 +126,7 @@ pub unsafe fn define_builtins_node<'sess>(data: &mut LLVM<'sess>, objtype: LLVMT
                 lltype
             };
 
-            define_builtins_vec(data, lltype, tscope.clone(), tscope.clone(), entries);
+            define_builtins_vec(data, lltype, tscope.clone(), entries);
         },
     }
 }

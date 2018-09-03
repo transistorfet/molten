@@ -68,7 +68,6 @@
         //let ab = 123.24 * 3
 
 
-
         class Stuff {
             fn new(self) { }
 
@@ -129,7 +128,7 @@
         vtest(thingy)
 
         while thingy.a > 0 {
-            println("Hey again")
+            println("Hey again" + str(thingy.a))
             thingy.a = thingy.a - 1000
         }
 
@@ -205,6 +204,7 @@
                 recoverload(x - 1.0)
         }
 */
+
 
 	println("thing" + "stuff\n")
         println("STUFF".push(" things"))

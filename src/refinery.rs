@@ -1,11 +1,15 @@
 
 use rand;
 
+use abi::ABI;
 use types::Type;
 use utils::UniqueID;
-use ast::{ NodeID, AST, Ident, ClassSpec };
+use ast::{ NodeID, Pos, AST, Ident, ClassSpec };
 
 pub fn refine(code: Vec<AST>) -> Vec<AST> {
+    //vec!(AST::make_func(Pos::empty(), Some(Ident::new(Pos::empty(), format!("init.{}", "test"))), vec!(), None,
+    //    Box::new(AST::make_block(Pos::empty(), refine_vec(code))),
+    //ABI::Molten))
     refine_vec(code)
 }
 
@@ -165,8 +169,7 @@ pub fn refine_node(node: AST) -> AST {
         AST::Import(_, _, _, _) => { node },
         //AST::Import(id, pos, ident, _) => {
         //    let path = ident.replace(".", "/") + ".dec";
-        //    let decls = import::load_index(path.as_str());
-        //    //let decls = session.parse_file(path.as_str());
+        //    let decls = session.parse_file(path.as_str());
         //    AST::Import(id, pos, ident, refine_vec(decls))
         //},
 

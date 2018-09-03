@@ -32,7 +32,8 @@ mod export;
 mod llvm;
 
 use config::Options;
-use llvm::compiler;
+use llvm::transform;
+use llvm::codegen;
 use llvm::lib;
 
 fn main() {
@@ -75,8 +76,9 @@ fn main() {
 
 fn compile_file(input: &str, output: Option<&str>) {
     let mut session = session::Session::new();
-    let name = input.rsplitn(2, '.').collect::<Vec<&str>>()[1];
-    session.target = output.map(|s| String::from(s)).unwrap_or_else(|| format!("{}.ll", name));
+    let source = input.rsplitn(2, '.').collect::<Vec<&str>>()[1];
+    session.name = source.replace("/", ".");
+    session.target = output.map(|s| String::from(s)).unwrap_or_else(|| format!("{}.ll", source));
 
     let builtins = lib::get_builtins();
     lib::make_global(&session, &builtins);
@@ -96,7 +98,10 @@ fn compile_file(input: &str, output: Option<&str>) {
 
     session.resolve_types();
 
-    compiler::compile(&builtins, &session, name, &code);
+    let transform = transform::Transform::new(&session);
+    transform.transform_program(session.map.get_global(), &code);
+    //println!("TRANSFORM:\n{:#?}", &*transform.toplevel.borrow());
+    codegen::generate(&builtins, &session, &*transform.toplevel.borrow());
 
     if Options::as_ref().debug {
         for (ref id, ref ttype) in session.types.borrow().iter() {
