@@ -2,7 +2,7 @@
 use ast::AST;
 //use utils::UniqueID;
 use session::Session;
-use scope::{ ScopeRef, ScopeMapRef };
+use scope::{ ScopeRef };
 
 macro_rules! debug {
     //($fmt:expr, $($arg:expr),*) => {

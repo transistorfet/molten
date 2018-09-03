@@ -149,7 +149,7 @@ impl Type {
             match ntype {
                 Ok(utype) => {
                     match dscope.get_var_def(name) {
-                        Some(defid) => { session.update_type(scope.clone(), defid, utype).unwrap(); },
+                        Some(defid) => { session.update_type(scope.clone(), defid, utype).unwrap()?; },
                         None => { },
                     }
                 },
@@ -169,9 +169,9 @@ impl Type {
                 Ok(ntype) => {
                     //let ntype = check_type(session, scope, Some(ttype.clone()), Some(ntype.clone()), Check::Def, false).unwrap();
                     pscope.update_type(idname, ntype.clone());
-                    session.update_type(pscope.get_def_id(idname).unwrap(), ntype.clone());
+                    session.update_type(pscope.get_def_id(idname).unwrap(), ntype.clone())?;
                     match otype {
-                        Some(Type::Variable(_, ref id)) if &id.to_string() != idname => { session.update_type(scope.clone(), *id, ntype); },
+                        Some(Type::Variable(_, ref id)) if &id.to_string() != idname => { session.update_type(scope.clone(), *id, ntype)?; },
                         _ => { },
                     }
                 },
@@ -298,14 +298,14 @@ pub fn check_type(session: &Session, scope: ScopeRef, odtype: Option<Type>, octy
             //if mode == Check::Update && dtype.is_variable() {
             if dtype.is_variable() && !scope.contains_type(&dtype.get_varname().unwrap()) {
             //if dtype.is_variable() && !scope.contains_type(name) {
-                if update { Type::update_type(scope, &dtype.get_id().unwrap().to_string(), ctype.clone()); }
+                if update { Type::update_type(scope, &dtype.get_id().unwrap().to_string(), ctype.clone())?; }
                 Ok(resolve_type(session, scope, ctype.clone()))
             } else {
-                if update { session.update_type(scope, *id, dtype.clone()); }
+                if update { session.update_type(scope, *id, dtype.clone())?; }
                 Ok(resolve_type(session, scope, dtype))
             }
         } else if let Type::Variable(_, ref id) = dtype {
-            if update { session.update_type(scope, *id, ctype.clone()); }
+            if update { session.update_type(scope, *id, ctype.clone())?; }
             Ok(resolve_type(session, scope, ctype))
         } else {
 */
@@ -321,7 +321,7 @@ pub fn check_type(session: &Session, scope: ScopeRef, odtype: Option<Type>, octy
                 }
             } else {
                 if update {
-                    session.update_type(scope.clone(), *did, ctype.clone());
+                    session.update_type(scope.clone(), *did, ctype.clone())?;
                     Ok(resolve_type(session, scope, dtype.clone()))
                 } else {
                     Ok(resolve_type(session, scope, ctype.clone()))
@@ -329,7 +329,7 @@ pub fn check_type(session: &Session, scope: ScopeRef, odtype: Option<Type>, octy
             }
         } else if let Type::Variable(_, ref cid) = ctype {
                 if update {
-                    session.update_type(scope.clone(), *cid, dtype.clone());
+                    session.update_type(scope.clone(), *cid, dtype.clone())?;
                     Ok(resolve_type(session, scope, ctype.clone()))
                 } else {
                     Ok(resolve_type(session, scope, dtype.clone()))

@@ -4,7 +4,7 @@ use abi::ABI;
 use types::Type;
 use ast::{ NodeID, Ident, ClassSpec, AST };
 use session::{ Session, Error };
-use scope::{ Scope, ScopeRef };
+use scope::{ ScopeRef };
 use utils::UniqueID;
 
 use defs::classes::ClassDef;

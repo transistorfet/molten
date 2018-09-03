@@ -58,7 +58,7 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &AST,
                     stype = fscope.map_all_typevars(session, stype);
                     atype = expect_type(session, fscope.clone(), Some(atype), Some(stype), Check::Def)?;
                 }
-                session.update_type(fscope.clone(), arg.id, atype.clone());
+                session.update_type(fscope.clone(), arg.id, atype.clone())?;
                 argtypes.push(atype);
             }
 
@@ -67,10 +67,8 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &AST,
             // Resolve type variables that can be
             for i in 0 .. argtypes.len() {
                 argtypes[i] = resolve_type(session, fscope.clone(), argtypes[i].clone());
-                session.update_type(fscope.clone(), args[i].id, argtypes[i].clone());
+                session.update_type(fscope.clone(), args[i].id, argtypes[i].clone())?;
             }
-            // TODO is this needed?
-            //update_scope_variable_types(session, fscope.clone());
 
             let tupleargs = Type::Tuple(argtypes);
             let nftype = Type::Function(Box::new(tupleargs.clone()), Box::new(rettype), *abi);
@@ -111,7 +109,7 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &AST,
                 },
                 Type::Variable(_, ref vid) => {
                     let ftype = Type::Function(Box::new(atypes), Box::new(expected.unwrap_or_else(|| tscope.new_typevar(session))), ABI::Unknown);
-                    session.update_type(tscope, *vid, ftype.clone());
+                    session.update_type(tscope, *vid, ftype.clone())?;
                     ftype
                 },
                 _ => return Err(Error::new(format!("NotAFunction: {:?}", fexpr))),
@@ -121,7 +119,7 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &AST,
             ftype.get_rettype()?.clone()
         },
 
-        AST::SideEffect(ref id, _, _, ref args) => {
+        AST::SideEffect(_, _, _, ref args) => {
             let mut ltype = None;
             for ref expr in args {
                 ltype = Some(expect_type(session, scope.clone(), ltype.clone(), Some(check_types_node(session, scope.clone(), expr, ltype.clone())), Check::List)?);
@@ -140,14 +138,14 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &AST,
             ttype.clone()
         },
 
-        AST::Identifier(ref id, _, ref ident) => {
+        AST::Identifier(_, _, ref ident) => {
             //session.get_type_from_ref(*id)?;
             scope.get_variable_type(session, &ident.name).unwrap_or_else(|| expected.unwrap_or_else(|| scope.new_typevar(session)))
         },
 
-        AST::Block(ref id, _, ref body) => check_types_vec(session, scope, body),
+        AST::Block(_, _, ref body) => check_types_vec(session, scope, body),
 
-        AST::If(ref id, _, ref cond, ref texpr, ref fexpr) => {
+        AST::If(_, _, ref cond, ref texpr, ref fexpr) => {
             // TODO should this require the cond type to be Bool?
             check_types_node(session, scope.clone(), cond, None);
             let ttype = check_types_node(session, scope.clone(), texpr, None);
@@ -168,12 +166,12 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &AST,
             rtype.unwrap()
         },
 
-        AST::Raise(ref id, _, ref expr) => {
+        AST::Raise(_, _, ref expr) => {
             // TODO should you check for a special error/exception type?
             check_types_node(session, scope, expr, None)
         },
 
-        AST::While(ref id, _, ref cond, ref body) => {
+        AST::While(_, _, ref cond, ref body) => {
             // TODO should this require the cond type to be Bool?
             check_types_node(session, scope.clone(), cond, None);
             check_types_node(session, scope.clone(), body, None);
@@ -186,7 +184,7 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &AST,
             let itype = lscope.get_variable_type(session, &ident.name).unwrap_or_else(|| expected.unwrap_or_else(|| scope.new_typevar(session)));
             let etype = Some(scope.make_obj(session, String::from("List"), vec!(itype))?);
             let ltype = expect_type(session, lscope.clone(), etype.clone(), Some(check_types_node(session, lscope.clone(), list, etype.clone())), Check::Def)?;
-            session.update_type(lscope.clone(), *id, ltype.get_params()?[0].clone());
+            session.update_type(lscope.clone(), *id, ltype.get_params()?[0].clone())?;
             check_types_node(session, lscope, body, None)
         },
 
@@ -213,7 +211,7 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &AST,
             Type::Tuple(types)
         },
 
-        AST::List(ref id, _, ref items) => {
+        AST::List(_, _, ref items) => {
             let mut ltype = None;
             for ref expr in items {
                 ltype = Some(expect_type(session, scope.clone(), ltype.clone(), Some(check_types_node(session, scope.clone(), expr, ltype.clone())), Check::List)?);
@@ -222,7 +220,7 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &AST,
             scope.make_obj(session, String::from("List"), vec!(ltype))?
         },
 
-        AST::TypeDef(ref id, _, _, _) => return Err(Error::new(format!("NotImplementedError: not yet supported, {:?}", node))),
+        AST::TypeDef(_, _, _, _) => return Err(Error::new(format!("NotImplementedError: not yet supported, {:?}", node))),
 
         AST::PtrCast(ref ttype, ref code) => {
             let ctype = check_types_node(session, scope.clone(), code, Some(ttype.clone()));
@@ -278,7 +276,7 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &AST,
             expect_type(session, scope, Some(ltype), Some(rtype), Check::Def)?
         },
 
-        AST::Import(ref id, _, _, ref decls) => {
+        AST::Import(_, _, _, ref decls) => {
             check_types_vec(session, scope.clone(), decls);
             //Type::Object(String::from("Nil"), vec!())
             scope.make_obj(session, String::from("Nil"), vec!())?
@@ -286,8 +284,8 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &AST,
 
         AST::Underscore => expected.unwrap_or_else(|| scope.new_typevar(session)),
 
-        AST::Recall(ref id, _) => panic!("InternalError: Recall ast element shouldn't appear this early"),
-        AST::Index(ref id, _, _, _) => panic!("InternalError: ast element shouldn't appear at this late phase: {:?}", node),
+        AST::Recall(_, _) => panic!("InternalError: Recall ast element shouldn't appear this early"),
+        AST::Index(_, _, _, _) => panic!("InternalError: ast element shouldn't appear at this late phase: {:?}", node),
     };
     
     debug!("CHECK: {:?} {:?}", rtype, node);
@@ -333,76 +331,5 @@ pub fn session_find_variant(session: &Session, scope: ScopeRef, invid: NodeID, f
 }
 
 
-pub fn update_scope_variable_types(session: &Session, scope: ScopeRef) {
-    let dscope = Scope::target(session, scope.clone());
-    let mut names = vec!();
-    for name in dscope.names.borrow().keys() {
-        names.push(name.clone());
-    }
-
-    for name in &names {
-        match dscope.get_variable_type(session, name) {
-            Some(otype) => {
-                let ntype = resolve_type(session, scope.clone(), otype.clone());
-if otype != ntype { println!("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!: {:?} {:?}", otype, ntype); }
-                match dscope.get_var_def(name) {
-                    Some(defid) => { session.update_type(scope.clone(), defid, ntype).unwrap(); },
-                    None => { },
-                }
-            },
-            _ => { },
-        }
-    }
-}
-
-
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use parser::*;
-    use scope::*;
-    use session::Session;
-
-    #[test]
-    fn basic_types() {
-        assert_eq!(
-            typecheck("5 * 3 + 8 / 100".as_bytes()),
-            parse_type("Int").unwrap()
-        );
-        assert_eq!(
-            typecheck("let x = 2 + 4 * 7 - 1 / 20  == 10 - 50 * 12".as_bytes()),
-            parse_type("Bool").unwrap()
-        );
-    }
-
-    #[test]
-    fn function_types() {
-        assert_eq!(
-            typecheck("fn x, y -> { let a = x * 1.0; y * y }".as_bytes()),
-            parse_type("(Real, 'e) -> 'e").unwrap()
-        );
-    }
-
-    #[test]
-    #[should_panic]
-    fn type_errors_basic() {
-        typecheck("5 * 3.0 + 8 / 100".as_bytes());
-    }
-
-    #[test]
-    #[should_panic]
-    fn type_errors_mismatch() {
-        typecheck("let b : Bool = 123.24".as_bytes());
-    }
-
-    fn typecheck(text: &[u8]) -> Type {
-        let result = parse(text);
-        let mut code = result.unwrap().1;
-        let session = Session::new();
-        let map: ScopeMapRef<()> = bind_names(&code);
-        check_types_vec(map, map.get_global(), &code)
-    }
-}
 
 

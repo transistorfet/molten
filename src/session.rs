@@ -14,7 +14,7 @@ use types::Type;
 use config::Options;
 use ast::{ NodeID, Pos, AST };
 use defs::{ Def };
-use scope::{ Scope, ScopeRef, ScopeMapRef };
+use scope::{ ScopeRef, ScopeMapRef };
 
 
 #[derive(Clone, Debug, PartialEq)]
