@@ -284,20 +284,24 @@ impl AST {
         AST::Identifier(NodeID::generate(), pos, ident)
     }
 
-    pub fn make_index(pos: Pos, list: Box<AST>, index: Box<AST>) -> AST {
-        AST::Index(NodeID::generate(), pos, list, index)
+    pub fn make_ident_from_str(pos: Pos, name: &str) -> AST {
+        AST::Identifier(NodeID::generate(), pos, Ident::from_str(name))
     }
 
-    pub fn make_resolve(pos: Pos, object: Box<AST>, ident: Ident) -> AST {
-        AST::Resolver(NodeID::generate(), pos, object, ident)
+    pub fn make_index(pos: Pos, list: AST, index: AST) -> AST {
+        AST::Index(NodeID::generate(), pos, Box::new(list), Box::new(index))
     }
 
-    pub fn make_access(pos: Pos, object: Box<AST>, ident: Ident) -> AST {
-        AST::Accessor(NodeID::generate(), pos, object, ident, NodeID::generate())
+    pub fn make_resolve(pos: Pos, object: AST, ident: Ident) -> AST {
+        AST::Resolver(NodeID::generate(), pos, Box::new(object), ident)
     }
 
-    pub fn make_invoke(pos: Pos, fexpr: Box<AST>, args: Vec<AST>) -> AST {
-        AST::Invoke(NodeID::generate(), pos, fexpr, args)
+    pub fn make_access(pos: Pos, object: AST, ident: Ident) -> AST {
+        AST::Accessor(NodeID::generate(), pos, Box::new(object), ident, NodeID::generate())
+    }
+
+    pub fn make_invoke(pos: Pos, fexpr: AST, args: Vec<AST>) -> AST {
+        AST::Invoke(NodeID::generate(), pos, Box::new(fexpr), args)
     }
 
     pub fn make_side_effect(pos: Pos, ident: Ident, args: Vec<AST>) -> AST {
@@ -308,32 +312,32 @@ impl AST {
         AST::Block(NodeID::generate(), pos, body)
     }
 
-    pub fn make_if(pos: Pos, cond: Box<AST>, texpr: Box<AST>, fexpr: Box<AST>) -> AST {
-        AST::If(NodeID::generate(), pos, cond, texpr, fexpr)
+    pub fn make_if(pos: Pos, cond: AST, texpr: AST, fexpr: AST) -> AST {
+        AST::If(NodeID::generate(), pos, Box::new(cond), Box::new(texpr), Box::new(fexpr))
     }
 
-    pub fn make_raise(pos: Pos, expr: Box<AST>) -> AST {
-        AST::Raise(NodeID::generate(), pos, expr)
+    pub fn make_raise(pos: Pos, expr: AST) -> AST {
+        AST::Raise(NodeID::generate(), pos, Box::new(expr))
     }
 
-    pub fn make_try(pos: Pos, cond: Box<AST>, cases: Vec<(AST, AST)>) -> AST {
-        AST::Try(NodeID::generate(), pos, cond, cases, NodeID::generate())
+    pub fn make_try(pos: Pos, cond: AST, cases: Vec<(AST, AST)>) -> AST {
+        AST::Try(NodeID::generate(), pos, Box::new(cond), cases, NodeID::generate())
     }
 
-    pub fn make_match(pos: Pos, cond: Box<AST>, cases: Vec<(AST, AST)>) -> AST {
-        AST::Match(NodeID::generate(), pos, cond, cases, NodeID::generate())
+    pub fn make_match(pos: Pos, cond: AST, cases: Vec<(AST, AST)>) -> AST {
+        AST::Match(NodeID::generate(), pos, Box::new(cond), cases, NodeID::generate())
     }
 
-    pub fn make_for(pos: Pos, ident: Ident, list: Box<AST>, body: Box<AST>) -> AST {
-        AST::For(NodeID::generate(), pos, ident, list, body)
+    pub fn make_for(pos: Pos, ident: Ident, list: AST, body: AST) -> AST {
+        AST::For(NodeID::generate(), pos, ident, Box::new(list), Box::new(body))
     }
 
     pub fn make_decl(pos: Pos, ident: Ident, ttype: Type) -> AST {
         AST::Declare(NodeID::generate(), pos, ident, ttype)
     }
 
-    pub fn make_func(pos: Pos, ident: Option<Ident>, args: Vec<Argument>, rtype: Option<Type>, body: Box<AST>, abi: ABI) -> AST {
-        AST::Function(NodeID::generate(), pos, ident, args, rtype, body, abi)
+    pub fn make_func(pos: Pos, ident: Option<Ident>, args: Vec<Argument>, rtype: Option<Type>, body: AST, abi: ABI) -> AST {
+        AST::Function(NodeID::generate(), pos, ident, args, rtype, Box::new(body), abi)
     }
 
     pub fn make_new(pos: Pos, classspec: ClassSpec) -> AST {
@@ -348,16 +352,16 @@ impl AST {
         AST::Import(NodeID::generate(), pos, ident, decls)
     }
 
-    pub fn make_def(pos: Pos, ident: Ident, ttype: Option<Type>, value: Box<AST>) -> AST {
-        AST::Definition(NodeID::generate(), pos, ident, ttype, value)
+    pub fn make_def(pos: Pos, ident: Ident, ttype: Option<Type>, value: AST) -> AST {
+        AST::Definition(NodeID::generate(), pos, ident, ttype, Box::new(value))
     }
 
-    pub fn make_assign(pos: Pos, left: Box<AST>, right: Box<AST>) -> AST {
-        AST::Assignment(NodeID::generate(), pos, left, right)
+    pub fn make_assign(pos: Pos, left: AST, right: AST) -> AST {
+        AST::Assignment(NodeID::generate(), pos, Box::new(left), Box::new(right))
     }
 
-    pub fn make_while(pos: Pos, cond: Box<AST>, body: Box<AST>) -> AST {
-        AST::While(NodeID::generate(), pos, cond, body)
+    pub fn make_while(pos: Pos, cond: AST, body: AST) -> AST {
+        AST::While(NodeID::generate(), pos, Box::new(cond), Box::new(body))
     }
 
     pub fn make_typedef(pos: Pos, classspec: ClassSpec, fields: Vec<Field>) -> AST {

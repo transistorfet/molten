@@ -142,7 +142,7 @@ named!(definition(Span) -> AST,
             wscom!(tag!("=")),
             expression
         )) >>
-        (AST::make_def(Pos::new(pos), i.1, i.2, Box::new(if e.is_some() { e.unwrap() } else { AST::make_nil() })))
+        (AST::make_def(Pos::new(pos), i.1, i.2, if e.is_some() { e.unwrap() } else { AST::make_nil() }))
     )
 );
 
@@ -152,7 +152,7 @@ named!(assignment(Span) -> AST,
         o: subatomic_operation >>
         wscom!(tag!("=")) >>
         e: expression >>
-        (AST::make_assign(Pos::new(pos), Box::new(o), Box::new(e)))
+        (AST::make_assign(Pos::new(pos), o, e))
     )
 );
 
@@ -163,7 +163,7 @@ named!(whileloop(Span) -> AST,
         c: expression >>
         opt!(multispace_comment) >>
         e: expression >>
-        (AST::make_while(Pos::new(pos), Box::new(c), Box::new(e)))
+        (AST::make_while(Pos::new(pos), c, e))
     )
 );
 
@@ -246,7 +246,7 @@ named!(ifexpr(Span) -> AST,
             wscom!(tag_word!("else")),
             expression
         )) >>
-        (AST::make_if(Pos::new(pos), Box::new(c), Box::new(t), Box::new(if f.is_some() { f.unwrap() } else { AST::make_nil() })))
+        (AST::make_if(Pos::new(pos), c, t, if f.is_some() { f.unwrap() } else { AST::make_nil() }))
     )
 );
 
@@ -257,7 +257,7 @@ named!(trywith(Span) -> AST,
         c: expression >>
         wscom!(tag_word!("with")) >>
         l: caselist >>
-        (AST::make_try(Pos::new(pos), Box::new(c), l))
+        (AST::make_try(Pos::new(pos), c, l))
     )
 );
 
@@ -266,7 +266,7 @@ named!(raise(Span) -> AST,
         pos: position!() >>
         wscom!(tag_word!("raise")) >>
         e: expression >>
-        (AST::make_raise(Pos::new(pos), Box::new(e)))
+        (AST::make_raise(Pos::new(pos), e))
     )
 );
 
@@ -278,7 +278,7 @@ named!(matchcase(Span) -> AST,
         //wscom!(tag_word!("with")) >>
         //l: caselist >>
         l: delimited!(wscom!(tag!("{")), caselist, wscom!(tag!("}"))) >>
-        (AST::make_match(Pos::new(pos), Box::new(c), l))
+        (AST::make_match(Pos::new(pos), c, l))
     )
 );
 
@@ -303,7 +303,7 @@ named!(forloop(Span) -> AST,
         l: expression >>
         opt!(multispace_comment) >>
         e: expression >>
-        (AST::make_for(Pos::new(pos), i, Box::new(l), Box::new(e)))
+        (AST::make_for(Pos::new(pos), i, l, e))
     )
 );
 
@@ -318,7 +318,7 @@ named!(newclass(Span) -> AST,
         ) >>
         (AST::PtrCast(
             Type::Object(cs.ident.name.clone(), UniqueID(0), cs.types.clone()),
-            Box::new(AST::make_invoke(Pos::new(pos), Box::new(AST::make_resolve(Pos::new(pos), Box::new(AST::make_ident(Pos::new(pos), cs.ident.clone())), Ident::from_str("new"))), a))))
+            Box::new(AST::make_invoke(Pos::new(pos), AST::make_resolve(Pos::new(pos), AST::make_ident(Pos::new(pos), cs.ident.clone()), Ident::from_str("new")), a))))
     )
 );
 
@@ -350,7 +350,7 @@ named!(function(Span) -> AST,
         r: opt!(preceded!(wscom!(tag!("->")), type_description)) >>
         a: abi_specifier >>
         e: alt_complete!(block | preceded!(wscom!(tag!("=>")), expression)) >>
-        (AST::make_func(Pos::new(pos), l.0, l.1, r, Box::new(e), a))
+        (AST::make_func(Pos::new(pos), l.0, l.1, r, e, a))
     )
 );
 
@@ -445,8 +445,8 @@ impl AST {
             "and" | "or" => AST::make_side_effect(pos, op, vec!(r1, r2)),
             _ => 
             //AST::Infix(pos, op, Box::new(r1), Box::new(r2))
-            AST::make_invoke(pos.clone(), Box::new(AST::make_ident(pos, op)), vec!(r1, r2))
-            //AST::make_invoke(pos, Box::new(AST::make_access(pos, Box::new(r1), op)), vec!(r2))
+            AST::make_invoke(pos.clone(), AST::make_ident(pos, op), vec!(r1, r2))
+            //AST::make_invoke(pos, AST::make_access(pos, r1, op), vec!(r2))
         }
     }
 }
@@ -480,8 +480,8 @@ named!(prefix(Span) -> AST,
         op: prefix_op >>
         a: atomic >>
         //(AST::Prefix(op, Box::new(a)))
-        (AST::make_invoke(Pos::new(pos), Box::new(AST::make_ident(Pos::new(pos), op)), vec!(a)))
-        //(AST::make_invoke(Box::new(AST::make_access(Pos::new(pos), Box::new(a), op)), vec!()))
+        (AST::make_invoke(Pos::new(pos), AST::make_ident(Pos::new(pos), op), vec!(a)))
+        //(AST::make_invoke(AST::make_access(Pos::new(pos), a, op), vec!()))
     )
 );
 
@@ -510,10 +510,10 @@ impl AST {
         let mut ret = left;
         for op in operations {
             match op {
-                SubOP::Index(p, e) => ret = AST::make_index(p, Box::new(ret), Box::new(e)),
-                SubOP::Invoke(p, e) => ret = AST::make_invoke(p, Box::new(ret), e),
-                SubOP::Accessor(p, name) => ret = AST::make_access(p, Box::new(ret), name.clone()),
-                SubOP::Resolver(p, name) => ret = AST::make_resolve(p, Box::new(ret), name.clone()),
+                SubOP::Index(p, e) => ret = AST::make_index(p, ret, e),
+                SubOP::Invoke(p, e) => ret = AST::make_invoke(p, ret, e),
+                SubOP::Accessor(p, name) => ret = AST::make_access(p, ret, name.clone()),
+                SubOP::Resolver(p, name) => ret = AST::make_resolve(p, ret, name.clone()),
             }
         }
         ret
