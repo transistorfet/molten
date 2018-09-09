@@ -87,15 +87,15 @@ pub fn refine_node(node: AST) -> AST {
             let typevar = rand::random::<i32>();
 
             block.push(AST::make_def(pos.clone(), Ident::new(pos.clone(), tmplist.clone()), None,
-                Box::new(AST::make_invoke(pos.clone(),
-                    Box::new(AST::make_resolve(pos.clone(), Box::new(AST::make_ident(pos.clone(), Ident::from_str("List"))), Ident::from_str("new"))),
+                AST::make_invoke(pos.clone(),
+                    AST::make_resolve(pos.clone(), AST::make_ident(pos.clone(), Ident::from_str("List")), Ident::from_str("new")),
                     vec!(
                         AST::make_new(pos.clone(), ClassSpec::new(pos.clone(), Ident::from_str("List"), vec!(Type::Variable(typevar.to_string(), UniqueID(0)))))
                         /*, AST::Integer(code.len() as isize)*/
-                    )))));
+                    ))));
             for item in code {
                 block.push(AST::make_invoke(pos.clone(),
-                    Box::new(AST::make_access(pos.clone(), Box::new(AST::make_ident(pos.clone(), Ident::new(pos.clone(), tmplist.clone()))), Ident::from_str("push"))),
+                    AST::make_access(pos.clone(), AST::make_ident(pos.clone(), Ident::new(pos.clone(), tmplist.clone())), Ident::from_str("push")),
                     vec!(item)));
             }
             block.push(AST::make_ident(pos.clone(), Ident::new(pos.clone(), tmplist.clone())));

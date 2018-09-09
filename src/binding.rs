@@ -12,8 +12,8 @@ use defs::functions::FuncDef;
 use defs::variables::{ VarDef, ArgDef };
 
 
-pub fn bind_names(session: &Session, code: &mut Vec<AST>) {
-    bind_names_vec(session, session.map.get_global(), code);
+pub fn bind_names(session: &Session, scope: ScopeRef, code: &mut Vec<AST>) {
+    bind_names_vec(session, scope, code);
     if session.errors.get() > 0 {
         panic!("Exiting due to previous errors");
     }

@@ -85,7 +85,7 @@ fn compile_file(input: &str, output: Option<&str>) {
 
     let mut code = session.parse_file(input, false);
     //code = refinery::refine(code);
-    binding::bind_names(&session, &mut code);
+    binding::bind_names(&session, session.map.get_global(), &mut code);
     typecheck::check_types(&session, session.map.get_global(), &code);
 
     if Options::as_ref().debug {
