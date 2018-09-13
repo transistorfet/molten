@@ -37,7 +37,6 @@ impl ABI {
         }
     }
 
-    // TODO there must be an easier way to do this
     pub fn as_str(&self) -> &str {
         match *self {
             ABI::Unknown => "unknown",
@@ -73,14 +72,6 @@ impl ABI {
             ABI::Molten => molten_mangle_name(name, argtypes, funcdefs),
             // TODO C++, etc
             _ => String::from(name),
-        }
-    }
-
-    pub fn unmangle_name(&self, name: &str) -> Option<String> {
-        match *self {
-            ABI::Molten => molten_unmangle_name(name),
-            // TODO C++, etc
-            _ => None,
         }
     }
 }
@@ -120,6 +111,7 @@ pub fn molten_mangle_type(ttype: &Type) -> String {
     }
 }
 
+/*
 pub fn molten_unmangle_name(name: &str) -> Option<String> {
     named!(unmangle(parser::Span) -> String,
         preceded!(tag!("_Z"),
@@ -134,5 +126,5 @@ pub fn molten_unmangle_name(name: &str) -> Option<String> {
         _ => None,
     }
 }
-
+*/
 

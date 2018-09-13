@@ -19,7 +19,7 @@ use binding::{ declare_typevars };
 use utils::UniqueID;
 
 use defs::classes::ClassDef;
-use defs::functions::AnyFunc;
+use defs::functions::{ AnyFunc, CFuncDef, FuncDef };
 
 use llvm::codegen::*;
 
@@ -63,11 +63,19 @@ pub fn declare_builtins_node<'sess>(session: &Session, scope: ScopeRef, node: &B
         BuiltinDef::Func(ref id, ref name, ref ftype, ref func) => {
             let mut ftype = parse_type(ftype);
             declare_typevars(session, scope.clone(), ftype.as_mut(), false).unwrap();
-            let abi = match *func {
-                Func::External => ABI::C,
-                _ => ABI::Molten,
+            match *func {
+                Func::Undefined |
+                Func::External => {
+                    CFuncDef::define(session, scope.clone(), *id, &Some(String::from(*name)), ftype.clone()).unwrap();
+                },
+                Func::Runtime(_) |
+                Func::Comptime(_) => {
+                    FuncDef::define(session, scope.clone(), *id, &Some(String::from(*name)), ftype.clone()).unwrap();
+                },
+                _ => {
+                    AnyFunc::define(session, scope.clone(), *id, &Some(String::from(*name)), ABI::Molten, ftype.clone()).unwrap();
+                },
             };
-            AnyFunc::define(session, scope.clone(), *id, &Some(String::from(*name)), abi, ftype.clone()).unwrap();
         },
         BuiltinDef::Class(ref id, ref name, ref params, _, ref entries) => {
             let tscope = ClassDef::create_class_scope(session, scope.clone(), *id);
