@@ -46,7 +46,7 @@ impl ClassDef {
         tscope
     }
 
-    pub fn define_class(session: &Session, scope: ScopeRef, id: NodeID, classtype: Type, parenttype: Option<Type>) -> Result<ClassDefRef, Error> {
+    pub fn define(session: &Session, scope: ScopeRef, id: NodeID, classtype: Type, parenttype: Option<Type>) -> Result<ClassDefRef, Error> {
         debug!("DEF CLASS: {:?}", classtype);
         let name = classtype.get_name()?;
         let tscope = session.map.get(&id);
@@ -183,7 +183,7 @@ impl StructDef {
         Rc::new(Self::new(vars))
     }
 
-    pub fn define_struct(session: &Session, scope: ScopeRef, id: NodeID, ttype: Type) -> Result<StructDefRef, Error> {
+    pub fn define(session: &Session, scope: ScopeRef, id: NodeID, ttype: Type) -> Result<StructDefRef, Error> {
         let vars = Scope::new_ref(None);
         vars.set_basename(ttype.get_name()?);
 

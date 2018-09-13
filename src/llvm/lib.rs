@@ -19,7 +19,7 @@ use binding::{ declare_typevars };
 use utils::UniqueID;
 
 use defs::classes::ClassDef;
-use defs::functions::FuncDef;
+use defs::functions::AnyFunc;
 
 use llvm::codegen::*;
 
@@ -67,13 +67,13 @@ pub fn declare_builtins_node<'sess>(session: &Session, scope: ScopeRef, node: &B
                 Func::External => ABI::C,
                 _ => ABI::Molten,
             };
-            FuncDef::define_func(session, scope.clone(), *id, &Some(String::from(*name)), abi, ftype.clone()).unwrap();
+            AnyFunc::define(session, scope.clone(), *id, &Some(String::from(*name)), abi, ftype.clone()).unwrap();
         },
         BuiltinDef::Class(ref id, ref name, ref params, _, ref entries) => {
             let tscope = ClassDef::create_class_scope(session, scope.clone(), *id);
             let mut ttype = Type::Object(String::from(*name), *id, params.clone());
             declare_typevars(session, tscope.clone(), Some(&mut ttype), true).unwrap();
-            let classdef = ClassDef::define_class(session, scope.clone(), *id, ttype, None).unwrap();
+            let classdef = ClassDef::define(session, scope.clone(), *id, ttype, None).unwrap();
 
             declare_builtins_vec(session, tscope.clone(), entries);
         },

@@ -23,7 +23,6 @@ use defs::Def;
 use scope::{ ScopeRef, ScopeMapRef };
 use ast::{ NodeID, Pos, Literal, Ident, ClassSpec, AST };
 
-use defs::functions::FuncDef;
 use defs::classes::{ ClassDefRef, StructDef, StructDefRef };
 
 use llvm::lib::{ BuiltinDef, initialize_builtins };
@@ -548,7 +547,7 @@ pub unsafe fn build_class_type(data: &LLVM, scope: ScopeRef, id: NodeID, name: &
         let pvttype = LLVMPointerType(vttype, 0);
         let vtid = classdef.vtable.id;
         // TODO move this define to class def...
-        let structdef = StructDef::define_struct(data.session, scope.clone(), vtid, Type::Object(vtname.clone(), vtid, vec!())).unwrap();
+        let structdef = StructDef::define(data.session, scope.clone(), vtid, Type::Object(vtname.clone(), vtid, vec!())).unwrap();
         data.set_type(vtid, TypeValue { value: pvttype, vttype: None });
         (Some(vttype), Some(pvttype))
     } else {

@@ -13,7 +13,6 @@
 * should we factor out some of the code in codegen which builds vtables into transform or classdef, such that you can build the type from either??
 
 
-* the pattern for naming define functions is different in classes vs functions... should be the same
 * make a proper patterns tree
 * get rid of unwind argument, and put it in an object
 * make the top level module function be a closure instead of using global vars?? there were a bunch of errors

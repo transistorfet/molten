@@ -13,15 +13,10 @@ use defs::traits::{  };
 use defs::classes::{ StructDef, StructDefRef };
 
 
-#[derive(Clone, Debug, PartialEq)]
-pub struct FuncDef {
+pub struct AnyFunc();
 
-}
-
-pub type FuncDefRef = Rc<FuncDef>;
-
-impl FuncDef {
-    pub fn define_func(session: &Session, scope: ScopeRef, id: NodeID, name: &Option<String>, abi: ABI, ttype: Option<Type>) -> Result<Def, Error> {
+impl AnyFunc {
+    pub fn define(session: &Session, scope: ScopeRef, id: NodeID, name: &Option<String>, abi: ABI, ttype: Option<Type>) -> Result<Def, Error> {
         match abi {
             ABI::C => CFuncDef::define(session, scope.clone(), id, name, ttype),
             ABI::Molten => {
@@ -35,7 +30,16 @@ impl FuncDef {
             _ => return Err(Error::new(format!("DefError: unsupported ABI {:?}", abi))),
         }
     }
+}
 
+#[derive(Clone, Debug, PartialEq)]
+pub struct FuncDef {
+
+}
+
+pub type FuncDefRef = Rc<FuncDef>;
+
+impl FuncDef {
     pub fn define(session: &Session, scope: ScopeRef, id: NodeID, name: &Option<String>, ttype: Option<Type>) -> Result<Def, Error> {
 
         let def = Def::Func(Rc::new(FuncDef {
@@ -203,7 +207,7 @@ impl ClosureDef {
         let ctid = NodeID::generate();
         // TODO the name is sloppy here
         let ctype = Type::Object(format!("{}_context_{}", fname, ctid), ctid, vec!());
-        let structdef = StructDef::define_struct(session, scope.clone(), ctid, ctype.clone())?;
+        let structdef = StructDef::define(session, scope.clone(), ctid, ctype.clone())?;
 
         let def = Def::Closure(Rc::new(ClosureDef {
             id: id,
