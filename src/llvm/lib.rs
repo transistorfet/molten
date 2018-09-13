@@ -118,7 +118,7 @@ pub unsafe fn define_builtins_node<'sess>(data: &mut LLVM<'sess>, objtype: LLVMT
 
             let lltype = if structdef.len() > 0 {
                 for (ref field, ref ttype) in structdef {
-                    classdef.structdef.add_field(field, ttype.clone());
+                    classdef.structdef.add_field(data.session, field, ttype.clone());
                 }
                 build_class_type(data, scope.clone(), *id, &cname, classdef.clone())
             } else {

@@ -101,7 +101,7 @@ impl Scope {
 
     pub fn target(session: &Session, scope: ScopeRef) -> ScopeRef {
         match scope.context.get() {
-            Context::Redirect => scope.find_type_def(session, &scope.basename.borrow()).unwrap().as_class().unwrap().classvars.clone(),
+            Context::Redirect => scope.find_type_def(session, &scope.basename.borrow()).unwrap().get_vars().unwrap(),
             _ => scope,
         }
     }

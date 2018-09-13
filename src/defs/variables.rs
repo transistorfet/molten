@@ -21,11 +21,11 @@ pub type VarDefRef = Rc<VarDef>;
 impl VarDef {
     pub fn define_var(session: &Session, scope: ScopeRef, id: NodeID, name: &String, ttype: Option<Type>) -> Result<Def, Error> {
         // TODO should you have a different one for Global, given that it'll compile to something different, until you remove it via closures...
-        //if scope.is_redirect() {
-        //  FieldDef::define(session, scope, id, name, ttype);
-        //} else {
-        VarDef::define(session, scope, id, name, ttype)
-        //}
+        if scope.is_redirect() {
+            FieldDef::define(session, scope, id, name, ttype)
+        } else {
+            VarDef::define(session, scope, id, name, ttype)
+        }
     }
 
     pub fn define(session: &Session, scope: ScopeRef, id: NodeID, name: &String, ttype: Option<Type>) -> Result<Def, Error> {
@@ -77,7 +77,15 @@ pub struct FieldDef {
 pub type FieldDefRef = Rc<FieldDef>;
 
 impl FieldDef {
+    pub fn define(session: &Session, scope: ScopeRef, id: NodeID, name: &String, ttype: Option<Type>) -> Result<Def, Error> {
 
+        let def = Def::Field(Rc::new(FieldDef {
+
+        }));
+
+        VarDef::set_var_def(session, scope.clone(), id, name, def.clone(), ttype)?;
+        Ok(def)
+    }
 }
 
 

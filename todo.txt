@@ -1,5 +1,21 @@
 
+* a possible alternative to this, which might sometimes work at least, is to have resolve and access set a reference to a field def, which has the id of it's owning object/type
+
+* you need to fix class vs structs somehow, and that could either mean adding scope to structs, or making it possible to call a trait method on either type to
+  do a lookup of some kind...  The former is clumbsy, but fits into the existing compiler better, the latter doesn't allow var/type namespaces as cleanly, but is
+  still possible.  Is it possible to get rid of scope in classdef? probably not
+* things like Expr::AllocObject currently require a class, and then resolve __alloc__ on their classvars scope; that would be needed by struct??
+
+* there's a bunch of class code that uses find_type_def().as_class().classvars to get the class scope, but that doesn't work with structs, and we shouldn't
+  be doing name lookups in the codegen stage!!! (ideally).  What if there was yet another hash table for objects (similar to refs), which points to the object def/type
+  that a value is tied to.  This would be used in places where we have a second oid in AST nodes, and could be used to avoid the lookup??
+  Or could we always get a type for the object, and use the id rather than the name to get the typedef
+* should we factor out some of the code in codegen which builds vtables into transform or classdef, such that you can build the type from either??
+
+
+* the pattern for naming define functions is different in classes vs functions... should be the same
 * make a proper patterns tree
+* get rid of unwind argument, and put it in an object
 * make the top level module function be a closure instead of using global vars?? there were a bunch of errors
 
 * should you add session to refinery and process imports there
@@ -68,6 +84,7 @@
 * what if you generalize overloaded types, such that they're checked in check_type, and options are eliminated, or resolved to one type over the course of checking
 
 
+* should you add let mut or def to class bodies so as not to conflict with 'let' as immutable outside of class bodies
 * should you add access modifiers to classes, and maybe functions; public, private, protected
 * should you add break/continue statements for loops
 * should you change Real to Float?  also should you change them to lower case names, which is in line with sml, ocmal, f#
@@ -76,7 +93,6 @@
 * should you fix scope resolution to also work on objects, so that you can have static methods from the object without explicitly referencing its type
 * should exports also list all the modules that the file imports, so that class definitions in other imports can be found, if needed for arguments
 * should variables be writable... maybe only with compiler directive, or only without one; if so, add a const expression
-* should you add let mut or def to class bodies so as not to conflict with 'let' as immutable outside of class bodies
 * should you add a return statement?  It's not functional, but it's practial
 * should you require an override keyword when masking definitions in lower scopes? like class definitions
 

@@ -2,7 +2,8 @@
         import lib.libcore
 
         let msg = "Hey"
-        let stringstuff = fn x: String => msg
+        // TODO this is actually a closure, which isn't implemented yet
+        //let stringstuff = fn x: String => msg
         println(msg)
         println(str(10))
 
@@ -14,9 +15,11 @@
         else
             e
 
+/*
         (12).add(3)
         e.add(3)
         fn test(x: Int) => x.add(2)
+*/
 
         let a = 5 * 5
         let b : Real = 123.24
@@ -34,6 +37,9 @@
 	let test3 = fn x => x() + 1
         println(str(test3(fn => 3)))
 
+        /*
+        // TODO why does this work, when the recursive reference requires a closure?  I guess when compiling, I'm somehow
+        //  making an exception for accessing functions by name instead of accessing the variable the name is actually refering to
         let recfoo = fn x => begin  //comment
             if x < 1 then           //comment
                 1                   //comment
@@ -41,6 +47,7 @@
                 x * recfoo(x - 1)   //comment
         end                         //comment
         println(str(recfoo(5)))
+        */
 
         0123
         0x234
@@ -172,39 +179,35 @@
             buffer
         }
 
-/*
+
         // TODO this causes a segfault during codegen
-        fn overload() / C {
-            let test = "Thing"
-            println(test)
+        //fn overload() / C {
+        //    let test = "Thing"
+        //    println(test)
 
-            fn strnum(num: Int, suffix: String) -> String {
-                strnum(num) + suffix
-            }
+        //    fn strnum(num: Int, suffix: String) -> String {
+        //        strnum(num) + suffix
+        //    }
 
-            println(strnum(1, "px"))
-            println(strnum(1.0))
-        }
-        overload()
-*/
+        //    println(strnum(1, "px"))
+        //    println(strnum(1.0))
+        //}
+        //overload()
 
-/*
         // TODO these don't work because it cannot be disambiguated during the recursive invoke
-        fn recoverload(x) {
-            if x <= 0 then
-                1
-            else
-                recoverload(x - 1)
-        }
-
-        fn recoverload(x) {
-            if x <= 0.0 then
-                1.0
-            else
-                recoverload(x - 1.0)
-        }
-*/
-
+        //fn recoverload(x) {
+        //    if x <= 0 then
+        //        1
+        //    else
+        //        recoverload(x - 1)
+        //}
+        //
+        //fn recoverload(x) {
+        //    if x <= 0.0 then
+        //        1.0
+        //    else
+        //        recoverload(x - 1.0)
+        //}
 
 	println("thing" + "stuff\n")
         println("STUFF".push(" things"))
@@ -299,6 +302,7 @@
         thing.bar()[1]
         (thing.bar())[1]
         get_thing().bar()[1]
+        thing.baz
 
         thing.foobar[1](123)
         get_thing().foobar[1](123)
@@ -315,8 +319,8 @@
         for x in numbers
             println("Count: " + str(x))
 
-
         /// Closures
+
 /*
         fn test() {
             let a = 98899
@@ -327,6 +331,7 @@
 
         println(str(test()()))
 */
+
 
     /*
 

@@ -28,8 +28,8 @@ impl FuncDef {
                 if scope.is_redirect() && name.is_some() {
                     MethodDef::define(session, scope.clone(), id, name, ttype)
                 } else {
-                    //FuncDef::define(session, scope.clone(), id, name, ttype)
-                    ClosureDef::define(session, scope.clone(), id, name, ttype)
+                    FuncDef::define(session, scope.clone(), id, name, ttype)
+                    //ClosureDef::define(session, scope.clone(), id, name, ttype)
                 }
             },
             _ => return Err(Error::new(format!("DefError: unsupported ABI {:?}", abi))),
@@ -184,6 +184,10 @@ impl OverloadDef {
 #[derive(Clone, Debug, PartialEq)]
 pub struct ClosureDef {
     pub id: UniqueID,
+    pub varid: UniqueID,
+    pub name: String,
+    pub contextid: NodeID,
+    pub contexttype: Type,
     pub context: StructDefRef,
 }
 
@@ -192,19 +196,50 @@ pub type ClosureDefRef = Rc<ClosureDef>;
 impl ClosureDef {
     pub fn define(session: &Session, scope: ScopeRef, id: NodeID, name: &Option<String>, ttype: Option<Type>) -> Result<Def, Error> {
 
+        // TODO this isn't correct, it needs to mangle
         let fname = scope.get_full_name(name.clone(), id);
-        let cid = NodeID::generate();
-        let ctype = Type::Object(String::from(format!("{}_context", fname)), cid, vec!());
-        // TODO do you need to set the context type
+
+        // create and register new closure context type
+        let ctid = NodeID::generate();
+        // TODO the name is sloppy here
+        let ctype = Type::Object(format!("{}_context_{}", fname, ctid), ctid, vec!());
+        let structdef = StructDef::define_struct(session, scope.clone(), ctid, ctype.clone())?;
+
         let def = Def::Closure(Rc::new(ClosureDef {
             id: id,
-            context: StructDef::new_ref(),
+            varid: NodeID::generate(),
+            name: fname,
+            contextid: ctid,
+            contexttype: ctype,
+            context: structdef,
         }));
 
         FuncDef::set_func_def(session, scope.clone(), id, name, def.clone(), ttype)?;
         Ok(def)
     }
 
+    pub fn add_field(&self, session: &Session, name: &str, ttype: Type) {
+        self.context.add_field(session, name, ttype);
+    }
+
+    // TODO I don't like this
+    pub fn add_context_to_ftype(&self, session: &Session) -> Type {
+        match session.get_type(self.id) {
+            Some(Type::Function(mut args, ret, abi)) => {
+                let args = match *args {
+                    Type::Tuple(mut items) => {
+                        items.insert(0, self.contexttype.clone());
+                        Type::Tuple(items)
+                    },
+                    ttype @ _ => Type::Tuple(vec!(self.contexttype.clone(), ttype)),
+                };
+                let ftype = Type::Function(Box::new(args), ret, abi);
+                session.set_type(self.id, ftype.clone());
+                ftype
+            },
+            ttype @ _ => panic!("Unexpected type when transforming closure: expected function but got {:?}", ttype),
+        }
+    }
 }
 
 

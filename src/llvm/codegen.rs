@@ -24,7 +24,7 @@ use scope::{ ScopeRef, ScopeMapRef };
 use ast::{ NodeID, Pos, Literal, Ident, ClassSpec, AST };
 
 use defs::functions::FuncDef;
-use defs::classes::{ ClassDefRef, StructDef };
+use defs::classes::{ ClassDefRef, StructDef, StructDefRef };
 
 use llvm::lib::{ BuiltinDef, initialize_builtins };
 
@@ -101,6 +101,26 @@ impl Compilable for Function {
     }
 
     fn get_ref(&self) -> LLVMValueRef {
+        self.0
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct Closure(pub LLVMValueRef);
+
+impl Compilable for Closure {
+    fn box_clone(&self) -> Box<Compilable> {
+        Box::new((*self).clone())
+    }
+
+    fn get_ref(&self) -> LLVMValueRef {
+        self.0
+    }
+
+    unsafe fn invoke(&self, data: &LLVM, unwind: Unwind, mut largs: Vec<LLVMValueRef>) -> LLVMValueRef {
+LLVMDumpValue(self.0);
+        //let func = build_struct_access(data, 0, self.0);
+        //LLVMBuildCall(data.builder, func, largs.as_mut_ptr(), largs.len() as u32, label("tmp"))
         self.0
     }
 }
@@ -451,7 +471,7 @@ pub unsafe fn build_function_start(data: &LLVM, id: NodeID, name: String, lftype
 
     let nargs = LLVMCountParams(function) as usize;
     if nargs != 0 && nargs != numargs {
-        panic!("ArgsError: argument counts don't match");
+        panic!("ArgsError: argument counts don't match: expected {} but found {}", numargs, nargs);
     }
 
     data.set_value(id, from_abi(&abi, function));
@@ -479,7 +499,7 @@ pub fn get_method(data: &LLVM, scope: ScopeRef, class: &str, method: &str, argty
     let classdef = if class == "" {
         scope.clone()
     } else {
-        scope.find_type_def(data.session, &String::from(class)).unwrap().as_class().unwrap().classvars.clone()
+        scope.find_type_def(data.session, &String::from(class)).unwrap().get_vars().unwrap()
     };
 
     let name = String::from(method);
@@ -516,8 +536,7 @@ pub unsafe fn build_allocator(data: &LLVM, scope: ScopeRef, cname: &String, fnam
 }
 */
 
-pub unsafe fn build_struct_access(data: &LLVM, classdef: ClassDefRef, field: &String, object: LLVMValueRef) -> LLVMValueRef {
-    let index = classdef.get_struct_index(field).unwrap();
+pub unsafe fn build_struct_access(data: &LLVM, index: usize, object: LLVMValueRef) -> LLVMValueRef {
     let mut indices = vec!(i32_value(data, 0), i32_value(data, index));
     LLVMBuildGEP(data.builder, object, indices.as_mut_ptr(), indices.len() as u32, label("tmp"))
 }
@@ -528,7 +547,8 @@ pub unsafe fn build_class_type(data: &LLVM, scope: ScopeRef, id: NodeID, name: &
         let vttype = LLVMStructCreateNamed(data.context, label(vtname.as_str()));
         let pvttype = LLVMPointerType(vttype, 0);
         let vtid = classdef.vtable.id;
-        let structdef = StructDef::define_struct(data.session, scope.clone(), vtid, Type::Object(vtname.clone(), vtid, vec!()), None).unwrap();
+        // TODO move this define to class def...
+        let structdef = StructDef::define_struct(data.session, scope.clone(), vtid, Type::Object(vtname.clone(), vtid, vec!())).unwrap();
         data.set_type(vtid, TypeValue { value: pvttype, vttype: None });
         (Some(vttype), Some(pvttype))
     } else {
@@ -554,6 +574,20 @@ pub unsafe fn build_class_type(data: &LLVM, scope: ScopeRef, id: NodeID, name: &
 
     pltype
 }
+
+pub unsafe fn build_struct_type(data: &LLVM, id: NodeID, name: &String, structdef: StructDefRef) -> LLVMTypeRef {
+    let lltype = LLVMStructCreateNamed(data.context, label(name));
+    let pltype = LLVMPointerType(lltype, 0);
+    data.set_type(id, TypeValue { value: pltype, vttype: None });
+
+    let mut types = vec!();
+    for &(_, ref ttype) in structdef.fields.borrow().iter() {
+        types.push(get_ltype(data, ttype.clone(), true))
+    }
+    LLVMStructSetBody(lltype, types.as_mut_ptr(), types.len() as u32, false as i32);
+
+    pltype
+} 
 
 pub unsafe fn get_ltype(data: &LLVM, ttype: Type, use_fptrs: bool) -> LLVMTypeRef {
     match ttype {
@@ -617,9 +651,13 @@ pub unsafe fn generate_declarations(data: &LLVM, scope: ScopeRef, transform: &Ve
                 data.set_value(element.id, Box::new(Global(global)));
             },
             TopKind::Func(ref name, ref args, _) |
-            TopKind::Closure(ref name, ref args, _) |
             TopKind::Method(ref name, ref args, _) => {
                 generate_func_start(data, scope.clone(), element.id, name.clone(), args);
+            },
+            TopKind::Closure(ref fid, ref fname, ref name, ref args, _) => {
+                let cl = data.session.get_def(element.id).unwrap().as_closure().unwrap();
+                build_struct_type(data, cl.contextid, name, cl.context.clone());
+                generate_func_start(data, scope.clone(), *fid, fname.clone(), args);
             },
             TopKind::Declare(ref name) => {
                 let ttype = data.session.get_type(element.id).unwrap();
@@ -731,7 +769,11 @@ pub unsafe fn generate_expr(data: &LLVM, func: LLVMValueRef, unwind: Unwind, sco
                     //largs.insert(0, object);
                     generate_access_field(data, func, unwind, scope.clone(), expr.id, object, field, *oid)
                 },
-                InvokeKind::Closure(ref fexpr) => panic!("unsupported"),
+                InvokeKind::Closure(ref fexpr) => {
+                    let closure = generate_expr(data, func, unwind, scope.clone(), fexpr).get_ref();
+                    largs.insert(0, closure);
+                    Box::new(Closure(closure))
+                },
                 InvokeKind::CFunc(ref fexpr) |
                 InvokeKind::Func(ref fexpr) => generate_expr(data, func, unwind, scope.clone(), fexpr),
                 InvokeKind::CByName(ref name) => Box::new(CFunction(LLVMGetNamedFunction(data.module, label(name.as_str())))),
@@ -792,32 +834,43 @@ pub unsafe fn generate_expr(data: &LLVM, func: LLVMValueRef, unwind: Unwind, sco
             }
         },
 
+        ExprKind::SetClosure(ref value) => {
+            let cl = data.session.get_def(expr.id).unwrap().as_closure().unwrap();
+            //let value = data.get_value(cl.varid).unwrap();
+            let value = generate_expr(data, func, unwind, scope.clone(), value);
+LLVMDumpValue(value.get_ref());
+            data.set_value(expr.id, value.clone());
+            value
+        },
+
 
         /////// Objects ///////
 
         ExprKind::AccessField(ref objexpr, ref field, ref oid) => {
             let object = generate_expr(data, func, unwind, scope.clone(), objexpr).get_ref();
+            //let structdef = data.session.get_def_from_ref(objexpr.id).unwrap().as_struct().unwrap();
             generate_access_field(data, func, unwind, scope.clone(), expr.id, object, field, *oid)
         },
 
         ExprKind::AllocObject(ref name) => {
-            let classdef = scope.find_type_def(data.session, &name).unwrap().as_class().unwrap();
-            let value = classdef.classvars.get_var_def(&String::from("__alloc__")).map(|id| data.get_value(id).unwrap());
+            let def = data.session.get_def_from_ref(expr.id).unwrap();
+            let value = def.get_vars().unwrap().get_var_def(&String::from("__alloc__")).map(|id| data.get_value(id).unwrap());
             let object = if let Some(function) = value {
                 let mut largs = vec!();
                 //LLVMBuildCall(data.builder, function, largs.as_mut_ptr(), largs.len() as u32, label("tmp"))
                 function.invoke(data, unwind, largs)
             } else {
-                //panic!("InternalError: no __alloc__ method for {}", &name);
                 let value = data.get_type(data.session.get_ref(expr.id).unwrap()).unwrap();
                 let mem = LLVMBuildMalloc(data.builder, LLVMGetElementType(value.value), label("ptr"));
                 let object = LLVMBuildPointerCast(data.builder, mem, value.value, label("ptr"));
-                if let Some(index) = classdef.get_struct_vtable_index() {
-                    //let vtable = LLVMGetNamedGlobal(data.module, label(format!("__{}_vtable", &name).as_str()));
-                    let vtable = data.get_value(scope.variable_id(&format!("__{}_vtable", &name)).unwrap()).unwrap().get_ref();
-                    let mut indices = vec!(i32_value(data, 0), i32_value(data, index));
-                    let pointer = LLVMBuildGEP(data.builder, object, indices.as_mut_ptr(), indices.len() as u32, label("tmp"));
-                    LLVMBuildStore(data.builder, vtable, pointer);
+                if let Def::Class(classdef) = def {
+                    if let Some(index) = classdef.get_struct_vtable_index() {
+                        //let vtable = LLVMGetNamedGlobal(data.module, label(format!("__{}_vtable", &name).as_str()));
+                        let vtable = data.get_value(scope.variable_id(&format!("__{}_vtable", &name)).unwrap()).unwrap().get_ref();
+                        let mut indices = vec!(i32_value(data, 0), i32_value(data, index));
+                        let pointer = LLVMBuildGEP(data.builder, object, indices.as_mut_ptr(), indices.len() as u32, label("tmp"));
+                        LLVMBuildStore(data.builder, vtable, pointer);
+                    }
                 }
                 object
             };
@@ -829,8 +882,6 @@ pub unsafe fn generate_expr(data: &LLVM, func: LLVMValueRef, unwind: Unwind, sco
         },
 
         ExprKind::AccessMethod => {
-            //let classdef = scope.find_type_def(data.session, &tname).unwrap().as_class().unwrap();
-            //let classid = classdef.classvars.variable_id(&right.name).unwrap();
             data.get_value(data.session.get_ref(expr.id).unwrap()).unwrap()
         },
 
@@ -838,10 +889,10 @@ pub unsafe fn generate_expr(data: &LLVM, func: LLVMValueRef, unwind: Unwind, sco
             let value = generate_expr(data, func, unwind, scope.clone(), valexpr);
 
             let otype = data.session.get_type(*oid).unwrap();
-            let name = otype.get_name().unwrap();
             let object = generate_expr(data, func, unwind, scope.clone(), objexpr).get_ref();
-            let classdef = scope.find_type_def(data.session, &name).unwrap().as_class().unwrap();
-            let pointer = build_struct_access(data, classdef, &field, object);
+// TODO this needs to be changed... you need to change build_struct_access probabl
+            let structdef = data.session.get_def(otype.get_id().unwrap()).unwrap().as_struct().unwrap();
+            let pointer = build_struct_access(data, structdef.get_index(field.as_str()).unwrap(), object);
             LLVMBuildStore(data.builder, value.get_ref(), pointer);
 
             value
@@ -932,12 +983,12 @@ pub unsafe fn generate_expr(data: &LLVM, func: LLVMValueRef, unwind: Unwind, sco
             //let cond_value = generate_expr(data, func, unwind, scope.clone(), cond).get_ref();
 
             let cond_value = LLVMBuildLoad(data.builder, inc, label("tmp"));
-            let cond_length = data.get_value(listdef.classvars.get_var_def(&String::from("len")).unwrap()).unwrap().invoke(data, unwind, vec!(list_value));
+            let cond_length = data.get_value(listdef.structdef.vars.get_var_def(&String::from("len")).unwrap()).unwrap().invoke(data, unwind, vec!(list_value));
             let is_end = LLVMBuildICmp(data.builder, LLVMIntPredicate::LLVMIntSGE, cond_value, cond_length, label("is_end"));
             LLVMBuildCondBr(data.builder, is_end, after_block, body_block);
 
             LLVMPositionBuilderAtEnd(data.builder, body_block);
-            let nextitem = build_cast_from_vartype(data, data.get_value(listdef.classvars.get_var_def(&String::from("get")).unwrap()).unwrap().invoke(data, unwind, vec!(list_value, cond_value)), itype);
+            let nextitem = build_cast_from_vartype(data, data.get_value(listdef.structdef.vars.get_var_def(&String::from("get")).unwrap()).unwrap().invoke(data, unwind, vec!(list_value, cond_value)), itype);
             LLVMBuildStore(data.builder, nextitem, item);
 
             let body_value = generate_expr(data, func, unwind, lscope.clone(), body).get_ref();
@@ -1115,19 +1166,17 @@ pub unsafe fn generate_func_start(data: &LLVM, scope: ScopeRef, id: NodeID, name
 }
 
 pub unsafe fn generate_access_field(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: ScopeRef, id: NodeID, object: LLVMValueRef, name: &String, oid: NodeID) -> Value {
-// TODO replace use of otype
-    let otype = data.session.get_type(oid);
-    //let otype = data.session.get_type_from_ref(objexpr.get_id());
-    //debug!("####################: {:?} {:?}", otype, data.session.get_type_from_ref(objexpr.get_id()));
+// TODO can we remove oid from everything???
+    let otype = data.session.get_type(oid).unwrap();
+    //let otype = data.session.get_type_from_ref(objexpr.get_id()).unwrap();
 
     let ttype = data.session.get_type_from_ref(id).unwrap();
-    let cname = otype.clone().unwrap().get_name().unwrap();
-    let classdef = scope.find_type_def(data.session, &cname).unwrap().as_class().unwrap();
+    let classdef = data.session.get_def(otype.get_id().unwrap()).unwrap().as_class().unwrap();
     debug!("*ACCESS: {:?} {:?} {:?}", id, name, classdef);
 
     if let Some(structindex) = classdef.get_struct_index(name.as_str()) {
         debug!(">>ACCESS STRUCT: {:?} {:?}", structindex, classdef.get_struct_type(structindex));
-        let pointer = build_struct_access(data, classdef.clone(), &name, object);
+        let pointer = build_struct_access(data, classdef.get_struct_index(name.as_str()).unwrap(), object);
         from_type(&classdef.get_struct_type(structindex), LLVMBuildLoad(data.builder, pointer, label("tmp")))
     } else if let Some(vtableindex) = classdef.get_vtable_index(data.session, scope.clone(), name.as_str(), &ttype) {
         debug!(">>ACCESS VTABLE: {:?} {:?}", vtableindex, classdef.get_vtable_type(vtableindex));

@@ -9,16 +9,16 @@ use session::{ Session, Error };
 use types::{ check_type, Check };
 use ast::{ NodeID, Ident, ClassSpec, AST };
 
+use defs::variables::FieldDef;
 
-pub type ClassVars = ScopeRef;
+
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct ClassDef {
     pub classname: String,
     pub classtype: Type,
     pub parenttype: Option<Type>,
-    pub classvars: ClassVars,
-    pub structdef: StructDef,
+    pub structdef: StructDefRef,
     pub vtable: Vtable,
 }
 
@@ -26,19 +26,18 @@ pub type ClassDefRef = Rc<ClassDef>;
 
 
 impl ClassDef {
-    pub fn new(classname: String, classtype: Type, parenttype: Option<Type>, classvars: ClassVars) -> Self {
+    pub fn new(classname: String, classtype: Type, parenttype: Option<Type>, vars: ScopeRef) -> Self {
         Self {
             classname: classname,
             classtype: classtype,
             parenttype: parenttype,
-            classvars: classvars,
-            structdef: StructDef::new(),
+            structdef: StructDef::new_ref(vars),
             vtable: Vtable::new(),
         }
     }
 
-    pub fn new_ref(classname: String, classtype: Type, parenttype: Option<Type>, classvars: ClassVars) -> ClassDefRef {
-        Rc::new(Self::new(classname, classtype, parenttype, classvars))
+    pub fn new_ref(classname: String, classtype: Type, parenttype: Option<Type>, vars: ScopeRef) -> ClassDefRef {
+        Rc::new(Self::new(classname, classtype, parenttype, vars))
     }
 
     pub fn create_class_scope(session: &Session, scope: ScopeRef, id: NodeID) -> ScopeRef {
@@ -80,11 +79,11 @@ impl ClassDef {
         };
 
         // Create class name bindings for checking ast::accessors
-        let classvars = Scope::new_ref(parentclass.map(|p| p.classvars.clone()));
-        classvars.set_basename(classtype.get_name()?);
+        let vars = Scope::new_ref(parentclass.map(|p| p.structdef.vars.clone()));
+        vars.set_basename(classtype.get_name()?);
 
         session.set_type(id, classtype.clone());
-        let classdef = ClassDef::new_ref(classtype.get_name()?, classtype, parenttype, classvars);
+        let classdef = ClassDef::new_ref(classtype.get_name()?, classtype, parenttype, vars);
         Ok(classdef)
     }
 
@@ -115,13 +114,13 @@ impl ClassDef {
             if let Some(index) = self.structdef.get_index("__vtable__") {
                 self.structdef.fields.borrow_mut()[index].1 = Type::Object(format!("{}_vtable", self.classname), self.vtable.id, vec!());
             } else {
-                self.structdef.add_field("__vtable__", Type::Object(format!("{}_vtable", self.classname), self.vtable.id, vec!()));
+                self.structdef.add_field(session, "__vtable__", Type::Object(format!("{}_vtable", self.classname), self.vtable.id, vec!()));
             }
         }
         for ref node in body.iter() {
             match **node {
                 AST::Definition(ref id, _, ref ident, _, ref value) => {
-                    self.structdef.add_field(ident.name.as_str(), session.get_type(*id).unwrap());
+                    self.structdef.add_field(session, ident.name.as_str(), session.get_type(*id).unwrap());
                 },
                 _ => { }
             }
@@ -166,30 +165,45 @@ pub mod llvm {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct StructDef {
+    pub vars: ScopeRef,
     pub fields: RefCell<Vec<(String, Type)>>,
 }
 
 pub type StructDefRef = Rc<StructDef>;
 
 impl StructDef {
-    pub fn new() -> Self {
+    pub fn new(vars: ScopeRef) -> Self {
         Self {
+            vars: vars,
             fields: RefCell::new(vec!()),
         }
     }
 
-    pub fn new_ref() -> StructDefRef {
-        Rc::new(Self::new())
+    pub fn new_ref(vars: ScopeRef) -> StructDefRef {
+        Rc::new(Self::new(vars))
+    }
+
+    pub fn define_struct(session: &Session, scope: ScopeRef, id: NodeID, ttype: Type) -> Result<StructDefRef, Error> {
+        let vars = Scope::new_ref(None);
+        vars.set_basename(ttype.get_name()?);
+
+        let structdef = StructDef::new_ref(vars);
+        scope.define_type(ttype.get_name()?, Some(id))?;
+        session.set_def(id, Def::Struct(structdef.clone()));
+        session.set_type(id, ttype);
+        Ok(structdef)
     }
 
     pub fn inherit(&self, inherit: &StructDef) {
         *self.fields.borrow_mut() = inherit.fields.borrow().clone();
     }
 
-    #[must_use]
-    pub fn add_field(&self, name: &str, ttype: Type) -> Result<(), Error> {
-        self.fields.borrow_mut().push((String::from(name), ttype));
-        Ok(())
+    pub fn add_field(&self, session: &Session, name: &str, ttype: Type) {
+        let sname = String::from(name);
+        if self.vars.get_var_def(&sname).is_none() {
+            FieldDef::define(session, self.vars.clone(), NodeID::generate(), &sname, Some(ttype.clone())).unwrap();
+        }
+        self.fields.borrow_mut().push((sname, ttype));
     }
 
     pub fn get_index(&self, field: &str) -> Option<usize> {
@@ -198,16 +212,6 @@ impl StructDef {
 
     pub fn get_type(&self, index: usize) -> Type {
         self.fields.borrow()[index].1.clone()
-    }
-
-
-    pub fn define_struct(session: &Session, scope: ScopeRef, id: NodeID, ttype: Type, parent: Option<ScopeRef>) -> Result<StructDefRef, Error> {
-        let structdef = StructDef::new_ref();
-
-        scope.define_type(ttype.get_name()?, Some(id))?;
-        session.set_def(id, Def::Struct(structdef.clone()));
-        session.set_type(id, ttype);
-        Ok(structdef)
     }
 }
 
@@ -255,7 +259,7 @@ impl Vtable {
     }
 
     pub fn add_entry(&self, session: &Session, scope: ScopeRef, id: NodeID, name: &str, ftype: Type) {
-        debug!("***************: {:?} {:?}", name, ftype);
+        debug!("ADDING VTABLE ENTRY: {:?} {:?}", name, ftype);
         if let Some(index) = self.get_index(session, scope, name, &ftype) {
             self.table.borrow_mut()[index].0 = id;
         } else {
@@ -263,9 +267,7 @@ impl Vtable {
         }
     }
 
-
     pub fn get_index(&self, session: &Session, scope: ScopeRef, name: &str, ftype: &Type) -> Option<usize> {
-        // TODO check types for overloaded match
         self.table.borrow().iter().position(|(_, ref ename, ref etype)| {
             ename.as_str() == name && check_type(session, scope.clone(), Some(etype.clone()), Some(ftype.clone()), Check::Def, false).is_ok()
         })

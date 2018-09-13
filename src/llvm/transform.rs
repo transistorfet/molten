@@ -8,6 +8,9 @@ use scope::{ ScopeRef };
 use session::{ Error, Session };
 use ast::{ NodeID, Pos, Ident, Literal, Argument, ClassSpec, AST };
 
+use defs::variables::ArgDef;
+use defs::functions::FuncDef;
+
 
 
 #[derive(Clone, Debug, PartialEq)]
@@ -22,7 +25,7 @@ pub enum TopKind {
     Global(String),
     Declare(String),
     Func(String, Vec<(NodeID, String)>, Expr),
-    Closure(String, Vec<(NodeID, String)>, Expr),
+    Closure(NodeID, String, String, Vec<(NodeID, String)>, Expr),
     Method(String, Vec<(NodeID, String)>, Expr),
     ClassDef(String, Vec<Expr>),
 }
@@ -58,6 +61,7 @@ pub enum ExprKind {
     DefVar(String, Box<Expr>),
     DefGlobal(String, Box<Expr>),
     AccessVar(String),
+    SetClosure(Box<Expr>),
 
     SideEffect(String, Vec<Expr>),
     If(Box<Expr>, Box<Expr>, Box<Expr>),
@@ -103,7 +107,7 @@ impl Expr {
 pub enum CodeContext {
     Func,
     ClassBody,
-    Closure,
+    Closure(NodeID),
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -145,18 +149,56 @@ impl<'sess> Transform<'sess> {
             /////// Functions ///////
 
             AST::Function(ref id, ref pos, ref ident, ref args, _, ref body, ref abi) => {
+                let def = self.session.get_def(*id).unwrap();
                 let fscope = self.session.map.get(id);
-                let name = self.transform_func_name(scope.clone(), ident.as_ref(), *id);
-                // TODO we add this function definition to the top level, and then return an Expr that references it
-                //if this is a plain function, do this
-                //if this is a method, is there anything special??? (maybe call a transform method on the def??
-                //if this is a closure, we need to record that so we can closure convert identifier, and also do the other things?
-                self.set_context(CodeContext::Closure);
-                let body = self.transform_expr(fscope.clone(), body);
-                self.restore_context();
+                let fname = self.transform_func_name(scope.clone(), ident.as_ref(), *id);
+                let mut args = self.transform_args(args);
 
-                self.add_function(*id, pos.clone(), name.clone(), self.transform_args(args), body);
-                self.access_def(*id, pos.clone(), name.clone())
+                if let Def::Closure(ref cl) = def {
+                    let cid = NodeID::generate();
+                    let cname = String::from("__context__");
+                    args.insert(0, (cid, cname.clone()));
+                    ArgDef::define(self.session, fscope.clone(), cid, &cname, Some(cl.contexttype.clone())).unwrap();
+                    let ftype = cl.add_context_to_ftype(self.session);
+                    let real_fname = fname.clone() + &"_func";
+                    cl.add_field(self.session, real_fname.as_str(), ftype);
+                    let index = self.toplevel.borrow().len();
+
+                    self.set_context(CodeContext::Closure(*id));
+                    let body = self.transform_expr(fscope.clone(), body);
+                    self.restore_context();
+
+                    use binding;
+                    use typecheck;
+                    use scope::Scope;
+                    let fid = NodeID::generate();
+                    //let tscope = Scope::new_ref(Some(scope.clone()));
+                    let mut code = vec!();
+                    code.push(AST::Definition(cl.varid, pos.clone(), Ident::new(pos.clone(), fname.clone()), None, Box::new(AST::make_new(pos.clone(), ClassSpec::from_str(format!("{}_context_{}", cl.name, cl.contextid).as_str())))));
+                    FuncDef::define(self.session, scope.clone(), fid, &Some(real_fname.clone()), Some(self.session.get_type(*id).unwrap()));
+                    for (index, &(ref field, ref ttype)) in cl.context.fields.borrow().iter().enumerate() {
+                        code.push(AST::make_assign(pos.clone(),
+                            AST::make_access(pos.clone(), AST::make_ident(pos.clone(), Ident::new(pos.clone(), fname.clone())), Ident::from_str(field.as_str())),
+                            AST::make_ident_from_str(pos.clone(), field.as_str()))
+                        );
+                    }
+                    code.push(AST::make_ident(pos.clone(), Ident::new(pos.clone(), fname.clone())));
+
+                    binding::bind_names(self.session, scope.clone(), &mut code);
+                    typecheck::check_types(self.session, scope.clone(), &code);
+                    let mut access = self.transform_vec(scope.clone(), &code);
+                    let last = access.pop().unwrap();
+                    access.push(Expr::new(*id, pos.clone(), ExprKind::SetClosure(Box::new(last))));
+                    println!("THE THING: {:#?}", access);
+
+                    //self.add_closure(*id, pos.clone(), fid, real_fname.clone(), fname.clone(), args, body);
+                    self.toplevel.borrow_mut().insert(index, TopLevel::new(*id, pos.clone(), TopKind::Closure(fid, real_fname.clone(), fname.clone(), args, body)));
+                    //Expr::new(*id, pos.clone(), ExprKind::MakeClosure)
+                    Expr::new(*id, pos.clone(), ExprKind::Block(access))
+                } else {
+                    self.add_function(*id, pos.clone(), fname.clone(), args, self.transform_expr(fscope.clone(), body));
+                    self.access_def(*id, pos.clone(), fname.clone())
+                }
             },
 
             AST::Declare(ref id, ref pos, ref ident, _) => {
@@ -166,21 +208,31 @@ impl<'sess> Transform<'sess> {
             },
 
             AST::Invoke(ref id, ref pos, ref fexpr, ref args) => {
-                let args = self.transform_vec(scope.clone(), args);
+                let mut args = self.transform_vec(scope.clone(), args);
                 let invoke = match **fexpr {
-                    // TODO if there's a def, it could be a function or a closure or a static method?? (should Resolve be )
-                    // TODO none means its a fptr, but according to its type, might be a different abi
                     AST::Accessor(ref aid, ref pos, ref obj, ref field, ref oid) => {
                         InvokeKind::Method(Box::new(self.transform_expr(scope.clone(), obj)), field.name.clone(), *oid)
                     },
                     _ => match self.session.get_type(*id) {
                         Some(Type::Function(_, _, ref abi)) => match *abi {
                             ABI::C => InvokeKind::CFunc(Box::new(self.transform_expr(scope.clone(), fexpr))),
-                            _ => InvokeKind::Func(Box::new(self.transform_expr(scope.clone(), fexpr))),
+                            ABI::Unknown |
+                            ABI::Molten => {
+                                // TODO this might cause you problems, if the ref is not always set (calculated calls).
+                                if let Ok(Def::Closure(ref cl)) = self.session.get_def_from_ref(*id) {
+                                    debug!("===== So a closure: {:?}", cl);
+                                    InvokeKind::Closure(Box::new(self.transform_expr(scope.clone(), fexpr)))
+                                } else {
+                                    debug!("===== much function: {:?}", self.session.get_ref(*id));
+                                    InvokeKind::Func(Box::new(self.transform_expr(scope.clone(), fexpr)))
+                                }
+                            },
+                            _ => panic!("Unsupported ABI type {:?} for {:?}", abi, fexpr),
                         },
                         _ => panic!("FunctionError: invoking a function with no type set, {:?}", fexpr),
                     },
                 };
+
                 Expr::new(*id, pos.clone(), ExprKind::Invoke(invoke, args))
             }
 
@@ -200,14 +252,34 @@ impl<'sess> Transform<'sess> {
             AST::Identifier(ref id, ref pos, ref ident) => {
                 let def = self.session.get_def_from_ref(*id).unwrap();
                 // TODO handle the case of accessing globals
-                //if self.context.borrow().last() == Some(CodeContext::Closure) {
-                    // TODO access closure context
-                    //self.access_closure_context(id, pos)
-                //} else if let Def::Var(_) = def {
-                if let Def::Var(_) = def {
-                    Expr::new(*id, pos.clone(), ExprKind::AccessVar(ident.name.clone()))
-                } else {
-                    Expr::new(*id, pos.clone(), ExprKind::AccessValue(ident.name.clone()))
+                match def {
+                    Def::Func(_) |
+                    Def::CFunc(_) => Expr::new(*id, pos.clone(), ExprKind::AccessValue(ident.name.clone())),
+                    _ => {
+                        // TODO actually we shouldn't access scope, because that wont get us the overloaded target, but how will we tell if a reference is local???
+                        if !scope.contains_local(&ident.name) && !scope.get_parent().map_or(false, |p| p.is_global()) {
+                            match self.get_context() {
+                                Some(CodeContext::Closure(ref cid)) => {
+                                    let cl = self.session.get_def(*cid).unwrap().as_closure().unwrap();
+                                    cl.add_field(self.session, ident.as_str(), self.session.get_type_from_ref(*id).unwrap());
+
+                                    let oid = NodeID::generate();
+                                    let objexpr = Expr::new(oid, pos.clone(), ExprKind::AccessValue(String::from("__context__")));
+                                    self.session.set_type(oid, cl.contexttype.clone());
+
+                                    Expr::new(*id, pos.clone(), ExprKind::AccessField(Box::new(objexpr), ident.name.clone(), oid))
+                                },
+                                _ => panic!("Cannot access variable outside of scope: {:?}", node),
+                            }
+                        } else if let Def::Var(_) = def {
+                            Expr::new(*id, pos.clone(), ExprKind::AccessVar(ident.name.clone()))
+                        // TODO this doesn't work because a closure will not always be a variable, but sometimes it will...
+                        //} else if let Def::Closure(_) = def {
+                        //    Expr::new(*id, pos.clone(), ExprKind::AccessVar(ident.name.clone()))
+                        } else {
+                            Expr::new(*id, pos.clone(), ExprKind::AccessValue(ident.name.clone()))
+                        }
+                    }
                 }
             },
 
@@ -226,11 +298,6 @@ impl<'sess> Transform<'sess> {
                 Expr::new(*id, pos.clone(), ExprKind::Nil)
             },
 
-            AST::Accessor(ref id, ref pos, ref obj, ref field, ref oid) => {
-                // TODO how do you represent this?? the field is always a text name?  How do you resolve?
-                Expr::new(*id, pos.clone(), ExprKind::AccessField(Box::new(self.transform_expr(scope.clone(), obj)), field.name.clone(), *oid))
-            },
-
             AST::New(ref id, ref pos, ClassSpec { ref ident, .. }) => {
                 // TODO do you need to get the full class name
                 Expr::new(*id, pos.clone(), ExprKind::AllocObject(ident.name.clone()))
@@ -238,6 +305,21 @@ impl<'sess> Transform<'sess> {
 
             AST::Resolver(ref id, ref pos, ref tname, ref method) => {
                 Expr::new(*id, pos.clone(), ExprKind::AccessMethod)
+            },
+
+            AST::Accessor(ref id, ref pos, ref obj, ref field, ref oid) => {
+                // TODO can you figure out here if this is a vtable access, struct access, or a classvar access, and then codegen is simpler
+                //let def = self.session.get_def_from_ref(*id).unwrap();
+                //match def {
+                //    Def::Method(_) => println!("METHOD!!!!!!!!!!!"),
+                //    Def::Var(_) => println!("Probable a FIELD!!!!!: {:?} {:?}", obj, field),
+                //    _ => println!("I don't know what it is {:?}!!!!!!!!!!!!!!!!", def),
+                //}
+
+
+                // TODO instead of using the def to determine what is being accessed, you can check if the field name is in the vtable, structdef, or fallback to classvars
+
+                Expr::new(*id, pos.clone(), ExprKind::AccessField(Box::new(self.transform_expr(scope.clone(), obj)), field.name.clone(), *oid))
             },
 
             AST::Assignment(ref id, ref pos, ref left, ref right) => {
@@ -353,8 +435,9 @@ impl<'sess> Transform<'sess> {
         for node in body {
             match *node {
                 AST::Function(ref id, ref pos, ref ident, ref args, _, ref body, ref abi) => {
+                    let fscope = self.session.map.get(id);
                     let name = self.transform_func_name(scope.clone(), ident.as_ref(), *id);
-                    self.add_method(*id, pos.clone(), name.clone(), self.transform_args(args), self.transform_expr(scope.clone(), body));
+                    self.add_method(*id, pos.clone(), name.clone(), self.transform_args(args), self.transform_expr(fscope.clone(), body));
                     newbody.push(self.access_def(NodeID::generate(), pos.clone(), name.clone()));
                 },
                 AST::Declare(ref id, ref pos, ref ident, _) => {
@@ -389,6 +472,10 @@ impl<'sess> Transform<'sess> {
         self.add_top(id, pos, TopKind::Func(name, args, body));
     }
 
+    pub fn add_closure(&self, id: NodeID, pos: Pos, fid: NodeID, fname: String, name: String, args: Vec<(NodeID, String)>, body: Expr) {
+        self.add_top(id, pos, TopKind::Closure(fid, fname, name, args, body));
+    }
+
     pub fn add_decl(&self, id: NodeID, pos: Pos, name: String) {
         self.add_top(id, pos, TopKind::Declare(name));
     }
@@ -421,6 +508,10 @@ impl<'sess> Transform<'sess> {
 
     pub fn restore_context(&self) {
         self.context.borrow_mut().pop();
+    }
+
+    pub fn get_context(&self) -> Option<CodeContext> {
+        self.context.borrow_mut().last().map(|c| *c)
     }
 }
 

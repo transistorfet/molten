@@ -10,7 +10,6 @@ pub trait Overloadable {
     fn num_variants(&self) -> i32;
     fn add_variant(&self, id: NodeID);
 }
-*/
 
 trait Invokable {
     fn typecheck_invoke(&self, session: &Session, scope: ScopeRef, node: &mut AST) -> Result<Type, Error>;
@@ -21,3 +20,7 @@ trait Invokable {
 trait CompileInvoke {
     fn compile(&self, args: Vec<LLVMValueRef>) -> LLVMValueRef;
 }
+*/
+
+
+
