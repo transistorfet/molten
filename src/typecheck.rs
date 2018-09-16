@@ -66,7 +66,7 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &AST,
 
             // Resolve type variables that can be
             for i in 0 .. argtypes.len() {
-                argtypes[i] = resolve_type(session, fscope.clone(), argtypes[i].clone());
+                argtypes[i] = resolve_type(session, argtypes[i].clone());
                 session.update_type(fscope.clone(), args[i].id, argtypes[i].clone())?;
             }
 
@@ -103,7 +103,7 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &AST,
                     //let ftype = expect_type(session, tscope.clone(), Some(etype.clone()), Some(Type::Function(Box::new(atypes), Box::new(expected.unwrap_or_else(|| tscope.new_typevar())), abi)), Check::Update)?;
                     let ftype = expect_type(session, tscope.clone(), Some(etype.clone()), Some(Type::Function(Box::new(atypes), Box::new(etype.get_rettype()?.clone()), *abi)), Check::Def)?;
                     // TODO should this actually be another expect, so type resolutions that occur in later args affect earlier args?  Might not be needed unless you add typevar constraints
-                    let ftype = resolve_type(session, tscope, ftype);        // NOTE This ensures the early arguments are resolved despite typevars not being assigned until later in the signature
+                    let ftype = resolve_type(session, ftype);        // NOTE This ensures the early arguments are resolved despite typevars not being assigned until later in the signature
 
                     ftype
                 },
@@ -280,7 +280,7 @@ pub fn get_access_ids(session: &Session, scope: ScopeRef, node: &AST) -> Result<
             Ok(Some((*id, session.get_ref(*id)?)))
         },
         AST::Accessor(ref id, _, ref left, ref field, ref oid) => {
-            let ltype = resolve_type(session, scope.clone(), check_types_node(session, scope.clone(), left, None));
+            let ltype = resolve_type(session, check_types_node(session, scope.clone(), left, None));
             session.set_type(*oid, ltype.clone());
 
             let vars = session.get_def(ltype.get_id()?)?.get_vars()?;
