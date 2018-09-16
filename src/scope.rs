@@ -168,13 +168,13 @@ impl Scope {
     }
 
     /*
-    */
     pub fn variable_id(&self, name: &String) -> Result<BindID, Error> {
         match self._search(name, |sym| Some(sym.id)) {
             Some(id) => Ok(id),
             None => Err(Error::new(format!("NameError: variable is undefined; {:?}", name))),
         }
     }
+    */
 
     pub fn get_variable_type(&self, session: &Session, name: &String) -> Option<Type> {
         //self.get_variable_type_full(session, name, false)

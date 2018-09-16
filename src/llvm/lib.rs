@@ -145,9 +145,9 @@ pub unsafe fn declare_c_function(data: &LLVM, scope: ScopeRef, name: &str, args:
     let ftype = LLVMFunctionType(ret_type, args.as_mut_ptr(), args.len() as u32, vargs as i32);
     let func = LLVMAddFunction(data.module, label(name), ftype);
     let name = &String::from(name);
-    if scope.contains(name) {
-        data.set_value(scope.variable_id(name).unwrap(), Box::new(CFunction(func)));
-    }
+    //if scope.contains(name) {
+    //    data.set_value(scope.variable_id(name).unwrap(), Box::new(CFunction(func)));
+    //}
 }
 
 unsafe fn declare_irregular_functions(data: &LLVM, scope: ScopeRef) {

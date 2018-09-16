@@ -560,7 +560,7 @@ pub unsafe fn build_class_type(data: &LLVM, scope: ScopeRef, id: NodeID, name: &
         let pvttype = LLVMPointerType(vttype, 0);
         let vtid = classdef.vtable.id;
         // TODO move this define to class def...
-        let structdef = StructDef::define(data.session, scope.clone(), vtid, Type::Object(vtname.clone(), vtid, vec!())).unwrap();
+        //let structdef = StructDef::define(data.session, scope.clone(), vtid, Type::Object(vtname.clone(), vtid, vec!())).unwrap();
         data.set_type(vtid, TypeValue { value: pvttype, vttype: None });
         (Some(vttype), Some(pvttype))
     } else {
@@ -599,7 +599,27 @@ pub unsafe fn build_struct_type(data: &LLVM, id: NodeID, name: &String, structde
     LLVMStructSetBody(lltype, types.as_mut_ptr(), types.len() as u32, false as i32);
 
     pltype
-} 
+}
+
+/*
+pub unsafe fn build_vtable_type(data: &LLVM, id: NodeID, name: &String, vtable: &Vtable) -> LLVMTypeRef {
+    let vtname = format!("{}_vtable", name);
+    let vttype = LLVMStructCreateNamed(data.context, label(vtname.as_str()));
+    let pvttype = LLVMPointerType(vttype, 0);
+    // TODO move this define to class def...
+    //let structdef = StructDef::define(data.session, scope.clone(), vtid, Type::Object(vtname.clone(), vtable.id, vec!())).unwrap();
+    data.set_type(vtable.id, TypeValue { value: pvttype, vttype: None });
+
+    let mut types = vec!();
+    for &(_, _, ref ttype) in vtable.table.borrow().iter() {
+        types.push(get_ltype(data, ttype.clone(), true))
+    }
+    LLVMStructSetBody(vttype, types.as_mut_ptr(), types.len() as u32, false as i32);
+
+    pvttype
+}
+*/
+
 
 pub unsafe fn get_ltype(data: &LLVM, ttype: Type, use_fptrs: bool) -> LLVMTypeRef {
     match ttype {
@@ -718,13 +738,10 @@ pub unsafe fn generate_vtables(data: &LLVM, scope: ScopeRef, transform: &Vec<Top
 
                     let value = data.get_type(element.id).unwrap();
                     let vtype = value.vttype.unwrap();
-                    let vname = format!("__{}_vtable", name);
-                    let global = LLVMAddGlobal(data.module, LLVMGetElementType(vtype), label(vname.as_str()));
+                    let global = LLVMAddGlobal(data.module, LLVMGetElementType(vtype), label(format!("__{}_vtable", name).as_str()));
                     LLVMSetInitializer(global, LLVMConstNamedStruct(vtype, methods.as_mut_ptr(), methods.len() as u32));
                     LLVMSetLinkage(global, LLVMLinkage::LLVMLinkOnceAnyLinkage);
-                    let id = scope.define(vname.clone(), None).unwrap();
-                    data.session.set_type(id, Type::Object(format!("{}_vtable", name), classdef.vtable.id, vec!()));
-                    data.set_value(id, Box::new(Global(global)));
+                    data.set_value(classdef.vtable.id, Box::new(Global(global)));
                 }
             },
             _ => { },
@@ -877,8 +894,7 @@ LLVMDumpValue(value.get_ref());
                 let object = LLVMBuildPointerCast(data.builder, mem, value.value, label("ptr"));
                 if let Def::Class(classdef) = def {
                     if let Some(index) = classdef.get_struct_vtable_index() {
-                        //let vtable = LLVMGetNamedGlobal(data.module, label(format!("__{}_vtable", &name).as_str()));
-                        let vtable = data.get_value(scope.variable_id(&format!("__{}_vtable", &name)).unwrap()).unwrap().get_ref();
+                        let vtable = data.get_value(classdef.vtable.id).unwrap().get_ref();
                         let mut indices = vec!(i32_value(data, 0), i32_value(data, index));
                         let pointer = LLVMBuildGEP(data.builder, object, indices.as_mut_ptr(), indices.len() as u32, label("tmp"));
                         LLVMBuildStore(data.builder, vtable, pointer);

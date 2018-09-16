@@ -9,9 +9,6 @@
 
 * a possible alternative to this, which might sometimes work at least, is to have resolve and access set a reference to a field def, which has the id of it's owning object/type
 
-* you need to fix class vs structs somehow, and that could either mean adding scope to structs, or making it possible to call a trait method on either type to
-  do a lookup of some kind...  The former is clumbsy, but fits into the existing compiler better, the latter doesn't allow var/type namespaces as cleanly, but is
-  still possible.  Is it possible to get rid of scope in classdef? probably not
 * things like Expr::AllocObject currently require a class, and then resolve __alloc__ on their classvars scope; that would be needed by struct??
 
 * there's a bunch of class code that uses find_type_def().as_class().classvars to get the class scope, but that doesn't work with structs, and we shouldn't

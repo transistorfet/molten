@@ -26,18 +26,18 @@ pub type ClassDefRef = Rc<ClassDef>;
 
 
 impl ClassDef {
-    pub fn new(classname: String, classtype: Type, parenttype: Option<Type>, vars: ScopeRef) -> Self {
+    pub fn new(classname: String, classtype: Type, parenttype: Option<Type>, vars: ScopeRef, vtable: Vtable) -> Self {
         Self {
             classname: classname,
             classtype: classtype,
             parenttype: parenttype,
             structdef: StructDef::new_ref(vars),
-            vtable: Vtable::new(),
+            vtable: vtable,
         }
     }
 
-    pub fn new_ref(classname: String, classtype: Type, parenttype: Option<Type>, vars: ScopeRef) -> ClassDefRef {
-        Rc::new(Self::new(classname, classtype, parenttype, vars))
+    pub fn new_ref(classname: String, classtype: Type, parenttype: Option<Type>, vars: ScopeRef, vtable: Vtable) -> ClassDefRef {
+        Rc::new(Self::new(classname, classtype, parenttype, vars, vtable))
     }
 
     pub fn create_class_scope(session: &Session, scope: ScopeRef, id: NodeID) -> ScopeRef {
@@ -72,6 +72,8 @@ impl ClassDef {
     }
 
     pub fn create_class(session: &Session, scope: ScopeRef, id: NodeID, classtype: Type, parenttype: Option<Type>) -> Result<ClassDefRef, Error> {
+        let name = classtype.get_name()?;
+
         // Find the parent class definitions, which the new class will inherit from
         let parentclass = match parenttype {
             Some(Type::Object(ref pname, _, _)) => Some(scope.find_type_def(session, &pname)?.as_class()?),
@@ -80,10 +82,11 @@ impl ClassDef {
 
         // Create class name bindings for checking ast::accessors
         let vars = Scope::new_ref(parentclass.map(|p| p.structdef.vars.clone()));
-        vars.set_basename(classtype.get_name()?);
+        vars.set_basename(name.clone());
 
         session.set_type(id, classtype.clone());
-        let classdef = ClassDef::new_ref(classtype.get_name()?, classtype, parenttype, vars);
+        let vtable = Vtable::create(session, NodeID::generate(), format!("{}_vtable", name.clone()))?;
+        let classdef = ClassDef::new_ref(name, classtype, parenttype, vars, vtable);
         Ok(classdef)
     }
 
@@ -110,11 +113,12 @@ impl ClassDef {
             self.structdef.inherit(&cls.structdef);
         }
 
+        let vtype = session.get_type(self.vtable.id).unwrap();
         if self.has_vtable() {
-            if let Some(index) = self.structdef.get_index("__vtable__") {
-                self.structdef.fields.borrow_mut()[index].1 = Type::Object(format!("{}_vtable", self.classname), self.vtable.id, vec!());
+            if let Some(index) = self.get_struct_vtable_index() {
+                self.structdef.fields.borrow_mut()[index].1 = vtype;
             } else {
-                self.structdef.add_field(session, "__vtable__", Type::Object(format!("{}_vtable", self.classname), self.vtable.id, vec!()));
+                self.structdef.add_field(session, "__vtable__", vtype);
             }
         }
         for ref node in body.iter() {
@@ -225,11 +229,17 @@ pub struct Vtable {
 }
 
 impl Vtable {
-    pub fn new() -> Self {
+    pub fn new(id: NodeID) -> Self {
         Vtable {
-            id: NodeID::generate(),
+            id: id,
             table: RefCell::new(vec!()),
         }
+    }
+
+    pub fn create(session: &Session, id: NodeID, name: String) -> Result<Vtable, Error> {
+        let vtable = Vtable::new(id);
+        session.set_type(id, Type::Object(name, id, vec!()));
+        Ok(vtable)
     }
 
     pub fn inherit(&self, inherit: &Vtable) {
