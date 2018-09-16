@@ -1,4 +1,12 @@
 
+* ideally, the transformed code should be directly compilable, such that you can use it for defining builtin runtime funcs, and desugared stuff.  It has
+  to be easy to make and build up
+* can you factor out phi statements? (use as part of if, match, sideeffect)
+* can you factor out for and while loops into a set of things that do both
+* factor conditionals
+* add return transform
+* make casting transforms that do an LLVM cast (should the transform have LLVM types in it, or should it always convert from molten types? (kinda need more flexability than molten types)
+
 * a possible alternative to this, which might sometimes work at least, is to have resolve and access set a reference to a field def, which has the id of it's owning object/type
 
 * you need to fix class vs structs somehow, and that could either mean adding scope to structs, or making it possible to call a trait method on either type to
@@ -18,7 +26,6 @@
 * make the top level module function be a closure instead of using global vars?? there were a bunch of errors
 
 * should you add session to refinery and process imports there
-* refactor code that uses num_funcdefs
 
 * one thing i'm seeing a lot of now is stuff like classspec.ident.name... can we prevent so many levels deep?
 

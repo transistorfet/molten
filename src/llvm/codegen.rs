@@ -494,6 +494,7 @@ unsafe fn build_function_body(data: &LLVM, id: NodeID, body: &Expr) {
     //LLVMRunFunctionPassManager(data.funcpass, function);
 }
 
+// TODO can we get rid of or refactor this
 pub fn get_method(data: &LLVM, scope: ScopeRef, class: &str, method: &str, argtypes: Vec<Type>) -> Box<Compilable> {
     let classdef = if class == "" {
         scope.clone()
@@ -511,9 +512,21 @@ pub fn get_method(data: &LLVM, scope: ScopeRef, class: &str, method: &str, argty
     data.get_value(defid).unwrap()
 }
 
-pub unsafe fn build_c_call(data: &LLVM, name: &str, largs: &mut Vec<LLVMValueRef>) -> LLVMValueRef {
-    let function = LLVMGetNamedFunction(data.module, label(name));
-    LLVMBuildCall(data.builder, function, largs.as_mut_ptr(), largs.len() as u32, label("tmp"))
+pub unsafe fn generate_func_start(data: &LLVM, scope: ScopeRef, id: NodeID, name: String, args: &Vec<(NodeID, String)>) -> Value {
+    let ttype = data.session.get_type(id).unwrap();
+    let lftype = get_ltype(data, ttype.clone(), false);
+    let abi = ttype.get_abi().unwrap();
+    let function = build_function_start(data, id, name, lftype, args.len(), abi);
+    //LLVMSetGC(function, label("shadow-stack"));
+    //LLVMSetPersonalityFn(function, LLVMGetNamedFunction(data.module, label("__gxx_personality_v0")));
+
+    for (i, ref arg) in args.iter().enumerate() {
+        let llarg = LLVMGetParam(function, i as u32);
+        LLVMSetValueName(llarg, label(arg.1.as_str()));
+        data.set_value(arg.0, from_type(&data.session.get_type(arg.0).unwrap(), llarg));
+    }
+
+    from_abi(&abi, function)
 }
 
 /*
@@ -932,6 +945,82 @@ LLVMDumpValue(value.get_ref());
             Box::new(Data(phi))
         },
 
+        ExprKind::SideEffect(ref op, ref args) => {
+            // TODO This only handles two arguments, which is all that will be parsed, but you can do better... 
+            let lexpr_block = LLVMAppendBasicBlockInContext(data.context, func, label(op.as_str()));
+            let rexpr_block = LLVMAppendBasicBlockInContext(data.context, func, label(op.as_str()));
+            let merge_block = LLVMAppendBasicBlockInContext(data.context, func, label(op.as_str()));
+
+            LLVMBuildBr(data.builder, lexpr_block);
+
+            LLVMPositionBuilderAtEnd(data.builder, lexpr_block);
+            let lexpr_value = generate_expr(data, func, unwind, scope.clone(), &args[0]).get_ref();
+            let test_type = match op.as_str() {
+                "or" => LLVMIntPredicate::LLVMIntNE,
+                "and" => LLVMIntPredicate::LLVMIntEQ,
+                _ => panic!("NotImplementedError: attempted to compile invalid side effect operation: {}", op.as_str())
+            };
+            let is_enough = LLVMBuildICmp(data.builder, test_type, lexpr_value, null_value(LLVMTypeOf(lexpr_value)), label("is_enough"));
+            LLVMBuildCondBr(data.builder, is_enough, merge_block, rexpr_block);
+
+            LLVMPositionBuilderAtEnd(data.builder, rexpr_block);
+            let rexpr_value = generate_expr(data, func, unwind, scope.clone(), &args[1]).get_ref();
+            LLVMBuildBr(data.builder, merge_block);
+
+            LLVMPositionBuilderAtEnd(data.builder, merge_block);
+            let phi = LLVMBuildPhi(data.builder, LLVMTypeOf(lexpr_value), label(op.as_str()));
+
+            let mut values = vec![lexpr_value, rexpr_value];
+            let mut blocks = vec![lexpr_block, rexpr_block];
+
+            LLVMAddIncoming(phi, values.as_mut_ptr(), blocks.as_mut_ptr(), 2);
+            Box::new(Data(phi))
+        },
+
+
+        ExprKind::Match(ref cond, ref cases, ref cid) => {
+            let mut cond_blocks = vec!();
+            let mut do_blocks = vec!();
+            for _ in 0 .. cases.len() {
+                cond_blocks.push(LLVMAppendBasicBlockInContext(data.context, func, label("matchcond")));
+                do_blocks.push(LLVMAppendBasicBlockInContext(data.context, func, label("matchdo")));
+            }
+            let merge_block = LLVMAppendBasicBlockInContext(data.context, func, label("matchend"));
+            cond_blocks.push(merge_block);
+
+            let cond_value = generate_expr(data, func, unwind, scope.clone(), cond).get_ref();
+            LLVMBuildBr(data.builder, cond_blocks[0]);
+
+            let ctype = data.session.get_type(*cid).unwrap();
+            let mut values = vec!();
+            for (i, &(ref case, ref expr)) in cases.iter().enumerate() {
+                LLVMPositionBuilderAtEnd(data.builder, cond_blocks[i]);
+                match case.kind {
+                    ExprKind::Underscore => { LLVMBuildBr(data.builder, do_blocks[i]); },
+                    _ => {
+                        let case_value = generate_expr(data, func, unwind, scope.clone(), case).get_ref();
+                        //let is_true = LLVMBuildICmp(data.builder, LLVMIntPredicate::LLVMIntEQ, cond_value, case_value, label("is_true"));
+                        let eqfunc = get_method(data, scope.clone(), "", "==", vec!(ctype.clone(), ctype.clone()));
+                        let is_true = eqfunc.invoke(data, unwind, vec!(cond_value, case_value));
+                        LLVMBuildCondBr(data.builder, is_true, do_blocks[i], cond_blocks[i + 1]);
+                    }
+                }
+
+                LLVMPositionBuilderAtEnd(data.builder, do_blocks[i]);
+                values.push(generate_expr(data, func, unwind, scope.clone(), expr).get_ref());
+                LLVMBuildBr(data.builder, merge_block);
+                do_blocks[i] = LLVMGetInsertBlock(data.builder);
+            }
+
+            LLVMPositionBuilderAtEnd(data.builder, merge_block);
+            let phi = LLVMBuildPhi(data.builder, LLVMTypeOf(values[0]), label("matchphi"));
+
+            LLVMAddIncoming(phi, values.as_mut_ptr(), do_blocks.as_mut_ptr(), values.len() as u32);
+            Box::new(Data(phi))
+        },
+
+
+
         ExprKind::While(ref cond, ref body) => {
             let before_block = LLVMAppendBasicBlockInContext(data.context, func, label("while"));
             let body_block = LLVMAppendBasicBlockInContext(data.context, func, label("whilebody"));
@@ -1008,80 +1097,6 @@ LLVMDumpValue(value.get_ref());
             Box::new(Data(body_value))
         },
 
-        ExprKind::SideEffect(ref op, ref args) => {
-            // TODO This only handles two arguments, which is all that will be parsed, but you can do better... 
-            let lexpr_block = LLVMAppendBasicBlockInContext(data.context, func, label(op.as_str()));
-            let rexpr_block = LLVMAppendBasicBlockInContext(data.context, func, label(op.as_str()));
-            let merge_block = LLVMAppendBasicBlockInContext(data.context, func, label(op.as_str()));
-
-            LLVMBuildBr(data.builder, lexpr_block);
-
-            LLVMPositionBuilderAtEnd(data.builder, lexpr_block);
-            let lexpr_value = generate_expr(data, func, unwind, scope.clone(), &args[0]).get_ref();
-            let test_type = match op.as_str() {
-                "or" => LLVMIntPredicate::LLVMIntNE,
-                "and" => LLVMIntPredicate::LLVMIntEQ,
-                _ => panic!("NotImplementedError: attempted to compile invalid side effect operation: {}", op.as_str())
-            };
-            let is_enough = LLVMBuildICmp(data.builder, test_type, lexpr_value, null_value(LLVMTypeOf(lexpr_value)), label("is_enough"));
-            LLVMBuildCondBr(data.builder, is_enough, merge_block, rexpr_block);
-
-            LLVMPositionBuilderAtEnd(data.builder, rexpr_block);
-            let rexpr_value = generate_expr(data, func, unwind, scope.clone(), &args[1]).get_ref();
-            LLVMBuildBr(data.builder, merge_block);
-
-            LLVMPositionBuilderAtEnd(data.builder, merge_block);
-            let phi = LLVMBuildPhi(data.builder, LLVMTypeOf(lexpr_value), label(op.as_str()));
-
-            let mut values = vec![lexpr_value, rexpr_value];
-            let mut blocks = vec![lexpr_block, rexpr_block];
-
-            LLVMAddIncoming(phi, values.as_mut_ptr(), blocks.as_mut_ptr(), 2);
-            Box::new(Data(phi))
-        },
-
-
-        ExprKind::Match(ref cond, ref cases, ref cid) => {
-            let mut cond_blocks = vec!();
-            let mut do_blocks = vec!();
-            for _ in 0 .. cases.len() {
-                cond_blocks.push(LLVMAppendBasicBlockInContext(data.context, func, label("matchcond")));
-                do_blocks.push(LLVMAppendBasicBlockInContext(data.context, func, label("matchdo")));
-            }
-            let merge_block = LLVMAppendBasicBlockInContext(data.context, func, label("matchend"));
-            cond_blocks.push(merge_block);
-
-            let cond_value = generate_expr(data, func, unwind, scope.clone(), cond).get_ref();
-            LLVMBuildBr(data.builder, cond_blocks[0]);
-
-            let ctype = data.session.get_type(*cid).unwrap();
-            let mut values = vec!();
-            for (i, &(ref case, ref expr)) in cases.iter().enumerate() {
-                LLVMPositionBuilderAtEnd(data.builder, cond_blocks[i]);
-                match case.kind {
-                    ExprKind::Underscore => { LLVMBuildBr(data.builder, do_blocks[i]); },
-                    _ => {
-                        let case_value = generate_expr(data, func, unwind, scope.clone(), case).get_ref();
-                        //let is_true = LLVMBuildICmp(data.builder, LLVMIntPredicate::LLVMIntEQ, cond_value, case_value, label("is_true"));
-                        let eqfunc = get_method(data, scope.clone(), "", "==", vec!(ctype.clone(), ctype.clone()));
-                        let is_true = eqfunc.invoke(data, unwind, vec!(cond_value, case_value));
-                        LLVMBuildCondBr(data.builder, is_true, do_blocks[i], cond_blocks[i + 1]);
-                    }
-                }
-
-                LLVMPositionBuilderAtEnd(data.builder, do_blocks[i]);
-                values.push(generate_expr(data, func, unwind, scope.clone(), expr).get_ref());
-                LLVMBuildBr(data.builder, merge_block);
-                do_blocks[i] = LLVMGetInsertBlock(data.builder);
-            }
-
-            LLVMPositionBuilderAtEnd(data.builder, merge_block);
-            let phi = LLVMBuildPhi(data.builder, LLVMTypeOf(values[0]), label("matchphi"));
-
-            LLVMAddIncoming(phi, values.as_mut_ptr(), do_blocks.as_mut_ptr(), values.len() as u32);
-            Box::new(Data(phi))
-        },
-
 
         /////// Exceptions ///////
 
@@ -1147,22 +1162,6 @@ LLVMDumpValue(value.get_ref());
     }
 }
 
-pub unsafe fn generate_func_start(data: &LLVM, scope: ScopeRef, id: NodeID, name: String, args: &Vec<(NodeID, String)>) -> Value {
-    let ttype = data.session.get_type(id).unwrap();
-    let lftype = get_ltype(data, ttype.clone(), false);
-    let abi = ttype.get_abi().unwrap();
-    let function = build_function_start(data, id, name, lftype, args.len(), abi);
-    //LLVMSetGC(function, label("shadow-stack"));
-    //LLVMSetPersonalityFn(function, LLVMGetNamedFunction(data.module, label("__gxx_personality_v0")));
-
-    for (i, ref arg) in args.iter().enumerate() {
-        let llarg = LLVMGetParam(function, i as u32);
-        LLVMSetValueName(llarg, label(arg.1.as_str()));
-        data.set_value(arg.0, from_type(&data.session.get_type(arg.0).unwrap(), llarg));
-    }
-
-    from_abi(&abi, function)
-}
 
 pub unsafe fn generate_access_field(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: ScopeRef, id: NodeID, object: LLVMValueRef, name: &String, oid: NodeID) -> Value {
 // TODO can we remove oid from everything???
@@ -1252,5 +1251,10 @@ pub unsafe fn invoke_molten_function(data: &LLVM, func: LLVMValueRef, unwind: Un
 
 pub unsafe fn invoke_c_function(data: &LLVM, func: LLVMValueRef, unwind: Unwind, mut largs: Vec<LLVMValueRef>) -> LLVMValueRef {
     LLVMBuildCall(data.builder, func, largs.as_mut_ptr(), largs.len() as u32, label("tmp"))
+}
+
+pub unsafe fn build_c_call(data: &LLVM, name: &str, largs: &mut Vec<LLVMValueRef>) -> LLVMValueRef {
+    let function = LLVMGetNamedFunction(data.module, label(name));
+    LLVMBuildCall(data.builder, function, largs.as_mut_ptr(), largs.len() as u32, label("tmp"))
 }
 

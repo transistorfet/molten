@@ -349,6 +349,17 @@ unsafe fn build_buffer_get(data: &LLVM, id: NodeID, name: &str, objtype: LLVMTyp
     let function = build_function_start_lib(data, id, name, vec!(objtype, int_type(data)), str_type(data));
     LLVMSetLinkage(function, llvm::LLVMLinkage::LLVMLinkOnceAnyLinkage);
 
+    // TODO generate this in place of the custom function
+    //Return(
+    //  AccessVar(
+    //    AccessOffset(
+    //        AccessValue(arg 0),
+    //        Cast(AccessValue(arg 1), i32)
+    //    )
+    //  )
+    //)
+    // AccessOffset has one index, AccessField has a (0, fieldnum) to deref it first
+
     let buffer = LLVMGetParam(function, 0);
     let index = LLVMBuildCast(data.builder, llvm::LLVMOpcode::LLVMTrunc, LLVMGetParam(function, 1), i32_type(data), label("tmp"));
     let mut indices = vec!(index);
