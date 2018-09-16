@@ -109,83 +109,9 @@ impl Type {
         }
     }
 
-    /*
-    pub fn get_variants(&self) -> Vec<Type> {
-        match self {
-            &Type::Overload(ref variants) => variants.clone(),
-            _ => vec!(self.clone()),
-        }
-    }
-
-    pub fn add_variant(self, session: &Session, scope: ScopeRef, ntype: Type) -> Result<Type, Error> {
-        let rtype = match self {
-            Type::Overload(ref variants) => {
-                for variant in variants {
-                    if check_type(session, scope.clone(), Some(variant.clone()), Some(ntype.clone()), Check::Def, false).is_ok() {
-                        return Err(Error::new(format!("OverloadError: function definitions overlap; {:?} vs {:?}", variant, ntype)));
-                    }
-                }
-                let mut nvariants = variants.clone();
-                nvariants.push(ntype);
-                Type::Overload(nvariants)
-            },
-            _ => expect_type(session, scope, Some(self), Some(ntype.clone()), Check::Def)?,
-        };
-        Ok(rtype)
-    }
-    */
-
     pub fn from_spec(classspec: ClassSpec, id: UniqueID) -> Type {
         Type::Object(classspec.ident.name, id, classspec.types)
     }
-
-    /*
-    pub fn update_variable_type(session: &Session, scope: ScopeRef, name: &String, ttype: Type) {
-        let dscope = Scope::target(session, scope.clone());
-        let pscope = Scope::locate_variable(dscope.clone(), name).unwrap();
-        let otype = pscope.get_variable_type(session, name).clone();
-        if !pscope.is_primative() {
-            let ntype = check_type(session, scope.clone(), otype.clone(), Some(ttype.clone()), Check::Def, false);
-            match ntype {
-                Ok(utype) => {
-                    match dscope.get_var_def(name) {
-                        Some(defid) => { session.update_type(scope.clone(), defid, utype).unwrap()?; },
-                        None => { },
-                    }
-                },
-                Err(err) => panic!("while updating variable type {:?}:\n{:?}", name, err),
-            }
-        }
-    }
-
-    pub fn update_type(session: &Session, scope: ScopeRef, idname: &String, ttype: Type) {
-        let ttype = resolve_type(session, ttype);
-        let pscope = Scope::locate_type(scope.clone(), idname).unwrap();
-        let otype = pscope.find_type(session, idname).clone();
-        debug!("UPDATE TYPE: from {:?} to {:?}", otype, ttype);
-        if !pscope.is_primative() {
-            let entype = check_type(session, scope.clone(), otype.clone(), Some(ttype.clone()), Check::Def, false);
-            match entype {
-                Ok(ntype) => {
-                    //let ntype = check_type(session, scope, Some(ttype.clone()), Some(ntype.clone()), Check::Def, false).unwrap();
-                    pscope.update_type(idname, ntype.clone());
-                    session.update_type(pscope.get_def_id(idname).unwrap(), ntype.clone())?;
-                    match otype {
-                        Some(Type::Variable(_, ref id)) if &id.to_string() != idname => { session.update_type(scope.clone(), *id, ntype)?; },
-                        _ => { },
-                    }
-                },
-                Err(err) => panic!("while updating type {:?}:\n{:?}", idname, err),
-            }
-
-            //if !Rc::ptr_eq(&pscope, &scope) {
-            //    debug!("RAISING: {:?} {:?} {:?}", pscope.get_basename(), otype, ttype);
-            //    pscope.raise_type(scope, otype.unwrap());
-            //    pscope.raise_type(scope, ttype);
-            //}
-        }
-    }
-    */
 
     /*
     pub fn convert<F>(self, f: &F) -> Type where F: FnOnce(Type) -> Type {

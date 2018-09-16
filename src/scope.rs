@@ -21,27 +21,17 @@ pub enum Context {
 }
 
 
-pub type BindID = UniqueID;
-
 #[derive(Clone, Debug, PartialEq)]
-pub struct VarInfo {
-    pub id: BindID,
+pub struct BindInfo {
     pub defid: Option<NodeID>,
 }
-
-#[derive(Clone, Debug, PartialEq)]
-pub struct TypeInfo {
-    pub id: BindID,
-    pub defid: Option<NodeID>,
-}
-
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Scope {
     pub context: Cell<Context>,
     pub basename: RefCell<String>,
-    pub names: RefCell<HashMap<String, VarInfo>>,
-    pub types: RefCell<HashMap<String, TypeInfo>>,
+    pub names: RefCell<HashMap<String, BindInfo>>,
+    pub types: RefCell<HashMap<String, BindInfo>>,
     pub parent: Option<ScopeRef>,
 }
 
@@ -109,22 +99,20 @@ impl Scope {
     ///// Variable Functions /////
 
     #[must_use]
-    pub fn define(&self, name: String, defid: Option<NodeID>) -> Result<BindID, Error> {
+    pub fn define(&self, name: String, defid: Option<NodeID>) -> Result<(), Error> {
         let mut names = self.names.borrow_mut();
         match names.contains_key(&name) {
             true => Err(Error::new(format!("NameError: variable is already defined; {:?}", name))),
             false => {
-                let id = BindID::generate();
-                names.insert(name, VarInfo {
-                    id: id,
+                names.insert(name, BindInfo {
                     defid: defid,
                 });
-                Ok(id)
+                Ok(())
             },
         }
     }
 
-    pub fn modify_local<F>(&self, name: &String, mut f: F) -> () where F: FnMut(&mut VarInfo) -> () {
+    pub fn modify_local<F>(&self, name: &String, mut f: F) -> () where F: FnMut(&mut BindInfo) -> () {
         match self.names.borrow_mut().entry(name.clone()) {
             Entry::Vacant(_) => panic!("NameError: variable is undefined in this scope; {:?}", name),
             Entry::Occupied(mut entry) => f(entry.get_mut()),
@@ -132,7 +120,7 @@ impl Scope {
     }
 
     /*
-    pub fn modify<F>(&mut self, name: &String, mut f: F) -> () where F: FnMut(&mut VarInfo) -> () {
+    pub fn modify<F>(&mut self, name: &String, mut f: F) -> () where F: FnMut(&mut BindInfo) -> () {
         // TODO this might be an issue with overloaded functions; this was changed to make overloading work when in different scopes, which might cause a name/type error if something in a
         // more global scope tries to access an overloaded type specified in a more local scope... maybe the solution is to create a new entry with the new variant only accessible from the
         // more local scope... but will that cause a duplicate name error somewhere?
@@ -146,7 +134,7 @@ impl Scope {
     }
     */
 
-    pub fn _search<F, U>(&self, name: &String, f: F) -> Option<U> where F: Fn(&VarInfo) -> Option<U> {
+    pub fn _search<F, U>(&self, name: &String, f: F) -> Option<U> where F: Fn(&BindInfo) -> Option<U> {
         if let Some(sym) = self.names.borrow().get(name) {
             f(sym)
         } else if let Some(ref parent) = self.parent {
@@ -167,17 +155,7 @@ impl Scope {
         self.names.borrow().contains_key(name)
     }
 
-    /*
-    pub fn variable_id(&self, name: &String) -> Result<BindID, Error> {
-        match self._search(name, |sym| Some(sym.id)) {
-            Some(id) => Ok(id),
-            None => Err(Error::new(format!("NameError: variable is undefined; {:?}", name))),
-        }
-    }
-    */
-
     pub fn get_variable_type(&self, session: &Session, name: &String) -> Option<Type> {
-        //self.get_variable_type_full(session, name, false)
         match self.get_var_def(name) {
             Some(defid) => session.get_type(defid),
             None => None,
@@ -202,45 +180,19 @@ impl Scope {
         session.get_def(self.get_var_def(name).ok_or(Error::new(format!("VarError: definition not set for {:?}", name)))?)
     }
 
-    pub fn find_type_def(&self, session: &Session, name: &String) -> Result<Def, Error> {
-        session.get_def(self.get_type_def(name).ok_or(Error::new(format!("TypeError: definition not set for {:?}", name)))?)
-    }
-
-
-    pub fn is_closure_var(&self, name: &String) -> bool {
-        if self.names.borrow().contains_key(name) {
-            return false;
-        }
-
-        let mut parent = self.parent.clone();
-        while parent.is_some() {
-            let scope = parent.unwrap();
-            if scope.is_global() {
-                return false;
-            }
-            if scope.contains_local(name) {
-                return true;
-            }
-            parent = scope.parent.clone();
-        }
-        false
-    }
-
 
     ///// Type Functions /////
 
     #[must_use]
-    pub fn define_type(&self, name: String, defid: Option<NodeID>) -> Result<BindID, Error> {
+    pub fn define_type(&self, name: String, defid: Option<NodeID>) -> Result<(), Error> {
         let mut types = self.types.borrow_mut();
         match types.contains_key(&name) {
             true => Err(Error::new(format!("NameError: type is already defined; {:?}", name))),
             false => {
-                let id = BindID::generate();
-                types.insert(name, TypeInfo {
-                    id: id,
+                types.insert(name, BindInfo {
                     defid: defid,
                 });
-                Ok(id)
+                Ok(())
             },
         }
     }
@@ -256,19 +208,19 @@ impl Scope {
         self.types.borrow().contains_key(name)
     }
 
-    pub fn modify_type<F>(&self, name: &String, f: F) where F: Fn(&mut TypeInfo) -> () {
+    pub fn _modify_type<F>(&self, name: &String, f: F) where F: Fn(&mut BindInfo) -> () {
         match self.types.borrow_mut().entry(name.clone()) {
             Entry::Occupied(mut entry) => f(entry.get_mut()),
             _ => match self.parent {
                 Some(ref parent) => {
-                    parent.modify_type(name, f);
+                    parent._modify_type(name, f);
                 },
                 _ => panic!("NameError: type is undefined; {:?}", name),
             },
         }
     }
 
-    fn _search_type<F, U>(&self, name: &String, f: F) -> Option<U> where F: Fn(&TypeInfo) -> Option<U> {
+    fn _search_type<F, U>(&self, name: &String, f: F) -> Option<U> where F: Fn(&BindInfo) -> Option<U> {
         if let Some(ref info) = self.types.borrow().get(name) {
             f(info)
         } else if let Some(ref parent) = self.parent {
@@ -292,21 +244,8 @@ impl Scope {
         }
     }
 
-    pub fn make_obj(&self, session: &Session, name: String, params: Vec<Type>) -> Result<Type, Error> {
-        match self.find_type(session, &name) {
-            Some(Type::Object(ename, id, eparams)) => {
-                if eparams.len() != params.len() {
-                    return Err(Error::new(format!("TypeError: type parameters don't match.  Expected {:?} but found {:?}", eparams, params)));
-                }
-                Ok(Type::Object(name, id, params))
-            },
-            Some(ttype) => Err(Error::new(format!("TypeError: expected object type but found {:?}", ttype))),
-            None => Err(Error::new(format!("TypeError: type not found: {:?}", name)))
-        }
-    }
-
     pub fn set_type_def(&self, name: &String, defid: NodeID) {
-        self.modify_type(name, move |info| {
+        self._modify_type(name, move |info| {
             info.defid = Some(defid.clone());
         })
     }
@@ -321,36 +260,22 @@ impl Scope {
         })
     }
 
-    /*
-    pub fn type_id(&self, name: &String) -> Result<BindID, Error> {
-        match self._search_type(name, |info| Some(info.id)) {
-            Some(id) => Ok(id),
-            None => Err(Error::new(format!("NameError: type is undefined; {:?}", name))),
-        }
-    }
-    */
-
-    pub fn locate_variable(scope: ScopeRef, name: &String) -> Option<ScopeRef> {
-        if let Some(_) = scope.names.borrow().get(name) {
-            return Some(scope.clone());
-        }
-
-        let parent = scope.parent.clone();
-        match parent {
-            Some(parent) => Scope::locate_variable(parent, name),
-            _ => None
-        }
+    pub fn find_type_def(&self, session: &Session, name: &String) -> Result<Def, Error> {
+        session.get_def(self.get_type_def(name).ok_or(Error::new(format!("TypeError: definition not set for {:?}", name)))?)
     }
 
-    pub fn locate_type(scope: ScopeRef, name: &String) -> Option<ScopeRef> {
-        if let Some(_) = scope.types.borrow().get(name) {
-            return Some(scope.clone());
-        }
 
-        let parent = scope.parent.clone();
-        match parent {
-            Some(parent) => Scope::locate_type(parent, name),
-            _ => None
+
+    pub fn make_obj(&self, session: &Session, name: String, params: Vec<Type>) -> Result<Type, Error> {
+        match self.find_type(session, &name) {
+            Some(Type::Object(ename, id, eparams)) => {
+                if eparams.len() != params.len() {
+                    return Err(Error::new(format!("TypeError: type parameters don't match.  Expected {:?} but found {:?}", eparams, params)));
+                }
+                Ok(Type::Object(name, id, params))
+            },
+            Some(ttype) => Err(Error::new(format!("TypeError: expected object type but found {:?}", ttype))),
+            None => Err(Error::new(format!("TypeError: type not found: {:?}", name)))
         }
     }
 
