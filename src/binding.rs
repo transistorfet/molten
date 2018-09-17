@@ -7,9 +7,9 @@ use session::{ Session, Error };
 use scope::{ ScopeRef };
 use utils::UniqueID;
 
-use defs::classes::ClassDef;
 use defs::functions::AnyFunc;
-use defs::variables::{ AnyVar, ArgDef };
+use defs::classes::{ ClassDef, StructDef };
+use defs::variables::{ AnyVar, ArgDef, FieldDef };
 
 
 pub fn bind_names(session: &Session, scope: ScopeRef, code: &mut Vec<AST>) {
@@ -161,6 +161,8 @@ fn bind_names_node_or_error(session: &Session, scope: ScopeRef, node: &mut AST) 
         },
 
         AST::TypeDef(ref id, _, ref mut classspec, ref mut fields) => {
+            //StructDef::define(session, scope.clone(), *id, ****makeobjecttype*****)?;
+
             //let mut types = vec!();
             // TODO this is nearly identical to class... these need to be separated
             let tscope = session.map.add(*id, None);
@@ -170,7 +172,7 @@ fn bind_names_node_or_error(session: &Session, scope: ScopeRef, node: &mut AST) 
             classspec.types.iter_mut().map(|ref mut ttype| declare_typevars(session, tscope.clone(), Some(ttype), true).unwrap()).count();
             for field in fields {
                 declare_typevars(session, scope.clone(), field.ttype.as_mut(), true)?;
-                AnyVar::define(session, scope.clone(), *id, &field.ident.name, field.ttype.clone())?;
+                FieldDef::define(session, scope.clone(), *id, &field.ident.name, field.ttype.clone())?;
             }
         },
 

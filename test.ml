@@ -31,6 +31,7 @@
         //let fac = fn (x : Int, y = 5 * 3, z: String = "hey") => if not x then 1 else x - -123
         // TODO this wasn't compiling because it could not resolve the type of x, so couldn't disambiguate "not"
         //let fac2 = fn x, y, z => if not x then 1 else x - -123
+        //fac2(3)
         testy(3)
 
 	let test2 = fn x => x()
@@ -64,6 +65,17 @@
         123 + ~124 * 25
         123 + (124 * 25)
         (1, 2)
+
+        begin 123 * 342 end
+
+        begin
+            a
+        end
+
+        {
+            a
+            { b }
+        }
 
         println("Rem: " + str(10 % 3))
         println("2^16: " + str(2.0 ^ 16.0))
@@ -135,7 +147,7 @@
         vtest(thingy)
 
         while thingy.a > 0 {
-            println("Hey again" + str(thingy.a))
+            println("Hey again " + str(thingy.a))
             thingy.a = thingy.a - 1000
         }
 
@@ -319,6 +331,17 @@
         for x in numbers
             println("Count: " + str(x))
 
+        /// Type Defs
+
+/*
+        type newint = {
+            things: Int,
+            stuff: Int
+        }
+
+        type newreal = Real
+*/
+
         /// Closures
 
 /*
@@ -342,7 +365,6 @@
         while x
             noop
 
-
         try raise a with
             1 => a
             2 => a * 4
@@ -350,34 +372,6 @@
 
 
         thing.stuff() * ~foo().bar
-
-        let a = 123.24
-        // comments
-        123 + 124 * 25
-        let fac = fn x, y => if not x then 1 else x - -123
-        fac(3)
-
-        begin
-            stuff
-        end
-
-        {
-            stuff
-            { things }
-        }
-
-        let a = 123.24 * 3
-        123 + 124 * 25
-        123 + (124 * 25)
-        begin 123 * 342 end
-
-
-        type newint = {
-            things: int,
-            stuff: int
-        }
-
-        type newfloat = float
 
     */
 

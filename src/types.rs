@@ -193,10 +193,6 @@ pub enum Check {
 }
 
 pub fn expect_type(session: &Session, scope: ScopeRef, odtype: Option<Type>, octype: Option<Type>, mode: Check) -> Result<Type, Error> {
-    //match check_type(scope, odtype, octype, mode, true) {
-    //    Ok(ttype) => ttype,
-    //    Err(err) => panic!("{}", err),
-    //}
     check_type(session, scope, odtype, octype, mode, true)
 }
 

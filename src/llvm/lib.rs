@@ -177,16 +177,6 @@ fn id() -> NodeID {
 
 pub fn get_builtins<'sess>() -> Vec<BuiltinDef<'sess>> {
     vec!(
-        /*
-        BuiltinDef::Type(id(), "Nil",    Type::Object(String::from("Nil"), vec!())),
-        BuiltinDef::Type(id(), "Bool",   Type::Object(String::from("Bool"), vec!())),
-        BuiltinDef::Type(id(), "Byte",   Type::Object(String::from("Byte"), vec!())),
-        BuiltinDef::Type(id(), "Real",   Type::Object(String::from("Real"), vec!())),
-        BuiltinDef::Type(id(), "String", Type::Object(String::from("String"), vec!())),
-        BuiltinDef::Type(id(), "List",   Type::Object(String::from("List"), vec!(Type::Variable(String::from("item"), UniqueID(0))))),
-        //BuiltinDef::Type(id(), "Class",  Type::Object(String::from("Class"), vec!())),
-        */
-
         BuiltinDef::Class(id(), "Nil",    vec!(), vec!(), vec!()),
         BuiltinDef::Class(id(), "Bool",   vec!(), vec!(), vec!()),
         BuiltinDef::Class(id(), "Byte",   vec!(), vec!(), vec!()),

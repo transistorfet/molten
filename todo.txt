@@ -1,77 +1,68 @@
 
-* ideally, the transformed code should be directly compilable, such that you can use it for defining builtin runtime funcs, and desugared stuff.  It has
-  to be easy to make and build up
+=====
+* ideally, the transformed code should be directly compilable, such that you can use it for defining builtin runtime funcs, and desugared stuff.  It has to be easy to make and build up
 * can you factor out phi statements? (use as part of if, match, sideeffect)
 * can you factor out for and while loops into a set of things that do both
 * factor conditionals
 * add return transform
 * make casting transforms that do an LLVM cast (should the transform have LLVM types in it, or should it always convert from molten types? (kinda need more flexability than molten types)
+=====
 
-* a possible alternative to this, which might sometimes work at least, is to have resolve and access set a reference to a field def, which has the id of it's owning object/type
+* the current problem with closure code (line 269 of test.ml) is that we're assigning a closure to a struct field but the types don't match, because the get_type function
+  returned an actual function type, rather than a pointer to the closure context... so you kinda need a way to distinguish different function types
 
-* things like Expr::AllocObject currently require a class, and then resolve __alloc__ on their classvars scope; that would be needed by struct??
-
-* there's a bunch of class code that uses find_type_def().as_class().classvars to get the class scope, but that doesn't work with structs, and we shouldn't
-  be doing name lookups in the codegen stage!!! (ideally).  What if there was yet another hash table for objects (similar to refs), which points to the object def/type
-  that a value is tied to.  This would be used in places where we have a second oid in AST nodes, and could be used to avoid the lookup??
-  Or could we always get a type for the object, and use the id rather than the name to get the typedef
 * should we factor out some of the code in codegen which builds vtables into transform or classdef, such that you can build the type from either??
 
+
+* either add in the initialization of class variables, possibly limited to constant expressions only, or else raise an error if an initializer is provided
+* fix the parser issues where you need nil to make it work.... i think parser parsing ";" into noop/nil might work, if i can get the parser working
 
 * make a proper patterns tree
 * get rid of unwind argument, and put it in an object
 * make the top level module function be a closure instead of using global vars?? there were a bunch of errors
 
+* improve storing of files and file data in the Pos structs (maybe rename to Span?); pass session to parsers
+* change parser to take session argument or something so it can record the file info, and maybe do other advanced things
+* remove extraneous Pos's with Ident/Arguments?
 * should you add session to refinery and process imports there
 
-* one thing i'm seeing a lot of now is stuff like classspec.ident.name... can we prevent so many levels deep?
+* it might also make it easier/generic to allow compiling to object files?  So no linking, but it would do optimization and object file output
+* how does rust do "use" if there is a circular dependency?
+* put intermediate files somewhere else, at least as controlled by the molten script, so as not to clutter source directories
 
-* how can you use all the new things to make closures...
-* you could check during binding if an identifier is a closure context ref, and bind the ref there
 * you might not be making sure that non-closure functions don't access variables outside their scope (methods are never closures)
 * make sure that you don't overload different types of functions (closures, functions, and methods must all be the same type to allow overloading)
 
-* do you need a BuiltinDef type?
-* do you need a GlobalVarDef type?  or a ConstDef or FieldDef/PropertyDef/etc
-* remove declare typevars if possible??
 
 * there must be a way to fix the 'scope exceptions' (Scope::target) that we're doing to make class bodies work...
 * but actually... what if you had an argument that you sent to all the scoped functions that select the namespace?  This might be a refactor for later, once scopes only store def ids
 * add some helpful things to the AST::make_* functions, maybe we'd need a different name format for those?
 * add the .set_id() functions to simpliy ast builders
 
-* eventually we want to make a visitor
-* improve storing of files and file data in the Pos structs (maybe rename to Span?); pass session to parsers
-* change parser to take session argument or something so it can record the file info, and maybe do other advanced things
-* remove extraneous Pos's with Ident/Arguments?
-
+* one thing i'm seeing a lot of now is stuff like classspec.ident.name... can we prevent so many levels deep?
 * make common error printer, with fancy colours
 * there are poor error messages when deleting the "=" from a "let something = fn x => ..." both inside and outside classes.... shouldn't be doing this
 
-* it might also make it easier/generic to allow compiling to object files?  So no linking, but it would do optimization and object file output
-* how does rust do "use" if there is a circular dependency?
+* eventually we want to make a visitor
+* do you need a BuiltinDef type?
+* do you need a GlobalVarDef type?  or a ConstDef or FieldDef/PropertyDef/etc
 
-* add ast element like Struct... which does the same as class build type, but without the vtable stuff, and we can bypass some of the complexity...
-  but!!!! could we also/instead factor out the vtables somehow... so that it's more modular/selectable
 
 
 * there's still a problem with typevars not resolving fully, where a function that should return a concrete returns a free typevar.... (recursion or forward definition)
-* either add in the initialization of class variables, possibly limited to constant expressions only, or else raise an error if an initializer is provided
-* fix the parser issues where you need nil to make it work.... i think parser parsing ";" into noop/nil might work, if i can get the parser working
 
-* add an iterator type that gets used in for loops; might need vtables for that
-
-* put intermediate files somewhere else, at least as controlled by the molten script, so as not to clutter source directories
-
-* add compiler directives?
+* implement type definition ast element (enum type?)
+* add patterns and matching of patterns
+* add an iterator type
 * get llvm closures working
+* add compiler directives?
 * implement exceptions
 * implement garbage collection
-* add patterns and matching of patterns
-* implement type definition ast element (enum type?)
+* make nestable comments
 
 * better support for generics; right now it just forces everything to/from a pointer type
 * fill in string and list type functions, and finish hashmap (rename to dict?)
+* issue with separator/lf not working when two expressions are on the same line (it should produce a parse error)
 
 
 
@@ -87,33 +78,23 @@
 * what if you generalize overloaded types, such that they're checked in check_type, and options are eliminated, or resolved to one type over the course of checking
 
 
-* should you add let mut or def to class bodies so as not to conflict with 'let' as immutable outside of class bodies
+* should you add "let mut" or "def" to class bodies so as not to conflict with 'let' as immutable outside of class bodies?
 * should you add access modifiers to classes, and maybe functions; public, private, protected
 * should you add break/continue statements for loops
+* should you add a return statement?  It's not functional, but it's practial
 * should you change Real to Float?  also should you change them to lower case names, which is in line with sml, ocmal, f#
 * should you allow keyword arguments in invoke; foo(a=10, b=20)
 * should you allow arguments with a default value to be omitted from a function call?, that would require a bunch of changes to typechecking
 * should you fix scope resolution to also work on objects, so that you can have static methods from the object without explicitly referencing its type
 * should exports also list all the modules that the file imports, so that class definitions in other imports can be found, if needed for arguments
 * should variables be writable... maybe only with compiler directive, or only without one; if so, add a const expression
-* should you add a return statement?  It's not functional, but it's practial
 * should you require an override keyword when masking definitions in lower scopes? like class definitions
+* should you add dicts syntax
+* should you add macros and expandable forms (like lisp)
 
 
 
-PARSER:
-
-* issue with separator/lf not working when two expressions are on the same line (it should produce a parse error)
-* make nestable comments
-
-
-FEATURES:
-
-* add dicts syntax
-* add macros and expandable forms (like lisp)
-
-
-EXAMPLE PROGRAMS:
+EXAMPLE PROGRAM IDEAS:
 
 * hash table
 * regex matcher

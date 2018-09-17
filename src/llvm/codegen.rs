@@ -811,6 +811,7 @@ pub unsafe fn generate_expr(data: &LLVM, func: LLVMValueRef, unwind: Unwind, sco
 
             generate_cast_args(data, function.get_ref(), &mut largs);
             let value = function.invoke(data, unwind, largs);
+            // TODO this is perhaps an alternate way of doing calls?
             //let value = match invoke {
             //    InvokeKind::Func(_) |
             //    InvokeKind::Method(_, _, _) => invoke_molten_function(data, function.get_ref(), unwind, largs),

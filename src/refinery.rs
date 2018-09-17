@@ -135,7 +135,6 @@ pub fn refine_node(node: AST) -> AST {
         },
 
         AST::Index(id, pos, base, index) => {
-            //AST::Index(id, pos, Box::new(refine_node(*base)), Box::new(refine_node(*index)), stype)
             refine_node(AST::Invoke(id, pos.clone(), Box::new(AST::Accessor(NodeID::generate(), pos.clone(), base, Ident::new(pos.clone(), String::from("[]")), NodeID::generate())), vec!(*index)))
         },
 
@@ -163,7 +162,6 @@ pub fn refine_node(node: AST) -> AST {
                 },
                 _ => panic!("SyntaxError: assignment to something other than a list or class element: {:?}", left),
             }
-            //AST::Assignment(Box::new(refine_node(*left)), Box::new(refine_node(*right)))
         },
 
         AST::Import(_, _, _, _) => { node },
