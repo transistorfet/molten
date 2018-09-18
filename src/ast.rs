@@ -21,6 +21,7 @@ pub struct Pos {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Literal {
+    Unit,
     Boolean(bool),
     Integer(isize),
     Real(f64),

@@ -118,8 +118,10 @@ named!(statement(Span) -> AST,
             expression
             // TODO should class be here too?
         )) >>
-        //eat_separator!("\n") >>
         separator >>
+        t: opt!(map!(tag!(";"), |_| AST::make_lit(Literal::Unit))) >>
+        // TODO this works but is not ideal...  Also you need a unit type or else the nil type seems to cast to int...
+        //(if t.is_none() { s } else { AST::make_block(Pos::empty(), vec!(s, t.unwrap())) })
         (s)
     )
 );
@@ -598,6 +600,11 @@ named!(type_description(Span) -> Type,
     )
 );
 
+named!(type_unit(Span) -> Type,
+    map!(tag!("()"), |s| Type::Object(String::from("()"), UniqueID(0), vec!()))
+);
+
+
 named!(type_object(Span) -> Type,
     do_parse!(
         cs: class_spec >>
@@ -663,6 +670,7 @@ named!(reserved(Span) -> Span,
 
 named!(literal(Span) -> AST,
     alt_complete!(
+        unit |
         nil |
         boolean |
         string |
@@ -671,6 +679,10 @@ named!(literal(Span) -> AST,
         tuple |
         list
     )
+);
+
+named!(unit(Span) -> AST,
+    value!(AST::make_lit(Literal::Unit), tag_word!("()"))
 );
 
 named!(nil(Span) -> AST,
@@ -793,7 +805,8 @@ named!(separator(Span) -> Span,
         //alt!(take_while1!(is_ws) | comment)
         //alt!(take_while1!(is_ws) | delimited!(tag!("//"), not_line_ending, line_ending))
         //terminated!(sp!(alt!(line_comment | block_comment)), line_ending)
-        delimited!(space_comment, alt!(line_ending | tag!(";")), multispace_comment)
+        //delimited!(space_comment, alt!(line_ending | tag!(";")), multispace_comment)
+        delimited!(space_comment, line_ending, multispace_comment)
     ))
 );
 

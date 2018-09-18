@@ -624,6 +624,7 @@ pub unsafe fn build_vtable_type(data: &LLVM, id: NodeID, name: &String, vtable: 
 pub unsafe fn get_ltype(data: &LLVM, ttype: Type, use_fptrs: bool) -> LLVMTypeRef {
     match ttype {
         Type::Object(ref tname, ref id, ref _ptypes) => match tname.as_str() {
+            "()" => int_type(data),
             "Nil" => str_type(data),
             "Bool" => bool_type(data),
             "Byte" => LLVMInt8TypeInContext(data.context),
@@ -777,6 +778,7 @@ pub unsafe fn generate_expr(data: &LLVM, func: LLVMValueRef, unwind: Unwind, sco
         ExprKind::Nil => Box::new(Data(null_value(get_ltype(data, data.session.get_type(expr.id).unwrap(), true)))),
         ExprKind::Literal(ref lit) => {
             match lit {
+                Literal::Unit => Box::new(Data(LLVMConstInt(int_type(data), 0, 0))),
                 Literal::Boolean(ref num) => Box::new(Data(LLVMConstInt(bool_type(data), *num as u64, 0))),
                 Literal::Integer(ref num) => Box::new(Data(LLVMConstInt(int_type(data), *num as u64, 0))),
                 Literal::Real(ref num) => Box::new(Data(LLVMConstReal(real_type(data), *num))),

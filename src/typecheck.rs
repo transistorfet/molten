@@ -39,6 +39,7 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &AST,
     let rtype = match *node {
         AST::Literal(ref _id, ref literal) => {
             match literal {
+                Literal::Unit => scope.make_obj(session, String::from("()"), vec!())?,
                 Literal::Boolean(_) => scope.make_obj(session, String::from("Bool"), vec!())?,
                 Literal::Integer(_) => scope.make_obj(session, String::from("Int"), vec!())?,
                 Literal::Real(_) => scope.make_obj(session, String::from("Real"), vec!())?,

@@ -177,6 +177,7 @@ fn id() -> NodeID {
 
 pub fn get_builtins<'sess>() -> Vec<BuiltinDef<'sess>> {
     vec!(
+        BuiltinDef::Class(id(), "()",     vec!(), vec!(), vec!()),
         BuiltinDef::Class(id(), "Nil",    vec!(), vec!(), vec!()),
         BuiltinDef::Class(id(), "Bool",   vec!(), vec!(), vec!()),
         BuiltinDef::Class(id(), "Byte",   vec!(), vec!(), vec!()),

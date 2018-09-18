@@ -1,4 +1,6 @@
 
+* FIX SEMICOLON
+
 =====
 * ideally, the transformed code should be directly compilable, such that you can use it for defining builtin runtime funcs, and desugared stuff.  It has to be easy to make and build up
 * can you factor out phi statements? (use as part of if, match, sideeffect)
@@ -10,6 +12,7 @@
 
 * the current problem with closure code (line 269 of test.ml) is that we're assigning a closure to a struct field but the types don't match, because the get_type function
   returned an actual function type, rather than a pointer to the closure context... so you kinda need a way to distinguish different function types
+* should you make a unit type, and keep nil for pointers only (with the possibility of removing it later)
 
 * should we factor out some of the code in codegen which builds vtables into transform or classdef, such that you can build the type from either??
 

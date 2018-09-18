@@ -57,6 +57,7 @@
         -Inf
         NaN
         true false
+        ()
 
         2 * (10 + -3) + 5
         2 + 4 * 7 - 1 / 20  * 10 - 50 * 12
@@ -178,6 +179,13 @@
             println("It's more than 1!")
             nil
         }
+
+        let d = if a > 1 then {
+            a;   
+        } else {
+            a * -1;
+        }
+        //println("semicolon: " + str(d))
 
         fn strnum(num: Int) -> String {
             let buffer: String = malloc(22)
