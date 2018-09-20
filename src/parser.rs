@@ -99,13 +99,29 @@ pub fn parse_or_error(name: &str, text: &[u8]) -> Vec<AST> {
 
 named!(pub parse(Span) -> Vec<AST>,
     complete!(do_parse!(
-        e: many0!(statement) >>
+        e: statement_list >>
         eof!() >>
         (e)
     ))
 );
 
-named!(statement(Span) -> AST,
+named!(statement_list(Span) -> Vec<AST>,
+    map!(
+        fold_many0!(statement, (Vec::new(), None), |(mut list, mut term): (Vec<AST>, Option<AST>), (s, t)| {
+            list.push(s);
+            term = t;
+            (list, term)
+        }),
+        |(mut list, mut term)| {
+            if let Some(term) = term {
+                list.push(term);
+            }
+            list
+        }
+    )
+);
+
+named!(statement(Span) -> (AST, Option<AST>),
     //separated_list_complete!(ws!(tag!(",")), do_parse!(
     do_parse!(
         s: wscom!(alt_complete!(
@@ -120,9 +136,7 @@ named!(statement(Span) -> AST,
         )) >>
         separator >>
         t: opt!(map!(tag!(";"), |_| AST::make_lit(Literal::Unit))) >>
-        // TODO this works but is not ideal...  Also you need a unit type or else the nil type seems to cast to int...
-        //(if t.is_none() { s } else { AST::make_block(Pos::empty(), vec!(s, t.unwrap())) })
-        (s)
+        (s, t)
     )
 );
 
@@ -230,7 +244,7 @@ named!(block(Span) -> AST,
         wscom!(alt!(tag_word!("begin") | tag!("{"))),
         do_parse!(
             pos: position!() >>
-            s: many0!(statement) >>
+            s: statement_list >>
             (AST::make_block(Pos::new(pos), s))
         ),
         wscom!(alt!(tag_word!("end") | tag!("}")))
@@ -593,6 +607,7 @@ pub fn parse_type(s: &str) -> Option<Type> {
 
 named!(type_description(Span) -> Type,
     alt_complete!(
+        type_unit |
         type_function |
         type_tuple |
         type_variable |

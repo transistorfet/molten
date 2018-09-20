@@ -1,5 +1,4 @@
 
-* FIX SEMICOLON
 
 =====
 * ideally, the transformed code should be directly compilable, such that you can use it for defining builtin runtime funcs, and desugared stuff.  It has to be easy to make and build up
@@ -12,14 +11,10 @@
 
 * the current problem with closure code (line 269 of test.ml) is that we're assigning a closure to a struct field but the types don't match, because the get_type function
   returned an actual function type, rather than a pointer to the closure context... so you kinda need a way to distinguish different function types
-* should you make a unit type, and keep nil for pointers only (with the possibility of removing it later)
-
-* should we factor out some of the code in codegen which builds vtables into transform or classdef, such that you can build the type from either??
-
 
 * either add in the initialization of class variables, possibly limited to constant expressions only, or else raise an error if an initializer is provided
-* fix the parser issues where you need nil to make it work.... i think parser parsing ";" into noop/nil might work, if i can get the parser working
 
+* should we factor out some of the code in codegen which builds vtables into transform or classdef, such that you can build the type from either??
 * make a proper patterns tree
 * get rid of unwind argument, and put it in an object
 * make the top level module function be a closure instead of using global vars?? there were a bunch of errors
@@ -39,7 +34,6 @@
 
 * there must be a way to fix the 'scope exceptions' (Scope::target) that we're doing to make class bodies work...
 * but actually... what if you had an argument that you sent to all the scoped functions that select the namespace?  This might be a refactor for later, once scopes only store def ids
-* add some helpful things to the AST::make_* functions, maybe we'd need a different name format for those?
 * add the .set_id() functions to simpliy ast builders
 
 * one thing i'm seeing a lot of now is stuff like classspec.ident.name... can we prevent so many levels deep?
@@ -56,12 +50,12 @@
 
 * implement type definition ast element (enum type?)
 * add patterns and matching of patterns
+* make nestable comments
 * add an iterator type
 * get llvm closures working
 * add compiler directives?
 * implement exceptions
 * implement garbage collection
-* make nestable comments
 
 * better support for generics; right now it just forces everything to/from a pointer type
 * fill in string and list type functions, and finish hashmap (rename to dict?)
@@ -86,6 +80,7 @@
 * should you add break/continue statements for loops
 * should you add a return statement?  It's not functional, but it's practial
 * should you change Real to Float?  also should you change them to lower case names, which is in line with sml, ocmal, f#
+* should you remove the Nil type?
 * should you allow keyword arguments in invoke; foo(a=10, b=20)
 * should you allow arguments with a default value to be omitted from a function call?, that would require a bunch of changes to typechecking
 * should you fix scope resolution to also work on objects, so that you can have static methods from the object without explicitly referencing its type

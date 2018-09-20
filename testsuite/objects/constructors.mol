@@ -14,8 +14,7 @@ class Object {
     }
 
     fn test(self, x) {
-        self.a = x
-        nil
+        self.a = x;
     }
 }
 

@@ -202,17 +202,17 @@ pub fn get_builtins<'sess>() -> Vec<BuiltinDef<'sess>> {
 
         BuiltinDef::Func(id(), "malloc",     "(Int) -> 'ptr / C",             Func::External),
         BuiltinDef::Func(id(), "realloc",    "('ptr, Int) -> 'ptr / C",       Func::External),
-        BuiltinDef::Func(id(), "free",       "('ptr) -> Nil / C",             Func::External),
+        BuiltinDef::Func(id(), "free",       "('ptr) -> () / C",              Func::External),
         BuiltinDef::Func(id(), "memcpy",     "('ptr, 'ptr, Int) -> 'ptr / C", Func::External),
         BuiltinDef::Func(id(), "strcmp",     "(String, String) -> Int / C",   Func::External),
-        BuiltinDef::Func(id(), "puts",       "(String) -> Nil / C",           Func::External),
+        BuiltinDef::Func(id(), "puts",       "(String) -> () / C",            Func::External),
         BuiltinDef::Func(id(), "gets",       "(String) -> String / C",        Func::External),
         BuiltinDef::Func(id(), "strlen",     "(String) -> Int / C",           Func::External),
         //BuiltinDef::Func(id(), "sprintf",    "'tmp",                          Func::Undefined),
-        //BuiltinDef::Func(id(), "sprintf",    "(String, String, 'sess1, 'sess2) -> Nil / C", Func::Undefined),
-        BuiltinDef::Func(id(), "sprintf",    "(String, String, 'sess1, 'sess2) -> Nil / C", Func::Comptime(sprintf)),
+        //BuiltinDef::Func(id(), "sprintf",    "(String, String, 'sess1, 'sess2) -> () / C", Func::Undefined),
+        BuiltinDef::Func(id(), "sprintf",    "(String, String, 'sess1, 'sess2) -> () / C", Func::Comptime(sprintf)),
 
-        BuiltinDef::Func(id(), "println",    "(String) -> Nil / C",           Func::Runtime(build_lib_println)),
+        BuiltinDef::Func(id(), "println",    "(String) -> () / C",            Func::Runtime(build_lib_println)),
         BuiltinDef::Func(id(), "readline",   "() -> String / C",              Func::Runtime(build_lib_readline)),
 
 
@@ -408,7 +408,7 @@ unsafe fn build_lib_add(data: &LLVM, id: NodeID, name: &str, _objtype: LLVMTypeR
 
 
 unsafe fn build_lib_println(data: &LLVM, id: NodeID, name: &str, _objtype: LLVMTypeRef) -> LLVMValueRef {
-    let function = build_function_start_lib(data, id, name, vec!(str_type(data)), str_type(data));
+    let function = build_function_start_lib(data, id, name, vec!(str_type(data)), int_type(data));
     LLVMSetLinkage(function, llvm::LLVMLinkage::LLVMLinkOnceAnyLinkage);
 
     let value = build_c_call(data, "puts", &mut vec!(LLVMGetParam(function, 0)));

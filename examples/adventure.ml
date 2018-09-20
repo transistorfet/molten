@@ -15,11 +15,9 @@ class Input {
 
             if input == "quit" then {
                 self.stopflag = true;
-                nil                     // NOTE: this is because the parser can't yet insert a nil after 
-                                        // the semi-colon, and the "if" expr must return the same type
             }
             else {
-                println(input)
+                println(input);
             }
         }
     }

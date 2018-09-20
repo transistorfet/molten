@@ -40,6 +40,10 @@ fn +(s1: String, s2: String) -> String {
 }
 
 
+fn str(unit: ()) -> String {
+    "()"
+}
+
 fn str(num: Bool) -> String {
     if num then
         "true"

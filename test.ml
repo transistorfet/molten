@@ -177,7 +177,6 @@
 
         if a > 1 then {
             println("It's more than 1!")
-            nil
         }
 
         let d = if a > 1 then {
