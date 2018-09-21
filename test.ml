@@ -103,7 +103,7 @@
                 a * 4.0
             }
 
-            let a = 1
+            let mut a = 1
             let b: String = "aoeu"
 
             fn virtfun(self) {
@@ -271,7 +271,7 @@
         }
 
         class B<'it, 'jt> extends A<'jt> {
-            let bar: 'it = nil
+            let mut bar: 'it = nil
 
             fn test2(self) {
                 Super::test(self)
@@ -294,9 +294,9 @@
                 a * 4
             }
 
-            let bar = fn a => [ a, a, a ]
-            let arr: List<Int>
-            let foobar: List<(Int) -> Int>
+            let mut bar = fn a => [ a, a, a ]
+            let mut arr: List<Int>
+            let mut foobar: List<(Int) -> Int>
             //let arr = [ 1, 2, 3, 4 ]
             //let foobar = [ fn x => x * 16, fn x => x * 100 ]
 

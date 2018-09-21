@@ -2,7 +2,7 @@
 import lib.libcore
 
 class TestClass {
-    let a = 1
+    let mut a = 1
 
     fn new(self) { }
 

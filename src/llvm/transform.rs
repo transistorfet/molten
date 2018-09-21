@@ -159,7 +159,7 @@ impl<'sess> Transform<'sess> {
                     let cid = NodeID::generate();
                     let cname = String::from("__context__");
                     args.insert(0, (cid, cname.clone()));
-                    ArgDef::define(self.session, fscope.clone(), cid, &cname, Some(cl.contexttype.clone())).unwrap();
+                    ArgDef::define(self.session, fscope.clone(), cid, false, &cname, Some(cl.contexttype.clone())).unwrap();
                     let ftype = cl.add_context_to_ftype(self.session);
                     let real_fname = fname.clone() + &"_func";
                     cl.add_field(self.session, real_fname.as_str(), ftype);
@@ -175,7 +175,7 @@ impl<'sess> Transform<'sess> {
                     let fid = NodeID::generate();
                     //let tscope = Scope::new_ref(Some(scope.clone()));
                     let mut code = vec!();
-                    code.push(AST::Definition(cl.varid, pos.clone(), Ident::new(pos.clone(), fname.clone()), None, Box::new(AST::make_new(pos.clone(), ClassSpec::from_str(format!("{}_context_{}", cl.name, cl.contextid).as_str())))));
+                    code.push(AST::Definition(cl.varid, pos.clone(), false, Ident::new(pos.clone(), fname.clone()), None, Box::new(AST::make_new(pos.clone(), ClassSpec::from_str(format!("{}_context_{}", cl.name, cl.contextid).as_str())))));
                     FuncDef::define(self.session, scope.clone(), fid, &Some(real_fname.clone()), Some(self.session.get_type(*id).unwrap()));
                     for (index, &(ref field, ref ttype)) in cl.context.fields.borrow().iter().enumerate() {
                         code.push(AST::make_assign(pos.clone(),
@@ -240,7 +240,7 @@ impl<'sess> Transform<'sess> {
 
             /////// Variables ///////
 
-            AST::Definition(ref id, ref pos, ref ident, _, ref value) => {
+            AST::Definition(ref id, ref pos, ref mutable, ref ident, _, ref value) => {
                 let name = self.transform_def_name(scope.clone(), ident);
                 if scope.is_global() {
                     self.add_global(*id, pos.clone(), name.clone());
@@ -446,7 +446,7 @@ impl<'sess> Transform<'sess> {
                     self.add_decl(*id, pos.clone(), name.clone());
                     newbody.push(self.access_def(NodeID::generate(), pos.clone(), name.clone()));
                 },
-                AST::Definition(ref id, ref pos, ref ident, _, ref value) => {
+                AST::Definition(ref id, ref pos, ref mutable, ref ident, _, ref value) => {
                     //let name = self.transform_def_name(scope.clone(), ident);
                     //Expr::new(*id, *pos, ExprKind::AssignField(self.transform_expr(scope.clone(), obj), name.clone(), self.transform_expr(scope.clone(), value)));
                     newbody.push(self.access_def(NodeID::generate(), pos.clone(), ident.name.clone()));

@@ -118,13 +118,13 @@ impl ClassDef {
             if let Some(index) = self.get_struct_vtable_index() {
                 self.structdef.fields.borrow_mut()[index].1 = vtype;
             } else {
-                self.structdef.add_field(session, "__vtable__", vtype);
+                self.structdef.add_field(session, false, "__vtable__", vtype);
             }
         }
         for ref node in body.iter() {
             match **node {
-                AST::Definition(ref id, _, ref ident, _, ref value) => {
-                    self.structdef.add_field(session, ident.name.as_str(), session.get_type(*id).unwrap());
+                AST::Definition(ref id, _, ref mutable, ref ident, _, ref value) => {
+                    self.structdef.add_field(session, *mutable, ident.name.as_str(), session.get_type(*id).unwrap());
                 },
                 _ => { }
             }
@@ -202,10 +202,10 @@ impl StructDef {
         *self.fields.borrow_mut() = inherit.fields.borrow().clone();
     }
 
-    pub fn add_field(&self, session: &Session, name: &str, ttype: Type) {
+    pub fn add_field(&self, session: &Session, mutable: bool, name: &str, ttype: Type) {
         let sname = String::from(name);
         if self.vars.get_var_def(&sname).is_none() {
-            FieldDef::define(session, self.vars.clone(), NodeID::generate(), &sname, Some(ttype.clone())).unwrap();
+            FieldDef::define(session, self.vars.clone(), NodeID::generate(), mutable, &sname, Some(ttype.clone())).unwrap();
         }
         self.fields.borrow_mut().push((sname, ttype));
     }

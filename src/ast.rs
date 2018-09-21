@@ -96,7 +96,7 @@ pub enum AST {
     TypeDef(NodeID, Pos, ClassSpec, Vec<Field>),
 
     Import(NodeID, Pos, Ident, Vec<AST>),
-    Definition(NodeID, Pos, Ident, Option<Type>, Box<AST>),
+    Definition(NodeID, Pos, bool, Ident, Option<Type>, Box<AST>),
     Assignment(NodeID, Pos, Box<AST>, Box<AST>),
 }
 
@@ -221,7 +221,7 @@ impl AST {
             AST::New(_, ref pos, _) |
             AST::Class(_, ref pos, _, _, _) |
             AST::Import(_, ref pos, _, _) |
-            AST::Definition(_, ref pos, _, _, _) |
+            AST::Definition(_, ref pos, _, _, _, _) |
             AST::Assignment(_, ref pos, _, _) |
             AST::While(_, ref pos, _, _) |
             AST::TypeDef(_, ref pos, _, _) => { pos.clone() }
@@ -253,7 +253,7 @@ impl AST {
             AST::New(ref id, _, _) |
             AST::Class(ref id, _, _, _, _) |
             AST::Import(ref id, _, _, _) |
-            AST::Definition(ref id, _, _, _, _) |
+            AST::Definition(ref id, _, _, _, _, _) |
             AST::Assignment(ref id, _, _, _) |
             AST::While(ref id, _, _, _) |
             AST::TypeDef(ref id, _, _, _) => { *id }
@@ -353,8 +353,8 @@ impl AST {
         AST::Import(NodeID::generate(), pos, ident, decls)
     }
 
-    pub fn make_def(pos: Pos, ident: Ident, ttype: Option<Type>, value: AST) -> AST {
-        AST::Definition(NodeID::generate(), pos, ident, ttype, Box::new(value))
+    pub fn make_def(pos: Pos, mutable: bool, ident: Ident, ttype: Option<Type>, value: AST) -> AST {
+        AST::Definition(NodeID::generate(), pos, mutable, ident, ttype, Box::new(value))
     }
 
     pub fn make_assign(pos: Pos, left: AST, right: AST) -> AST {

@@ -30,8 +30,8 @@ pub fn refine_node(node: AST) -> AST {
             AST::Block(id, pos, refine_vec(code))
         },
 
-        AST::Definition(id, pos, ident, ttype, code) => {
-            AST::Definition(id, pos, ident, ttype, Box::new(refine_node(*code)))
+        AST::Definition(id, pos, mutable, ident, ttype, code) => {
+            AST::Definition(id, pos, mutable, ident, ttype, Box::new(refine_node(*code)))
         },
 
         AST::Declare(id, pos, ident, ttype) => {
@@ -86,7 +86,8 @@ pub fn refine_node(node: AST) -> AST {
             let tmplist = format!("{}", UniqueID::generate());
             let typevar = rand::random::<i32>();
 
-            block.push(AST::make_def(pos.clone(), Ident::new(pos.clone(), tmplist.clone()), None,
+            // TODO this makes lists immutable, which might not be what we want
+            block.push(AST::make_def(pos.clone(), false, Ident::new(pos.clone(), tmplist.clone()), None,
                 AST::make_invoke(pos.clone(),
                     AST::make_resolve(pos.clone(), AST::make_ident(pos.clone(), Ident::from_str("List")), Ident::from_str("new")),
                     vec!(

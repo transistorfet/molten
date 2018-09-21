@@ -128,7 +128,7 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &AST,
             ltype.unwrap()
         },
 
-        AST::Definition(ref id, _, ref ident, ref ttype, ref body) => {
+        AST::Definition(ref id, _, _, ref ident, ref ttype, ref body) => {
             let btype = expect_type(session, scope.clone(), ttype.clone(), Some(check_types_node(session, scope.clone(), body, ttype.clone())), Check::Def)?;
             session.update_type(scope.clone(), *id, btype.clone())?;
             btype
@@ -254,6 +254,12 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &AST,
         },
 
         AST::Assignment(ref id, _, ref left, ref right) => {
+            // TODO this is duplicated in check_types_node(left)... can we avoid that
+            let (refid, defid) = get_access_ids(session, scope.clone(), left)?.unwrap();
+            if !session.get_def(defid).map(|d| d.is_mutable()).unwrap_or(false) {
+                return Err(Error::new(format!("MutableError: attempting to assign to an immutable variable")));
+            }
+
             let ltype = check_types_node(session, scope.clone(), left, None);
             let rtype = check_types_node(session, scope.clone(), right, Some(ltype.clone()));
             expect_type(session, scope, Some(ltype), Some(rtype), Check::Def)?

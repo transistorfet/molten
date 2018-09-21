@@ -44,6 +44,8 @@
 * do you need a BuiltinDef type?
 * do you need a GlobalVarDef type?  or a ConstDef or FieldDef/PropertyDef/etc
 
+* should you make mutable modifiers more strict, like rust?
+
 
 
 * there's still a problem with typevars not resolving fully, where a function that should return a concrete returns a free typevar.... (recursion or forward definition)
@@ -75,7 +77,6 @@
 * what if you generalize overloaded types, such that they're checked in check_type, and options are eliminated, or resolved to one type over the course of checking
 
 
-* should you add "let mut" or "def" to class bodies so as not to conflict with 'let' as immutable outside of class bodies?
 * should you add access modifiers to classes, and maybe functions; public, private, protected
 * should you add break/continue statements for loops
 * should you add a return statement?  It's not functional, but it's practial

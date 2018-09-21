@@ -223,7 +223,7 @@ impl ClosureDef {
     }
 
     pub fn add_field(&self, session: &Session, name: &str, ttype: Type) {
-        self.context.add_field(session, name, ttype);
+        self.context.add_field(session, false, name, ttype);
     }
 
     // TODO I don't like this

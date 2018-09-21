@@ -75,6 +75,15 @@ impl Def {
     }
     */
 
+    pub fn is_mutable(&self) -> bool {
+        match self {
+            Def::Var(def) => def.mutable,
+            Def::Arg(def) => def.mutable,
+            Def::Field(def) => def.mutable,
+            _ => false,
+        }
+    }
+
     pub fn num_variants(&self, session: &Session) -> i32 {
         match *self {
             Def::Func(_) |

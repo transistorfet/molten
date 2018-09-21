@@ -18,7 +18,7 @@ class Object {
 }
 
 class Thing extends Object {
-    let s: String
+    let mut s: String
 
     fn new(self) {
         self.s = "Start"

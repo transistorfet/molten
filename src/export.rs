@@ -39,7 +39,7 @@ fn build_index_node(index: &mut String, session: &Session, scope: ScopeRef, node
             }
         },
 
-        AST::Definition(_, _, _, _, ref body) => match **body {
+        AST::Definition(_, _, _, _, _, ref body) => match **body {
             ref node @ AST::Class(_, _, _, _, _) => build_index_node(index, session, scope.clone(), node),
             _ => { },
         },
@@ -59,12 +59,12 @@ fn build_index_node(index: &mut String, session: &Session, scope: ScopeRef, node
             //index.push_str(format!("    decl __init__ : ({}) -> Nil\n", namespec).as_str());
             for node in body {
                 match *node {
-                    AST::Definition(ref id, _, ref ident, _, _) => {
+                    AST::Definition(ref id, _, ref mutable, ref ident, _, _) => {
                         let ttype = session.get_type(*id).unwrap();
                         //let stype = classdef.get_variable_type(session, name).unwrap();
                         //println!("WHICH ONE??? {:?} {:?}", ttype, stype);
                         //index.push_str(format!("    decl {} : {}\n", ident.name, unparse_type(session, tscope.clone(), ttype.clone().unwrap())).as_str());
-                        index.push_str(format!("    let {} : {}\n", ident.name, unparse_type(session, tscope.clone(), ttype)).as_str());
+                        index.push_str(format!("    let {}{} : {}\n", if *mutable { "mut " } else { "" }, ident.name, unparse_type(session, tscope.clone(), ttype)).as_str());
                     },
                     AST::Function(ref id, _, ref ident, _, _, _, _) => {
                         if let Some(ref ident) = *ident {

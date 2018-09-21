@@ -6,7 +6,7 @@
 import lib.libcore
 
 class Object {
-    let a: Int
+    let mut a: Int
 
     fn new(self) { }
 

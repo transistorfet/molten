@@ -49,7 +49,8 @@ fn bind_names_node_or_error(session: &Session, scope: ScopeRef, node: &mut AST) 
             AnyFunc::define(session, scope.clone(), *id, &ident.as_ref().map(|ref ident| String::from(ident.as_str())), *abi, None)?;
 
             for ref arg in args.iter() {
-                ArgDef::define(session, fscope.clone(), arg.id, &arg.ident.name, arg.ttype.clone())?;
+                // TODO this is assumed to be always immutable, but maybe shouldn't be
+                ArgDef::define(session, fscope.clone(), arg.id, false, &arg.ident.name, arg.ttype.clone())?;
             }
 
             bind_names_node(session, fscope, body)
@@ -60,9 +61,9 @@ fn bind_names_node_or_error(session: &Session, scope: ScopeRef, node: &mut AST) 
             bind_names_vec(session, scope, args);
         },
 
-        AST::Definition(ref id, _, ref ident, ref mut ttype, ref mut code) => {
+        AST::Definition(ref id, _, ref mutable, ref ident, ref mut ttype, ref mut code) => {
             declare_typevars(session, scope.clone(), ttype.as_mut(), false)?;
-            AnyVar::define(session, scope.clone(), *id, &ident.name, ttype.clone())?;
+            AnyVar::define(session, scope.clone(), *id, *mutable, &ident.name, ttype.clone())?;
             bind_names_node(session, scope, code);
         },
 
@@ -112,7 +113,7 @@ fn bind_names_node_or_error(session: &Session, scope: ScopeRef, node: &mut AST) 
 
         AST::For(ref id, _, ref ident, ref mut cond, ref mut body) => {
             let lscope = session.map.add(*id, Some(scope.clone()));
-            AnyVar::define(session, lscope.clone(), *id, &ident.name, None)?;
+            AnyVar::define(session, lscope.clone(), *id, true, &ident.name, None)?;
             bind_names_node(session, lscope.clone(), cond);
             bind_names_node(session, lscope, body);
         },
@@ -172,7 +173,8 @@ fn bind_names_node_or_error(session: &Session, scope: ScopeRef, node: &mut AST) 
             classspec.types.iter_mut().map(|ref mut ttype| declare_typevars(session, tscope.clone(), Some(ttype), true).unwrap()).count();
             for field in fields {
                 declare_typevars(session, scope.clone(), field.ttype.as_mut(), true)?;
-                FieldDef::define(session, scope.clone(), *id, &field.ident.name, field.ttype.clone())?;
+                // TODO this is assumed to be mutable always, but maybe not
+                FieldDef::define(session, scope.clone(), *id, true, &field.ident.name, field.ttype.clone())?;
             }
         },
 

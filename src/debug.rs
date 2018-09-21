@@ -29,8 +29,8 @@ pub fn print_types_node(session: &Session, scope: ScopeRef, node: &AST) {
             print_types_scope(session, fscope.clone());
             print_types_node(session, fscope, body);
         },
-        AST::Definition(_, _, ref name, ref ttype, ref body) => {
-            println!("\nDefining: {:?} {:?}", name, ttype);
+        AST::Definition(_, _, ref mutable, ref name, ref ttype, ref body) => {
+            println!("\nDefining {}: {:?} {:?}", mutable, name, ttype);
             print_types_node(session, scope, body);
         },
         _ => ()

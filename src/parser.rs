@@ -153,12 +153,13 @@ named!(definition(Span) -> AST,
     do_parse!(
         pos: position!() >>
         wscom!(tag_word!("let")) >>
+        m: opt!(wscom!(tag_word!("mut"))) >>
         i: identifier_typed >>
         e: opt!(preceded!(
             wscom!(tag!("=")),
             expression
         )) >>
-        (AST::make_def(Pos::new(pos), i.1, i.2, if e.is_some() { e.unwrap() } else { AST::make_nil() }))
+        (AST::make_def(Pos::new(pos), m.is_some(), i.1, i.2, if e.is_some() { e.unwrap() } else { AST::make_nil() }))
     )
 );
 

@@ -73,9 +73,9 @@ fn str(num: Real) -> String {
 
 
 class List<'item> {
-    let capacity: Int
-    let length: Int
-    let data: Buffer<'item> = nil
+    let mut capacity: Int
+    let mut length: Int
+    let mut data: Buffer<'item> = nil
 
     fn new(self) {
         self.length = 0
@@ -149,9 +149,9 @@ class List<'item> {
 }
 
 class HashMapNode<'item> {
-    let key: String
-    let data: 'item
-    let next: HashMapNode<'item>
+    let mut key: String
+    let mut data: 'item
+    let mut next: HashMapNode<'item>
 
     fn new(self, key, data) {
         self.key = key
@@ -161,8 +161,8 @@ class HashMapNode<'item> {
 }
 
 class HashMap<'item> {
-    let size = 0
-    let data: Buffer<HashMapNode<'item>> = nil
+    let mut size = 0
+    let mut data: Buffer<HashMapNode<'item>> = nil
 
     fn new(self) {
         self.size = 10
@@ -194,8 +194,8 @@ class Iter<'item> {
 
 
 class ListIter<'item> extends Iter<'item> {
-    let list: List<'item>
-    let index: Int
+    let mut list: List<'item>
+    let mut index: Int
 
     fn new(self, list) {
         self.list = list
