@@ -7,7 +7,6 @@ use llvm::LLVMValueRef;
 
 /*
 pub trait Overloadable {
-    fn num_variants(&self) -> i32;
     fn add_variant(&self, id: NodeID);
 }
 
