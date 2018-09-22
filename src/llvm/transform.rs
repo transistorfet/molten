@@ -175,15 +175,15 @@ impl<'sess> Transform<'sess> {
                     let fid = NodeID::generate();
                     //let tscope = Scope::new_ref(Some(scope.clone()));
                     let mut code = vec!();
-                    code.push(AST::Definition(cl.varid, pos.clone(), false, Ident::new(pos.clone(), fname.clone()), None, Box::new(AST::make_new(pos.clone(), ClassSpec::from_str(format!("{}_context_{}", cl.name, cl.contextid).as_str())))));
+                    code.push(AST::Definition(cl.varid, pos.clone(), false, Ident::new(fname.clone()), None, Box::new(AST::make_new(pos.clone(), ClassSpec::from_str(format!("{}_context_{}", cl.name, cl.contextid).as_str())))));
                     FuncDef::define(self.session, scope.clone(), fid, &Some(real_fname.clone()), Some(self.session.get_type(*id).unwrap()));
                     for (index, &(ref field, ref ttype)) in cl.context.fields.borrow().iter().enumerate() {
                         code.push(AST::make_assign(pos.clone(),
-                            AST::make_access(pos.clone(), AST::make_ident(pos.clone(), Ident::new(pos.clone(), fname.clone())), Ident::from_str(field.as_str())),
+                            AST::make_access(pos.clone(), AST::make_ident(pos.clone(), Ident::new(fname.clone())), Ident::from_str(field.as_str())),
                             AST::make_ident_from_str(pos.clone(), field.as_str()))
                         );
                     }
-                    code.push(AST::make_ident(pos.clone(), Ident::new(pos.clone(), fname.clone())));
+                    code.push(AST::make_ident(pos.clone(), Ident::new(fname.clone())));
 
                     binding::bind_names(self.session, scope.clone(), &mut code);
                     typecheck::check_types(self.session, scope.clone(), &code);

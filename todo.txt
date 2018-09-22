@@ -1,5 +1,4 @@
 
-
 =====
 * ideally, the transformed code should be directly compilable, such that you can use it for defining builtin runtime funcs, and desugared stuff.  It has to be easy to make and build up
 * can you factor out phi statements? (use as part of if, match, sideeffect)
@@ -11,40 +10,34 @@
 
 * the current problem with closure code (line 269 of test.ml) is that we're assigning a closure to a struct field but the types don't match, because the get_type function
   returned an actual function type, rather than a pointer to the closure context... so you kinda need a way to distinguish different function types
-
 * either add in the initialization of class variables, possibly limited to constant expressions only, or else raise an error if an initializer is provided
+
+* there are poor error messages when deleting the "=" from a "let something = fn x => ..." both inside and outside classes.... shouldn't be doing this
+* you might not be making sure that non-closure functions don't access variables outside their scope (methods are never closures)
+* make sure that you don't overload different types of functions (closures, functions, and methods must all be the same type to allow overloading)
+* should you make mutable modifiers more strict, like rust?
 
 * should we factor out some of the code in codegen which builds vtables into transform or classdef, such that you can build the type from either??
 * make a proper patterns tree
 * get rid of unwind argument, and put it in an object
-* make the top level module function be a closure instead of using global vars?? there were a bunch of errors
 
-* improve storing of files and file data in the Pos structs (maybe rename to Span?); pass session to parsers
+* improve storing of file info in the Pos structs (maybe rename to Span?)
 * change parser to take session argument or something so it can record the file info, and maybe do other advanced things
-* remove extraneous Pos's with Ident/Arguments?
 * should you add session to refinery and process imports there
+* remove extraneous Pos's with Ident/Arguments?
 
+* make the top level module function be a closure instead of using global vars?? there were a bunch of errors
 * it might also make it easier/generic to allow compiling to object files?  So no linking, but it would do optimization and object file output
 * how does rust do "use" if there is a circular dependency?
 * put intermediate files somewhere else, at least as controlled by the molten script, so as not to clutter source directories
 
-* you might not be making sure that non-closure functions don't access variables outside their scope (methods are never closures)
-* make sure that you don't overload different types of functions (closures, functions, and methods must all be the same type to allow overloading)
-
-
-* there must be a way to fix the 'scope exceptions' (Scope::target) that we're doing to make class bodies work...
-* but actually... what if you had an argument that you sent to all the scoped functions that select the namespace?  This might be a refactor for later, once scopes only store def ids
-* add the .set_id() functions to simpliy ast builders
-
+* there must be a way to fix the 'scope exceptions' (Scope::target) that we're doing to make class bodies work... pass in an argument to all scoped functions?  or use scopemap and scope ids?
 * one thing i'm seeing a lot of now is stuff like classspec.ident.name... can we prevent so many levels deep?
-* make common error printer, with fancy colours
-* there are poor error messages when deleting the "=" from a "let something = fn x => ..." both inside and outside classes.... shouldn't be doing this
 
 * eventually we want to make a visitor
-* do you need a BuiltinDef type?
-* do you need a GlobalVarDef type?  or a ConstDef or FieldDef/PropertyDef/etc
+* do you need a BuiltinDef type? a GlobalVarDef type?
+* add the .set_id() functions to simpliy ast builders
 
-* should you make mutable modifiers more strict, like rust?
 
 
 
@@ -86,7 +79,7 @@
 * should you allow arguments with a default value to be omitted from a function call?, that would require a bunch of changes to typechecking
 * should you fix scope resolution to also work on objects, so that you can have static methods from the object without explicitly referencing its type
 * should exports also list all the modules that the file imports, so that class definitions in other imports can be found, if needed for arguments
-* should variables be writable... maybe only with compiler directive, or only without one; if so, add a const expression
+* should variables be mutable... maybe only with compiler directive, or only without one; if so, add a const expression
 * should you require an override keyword when masking definitions in lower scopes? like class definitions
 * should you add dicts syntax
 * should you add macros and expandable forms (like lisp)

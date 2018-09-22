@@ -87,7 +87,7 @@ pub fn refine_node(node: AST) -> AST {
             let typevar = rand::random::<i32>();
 
             // TODO this makes lists immutable, which might not be what we want
-            block.push(AST::make_def(pos.clone(), false, Ident::new(pos.clone(), tmplist.clone()), None,
+            block.push(AST::make_def(pos.clone(), false, Ident::new(tmplist.clone()), None,
                 AST::make_invoke(pos.clone(),
                     AST::make_resolve(pos.clone(), AST::make_ident(pos.clone(), Ident::from_str("List")), Ident::from_str("new")),
                     vec!(
@@ -96,10 +96,10 @@ pub fn refine_node(node: AST) -> AST {
                     ))));
             for item in code {
                 block.push(AST::make_invoke(pos.clone(),
-                    AST::make_access(pos.clone(), AST::make_ident(pos.clone(), Ident::new(pos.clone(), tmplist.clone())), Ident::from_str("push")),
+                    AST::make_access(pos.clone(), AST::make_ident(pos.clone(), Ident::new(tmplist.clone())), Ident::from_str("push")),
                     vec!(item)));
             }
-            block.push(AST::make_ident(pos.clone(), Ident::new(pos.clone(), tmplist.clone())));
+            block.push(AST::make_ident(pos.clone(), Ident::new(tmplist.clone())));
             AST::make_block(pos.clone(), refine_vec(block))
         },
 
@@ -112,7 +112,7 @@ pub fn refine_node(node: AST) -> AST {
                         if ident.as_ref().map(|i| i.name.as_str()) == Some("new") {
                             has_new = true;
                             if args.len() > 0 && args[0].ident.as_str() == "self" {
-                                body = Box::new(AST::Block(NodeID::generate(), pos.clone(), vec!(*body, AST::Identifier(NodeID::generate(), pos.clone(), Ident::new(pos.clone(), String::from("self"))))));
+                                body = Box::new(AST::Block(NodeID::generate(), pos.clone(), vec!(*body, AST::Identifier(NodeID::generate(), pos.clone(), Ident::new(String::from("self"))))));
                             } else {
                                 panic!("SyntaxError: the \"new\" method on a class must have \"self\" as its first parameter");
                             }
@@ -136,7 +136,7 @@ pub fn refine_node(node: AST) -> AST {
         },
 
         AST::Index(id, pos, base, index) => {
-            refine_node(AST::Invoke(id, pos.clone(), Box::new(AST::Accessor(NodeID::generate(), pos.clone(), base, Ident::new(pos.clone(), String::from("[]")), NodeID::generate())), vec!(*index)))
+            refine_node(AST::Invoke(id, pos.clone(), Box::new(AST::Accessor(NodeID::generate(), pos.clone(), base, Ident::new(String::from("[]")), NodeID::generate())), vec!(*index)))
         },
 
         AST::Resolver(id, pos, left, right) => {
@@ -159,7 +159,7 @@ pub fn refine_node(node: AST) -> AST {
                     AST::Assignment(id, pos, Box::new(refine_node(left)), Box::new(refine_node(*right)))
                 },
                 AST::Index(iid, ipos, base, index) => {
-                    refine_node(AST::Invoke(id, pos, Box::new(AST::Accessor(iid, ipos.clone(), base, Ident::new(ipos.clone(), String::from("[]")), NodeID::generate())), vec!(*index, *right)))
+                    refine_node(AST::Invoke(id, pos, Box::new(AST::Accessor(iid, ipos.clone(), base, Ident::new(String::from("[]")), NodeID::generate())), vec!(*index, *right)))
                 },
                 _ => panic!("SyntaxError: assignment to something other than a list or class element: {:?}", left),
             }

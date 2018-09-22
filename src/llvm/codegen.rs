@@ -341,8 +341,10 @@ unsafe fn write_module(data: &LLVM, filename: &str) {
     }
     LLVMDisposeMessage(*err_msg.as_ref().unwrap());
 
+    //LLVMSetDataLayout(data.module, target_machine
     let target_machine = LLVMCreateTargetMachine(*target.as_ref().unwrap(), target_triple, label("generic"), label(""), LLVMCodeGenOptLevel::LLVMCodeGenLevelDefault, LLVMRelocMode::LLVMRelocDefault, LLVMCodeModel::LLVMCodeModelDefault);
-    LLVMTargetMachineEmitToFile(target_machine, data.module, label(filename), LLVMCodeGenFileType::LLVMObjectFile, ptr::null_mut());
+    LLVMTargetMachineEmitToFile(target_machine, data.module, label(filename), LLVMCodeGenFileType::LLVMObjectFile, err_msg);
+
 /*
     let mut target = ptr::null_mut();
     let mut err_msg = ptr::null_mut();

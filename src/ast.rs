@@ -30,7 +30,6 @@ pub enum Literal {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Ident {
-    pub pos: Pos,
     pub name: String,
 }
 
@@ -136,23 +135,20 @@ impl fmt::Debug for Pos {
 
 
 impl Ident {
-    pub fn new(pos: Pos, name: String) -> Self {
+    pub fn new(name: String) -> Self {
         Ident {
-            pos: pos,
             name: name
         }
     }
 
     pub fn from_str(name: &str) -> Ident {
         Ident {
-            pos: Pos::empty(),
             name: String::from(name),
         }
     }
 
     pub fn from_span(span: Span) -> Ident {
         Ident {
-            pos: Pos::new(span),
             name: String::from(str::from_utf8(&span.fragment).unwrap()),
         }
     }
