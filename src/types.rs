@@ -42,10 +42,10 @@ impl Type {
         }
     }
 
-    pub fn get_types(&self) -> Result<&Vec<Type>, Error> {
+    pub fn as_vec(&self) -> Vec<Type> {
         match self {
-            &Type::Tuple(ref types) => Ok(types),
-            _ => Err(Error::new(format!("TypeError: expected tuple type, found {:?}", self))),
+            &Type::Tuple(ref types) => types.clone(),
+            _ => vec!(self.clone()),
         }
     }
 
@@ -309,7 +309,7 @@ fn is_subclass_of(session: &Session, scope: ScopeRef, adef: (&String, UniqueID, 
     let mut adef = (adef.0.clone(), adef.1, adef.2.clone());
 
     loop {
-        let mut class = scope.find_type(session, &adef.0).unwrap();
+        let mut class = session.get_type(adef.1).unwrap();
         class = tscope.map_typevars(session, &mut names, class);
         adef.2 = check_type_params(session, tscope.clone(), &class.get_params()?, &adef.2, mode.clone(), true)?;
 
@@ -324,7 +324,7 @@ fn is_subclass_of(session: &Session, scope: ScopeRef, adef: (&String, UniqueID, 
             return Ok(rtype);
         }
 
-        let classdef = scope.find_type_def(session, &adef.0)?.as_class()?;
+        let classdef = session.get_def(adef.1)?.as_class()?;
         if classdef.parenttype.is_none() {
             return Err(Error::new(format!("TypeError: type mismatch, expected {} but found {}", Type::Object(adef.0.clone(), adef.1, adef.2), Type::Object(bdef.0.clone(), bdef.1, bdef.2.clone()))));
         }

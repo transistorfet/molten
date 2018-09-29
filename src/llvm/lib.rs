@@ -63,17 +63,13 @@ pub fn declare_builtins_node<'sess>(session: &Session, scope: ScopeRef, node: &B
         BuiltinDef::Func(ref id, ref name, ref ftype, ref func) => {
             let mut ftype = parse_type(ftype);
             declare_typevars(session, scope.clone(), ftype.as_mut(), false).unwrap();
+            let abi = ftype.as_ref().map(|t| t.get_abi().unwrap()).unwrap_or(ABI::Molten);
             match *func {
-                Func::Undefined |
-                Func::External => {
-                    CFuncDef::define(session, scope.clone(), *id, &Some(String::from(*name)), ftype.clone()).unwrap();
-                },
-                Func::Runtime(_) |
                 Func::Comptime(_) => {
                     FuncDef::define(session, scope.clone(), *id, &Some(String::from(*name)), ftype.clone()).unwrap();
                 },
                 _ => {
-                    AnyFunc::define(session, scope.clone(), *id, &Some(String::from(*name)), ABI::Molten, ftype.clone()).unwrap();
+                    AnyFunc::define(session, scope.clone(), *id, &Some(String::from(*name)), abi, ftype.clone()).unwrap();
                 },
             };
         },
@@ -122,7 +118,7 @@ pub unsafe fn define_builtins_node<'sess>(data: &mut LLVM<'sess>, objtype: LLVMT
         BuiltinDef::Class(ref id, ref name, _, ref structdef, ref entries) => {
             let tscope = data.session.map.get(id);
             let cname = String::from(*name);
-            let classdef = scope.find_type_def(data.session, &String::from(*name)).unwrap().as_class().unwrap();
+            let classdef = data.session.get_def(*id).unwrap().as_class().unwrap();
 
             let lltype = if structdef.len() > 0 {
                 for (ref field, ref ttype) in structdef {
@@ -130,7 +126,7 @@ pub unsafe fn define_builtins_node<'sess>(data: &mut LLVM<'sess>, objtype: LLVMT
                 }
                 build_class_type(data, scope.clone(), *id, &cname, classdef.clone())
             } else {
-                let lltype = get_ltype(data, scope.find_type(data.session, &cname).unwrap(), true);
+                let lltype = get_ltype(data, data.session.get_type(*id).unwrap(), true);
                 data.set_type(*id, TypeValue { value: lltype, vttype: None });
                 lltype
             };

@@ -608,8 +608,8 @@ pub fn parse_type(s: &str) -> Option<Type> {
 
 named!(type_description(Span) -> Type,
     alt_complete!(
-        type_unit |
         type_function |
+        type_unit |
         type_tuple |
         type_variable |
         type_object

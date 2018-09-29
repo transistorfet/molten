@@ -196,10 +196,12 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &AST,
         },
 
         AST::Tuple(ref id, _, ref items) => {
-            let etypes = match expected {
-                Some(ref e) => e.get_types()?.iter().map(|i| Some(i.clone())).collect(),
-                None => vec![None; items.len()]
-            };
+            // TODO would this not be a bug if the expected type was for some reason a variable?
+            //let etypes = match expected {
+            //    Some(ref e) => e.get_types()?.iter().map(|i| Some(i.clone())).collect(),
+            //    None => vec![None; items.len()]
+            //};
+            let etypes = vec![None; items.len()];
 
             if etypes.len() != items.len() {
                 return Err(Error::new(format!("TypeError: number of tuple items don't match: expected {:?} with {} items but found {} items", expected, etypes.len(), items.len())));
@@ -257,6 +259,7 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &AST,
             // TODO this is duplicated in check_types_node(left)... can we avoid that
             let (refid, defid) = get_access_ids(session, scope.clone(), left)?.unwrap();
             if !session.get_def(defid).map(|d| d.is_mutable()).unwrap_or(false) {
+    debug!("CHECK:  {:?} {:?}", defid, node);
                 return Err(Error::new(format!("MutableError: attempting to assign to an immutable variable")));
             }
 

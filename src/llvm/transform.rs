@@ -4,7 +4,7 @@ use std::cell::RefCell;
 use abi::ABI;
 use defs::Def;
 use types::Type;
-use scope::{ ScopeRef };
+use scope::{ Scope, ScopeRef };
 use session::{ Error, Session };
 use ast::{ NodeID, Pos, Ident, Literal, Argument, ClassSpec, AST };
 
@@ -175,7 +175,7 @@ impl<'sess> Transform<'sess> {
                     let fid = NodeID::generate();
                     //let tscope = Scope::new_ref(Some(scope.clone()));
                     let mut code = vec!();
-                    code.push(AST::Definition(cl.varid, pos.clone(), false, Ident::new(fname.clone()), None, Box::new(AST::make_new(pos.clone(), ClassSpec::from_str(format!("{}_context_{}", cl.name, cl.contextid).as_str())))));
+                    code.push(AST::Definition(cl.varid, pos.clone(), true, Ident::new(fname.clone()), None, Box::new(AST::make_new(pos.clone(), ClassSpec::from_str(format!("{}_context_{}", cl.name, cl.contextid).as_str())))));
                     FuncDef::define(self.session, scope.clone(), fid, &Some(real_fname.clone()), Some(self.session.get_type(*id).unwrap()));
                     for (index, &(ref field, ref ttype)) in cl.context.fields.borrow().iter().enumerate() {
                         code.push(AST::make_assign(pos.clone(),
@@ -258,7 +258,7 @@ impl<'sess> Transform<'sess> {
                     Def::CFunc(_) => Expr::new(*id, pos.clone(), ExprKind::AccessValue(ident.name.clone())),
                     _ => {
                         // TODO actually we shouldn't access scope, because that wont get us the overloaded target, but how will we tell if a reference is local???
-                        if !scope.contains_local(&ident.name) && !scope.get_parent().map_or(false, |p| p.is_global()) {
+                        if !scope.contains_local(&ident.name) && !Scope::global(scope.clone()).contains(&ident.name) {
                             match self.get_context() {
                                 Some(CodeContext::Closure(ref cid)) => {
                                     let cl = self.session.get_def(*cid).unwrap().as_closure().unwrap();
@@ -383,7 +383,8 @@ impl<'sess> Transform<'sess> {
             },
 
             AST::For(ref id, ref pos, ref ident, ref cond, ref body) => {
-                Expr::new(*id, pos.clone(), ExprKind::For(ident.name.clone(), Box::new(self.transform_expr(scope.clone(), cond)), Box::new(self.transform_expr(scope.clone(), body))))
+                let lscope = self.session.map.get(id);
+                Expr::new(*id, pos.clone(), ExprKind::For(ident.name.clone(), Box::new(self.transform_expr(scope.clone(), cond)), Box::new(self.transform_expr(lscope.clone(), body))))
             },
             AST::While(ref id, ref pos, ref cond, ref body) => {
                 Expr::new(*id, pos.clone(), ExprKind::While(Box::new(self.transform_expr(scope.clone(), cond)), Box::new(self.transform_expr(scope.clone(), body))))

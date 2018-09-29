@@ -391,6 +391,23 @@ pub unsafe fn ptr_type(data: &LLVM) -> LLVMTypeRef {
     LLVMPointerType(LLVMPointerType(LLVMInt8TypeInContext(data.context), 0), 0)
 }
 
+pub unsafe fn cfunc_type(data: &LLVM, args: Type, ret: Type) -> LLVMTypeRef {
+    let mut atypes = vec!();
+    for ttype in args.as_vec() {
+        atypes.push(get_ltype(data, ttype, true));
+    }
+    let rtype = get_ltype(data, ret, true);
+    LLVMFunctionType(rtype, atypes.as_mut_ptr(), atypes.len() as u32, false as i32)
+}
+
+pub unsafe fn ptr_type_of(lftype: LLVMTypeRef) -> LLVMTypeRef {
+    //if use_fptrs {
+        LLVMPointerType(lftype, 0)
+    //} else {
+    //    lftype
+    //}
+}
+
 
 pub unsafe fn null_value(ttype: LLVMTypeRef) -> LLVMValueRef {
     LLVMConstNull(ttype)
@@ -649,18 +666,22 @@ pub unsafe fn get_ltype(data: &LLVM, ttype: Type, use_fptrs: bool) -> LLVMTypeRe
             }
             LLVMStructType(ltypes.as_mut_ptr(), ltypes.len() as u32, false as i32)
         },
-        Type::Function(ref args, ref ret, _) => {
-            // TODO should you incorporate abi??
-            let mut atypes = vec!();
-            for ttype in args.get_types().unwrap() {
-                atypes.push(get_ltype(data, ttype.clone(), true));
-            }
-            let rtype = get_ltype(data, *ret.clone(), true);
-            let ftype = LLVMFunctionType(rtype, atypes.as_mut_ptr(), atypes.len() as u32, false as i32);
+        Type::Function(ref args, ref ret, ref abi) => {
+            let lftype = match abi {
+                ABI::C => cfunc_type(data, *args.clone(), *ret.clone()),
+                ABI::Molten | ABI::Unknown => {
+                    // TODO How the hell do you know the closure id to get the context type??? You need an ID here, to base it off the def instead of the molten type...
+                    // I don't think there's an alternative
+                    //str_type(data)
+                    cfunc_type(data, *args.clone(), *ret.clone())
+                },
+                _ => panic!("Unsupported ABI: {:?}", abi),
+            };
+
             if use_fptrs {
-                LLVMPointerType(ftype, 0)
+                ptr_type_of(lftype)
             } else {
-                ftype
+                lftype
             }
         },
         // TODO this is not the correct way to deal with type variables... there should be overloaded functions generated
@@ -711,7 +732,7 @@ pub unsafe fn generate_declarations(data: &LLVM, scope: ScopeRef, transform: &Ve
                 let lltype = build_class_type(data, scope.clone(), element.id, name, classdef.clone());
 
                 //let alloc = String::from("__alloc__");
-                //let classdef = scope.find_type_def(data.session, name).unwrap().as_class().unwrap();
+                //let classdef = data.session.get_def(element.id).unwrap().as_class().unwrap();
                 //if !classdef.contains_local(&alloc) {
                 //    debug!("******* CREATING ALLOC: {}", name);
                 //    let cname = scope.get_full_name(&Some(name.clone()), id);
@@ -1226,9 +1247,9 @@ pub fn get_function_types(data: &LLVM, id: NodeID) -> (Type, Type, ABI) {
 pub unsafe fn generate_invoke_args(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: ScopeRef, atypes: &Type, args: &Vec<Expr>) -> Vec<LLVMValueRef> {
     let mut largs = vec!();
     // TODO this forces the function arg type to be a tuple
-    for (ttype, arg) in atypes.get_types().unwrap().iter().zip(args.iter()) {
+    for (ttype, arg) in atypes.as_vec().into_iter().zip(args.iter()) {
         let mut larg = generate_expr(data, func, unwind, scope.clone(), arg).get_ref();
-        let ltype = get_ltype(data, ttype.clone(), true);
+        let ltype = get_ltype(data, ttype, true);
         if ltype != LLVMTypeOf(larg) {
             // TODO this seems to cast to int as well as pointers, so maybe it's doing too much, at least without checking that it's supposed to
             larg = LLVMBuildPointerCast(data.builder, larg, ltype, label("ptr"));
