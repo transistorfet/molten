@@ -1,7 +1,7 @@
 
 
 extern crate nom;
-use nom::{ digit, hex_digit, oct_digit, line_ending, not_line_ending, space, multispace, is_alphanumeric, is_alphabetic, is_space, Needed, IResult, Context };
+use nom::{ digit, hex_digit, oct_digit, line_ending, not_line_ending, anychar, space, multispace, is_alphanumeric, is_alphabetic, is_space, Needed, IResult, Context };
 use nom::types::CompleteByteSlice;
 
 extern crate nom_locate;
@@ -843,9 +843,19 @@ named!(line_comment(Span) -> Span,
     delimited!(tag!("//"), not_line_ending, peek!(line_ending))    //, |s| AST::Comment(String::from(str::from_utf8(s).unwrap())))
 );
 
-// TODO allow for nested comments
 named!(block_comment(Span) -> Span,
-    delimited!(tag!("/*"), take_until!("*/"), tag!("*/"))              //, |s| AST::Comment(String::from(str::from_utf8(s).unwrap())))
+    delimited!(
+        tag!("/*"),
+        recognize!(many0!(
+           alt!(
+                block_comment |
+                recognize!(many_till!(anychar, peek!(alt!(tag!("/*") | tag!("*/")))))
+            )
+        )),
+        //recognize!(dbg_dmp!(many_till!(anychar, peek!(tag!("*/"))))),
+        //take_until!("*/"),
+        tag!("*/")
+    )
 );
 
 /*

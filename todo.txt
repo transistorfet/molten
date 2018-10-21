@@ -8,6 +8,7 @@
 * make casting transforms that do an LLVM cast (should the transform have LLVM types in it, or should it always convert from molten types? (kinda need more flexability than molten types)
 =====
 
+* in rust, all closures have their own type (because the context is always different), but ocaml doesn't...
 * it might be possible to replace some instances of get_ltype() with a reference to the definition, such that the ltype can be determined by the object type rather than directly correlating
   to the molten type (one molten type -> many llvm types).  Barring that, you could always add an id to the function type, even though it's not at all pretty
 * the current problem with closure code (line 269 of test.ml) is that we're assigning a closure to a struct field but the types don't match, because the get_type function
@@ -44,12 +45,10 @@
 
 
 
-
 * there's still a problem with typevars not resolving fully, where a function that should return a concrete returns a free typevar.... (recursion or forward definition)
 
 * implement type definition ast element (enum type?)
 * add patterns and matching of patterns
-* make nestable comments
 * add an iterator type
 * get llvm closures working
 * add compiler directives?
