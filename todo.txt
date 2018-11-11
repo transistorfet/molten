@@ -1,4 +1,7 @@
 
+* try upgrading to llvm 7
+
+
 =====
 * ideally, the transformed code should be directly compilable, such that you can use it for defining builtin runtime funcs, and desugared stuff.  It has to be easy to make and build up
 * can you factor out phi statements? (use as part of if, match, sideeffect)
@@ -15,6 +18,9 @@
   returned an actual function type, rather than a pointer to the closure context... so you kinda need a way to distinguish different function types
 * Builtins are erroniously treated as closures...
 
+
+* fix struct assign to actually work... right now it returns a new struct with the value set rather than modifying the value in place, but in order to modify in place, it must
+  avoid the initial load instruction of the source... and this might not work with register-only refs like arguments (which we might want to use later)
 * either add in the initialization of class variables, possibly limited to constant expressions only, or else raise an error if an initializer is provided
 
 * you might not be making sure that non-closure functions don't access variables outside their scope (methods are never closures)
@@ -42,6 +48,11 @@
 * add the .set_id() functions to simpliy ast builders
 * there are poor error messages when deleting the "=" from a "let something = fn x => ..." both inside and outside classes.... shouldn't be doing this (actually, because of
   let without init, and the lf issue... lf fix would solve this)
+
+* for type defs... should they always be direct data and classes will always be pointers to structs?  How will you initialize/create a struct?  Will it be an alternate "new"
+  format (clunky, overloading meaning of new if struct is not pointer, but if you also allow pointers to structs, then new Struct { ... } would need to be valid)
+  or do you make a bareword-started constructor Struct { field: 3, prop: 6 }, which might be cumbersome or slower to parse
+  how would you do enums, when you get there?  
 
 
 
@@ -82,7 +93,7 @@
 * should you allow arguments with a default value to be omitted from a function call?, that would require a bunch of changes to typechecking
 * should you fix scope resolution to also work on objects, so that you can have static methods from the object without explicitly referencing its type
 * should exports also list all the modules that the file imports, so that class definitions in other imports can be found, if needed for arguments
-* should variables be mutable... maybe only with compiler directive, or only without one; if so, add a const expression
+* should local variables be allowed to be mutable...
 * should you require an override keyword when masking definitions in lower scopes? like class definitions
 * should you add dicts syntax
 * should you add macros and expandable forms (like lisp)

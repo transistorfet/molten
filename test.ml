@@ -16,7 +16,7 @@
             e
 
 /*
-
+        /* this ends up causing various problems */
         (12).add(3)
         e.add(3)
         fn test(x: Int) => x.add(2)
@@ -341,14 +341,19 @@
 
         /// Type Defs
 
-/*
         type newint = {
             things: Int,
             stuff: Int
         }
 
-        type newreal = Real
-*/
+        //type newreal = Real
+        let ni: newint
+        ni.things = 745
+        println(str(ni.things))
+
+        fn thi(a: newint) {
+            //a.things = 5
+        }
 
         /// Closures
 

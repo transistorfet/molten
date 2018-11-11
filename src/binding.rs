@@ -162,19 +162,19 @@ fn bind_names_node_or_error(session: &Session, scope: ScopeRef, node: &mut AST) 
         },
 
         AST::TypeDef(ref id, _, ref mut classspec, ref mut fields) => {
-            //StructDef::define(session, scope.clone(), *id, ****makeobjecttype*****)?;
+            let structtype = Type::Object(classspec.ident.name.clone(), *id, classspec.types.clone());
+            StructDef::define(session, scope.clone(), *id, structtype)?;
 
-            //let mut types = vec!();
             // TODO this is nearly identical to class... these need to be separated
-            let tscope = session.map.add(*id, None);
+            let tscope = session.map.add(*id, Some(scope.clone()));
             tscope.set_redirect(true);
             tscope.set_basename(classspec.ident.name.clone());
 
             classspec.types.iter_mut().map(|ref mut ttype| declare_typevars(session, tscope.clone(), Some(ttype), true).unwrap()).count();
             for field in fields {
-                declare_typevars(session, scope.clone(), field.ttype.as_mut(), true)?;
+                declare_typevars(session, tscope.clone(), field.ttype.as_mut(), true)?;
                 // TODO this is assumed to be mutable always, but maybe not
-                FieldDef::define(session, scope.clone(), *id, true, &field.ident.name, field.ttype.clone())?;
+                FieldDef::define(session, tscope.clone(), field.id, true, &field.ident.name, field.ttype.clone())?;
             }
         },
 

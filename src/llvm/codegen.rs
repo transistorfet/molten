@@ -567,9 +567,24 @@ pub unsafe fn build_allocator(data: &LLVM, scope: ScopeRef, cname: &String, fnam
 }
 */
 
-pub unsafe fn build_struct_access(data: &LLVM, index: usize, object: LLVMValueRef) -> LLVMValueRef {
-    let mut indices = vec!(i32_value(data, 0), i32_value(data, index));
-    LLVMBuildGEP(data.builder, object, indices.as_mut_ptr(), indices.len() as u32, label("tmp"))
+pub unsafe fn build_struct_load(data: &LLVM, index: usize, object: LLVMValueRef) -> LLVMValueRef {
+    if LLVMGetTypeKind(LLVMTypeOf(object)) == LLVMTypeKind::LLVMPointerTypeKind {
+        let mut indices = vec!(i32_value(data, 0), i32_value(data, index));
+        let pointer = LLVMBuildGEP(data.builder, object, indices.as_mut_ptr(), indices.len() as u32, label("tmp"));
+        LLVMBuildLoad(data.builder, pointer, label("tmp"))
+    } else {
+        LLVMBuildExtractValue(data.builder, object, index as u32, label("tmp"))
+    }
+}
+
+pub unsafe fn build_struct_store(data: &LLVM, index: usize, object: LLVMValueRef, value: LLVMValueRef) -> LLVMValueRef {
+    if LLVMGetTypeKind(LLVMTypeOf(object)) == LLVMTypeKind::LLVMPointerTypeKind {
+        let mut indices = vec!(i32_value(data, 0), i32_value(data, index));
+        let pointer = LLVMBuildGEP(data.builder, object, indices.as_mut_ptr(), indices.len() as u32, label("tmp"));
+        LLVMBuildStore(data.builder, value, pointer)
+    } else {
+        LLVMBuildInsertValue(data.builder, object, value, index as u32, label("tmp"))
+    }
 }
 
 pub unsafe fn build_class_type(data: &LLVM, scope: ScopeRef, id: NodeID, name: &String, classdef: ClassDefRef) -> LLVMTypeRef {
@@ -606,9 +621,9 @@ pub unsafe fn build_class_type(data: &LLVM, scope: ScopeRef, id: NodeID, name: &
     pltype
 }
 
-pub unsafe fn build_struct_type(data: &LLVM, id: NodeID, name: &String, structdef: StructDefRef) -> LLVMTypeRef {
+pub unsafe fn build_struct_type(data: &LLVM, id: NodeID, name: &String, structdef: StructDefRef, ptr: bool) -> LLVMTypeRef {
     let lltype = LLVMStructCreateNamed(data.context, label(name));
-    let pltype = LLVMPointerType(lltype, 0);
+    let pltype = if ptr { LLVMPointerType(lltype, 0) } else { lltype };
     data.set_type(id, TypeValue { value: pltype, vttype: None });
 
     let mut types = vec!();
@@ -712,7 +727,7 @@ pub unsafe fn generate_declarations(data: &LLVM, scope: ScopeRef, transform: &Ve
             },
             TopKind::Closure(ref fid, ref fname, ref name, ref args, _) => {
                 let cl = data.session.get_def(element.id).unwrap().as_closure().unwrap();
-                build_struct_type(data, cl.contextid, name, cl.context.clone());
+                build_struct_type(data, cl.contextid, name, cl.context.clone(), true);
                 generate_func_start(data, scope.clone(), *fid, fname.clone(), args);
             },
             TopKind::Declare(ref name) => {
@@ -741,6 +756,10 @@ pub unsafe fn generate_declarations(data: &LLVM, scope: ScopeRef, transform: &Ve
                 //}
 
             },
+            TopKind::StructDef(ref name) => {
+                let structdef = data.session.get_def(element.id).unwrap().as_struct().unwrap();
+                build_struct_type(data, element.id, name, structdef, false);
+            }
         }
     }
 }
@@ -944,10 +963,8 @@ LLVMDumpValue(value.get_ref());
 
             let otype = data.session.get_type(*oid).unwrap();
             let object = generate_expr(data, func, unwind, scope.clone(), objexpr).get_ref();
-// TODO this needs to be changed... you need to change build_struct_access probabl
             let structdef = data.session.get_def(otype.get_id().unwrap()).unwrap().as_struct().unwrap();
-            let pointer = build_struct_access(data, structdef.get_index(field.as_str()).unwrap(), object);
-            LLVMBuildStore(data.builder, value.get_ref(), pointer);
+            build_struct_store(data, structdef.get_index(field.as_str()).unwrap(), object, value.get_ref());
 
             value
         },
@@ -1211,27 +1228,31 @@ pub unsafe fn generate_access_field(data: &LLVM, func: LLVMValueRef, unwind: Unw
     //let otype = data.session.get_type_from_ref(objexpr.get_id()).unwrap();
 
     let ttype = data.session.get_type_from_ref(id).unwrap();
-    let classdef = data.session.get_def(otype.get_id().unwrap()).unwrap().as_class().unwrap();
-    debug!("*ACCESS: {:?} {:?} {:?}", id, name, classdef);
+    let structdef = data.session.get_def(otype.get_id().unwrap()).unwrap().as_struct().unwrap();
+    debug!("*ACCESS: {:?} {:?} {:?}", id, name, structdef);
 
-    if let Some(structindex) = classdef.get_struct_index(name.as_str()) {
-        debug!(">>ACCESS STRUCT: {:?} {:?}", structindex, classdef.get_struct_type(structindex));
-        let pointer = build_struct_access(data, classdef.get_struct_index(name.as_str()).unwrap(), object);
-        from_type(&classdef.get_struct_type(structindex), LLVMBuildLoad(data.builder, pointer, label("tmp")))
-    } else if let Some(vtableindex) = classdef.get_vtable_index(data.session, scope.clone(), name.as_str(), &ttype) {
-        debug!(">>ACCESS VTABLE: {:?} {:?}", vtableindex, classdef.get_vtable_type(vtableindex));
-        //debug!("TABLE: {:#?}", classdef.vtable);
-        let vindex = classdef.get_struct_vtable_index().unwrap();
-        let mut indices = vec!(i32_value(data, 0), i32_value(data, vindex));
-        let pointer = LLVMBuildGEP(data.builder, object, indices.as_mut_ptr(), indices.len() as u32, label("tmp"));
-        let vtable = LLVMBuildLoad(data.builder, pointer, label("tmp"));
-
-        let mut indices = vec!(i32_value(data, 0), i32_value(data, vtableindex));
-        let pointer = LLVMBuildGEP(data.builder, vtable, indices.as_mut_ptr(), indices.len() as u32, label("tmp"));
-        from_type(&classdef.get_vtable_type(vtableindex), LLVMBuildLoad(data.builder, pointer, label("tmp")))
+    if let Some(structindex) = structdef.get_index(name.as_str()) {
+        debug!(">>ACCESS STRUCT: {:?} {:?}", structindex, structdef.get_type(structindex));
+        let access = build_struct_load(data, structdef.get_index(name.as_str()).unwrap(), object);
+        from_type(&structdef.get_type(structindex), access)
     } else {
-        debug!("ACCESS DEREF: {:?} -> {:?}", id, data.session.get_ref(id).unwrap());
-        data.get_value(data.session.get_ref(id).unwrap()).unwrap()
+        let classdef = data.session.get_def(otype.get_id().unwrap()).unwrap().as_class().unwrap();
+
+        if let Some(vtableindex) = classdef.get_vtable_index(data.session, scope.clone(), name.as_str(), &ttype) {
+            debug!(">>ACCESS VTABLE: {:?} {:?}", vtableindex, classdef.get_vtable_type(vtableindex));
+            //debug!("TABLE: {:#?}", classdef.vtable);
+            let vindex = classdef.get_struct_vtable_index().unwrap();
+            let mut indices = vec!(i32_value(data, 0), i32_value(data, vindex));
+            let pointer = LLVMBuildGEP(data.builder, object, indices.as_mut_ptr(), indices.len() as u32, label("tmp"));
+            let vtable = LLVMBuildLoad(data.builder, pointer, label("tmp"));
+
+            let mut indices = vec!(i32_value(data, 0), i32_value(data, vtableindex));
+            let pointer = LLVMBuildGEP(data.builder, vtable, indices.as_mut_ptr(), indices.len() as u32, label("tmp"));
+            from_type(&classdef.get_vtable_type(vtableindex), LLVMBuildLoad(data.builder, pointer, label("tmp")))
+        } else {
+            debug!("ACCESS DEREF: {:?} -> {:?}", id, data.session.get_ref(id).unwrap());
+            data.get_value(data.session.get_ref(id).unwrap()).unwrap()
+        }
     }
 }
 

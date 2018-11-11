@@ -51,6 +51,7 @@ pub struct ClassSpec {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Field {
+    pub id: NodeID,
     pub pos: Pos,
     pub ident: Ident,
     pub ttype: Option<Type>
@@ -187,6 +188,7 @@ impl ClassSpec {
 impl Field {
     pub fn new(pos: Pos, ident: Ident, ttype: Option<Type>) -> Self {
         Self {
+            id: NodeID::generate(),
             pos: pos,
             ident: ident,
             ttype: ttype

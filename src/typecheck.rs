@@ -223,7 +223,14 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &AST,
             scope.make_obj(session, String::from("List"), vec!(ltype))?
         },
 
-        AST::TypeDef(_, _, _, _) => return Err(Error::new(format!("NotImplementedError: not yet supported, {:?}", node))),
+        AST::TypeDef(ref id, _, ref classspec, ref fields) => {
+            let tscope = session.map.get(id);
+            for field in fields {
+                // TODO check the types such that any unprovided types are infered
+                //expect_type(session, tscope, Some(ttype.clone()), Some(ctype), Check::List)?;
+            }
+            scope.make_obj(session, String::from("Nil"), vec!())?
+        },
 
         AST::PtrCast(ref ttype, ref code) => {
             let ctype = check_types_node(session, scope.clone(), code, Some(ttype.clone()));
@@ -259,7 +266,6 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &AST,
             // TODO this is duplicated in check_types_node(left)... can we avoid that
             let (refid, defid) = get_access_ids(session, scope.clone(), left)?.unwrap();
             if !session.get_def(defid).map(|d| d.is_mutable()).unwrap_or(false) {
-    debug!("CHECK:  {:?} {:?}", defid, node);
                 return Err(Error::new(format!("MutableError: attempting to assign to an immutable variable")));
             }
 

@@ -209,7 +209,7 @@ named!(typedef(Span) -> AST,
         c: class_spec >>
         wscom!(tag!("=")) >>
         ts: alt!(
-            map!(identifier_typed, |i| vec!(i)) |
+            map!(type_description, |i| vec!((Pos::new(pos), Ident::from_str(""), Some(i)))) |
             delimited!(wscom!(tag!("{")), separated_list_complete!(wscom!(tag!(",")), identifier_typed), wscom!(tag!("}")))
         ) >>
         (AST::make_typedef(Pos::new(pos), c, ts.into_iter().map(|f| Field::new(f.0, f.1, f.2)).collect()))
@@ -691,7 +691,6 @@ named!(literal(Span) -> AST,
         boolean |
         string |
         number |
-        // TODO currently a parse error
         tuple |
         list
     )

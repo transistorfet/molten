@@ -28,6 +28,7 @@ pub enum TopKind {
     Closure(NodeID, String, String, Vec<(NodeID, String)>, Expr),
     Method(String, Vec<(NodeID, String)>, Expr),
     ClassDef(String, Vec<Expr>),
+    StructDef(String),
 }
 
 impl TopLevel {
@@ -332,9 +333,15 @@ impl<'sess> Transform<'sess> {
                 }
             },
 
-            AST::TypeDef(_, _, _, _) => {
-                // TODO fill this in
-                panic!("");
+            AST::TypeDef(ref id, ref pos, _, ref fields) => {
+                let structdef = self.session.get_def(*id).unwrap().as_struct().unwrap();
+                for field in fields {
+                    structdef.add_field(self.session, true, field.ident.as_str(), self.session.get_type(field.id).unwrap());
+                }
+
+                let tscope = self.session.map.get(id);
+                self.add_top(*id, pos.clone(), TopKind::StructDef(tscope.get_basename()));
+                Expr::new(*id, pos.clone(), ExprKind::Nil)
             },
 
 
