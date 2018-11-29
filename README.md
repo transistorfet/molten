@@ -6,19 +6,19 @@ Molten is a programming language which borrows from the ML family of languages,
 as well as from Rust and Python.  The compiler is written in Rust and uses
 LLVM to generate IR which can be compiled to machine code.
 
-The goal of this project is to create a high level language with a full object
-system that facilitates both functional and object-oriented programming.  Some
-syntax elements have been changed from typical ML languages to follow
-conventions found in more common languages, such as C++, Java, and Rust, to
-appeal to a broader audience (eg. parenthesis-delimited blocks, conventional
-class definitions, generics/type parameters, etc)
+I originally started this project in order to learn Rust.  It is intended to be
+a high level language with a full object system that facilitates both functional
+and object-oriented programming.  Some syntax elements have been changed from
+typical ML languages to follow conventions found in more common languages, such
+as C++, Rust, and Python (eg. parenthesis-delimited blocks, conventional class
+definitions, generics/type parameters with angle brackets, etc)
 
 
 Installing
 ----------
 
 You will need `rustc` and `cargo` installed.  It's recommended that you use
-`rustup` to install these.  I've only tested it with rustc version 1.23.
+`rustup` to install these.  I've most recently tested it with rustc version 1.28.
 You will also need LLVM 5.0 installed.
 
 On Debian/Ubuntu, run:
@@ -78,6 +78,8 @@ String
 () -> Int           // function type
 'a                  // type variable
 List<Int>           // list of integers
+(Int, Real)         // tuple
+{ a: Int, b: Real } // record
 ```
 
 ### Declarations
