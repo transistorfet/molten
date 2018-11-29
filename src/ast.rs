@@ -68,6 +68,7 @@ pub enum AST {
     PtrCast(Type, Box<AST>),
 
     Tuple(NodeID, Pos, Vec<AST>),
+    Record(NodeID, Pos, Vec<(Ident, AST)>),
     List(NodeID, Pos, Vec<AST>),
 
     Recall(NodeID, Pos),
@@ -200,6 +201,7 @@ impl AST {
     pub fn get_pos(&self) -> Pos {
         match *self {
             AST::Tuple(_, ref pos, _) |
+            AST::Record(_, ref pos, _) |
             AST::List(_, ref pos, _) |
             AST::Recall(_, ref pos) |
             AST::Identifier(_, ref pos, _) |
@@ -232,6 +234,7 @@ impl AST {
             AST::Literal(ref id, _) |
             AST::Nil(ref id) |
             AST::Tuple(ref id, _, _) |
+            AST::Record(ref id, _, _) |
             AST::List(ref id, _, _) |
             AST::Recall(ref id, _) |
             AST::Identifier(ref id, _, _) |
@@ -269,6 +272,10 @@ impl AST {
 
     pub fn make_tuple(pos: Pos, items: Vec<AST>) -> AST {
         AST::Tuple(NodeID::generate(), pos, items)
+    }
+
+    pub fn make_record(pos: Pos, items: Vec<(Ident, AST)>) -> AST {
+        AST::Record(NodeID::generate(), pos, items)
     }
 
     pub fn make_list(pos: Pos, items: Vec<AST>) -> AST {

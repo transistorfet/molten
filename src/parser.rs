@@ -508,7 +508,7 @@ named!(subatomic_operation(Span) -> AST,
         operations: many0!(alt_complete!(
             map!(delimited!(tag!("["), tuple!(position!(), expression), tag!("]")), |(p, e)| SubOP::Index(Pos::new(p), e)) |
             map!(delimited!(tag!("("), tuple!(position!(), expression_list), tag!(")")), |(p, e)| SubOP::Invoke(Pos::new(p), e)) |
-            map!(preceded!(tag!("."), tuple!(position!(), identifier)), |(p, s)| SubOP::Accessor(Pos::new(p), s)) |
+            map!(preceded!(tag!("."), tuple!(position!(), alt!(identifier | map!(digit, |s| Ident::from_span(s))))), |(p, s)| SubOP::Accessor(Pos::new(p), s)) |
             map!(preceded!(tag!("::"), tuple!(position!(), identifier)), |(p, s)| SubOP::Resolver(Pos::new(p), s))
         )) >>
         (AST::fold_access(left, operations))
@@ -611,6 +611,7 @@ named!(type_description(Span) -> Type,
         type_function |
         type_unit |
         type_tuple |
+        type_record |
         type_variable |
         type_object
     )
@@ -639,6 +640,22 @@ named!(type_tuple(Span) -> Type,
     ))
 );
 
+named!(type_record(Span) -> Type,
+    wscom!(do_parse!(
+        types: delimited!(
+            tag!("{"),
+            separated_list_complete!(wscom!(tag!(",")), do_parse!(
+                i: identifier >>
+                wscom!(tag!(":")) >>
+                t: type_description >>
+                ((i.name, t))
+            )),
+            tag!("}")
+        ) >>
+        (Type::Record(types))
+    ))
+);
+
 named!(type_function(Span) -> Type,
     wscom!(do_parse!(
         //args: delimited!(tag!("("), separated_list_complete!(wscom!(tag!(",")), type_description), tag!(")")) >>
@@ -650,10 +667,11 @@ named!(type_function(Span) -> Type,
     ))
 );
 
-//named!(type_overload(Span) -> Type,
+// TODO this used to be Overload, but it could potentially be useful as a contrained type of sorts
+//named!(type_ambiguous(Span) -> Type,
 //    map!(
-//        delimited!(tag!("Overload["), wscom!(separated_list_complete!(wscom!(tag!(",")), type_description)), tag!("]")),
-//        |t| Type::Overload(t)
+//        delimited!(tag!("Ambiguous["), wscom!(separated_list_complete!(wscom!(tag!(",")), type_description)), tag!("]")),
+//        |t| Type::Ambiguous(t)
 //    )
 //);
 
@@ -692,6 +710,7 @@ named!(literal(Span) -> AST,
         string |
         number |
         tuple |
+        record |
         list
     )
 );
@@ -797,6 +816,23 @@ named!(tuple(Span) -> AST,
             wscom!(tag!(")"))
         ) >>
         (AST::make_tuple(Pos::new(pos), l))
+    )
+);
+
+named!(record(Span) -> AST,
+    do_parse!(
+        pos: position!() >>
+        l: delimited!(
+            wscom!(tag!("{")),
+            separated_list_complete!(wscom!(tag!(",")), do_parse!(
+                i: identifier >>
+                wscom!(tag!("=")) >>
+                e: expression >>
+                ((i, e))
+            )),
+            wscom!(tag!("}"))
+        ) >>
+        (AST::make_record(Pos::new(pos), l))
     )
 );
 

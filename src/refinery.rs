@@ -79,9 +79,12 @@ pub fn refine_node(node: AST) -> AST {
             AST::For(id, pos, ident, Box::new(refine_node(*cond)), Box::new(refine_node(*body)))
         },
 
-        AST::Tuple(id, pos, code) => { AST::Tuple(id, pos, refine_vec(code)) },
-        //AST::List(id, pos, code, ttype) => { AST::List(id, pos, refine_vec(code), ttype) },
-        AST::List(id, pos, code) => {
+        AST::Tuple(id, pos, items) => { AST::Tuple(id, pos, refine_vec(items)) },
+
+        AST::Record(id, pos, items) => { AST::Record(id, pos, items.into_iter().map(|(i, e)| (i, refine_node(e))).collect()) },
+
+        //AST::List(id, pos, items, ttype) => { AST::List(id, pos, refine_vec(items), ttype) },
+        AST::List(id, pos, items) => {
             let mut block = vec!();
             let tmplist = format!("{}", UniqueID::generate());
             let typevar = rand::random::<i32>();
@@ -92,9 +95,9 @@ pub fn refine_node(node: AST) -> AST {
                     AST::make_resolve(pos.clone(), AST::make_ident(pos.clone(), Ident::from_str("List")), Ident::from_str("new")),
                     vec!(
                         AST::make_new(pos.clone(), ClassSpec::new(pos.clone(), Ident::from_str("List"), vec!(Type::Variable(typevar.to_string(), UniqueID(0)))))
-                        /*, AST::Integer(code.len() as isize)*/
+                        /*, AST::Integer(items.len() as isize)*/
                     ))));
-            for item in code {
+            for item in items {
                 block.push(AST::make_invoke(pos.clone(),
                     AST::make_access(pos.clone(), AST::make_ident(pos.clone(), Ident::new(tmplist.clone())), Ident::from_str("push")),
                     vec!(item)));

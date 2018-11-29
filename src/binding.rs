@@ -122,6 +122,12 @@ fn bind_names_node_or_error(session: &Session, scope: ScopeRef, node: &mut AST) 
         AST::List(_, _, ref mut code) |
         AST::Block(_, _, ref mut code) => { bind_names_vec(session, scope, code); },
 
+        AST::Record(_, _, ref mut items) => {
+            for &mut (ref mut name, ref mut expr) in items {
+                bind_names_node(session, scope.clone(), expr);
+            }
+        },
+
         AST::Index(_, _, ref mut base, ref mut index) => {
             bind_names_node(session, scope.clone(), base);
             bind_names_node(session, scope, index);
@@ -241,6 +247,11 @@ pub fn declare_typevars(session: &Session, scope: ScopeRef, ttype: Option<&mut T
                     declare_typevars(session, scope.clone(), Some(ttype), always_new)?;
                 }
             },
+            &mut Type::Record(ref mut types) => {
+                for (name, ttype) in types.iter_mut() {
+                    declare_typevars(session, scope.clone(), Some(ttype), always_new)?;
+                }
+            },
             &mut Type::Function(ref mut args, ref mut ret, _) => {
                 declare_typevars(session, scope.clone(), Some(args.as_mut()), always_new)?;
                 declare_typevars(session, scope, Some(ret.as_mut()), always_new)?;
@@ -265,7 +276,7 @@ pub fn declare_typevars(session: &Session, scope: ScopeRef, ttype: Option<&mut T
                     }
                 }
             },
-            &mut Type::Overload(_) => { },
+            &mut Type::Ambiguous(_) => { },
         },
         _ => { },
     }

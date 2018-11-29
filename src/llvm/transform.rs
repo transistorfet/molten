@@ -419,6 +419,11 @@ impl<'sess> Transform<'sess> {
                 Expr::new(*id, pos.clone(), ExprKind::Tuple(items))
             },
 
+            AST::Record(ref id, ref pos, ref items) => {
+                let items = items.iter().map(|(name, item)| self.transform_expr(scope.clone(), item)).collect();
+                Expr::new(*id, pos.clone(), ExprKind::Tuple(items))
+            },
+
             AST::PtrCast(ref ttype, ref node) => Expr::new(NodeID::generate(), Pos::empty(), ExprKind::PtrCast(ttype.clone(), Box::new(self.transform_expr(scope.clone(), node)))),
 
             AST::Underscore => Expr::new(NodeID::generate(), Pos::empty(), ExprKind::Underscore),

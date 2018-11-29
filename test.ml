@@ -355,6 +355,11 @@
             //a.things = 5
         }
 
+        let nt = (1, 4)
+        let nr = { a = 1, b = 4 }
+        //println("Tuple 0: " + str(nt.0))
+        //println("Record a: " + str(nr.b))
+
         /// Closures
 
 /*

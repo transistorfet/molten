@@ -325,7 +325,8 @@ impl Scope {
             // TODO why did I do this?  Was it because of a bug or just to reduce typevars, because it caused another bug with constructors
             //Type::Function(args, ret, abi) => Type::Function(Box::new(self.map_typevars(session, varmap, *args)), ret, abi),
             Type::Tuple(types) => Type::Tuple(self.map_typevars_vec(session, varmap, types)),
-            Type::Overload(variants) => Type::Overload(self.map_typevars_vec(session, varmap, variants)),
+            Type::Record(types) => Type::Record(types.into_iter().map(|(n, t)| (n, self.map_typevars(session, varmap, t))).collect()),
+            Type::Ambiguous(variants) => Type::Ambiguous(self.map_typevars_vec(session, varmap, variants)),
             Type::Object(name, id, types) => Type::Object(name.clone(), id, self.map_typevars_vec(session, varmap, types)),
         }
     }
@@ -349,7 +350,8 @@ impl Scope {
             // TODO why did I do this?  Was it because of a bug or just to reduce typevars, because it caused another bug with constructors
             //Type::Function(args, ret, abi) => Type::Function(Box::new(self.map_typevars(session, varmap, *args)), ret, abi),
             Type::Tuple(types) => Type::Tuple(self.unmap_typevars_vec(session, varmap, types)),
-            Type::Overload(variants) => Type::Overload(self.unmap_typevars_vec(session, varmap, variants)),
+            Type::Record(types) => Type::Record(types.into_iter().map(|(n, t)| (n, self.unmap_typevars(session, varmap, t))).collect()),
+            Type::Ambiguous(variants) => Type::Ambiguous(self.unmap_typevars_vec(session, varmap, variants)),
             Type::Object(name, id, types) => Type::Object(name.clone(), id, self.unmap_typevars_vec(session, varmap, types)),
         }
     }

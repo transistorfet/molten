@@ -206,12 +206,22 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &AST,
             if etypes.len() != items.len() {
                 return Err(Error::new(format!("TypeError: number of tuple items don't match: expected {:?} with {} items but found {} items", expected, etypes.len(), items.len())));
             }
+
             let mut types = vec!();
             for (ref expr, etype) in items.iter().zip(etypes.iter()) {
                 types.push(expect_type(session, scope.clone(), etype.clone(), Some(check_types_node(session, scope.clone(), expr, etype.clone())), Check::List)?);
             }
             session.set_type(*id, Type::Tuple(types.clone()));
             Type::Tuple(types)
+        },
+
+        AST::Record(ref id, _, ref items) => {
+            let mut types = vec!();
+            for (ref ident, ref expr) in items {
+                types.push((ident.name.clone(), check_types_node(session, scope.clone(), expr, None)));
+            }
+            session.set_type(*id, Type::Record(types.clone()));
+            Type::Record(types)
         },
 
         AST::List(_, _, ref items) => {

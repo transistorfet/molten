@@ -15,8 +15,10 @@ pub enum Type {
     Variable(String, UniqueID),
     Function(Box<Type>, Box<Type>, ABI),
     Tuple(Vec<Type>),
-    Overload(Vec<Type>),
-    //Generic(String, Vec<Type>),
+    Record(Vec<(String, Type)>),
+
+    // TODO this isn't used atm, I don't think, but we could use it for a constrained type
+    Ambiguous(Vec<Type>),
     //Constrained(Box<&mut AST>),
 }
 
@@ -102,9 +104,9 @@ impl Type {
         }
     }
 
-    pub fn is_overloaded(&self) -> bool {
+    pub fn is_ambiguous(&self) -> bool {
         match *self {
-            Type::Overload(_) => true,
+            Type::Ambiguous(_) => true,
             _ => false
         }
     }
@@ -122,11 +124,11 @@ impl Type {
                 }).collect();
                 Type::Object(name, id, types)
             },
-            Type::Overload(types) => {
+            Type::Ambiguous(types) => {
                 let types = types.into_iter().map(move |ttype| {
                     ttype.convert(f)
                 }).collect();
-                Type::Overload(types)
+                Type::Ambiguous(types)
             },
             Type::Tuple(types) => {
                 let types = types.into_iter().map(move |ttype| {
@@ -167,12 +169,16 @@ impl fmt::Display for Type {
                 let tuple: Vec<String> = types.iter().map(|t| format!("{}", t)).collect();
                 write!(f, "({})", tuple.join(", "))
             }
+            Type::Record(ref types) => {
+                let tuple: Vec<String> = types.iter().map(|(n, t)| format!("{}: {}", n, t)).collect();
+                write!(f, "{{ {} }}", tuple.join(", "))
+            }
             Type::Function(ref args, ref ret, ref abi) => {
                 write!(f, "{} -> {}{}", args, *ret, abi)
             }
-            Type::Overload(ref variants) => {
+            Type::Ambiguous(ref variants) => {
                 let varstr: Vec<String> = variants.iter().map(|v| format!("{}", v)).collect();
-                write!(f, "Overload[{}]", varstr.join(", "))
+                write!(f, "Ambiguous[{}]", varstr.join(", "))
             },
         }
     }
@@ -278,6 +284,20 @@ pub fn check_type(session: &Session, scope: ScopeRef, odtype: Option<Type>, octy
                         Err(Error::new(format!("TypeError: type mismatch, expected {} but found {}", dtype, ctype)))
                     }
                 },
+                (Type::Record(ref atypes), Type::Record(ref btypes)) => {
+                    let mut types = vec!();
+                    if atypes.len() == btypes.len() {
+                        for ((aname, atype), (bname, btype)) in atypes.iter().zip(btypes.iter()) {
+                            if aname != bname {
+                                return Err(Error::new(format!("TypeError: type mismatch, expected {} but found {}", dtype, ctype)));
+                            }
+                            types.push((aname.clone(), check_type(session, scope.clone(), Some(atype.clone()), Some(btype.clone()), mode.clone(), update)?));
+                        }
+                        Ok(Type::Record(types))
+                    } else {
+                        Err(Error::new(format!("TypeError: type mismatch, expected {} but found {}", dtype, ctype)))
+                    }
+                },
                 (Type::Object(ref aname, ref aid, ref atypes), Type::Object(ref bname, ref bid, ref btypes)) => {
                     match is_subclass_of(session, scope.clone(), (bname, *bid, btypes), (aname, *aid, atypes), mode.clone()) {
                         ok @ Ok(_) => ok,
@@ -287,8 +307,8 @@ pub fn check_type(session: &Session, scope: ScopeRef, odtype: Option<Type>, octy
                         }
                     }
                 },
-                (_, Type::Overload(_)) |
-                (Type::Overload(_), _) => Err(Error::new(format!("TypeError: overloaded types are not allowed here..."))),
+                (_, Type::Ambiguous(_)) |
+                (Type::Ambiguous(_), _) => Err(Error::new(format!("TypeError: overloaded types are not allowed here..."))),
                 _ => {
                     if dtype == ctype {
                         Ok(dtype)
@@ -375,12 +395,16 @@ pub fn resolve_type(session: &Session, ttype: Type) -> Type {
             let types = types.iter().map(|ttype| resolve_type(session, ttype.clone())).collect();
             Type::Tuple(types)
         },
+        Type::Record(ref types) => {
+            let types = types.iter().map(|(name, ttype)| (name.clone(), resolve_type(session, ttype.clone()))).collect();
+            Type::Record(types)
+        },
         Type::Function(ref args, ref ret, ref abi) => {
             Type::Function(Box::new(resolve_type(session, *args.clone())), Box::new(resolve_type(session, *ret.clone())), *abi)
         },
-        Type::Overload(ref variants) => {
+        Type::Ambiguous(ref variants) => {
             let newvars = variants.iter().map(|variant| resolve_type(session, variant.clone())).collect();
-            Type::Overload(newvars)
+            Type::Ambiguous(newvars)
         },
     }
 }

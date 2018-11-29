@@ -98,14 +98,17 @@ pub fn unparse_type(session: &Session, scope: ScopeRef, ttype: Type) -> String {
         Type::Tuple(types) => {
             let tuple: Vec<String> = types.iter().map(|t| unparse_type(session, scope.clone(), t.clone())).collect();
             format!("({})", tuple.join(", "))
-
+        },
+        Type::Record(types) => {
+            let tuple: Vec<String> = types.iter().map(|(n, t)| format!("{}: {}", n, unparse_type(session, scope.clone(), t.clone()))).collect();
+            format!("{{ {} }}", tuple.join(", "))
         },
         Type::Function(args, ret, abi) => {
             format!("{} -> {}{}", unparse_type(session, scope.clone(), *args), unparse_type(session, scope.clone(), *ret), abi)
         }
-        Type::Overload(variants) => {
+        Type::Ambiguous(variants) => {
             let varstr: Vec<String> = variants.iter().map(|v| unparse_type(session, scope.clone(), v.clone())).collect();
-            format!("Overload[{}]", varstr.join(", "))
+            format!("Ambiguous[{}]", varstr.join(", "))
         },
     }
 }

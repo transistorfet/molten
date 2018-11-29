@@ -681,6 +681,13 @@ pub unsafe fn get_ltype(data: &LLVM, ttype: Type, use_fptrs: bool) -> LLVMTypeRe
             }
             LLVMStructType(ltypes.as_mut_ptr(), ltypes.len() as u32, false as i32)
         },
+        Type::Record(ref types) => {
+            let mut ltypes = vec!();
+            for (name, ttype) in types {
+                ltypes.push(get_ltype(data, ttype.clone(), true));
+            }
+            LLVMStructType(ltypes.as_mut_ptr(), ltypes.len() as u32, false as i32)
+        },
         Type::Function(ref args, ref ret, ref abi) => {
             let lftype = match abi {
                 ABI::C => cfunc_type(data, *args.clone(), *ret.clone()),
@@ -1207,7 +1214,8 @@ LLVMDumpValue(value.get_ref());
                 let pointer = LLVMBuildGEP(data.builder, tuple, indices.as_mut_ptr(), indices.len() as u32, label("tmp"));
                 LLVMBuildStore(data.builder, value, pointer);
             }
-            Box::new(Var(tuple))
+
+            Box::new(Data(LLVMBuildLoad(data.builder, tuple, label("tuple"))))
         },
 
         ExprKind::PtrCast(ref ttype, ref code) => {
