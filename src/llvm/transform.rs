@@ -77,9 +77,10 @@ pub enum ExprKind {
     PtrCast(Type, Box<Expr>),
 
     AllocObject(String),
-    AccessField(Box<Expr>, String, NodeID),
+    AccessField(Box<Expr>, usize, Type),
+    AccessVtable(Box<Expr>, String, NodeID),
+    AccessMethod(NodeID),
     AssignField(Box<Expr>, String, Box<Expr>, NodeID),
-    AccessMethod,
 
     Block(Vec<Expr>),
 }
@@ -269,7 +270,12 @@ impl<'sess> Transform<'sess> {
                                     let objexpr = Expr::new(oid, pos.clone(), ExprKind::AccessValue(String::from("__context__")));
                                     self.session.set_type(oid, cl.contexttype.clone());
 
-                                    Expr::new(*id, pos.clone(), ExprKind::AccessField(Box::new(objexpr), ident.name.clone(), oid))
+                                    let objdef = self.session.get_def(cl.contexttype.get_id().unwrap()).unwrap();
+                                    if let Some((structindex, ftype)) = objdef.as_struct().unwrap().find_field(ident.as_str()) {
+                                        Expr::new(*id, pos.clone(), ExprKind::AccessField(Box::new(objexpr), structindex, ftype))
+                                    } else {
+                                        panic!("Attempting to access a closure context member that doesn't exist: {:?}", ident.name);
+                                    }
                                 },
                                 _ => panic!("Cannot access variable outside of scope: {:?}", node),
                             }
@@ -306,22 +312,12 @@ impl<'sess> Transform<'sess> {
             },
 
             AST::Resolver(ref id, ref pos, ref tname, ref method) => {
-                Expr::new(*id, pos.clone(), ExprKind::AccessMethod)
+                Expr::new(*id, pos.clone(), ExprKind::AccessMethod(self.session.get_ref(*id).unwrap()))
             },
 
             AST::Accessor(ref id, ref pos, ref obj, ref field, ref oid) => {
-                // TODO can you figure out here if this is a vtable access, struct access, or a classvar access, and then codegen is simpler
-                //let def = self.session.get_def_from_ref(*id).unwrap();
-                //match def {
-                //    Def::Method(_) => println!("METHOD!!!!!!!!!!!"),
-                //    Def::Var(_) => println!("Probable a FIELD!!!!!: {:?} {:?}", obj, field),
-                //    _ => println!("I don't know what it is {:?}!!!!!!!!!!!!!!!!", def),
-                //}
-
-
-                // TODO instead of using the def to determine what is being accessed, you can check if the field name is in the vtable, structdef, or fallback to classvars
-
-                Expr::new(*id, pos.clone(), ExprKind::AccessField(Box::new(self.transform_expr(scope.clone(), obj)), field.name.clone(), *oid))
+                let otype = self.session.get_type(*oid).unwrap();
+                self.transform_access(scope.clone(), *id, pos.clone(), self.transform_expr(scope.clone(), obj), field.as_str(), otype, *oid)
             },
 
             AST::Assignment(ref id, ref pos, ref left, ref right) => {
@@ -386,7 +382,13 @@ impl<'sess> Transform<'sess> {
 
             AST::Match(ref id, ref pos, ref cond, ref cases, ref cid) => {
                 let cases = cases.iter().map(|(pat, body)| (self.transform_expr(scope.clone(), pat), self.transform_expr(scope.clone(), body))).collect();
-                Expr::new(*id, pos.clone(), ExprKind::Match(Box::new(self.transform_expr(scope.clone(), cond)), cases, *cid))
+                let ctype = self.session.get_type(*cid).unwrap();
+                let compid = scope.get_var_def(&String::from("==")).unwrap();
+                let compid = match self.session.get_def(compid) {
+                    Ok(Def::Overload(ol)) => ol.find_variant(self.session, scope.clone(), Type::Tuple(vec!(ctype.clone(), ctype.clone()))).unwrap().0,
+                    _ => compid,
+                };
+                Expr::new(*id, pos.clone(), ExprKind::Match(Box::new(self.transform_expr(scope.clone(), cond)), cases, compid))
             },
 
             AST::For(ref id, ref pos, ref ident, ref cond, ref body) => {
@@ -431,6 +433,20 @@ impl<'sess> Transform<'sess> {
             AST::List(_, _, _) |
             AST::Index(_, _, _, _) => panic!("InternalError: ast element shouldn't appear at this late phase: {:?}", node),
 
+        }
+    }
+
+    pub fn transform_access(&self, scope: ScopeRef, id: NodeID, pos: Pos, objexpr: Expr, field: &str, otype: Type, oid: NodeID) -> Expr {
+        //let otype = self.session.get_type(*oid).unwrap();
+        let objdef = self.session.get_def(otype.get_id().unwrap()).unwrap();
+        let ttype = self.session.get_type_from_ref(id).unwrap();
+
+        if let Some((structindex, ftype)) = objdef.as_struct().unwrap().find_field(field) {
+            Expr::new(id, pos.clone(), ExprKind::AccessField(Box::new(objexpr), structindex, ftype))
+        } else if let Some(vtableindex) = objdef.as_class().unwrap().get_vtable_index(self.session, scope.clone(), field, &ttype) {
+            Expr::new(id, pos.clone(), ExprKind::AccessVtable(Box::new(objexpr), String::from(field), oid))
+        } else {
+            Expr::new(id, pos.clone(), ExprKind::AccessMethod(self.session.get_ref(id).unwrap()))
         }
     }
 

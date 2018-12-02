@@ -210,6 +210,11 @@ impl StructDef {
         self.fields.borrow_mut().push((sname, ttype));
     }
 
+    pub fn find_field(&self, field: &str) -> Option<(usize, Type)> {
+        let index = self.get_index(field)?;
+        Some((index, self.fields.borrow()[index].1.clone()))
+    }
+
     pub fn get_index(&self, field: &str) -> Option<usize> {
         self.fields.borrow().iter().position(|ref r| r.0.as_str() == field)
     }
