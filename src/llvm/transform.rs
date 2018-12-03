@@ -78,7 +78,7 @@ pub enum ExprKind {
 
     AllocObject(String),
     AccessField(Box<Expr>, usize, Type),
-    AccessVtable(Box<Expr>, String, NodeID),
+    AccessVtable(Box<Expr>, usize, usize, Type),
     AccessMethod(NodeID),
     AssignField(Box<Expr>, String, Box<Expr>, NodeID),
 
@@ -87,7 +87,7 @@ pub enum ExprKind {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum InvokeKind {
-    Method(Box<Expr>, String, NodeID),
+    Method(Box<Expr>, Box<Expr>, NodeID),
     Func(Box<Expr>),
     Closure(Box<Expr>),
     CFunc(Box<Expr>),
@@ -214,7 +214,11 @@ impl<'sess> Transform<'sess> {
                 let mut args = self.transform_vec(scope.clone(), args);
                 let invoke = match **fexpr {
                     AST::Accessor(ref aid, ref pos, ref obj, ref field, ref oid) => {
-                        InvokeKind::Method(Box::new(self.transform_expr(scope.clone(), obj)), field.name.clone(), *oid)
+                        let rid = NodeID::generate();
+                        self.session.set_ref(rid, *oid);
+                        let objexpr = Expr::new(rid, pos.clone(), ExprKind::AccessValue(String::from("method")));
+                        let access = self.transform_access(scope.clone(), *aid, pos.clone(), objexpr, field.as_str(), self.session.get_type(*oid).unwrap(), *oid);
+                        InvokeKind::Method(Box::new(self.transform_expr(scope.clone(), obj)), Box::new(access), *oid)
                     },
                     _ => match self.session.get_type(*id) {
                         Some(Type::Function(_, _, ref abi)) => match *abi {
@@ -317,7 +321,18 @@ impl<'sess> Transform<'sess> {
 
             AST::Accessor(ref id, ref pos, ref obj, ref field, ref oid) => {
                 let otype = self.session.get_type(*oid).unwrap();
-                self.transform_access(scope.clone(), *id, pos.clone(), self.transform_expr(scope.clone(), obj), field.as_str(), otype, *oid)
+                match otype {
+                    Type::Object(_, _, _) => self.transform_access(scope.clone(), *id, pos.clone(), self.transform_expr(scope.clone(), obj), field.as_str(), otype, *oid),
+                    Type::Record(ref items) => {
+                        let index = items.iter().position(|(name, _)| *name == field.name).unwrap();
+                        Expr::new(*id, pos.clone(), ExprKind::AccessField(Box::new(self.transform_expr(scope.clone(), obj)), index, items[index].1.clone()))
+                    },
+                    Type::Tuple(ref items) => {
+                        let index = field.name.parse::<usize>().unwrap();
+                        Expr::new(*id, pos.clone(), ExprKind::AccessField(Box::new(self.transform_expr(scope.clone(), obj)), index, items[index].clone()))
+                    },
+                    _ => panic!("invalid type or something"),
+                }
             },
 
             AST::Assignment(ref id, ref pos, ref left, ref right) => {
@@ -444,7 +459,10 @@ impl<'sess> Transform<'sess> {
         if let Some((structindex, ftype)) = objdef.as_struct().unwrap().find_field(field) {
             Expr::new(id, pos.clone(), ExprKind::AccessField(Box::new(objexpr), structindex, ftype))
         } else if let Some(vtableindex) = objdef.as_class().unwrap().get_vtable_index(self.session, scope.clone(), field, &ttype) {
-            Expr::new(id, pos.clone(), ExprKind::AccessVtable(Box::new(objexpr), String::from(field), oid))
+            let classdef = objdef.as_class().unwrap();
+            let vindex = classdef.get_struct_vtable_index().unwrap();
+            let ftype = classdef.get_vtable_type(vtableindex);
+            Expr::new(id, pos.clone(), ExprKind::AccessVtable(Box::new(objexpr), vindex, vtableindex, ftype))
         } else {
             Expr::new(id, pos.clone(), ExprKind::AccessMethod(self.session.get_ref(id).unwrap()))
         }

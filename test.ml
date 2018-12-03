@@ -234,10 +234,21 @@
         println(strnum(12))
         println(strnum(1.214))
 
+
+        /// Exceptions
+
         // TODO not yet implemented
         //try str(123) with
         //    _ => a * 16
 
+        //try raise a with
+        //    1 => a
+        //    2 => a * 4
+        //    _ => a * 16
+
+
+
+        /// Lists, Buffers, Alloc
 
         let alloc = malloc(30)
 
@@ -334,10 +345,14 @@
         thing "things"
 
 
+
+        /// For Loops
+
         let numbers = [ 1, 2, 3 ]
         numbers.insert(1, 5)
         for x in numbers
             println("Count: " + str(x))
+
 
         /// Type Defs
 
@@ -355,14 +370,21 @@
             //a.things = 5
         }
 
-        let nt = (1, 4)
-        let nr = { a = 1, b = 4 }
-        //println("Tuple 0: " + str(nt.0))
-        //println("Record a: " + str(nr.b))
 
-        /// Closures
+        /// Tuples
+
+        let t = (1, 3, 5)
+        println("Tuple #2: " + str(t.1))
+
+        /// Records
+
+        let nr = { a = 1, b = 4 }
+        println("Record a: " + str(nr.b))
+
 
 /*
+        /// Closures
+
         fn test() {
             let a = 98899
             fn closure() {
@@ -374,24 +396,9 @@
 */
 
 
-    /*
 
-        /// Random things from parser testing
-
-        while a > 0     //things
-            recfoo(5)
-        while x
-            noop
-
-        try raise a with
-            1 => a
-            2 => a * 4
-            _ => a * 16
-
-
-        thing.stuff() * ~foo().bar
-
-    */
+        // TODO parse test?
+        //thing.stuff() * ~foo().bar
 
         // things
         /* stuff */

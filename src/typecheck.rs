@@ -305,18 +305,35 @@ pub fn get_access_ids(session: &Session, scope: ScopeRef, node: &AST) -> Result<
         AST::Identifier(ref id, _, _) => {
             Ok(Some((*id, session.get_ref(*id)?)))
         },
-        AST::Accessor(ref id, _, ref left, ref field, ref oid) => {
-            let ltype = resolve_type(session, check_types_node(session, scope.clone(), left, None));
-            session.set_type(*oid, ltype.clone());
-
-            let vars = session.get_def(ltype.get_id()?)?.get_vars()?;
-            Ok(Some((*id, vars.get_var_def(&field.name).ok_or(Error::new(format!("VarError: definition not set for {:?}", field.name)))?)))
-        },
         AST::Resolver(ref id, _, ref left, ref field) => {
             let ltype = session.get_type_from_ref(*id).unwrap();
 
             let vars = session.get_def(ltype.get_id()?)?.get_vars()?;
             Ok(Some((*id, vars.get_var_def(&field.name).ok_or(Error::new(format!("VarError: definition not set for {:?}", field.name)))?)))
+        },
+        AST::Accessor(ref id, _, ref left, ref field, ref oid) => {
+            let ltype = resolve_type(session, check_types_node(session, scope.clone(), left, None));
+            session.set_type(*oid, ltype.clone());
+
+            match ltype {
+                Type::Object(_, lid, _) => {
+                    let vars = session.get_def(ltype.get_id()?)?.get_vars()?;
+                    Ok(Some((*id, vars.get_var_def(&field.name).ok_or(Error::new(format!("VarError: definition not set for {:?}", field.name)))?)))
+                },
+                Type::Record(ref items) => {
+                    let defid = NodeID::generate();
+                    let index = items.iter().position(|(name, _)| *name == field.name).unwrap();
+                    session.set_type(defid, items[index].1.clone());
+                    Ok(Some((*id, defid)))
+                },
+                Type::Tuple(ref items) => {
+                    let defid = NodeID::generate();
+                    let index = field.name.parse::<usize>().unwrap();
+                    session.set_type(defid, items[index].clone());
+                    Ok(Some((*id, defid)))
+                },
+                _ => panic!("")
+            }
         },
         _ => { Ok(None) },
     }
