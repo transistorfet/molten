@@ -160,11 +160,11 @@ impl<'sess> Transform<'sess> {
                 if let Def::Closure(ref cl) = def {
                     let cid = NodeID::generate();
                     let cname = String::from("__context__");
-                    args.insert(0, (cid, cname.clone()));
+                    args.push((cid, cname.clone()));
                     ArgDef::define(self.session, fscope.clone(), cid, false, &cname, Some(cl.contexttype.clone())).unwrap();
-                    let ftype = cl.add_context_to_ftype(self.session);
+                    let ftype = cl.add_context_to_ftype(self.session, scope.clone());
                     let real_fname = fname.clone() + &"_func";
-                    cl.add_field(self.session, real_fname.as_str(), ftype);
+                    //cl.add_field(self.session, real_fname.as_str(), ftype);
                     let index = self.toplevel.borrow().len();
 
                     self.set_context(CodeContext::Closure(*id));
@@ -185,7 +185,7 @@ impl<'sess> Transform<'sess> {
                             AST::make_ident_from_str(pos.clone(), field.as_str()))
                         );
                     }
-                    code.push(AST::make_ident(pos.clone(), Ident::new(fname.clone())));
+                    code.push(AST::Tuple(NodeID::generate(), pos.clone(), vec!(AST::make_ident_from_str(pos.clone(), real_fname.as_str()), AST::make_ident(pos.clone(), Ident::new(fname.clone())))));
 
                     binding::bind_names(self.session, scope.clone(), &mut code);
                     typecheck::check_types(self.session, scope.clone(), &code);

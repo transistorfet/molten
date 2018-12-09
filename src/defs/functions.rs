@@ -227,15 +227,16 @@ impl ClosureDef {
     }
 
     // TODO I don't like this
-    pub fn add_context_to_ftype(&self, session: &Session) -> Type {
+    pub fn add_context_to_ftype(&self, session: &Session, scope: ScopeRef) -> Type {
         match session.get_type(self.id) {
             Some(Type::Function(mut args, ret, abi)) => {
                 let args = match *args {
                     Type::Tuple(mut items) => {
-                        items.insert(0, self.contexttype.clone());
+                        //items.push(self.contexttype.clone());
+                        items.push(scope.new_typevar(session));
                         Type::Tuple(items)
                     },
-                    ttype @ _ => Type::Tuple(vec!(self.contexttype.clone(), ttype)),
+                    ttype @ _ => Type::Tuple(vec!(ttype, self.contexttype.clone())),
                 };
                 let ftype = Type::Function(Box::new(args), ret, abi);
                 session.set_type(self.id, ftype.clone());

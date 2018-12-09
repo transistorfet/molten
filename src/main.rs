@@ -98,11 +98,12 @@ fn compile_file(input: &str, output: Option<&str>) {
 
     session.resolve_types();
 
+    export::write_exports(&session, session.map.get_global(), format!("{}.dec", session.target).as_str(), &code);
+
     let transform = transform::Transform::new(&session);
     transform.transform_program(session.map.get_global(), &code);
     //println!("TRANSFORM:\n{:#?}", &*transform.toplevel.borrow());
     codegen::generate(&builtins, &session, &*transform.toplevel.borrow());
-    export::write_exports(&session, session.map.get_global(), format!("{}.dec", session.target).as_str(), &code);
 
     if Options::as_ref().debug {
         for (ref id, ref ttype) in session.types.borrow().iter() {

@@ -193,7 +193,7 @@ pub fn get_builtins<'sess>() -> Vec<BuiltinDef<'sess>> {
             BuiltinDef::Func(id(), "[]",   "(String, Int) -> Int",       Func::Runtime(build_string_get)),
         )),
         */
-        BuiltinDef::Func(id(), "getindex",   "(String, Int) -> Int",       Func::Runtime(build_string_get)),
+        BuiltinDef::Func(id(), "getindex",   "(String, Int) -> Int / C",      Func::Runtime(build_string_get)),
 
 
         BuiltinDef::Func(id(), "malloc",     "(Int) -> 'ptr / C",             Func::External),

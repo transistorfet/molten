@@ -117,10 +117,12 @@ impl Compilable for Closure {
     }
 
     unsafe fn invoke(&self, data: &LLVM, unwind: Unwind, mut largs: Vec<LLVMValueRef>) -> LLVMValueRef {
-LLVMDumpValue(self.0);
-        //let func = build_struct_access(data, 0, self.0);
-        //LLVMBuildCall(data.builder, func, largs.as_mut_ptr(), largs.len() as u32, label("tmp"))
-        self.0
+        LLVMDumpValue(self.0);
+        let func = build_struct_load(data, self.0, 0);
+        let context = build_struct_load(data, self.0, 1);
+        largs.push(context);
+        LLVMBuildCall(data.builder, func, largs.as_mut_ptr(), largs.len() as u32, label("cloj"))
+        //self.0
     }
 }
 
@@ -400,14 +402,6 @@ pub unsafe fn cfunc_type(data: &LLVM, args: Type, ret: Type) -> LLVMTypeRef {
     LLVMFunctionType(rtype, atypes.as_mut_ptr(), atypes.len() as u32, false as i32)
 }
 
-pub unsafe fn ptr_type_of(lftype: LLVMTypeRef) -> LLVMTypeRef {
-    //if use_fptrs {
-        LLVMPointerType(lftype, 0)
-    //} else {
-    //    lftype
-    //}
-}
-
 
 pub unsafe fn null_value(ttype: LLVMTypeRef) -> LLVMValueRef {
     LLVMConstNull(ttype)
@@ -683,13 +677,12 @@ pub unsafe fn get_ltype(data: &LLVM, ttype: Type, use_fptrs: bool) -> LLVMTypeRe
             };
 
             if use_fptrs {
-                ptr_type_of(lftype)
+                LLVMPointerType(lftype, 0)
             } else {
                 lftype
             }
         },
         // TODO this is not the correct way to deal with type variables... there should be overloaded functions generated
-        //Type::Variable(_, _) => LLVMInt64TypeInContext(data.context),
         Type::Variable(_, _) => str_type(data), //ptr_type(data),
         _ => panic!("InvalidType: cannot convert to llvm, {:?}", ttype),
     }
@@ -831,7 +824,7 @@ pub unsafe fn generate_expr(data: &LLVM, func: LLVMValueRef, unwind: Unwind, sco
                 },
                 InvokeKind::Closure(ref fexpr) => {
                     let closure = generate_expr(data, func, unwind, scope.clone(), fexpr).get_ref();
-                    largs.insert(0, closure);
+                    largs.push(closure);
                     Box::new(Closure(closure))
                 },
                 InvokeKind::CFunc(ref fexpr) |
@@ -842,14 +835,6 @@ pub unsafe fn generate_expr(data: &LLVM, func: LLVMValueRef, unwind: Unwind, sco
 
             generate_cast_args(data, function.get_ref(), &mut largs);
             let value = function.invoke(data, unwind, largs);
-            // TODO this is perhaps an alternate way of doing calls?
-            //let value = match invoke {
-            //    InvokeKind::Func(_) |
-            //    InvokeKind::Method(_, _, _) => invoke_molten_function(data, function.get_ref(), unwind, largs),
-            //
-            //    InvokeKind::CFunc(_) |
-            //    InvokeKind::CByName(_) => invoke_c_function(data, function.get_ref(), unwind, largs),
-            //};
             let value = generate_cast(data, rtype.clone(), value);
 
             from_type(&rtype, value)
@@ -896,11 +881,11 @@ pub unsafe fn generate_expr(data: &LLVM, func: LLVMValueRef, unwind: Unwind, sco
         },
 
         ExprKind::SetClosure(ref value) => {
-            let cl = data.session.get_def(expr.id).unwrap().as_closure().unwrap();
+            //let cl = data.session.get_def(expr.id).unwrap().as_closure().unwrap();
             //let value = data.get_value(cl.varid).unwrap();
             let value = generate_expr(data, func, unwind, scope.clone(), value);
-LLVMDumpValue(value.get_ref());
             data.set_value(expr.id, value.clone());
+            LLVMDumpValue(value.get_ref());
             value
         },
 
