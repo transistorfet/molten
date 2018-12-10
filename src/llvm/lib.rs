@@ -61,8 +61,15 @@ pub fn declare_builtins_vec<'sess>(session: &Session, scope: ScopeRef, entries: 
 pub fn declare_builtins_node<'sess>(session: &Session, scope: ScopeRef, node: &BuiltinDef<'sess>) {
     match *node {
         BuiltinDef::Func(ref id, ref name, ref ftype, ref func) => {
+            let tscope = if scope.is_primative() {
+                Scope::new_ref(Some(scope.clone()))
+            } else {
+                scope.clone()
+            };
+
             let mut ftype = parse_type(ftype);
-            declare_typevars(session, scope.clone(), ftype.as_mut(), false).unwrap();
+            declare_typevars(session, tscope.clone(), ftype.as_mut(), true).unwrap();
+            debug!("BUILTIN TYPE: {:?}", ftype);
             let abi = ftype.as_ref().map(|t| t.get_abi().unwrap()).unwrap_or(ABI::Molten);
             match *func {
                 Func::Comptime(_) => {
@@ -221,6 +228,9 @@ pub fn get_builtins<'sess>() -> Vec<BuiltinDef<'sess>> {
         )),
 
 
+        BuiltinDef::Func(id(), "!",   "(ref 'ptr) -> 'ptr",   Func::Comptime(deref)),
+
+
         BuiltinDef::Func(id(), "+",   "(Int, Int) -> Int",    Func::Comptime(add_int)),
         BuiltinDef::Func(id(), "-",   "(Int, Int) -> Int",    Func::Comptime(sub_int)),
         BuiltinDef::Func(id(), "*",   "(Int, Int) -> Int",    Func::Comptime(mul_int)),
@@ -261,6 +271,9 @@ pub fn get_builtins<'sess>() -> Vec<BuiltinDef<'sess>> {
         BuiltinDef::Func(id(), "not", "(Bool) -> Bool",       Func::Comptime(not_bool)),
     )
 }
+
+fn deref(data: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildLoad(data.builder, args[0], label("tmp")) } }
+
 
 fn add_int(data: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildAdd(data.builder, args[0], args[1], label("tmp")) } }
 fn sub_int(data: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildSub(data.builder, args[0], args[1], label("tmp")) } }

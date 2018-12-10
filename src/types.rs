@@ -16,6 +16,7 @@ pub enum Type {
     Function(Box<Type>, Box<Type>, ABI),
     Tuple(Vec<Type>),
     Record(Vec<(String, Type)>),
+    Ref(Box<Type>),
 
     // TODO this isn't used atm, I don't think, but we could use it for a constrained type
     Ambiguous(Vec<Type>),
@@ -176,6 +177,9 @@ impl fmt::Display for Type {
             Type::Function(ref args, ref ret, ref abi) => {
                 write!(f, "{} -> {}{}", args, *ret, abi)
             }
+            Type::Ref(ref ttype) => {
+                write!(f, "ref {}", ttype)
+            }
             Type::Ambiguous(ref variants) => {
                 let varstr: Vec<String> = variants.iter().map(|v| format!("{}", v)).collect();
                 write!(f, "Ambiguous[{}]", varstr.join(", "))
@@ -191,7 +195,7 @@ impl fmt::Display for Type {
 //}
 
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub enum Check {
     Def,
     List,
@@ -267,7 +271,7 @@ pub fn check_type(session: &Session, scope: ScopeRef, odtype: Option<Type>, octy
                 (Type::Function(ref aargs, ref aret, ref aabi), Type::Function(ref bargs, ref bret, ref babi)) => {
                     let oabi = aabi.compare(babi);
                     if oabi.is_some() {
-                        let mut argtypes = check_type(session, scope.clone(), Some(*aargs.clone()), Some(*bargs.clone()), mode.clone(), update)?;
+                        let mut argtypes = check_type(session, scope.clone(), Some(*aargs.clone()), Some(*bargs.clone()), mode, update)?;
                         Ok(Type::Function(Box::new(argtypes), Box::new(check_type(session, scope, Some(*aret.clone()), Some(*bret.clone()), mode, update)?), oabi.unwrap()))
                     } else {
                         Err(Error::new(format!("TypeError: type mismatch, expected {} but found {}", dtype, ctype)))
@@ -277,7 +281,7 @@ pub fn check_type(session: &Session, scope: ScopeRef, odtype: Option<Type>, octy
                     let mut types = vec!();
                     if atypes.len() == btypes.len() {
                         for (atype, btype) in atypes.iter().zip(btypes.iter()) {
-                            types.push(check_type(session, scope.clone(), Some(atype.clone()), Some(btype.clone()), mode.clone(), update)?);
+                            types.push(check_type(session, scope.clone(), Some(atype.clone()), Some(btype.clone()), mode, update)?);
                         }
                         Ok(Type::Tuple(types))
                     } else {
@@ -291,7 +295,7 @@ pub fn check_type(session: &Session, scope: ScopeRef, odtype: Option<Type>, octy
                             if aname != bname {
                                 return Err(Error::new(format!("TypeError: type mismatch, expected {} but found {}", dtype, ctype)));
                             }
-                            types.push((aname.clone(), check_type(session, scope.clone(), Some(atype.clone()), Some(btype.clone()), mode.clone(), update)?));
+                            types.push((aname.clone(), check_type(session, scope.clone(), Some(atype.clone()), Some(btype.clone()), mode, update)?));
                         }
                         Ok(Type::Record(types))
                     } else {
@@ -299,13 +303,17 @@ pub fn check_type(session: &Session, scope: ScopeRef, odtype: Option<Type>, octy
                     }
                 },
                 (Type::Object(ref aname, ref aid, ref atypes), Type::Object(ref bname, ref bid, ref btypes)) => {
-                    match is_subclass_of(session, scope.clone(), (bname, *bid, btypes), (aname, *aid, atypes), mode.clone()) {
+                    match is_subclass_of(session, scope.clone(), (bname, *bid, btypes), (aname, *aid, atypes), mode) {
                         ok @ Ok(_) => ok,
                         err @ Err(_) => match mode {
-                            Check::List => is_subclass_of(session, scope, (aname, *aid, atypes), (bname, *bid, btypes), mode.clone()),
+                            Check::List => is_subclass_of(session, scope, (aname, *aid, atypes), (bname, *bid, btypes), mode),
                             _ => err,
                         }
                     }
+                },
+                (Type::Ref(ref atype), Type::Ref(ref btype)) => {
+                    let ttype = check_type(session, scope.clone(), Some(*atype.clone()), Some(*btype.clone()), mode, update)?;
+                    Ok(Type::Ref(Box::new(ttype)))
                 },
                 (_, Type::Ambiguous(_)) |
                 (Type::Ambiguous(_), _) => Err(Error::new(format!("TypeError: overloaded types are not allowed here..."))),
@@ -331,11 +339,11 @@ fn is_subclass_of(session: &Session, scope: ScopeRef, adef: (&String, UniqueID, 
     loop {
         let mut class = session.get_type(adef.1).unwrap();
         class = tscope.map_typevars(session, &mut names, class);
-        adef.2 = check_type_params(session, tscope.clone(), &class.get_params()?, &adef.2, mode.clone(), true)?;
+        adef.2 = check_type_params(session, tscope.clone(), &class.get_params()?, &adef.2, mode, true)?;
 
         if *bdef.0 == adef.0 {
             let ptypes = if bdef.2.len() > 0 || adef.2.len() > 0 {
-                check_type_params(session, tscope.clone(), &adef.2, bdef.2, mode.clone(), true)?
+                check_type_params(session, tscope.clone(), &adef.2, bdef.2, mode, true)?
             } else {
                 vec!()
             };
@@ -362,7 +370,7 @@ pub fn check_type_params(session: &Session, scope: ScopeRef, dtypes: &Vec<Type>,
     } else {
         let mut ptypes = vec!();
         for (dtype, ctype) in dtypes.iter().zip(ctypes.iter()) {
-            ptypes.push(check_type(session, scope.clone(), Some(dtype.clone()), Some(ctype.clone()), mode.clone(), update)?);
+            ptypes.push(check_type(session, scope.clone(), Some(dtype.clone()), Some(ctype.clone()), mode, update)?);
         }
         Ok(ptypes)
     }
@@ -401,6 +409,9 @@ pub fn resolve_type(session: &Session, ttype: Type) -> Type {
         },
         Type::Function(ref args, ref ret, ref abi) => {
             Type::Function(Box::new(resolve_type(session, *args.clone())), Box::new(resolve_type(session, *ret.clone())), *abi)
+        },
+        Type::Ref(ref ttype) => {
+            Type::Ref(Box::new(resolve_type(session, *ttype.clone())))
         },
         Type::Ambiguous(ref variants) => {
             let newvars = variants.iter().map(|variant| resolve_type(session, variant.clone())).collect();

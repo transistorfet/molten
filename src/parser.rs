@@ -1,7 +1,23 @@
 
 
 extern crate nom;
-use nom::{ digit, hex_digit, oct_digit, line_ending, not_line_ending, anychar, space, multispace, is_alphanumeric, is_alphabetic, is_space, Needed, IResult, Context };
+use nom::{
+    digit,
+    hex_digit,
+    oct_digit,
+    line_ending,
+    not_line_ending,
+    anychar,
+    space,
+    multispace,
+    is_alphanumeric,
+    is_alphabetic,
+    is_space,
+    Needed,
+    IResult,
+    Context,
+    ErrorKind
+};
 use nom::types::CompleteByteSlice;
 
 extern crate nom_locate;
@@ -230,6 +246,7 @@ named!(expression(Span) -> AST,
         newclass |
         declare |
         function |
+        reference |
         infix
     )
 );
@@ -371,6 +388,15 @@ named!(function(Span) -> AST,
     )
 );
 
+named!(reference(Span) -> AST,
+    do_parse!(
+        pos: position!() >>
+        wscom!(tag_word!("ref")) >>
+        e: expression >>
+        (AST::make_ref(Pos::new(pos), e))
+    )
+);
+
 named!(argument_list(Span) -> Vec<Argument>,
     separated_list_complete!(tag!(","),
         do_parse!(
@@ -487,6 +513,7 @@ named!(atomic(Span) -> AST,
 named!(prefix_op(Span) -> Ident,
     map_ident!(alt!(
         tag_word!("not") |
+        tag!("!") |
         tag!("~")
     ))
 );
@@ -560,7 +587,7 @@ named!(identifier_node(Span) -> AST,
 
 named!(identifier(Span) -> Ident,
     do_parse!(
-        not!(reserved) >>
+        not_reserved >>
         s: recognize!(preceded!(
             take_while1!(is_alpha_underscore),
             take_while!(is_alphanumeric_underscore)
@@ -610,10 +637,19 @@ named!(type_description(Span) -> Type,
     alt_complete!(
         type_function |
         type_unit |
+        type_ref |
         type_tuple |
         type_record |
         type_variable |
         type_object
+    )
+);
+
+named!(type_ref(Span) -> Type,
+    do_parse!(
+        wscom!(tag_word!("ref")) >>
+        s: type_description >>
+        (Type::Ref(Box::new(s)))
     )
 );
 
@@ -683,8 +719,10 @@ named!(abi_specifier(Span) -> ABI,
 );
 
 
-named!(reserved(Span) -> Span,
-    alt!(
+named!(not_reserved(Span) -> (),
+    // TODO you need to figure out the add_error thing to raise a specific error
+    //return_error!(ErrorKind::Custom(128), alt!(
+    not!(alt!(
         tag_word!("do") |
         tag_word!("end") |
         tag_word!("while") |
@@ -697,7 +735,7 @@ named!(reserved(Span) -> Span,
         tag_word!("try") | tag_word!("with") | tag_word!("raise") |
         tag_word!("for") | tag_word!("in") |
         tag_word!("fn") | tag_word!("decl")
-    )
+    ))
 );
 
 

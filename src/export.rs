@@ -94,7 +94,7 @@ pub fn unparse_type(session: &Session, scope: ScopeRef, ttype: Type) -> String {
             }
             //format!("'v{}", id)
             format!("'{}", name)
-        }
+        },
         Type::Tuple(types) => {
             let tuple: Vec<String> = types.iter().map(|t| unparse_type(session, scope.clone(), t.clone())).collect();
             format!("({})", tuple.join(", "))
@@ -105,7 +105,10 @@ pub fn unparse_type(session: &Session, scope: ScopeRef, ttype: Type) -> String {
         },
         Type::Function(args, ret, abi) => {
             format!("{} -> {}{}", unparse_type(session, scope.clone(), *args), unparse_type(session, scope.clone(), *ret), abi)
-        }
+        },
+        Type::Ref(ttype) => {
+            format!("ref {}", unparse_type(session, scope.clone(), *ttype))
+        },
         Type::Ambiguous(variants) => {
             let varstr: Vec<String> = variants.iter().map(|v| unparse_type(session, scope.clone(), v.clone())).collect();
             format!("Ambiguous[{}]", varstr.join(", "))

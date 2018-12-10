@@ -66,6 +66,7 @@ pub enum AST {
     Literal(NodeID, Literal),
     Nil(NodeID),
     PtrCast(Type, Box<AST>),
+    Ref(NodeID, Pos, Box<AST>),
 
     Tuple(NodeID, Pos, Vec<AST>),
     Record(NodeID, Pos, Vec<(Ident, AST)>),
@@ -200,6 +201,7 @@ impl Field {
 impl AST {
     pub fn get_pos(&self) -> Pos {
         match *self {
+            AST::Ref(_, ref pos, _) |
             AST::Tuple(_, ref pos, _) |
             AST::Record(_, ref pos, _) |
             AST::List(_, ref pos, _) |
@@ -233,6 +235,7 @@ impl AST {
         match *self {
             AST::Literal(ref id, _) |
             AST::Nil(ref id) |
+            AST::Ref(ref id, _, _) |
             AST::Tuple(ref id, _, _) |
             AST::Record(ref id, _, _) |
             AST::List(ref id, _, _) |
@@ -260,6 +263,10 @@ impl AST {
             AST::TypeDef(ref id, _, _, _) => { *id }
             _ => UniqueID(0),
         }
+    }
+
+    pub fn make_ref(pos: Pos, expr: AST) -> AST {
+        AST::Ref(NodeID::generate(), pos, Box::new(expr))
     }
 
     pub fn make_lit(literal: Literal) -> AST {

@@ -650,6 +650,10 @@ pub unsafe fn get_ltype(data: &LLVM, ttype: Type, use_fptrs: bool) -> LLVMTypeRe
                 None => panic!("CompileError: unassigned type value, {:?}", tname),
             }
         },
+        Type::Ref(ref ttype) => {
+            let ltype = get_ltype(data, *ttype.clone(), true);
+            LLVMPointerType(ltype, 0)
+        },
         Type::Tuple(ref types) => {
             let mut ltypes = vec!();
             for ttype in types {
@@ -880,9 +884,7 @@ pub unsafe fn generate_expr(data: &LLVM, func: LLVMValueRef, unwind: Unwind, sco
             }
         },
 
-        ExprKind::SetClosure(ref value) => {
-            //let cl = data.session.get_def(expr.id).unwrap().as_closure().unwrap();
-            //let value = data.get_value(cl.varid).unwrap();
+        ExprKind::SetValue(ref value) => {
             let value = generate_expr(data, func, unwind, scope.clone(), value);
             data.set_value(expr.id, value.clone());
             LLVMDumpValue(value.get_ref());
@@ -1179,6 +1181,19 @@ pub unsafe fn generate_expr(data: &LLVM, func: LLVMValueRef, unwind: Unwind, sco
 
 
         /////// Miscellaneous ///////
+
+        ExprKind::Ref(ref code) => {
+            // TODO can you unify this with AllocObject?
+            let value = generate_expr(data, func, unwind, scope.clone(), &**code).get_ref();
+
+            let ttype = data.session.get_type(expr.id).unwrap();
+            let ltype = get_ltype(data, ttype.clone(), true);
+
+            let mem = LLVMBuildMalloc(data.builder, LLVMGetElementType(ltype), label("ptr"));
+            let reference = LLVMBuildPointerCast(data.builder, mem, ltype, label("ptr"));
+            LLVMBuildStore(data.builder, value, reference);
+            from_type(&ttype, reference)
+        },
 
         ExprKind::Tuple(ref items) => {
             let ttype = data.session.get_type(expr.id).unwrap();

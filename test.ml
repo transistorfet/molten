@@ -185,7 +185,7 @@
         } else {
             a * -1;
         }
-        //println("semicolon: " + str(d))
+        println("semicolon: " + str(d))
 
         fn strnum(num: Int) -> String {
             let buffer: String = malloc(22)
@@ -380,6 +380,13 @@
 
         let nr = { a = 1, b = 4 }
         println("Record a: " + str(nr.b))
+
+
+        /// References
+
+        let rr = ref 999
+        let v = !rr
+        println(str(v))
 
 
 /*

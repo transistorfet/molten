@@ -79,6 +79,8 @@ pub fn refine_node(node: AST) -> AST {
             AST::For(id, pos, ident, Box::new(refine_node(*cond)), Box::new(refine_node(*body)))
         },
 
+        AST::Ref(id, pos, expr) => { AST::Ref(id, pos, Box::new(refine_node(*expr))) },
+
         AST::Tuple(id, pos, items) => { AST::Tuple(id, pos, refine_vec(items)) },
 
         AST::Record(id, pos, items) => { AST::Record(id, pos, items.into_iter().map(|(i, e)| (i, refine_node(e))).collect()) },

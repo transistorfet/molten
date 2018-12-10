@@ -327,6 +327,7 @@ impl Scope {
             Type::Tuple(types) => Type::Tuple(self.map_typevars_vec(session, varmap, types)),
             Type::Record(types) => Type::Record(types.into_iter().map(|(n, t)| (n, self.map_typevars(session, varmap, t))).collect()),
             Type::Ambiguous(variants) => Type::Ambiguous(self.map_typevars_vec(session, varmap, variants)),
+            Type::Ref(ttype) => Type::Ref(Box::new(self.map_typevars(session, varmap, *ttype))),
             Type::Object(name, id, types) => Type::Object(name.clone(), id, self.map_typevars_vec(session, varmap, types)),
         }
     }
@@ -352,6 +353,7 @@ impl Scope {
             Type::Tuple(types) => Type::Tuple(self.unmap_typevars_vec(session, varmap, types)),
             Type::Record(types) => Type::Record(types.into_iter().map(|(n, t)| (n, self.unmap_typevars(session, varmap, t))).collect()),
             Type::Ambiguous(variants) => Type::Ambiguous(self.unmap_typevars_vec(session, varmap, variants)),
+            Type::Ref(ttype) => Type::Ref(Box::new(self.unmap_typevars(session, varmap, *ttype))),
             Type::Object(name, id, types) => Type::Object(name.clone(), id, self.unmap_typevars_vec(session, varmap, types)),
         }
     }

@@ -195,6 +195,14 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &AST,
             ttype
         },
 
+        AST::Ref(ref id, _, ref expr) => {
+            let ttype = check_types_node(session, scope.clone(), expr, None);
+            let rtype = Type::Ref(Box::new(ttype));
+            let rtype = expect_type(session, scope.clone(), expected.clone(), Some(rtype), Check::Def)?;
+            session.set_type(*id, rtype.clone());
+            rtype
+        },
+
         AST::Tuple(ref id, _, ref items) => {
             // TODO would this not be a bug if the expected type was for some reason a variable?
             //let etypes = match expected {

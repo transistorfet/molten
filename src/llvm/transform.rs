@@ -62,7 +62,7 @@ pub enum ExprKind {
     DefVar(String, Box<Expr>),
     DefGlobal(String, Box<Expr>),
     AccessVar(String),
-    SetClosure(Box<Expr>),
+    SetValue(Box<Expr>),
 
     SideEffect(String, Vec<Expr>),
     If(Box<Expr>, Box<Expr>, Box<Expr>),
@@ -73,6 +73,7 @@ pub enum ExprKind {
     Try(Box<Expr>, Vec<(Expr, Expr)>, NodeID),
     Raise(Box<Expr>),
 
+    Ref(Box<Expr>),
     Tuple(Vec<Expr>),
     PtrCast(Type, Box<Expr>),
 
@@ -191,7 +192,7 @@ impl<'sess> Transform<'sess> {
                     typecheck::check_types(self.session, scope.clone(), &code);
                     let mut access = self.transform_vec(scope.clone(), &code);
                     let last = access.pop().unwrap();
-                    access.push(Expr::new(*id, pos.clone(), ExprKind::SetClosure(Box::new(last))));
+                    access.push(Expr::new(*id, pos.clone(), ExprKind::SetValue(Box::new(last))));
                     println!("THE THING: {:#?}", access);
 
                     //self.add_closure(*id, pos.clone(), fid, real_fname.clone(), fname.clone(), args, body);
@@ -430,6 +431,10 @@ impl<'sess> Transform<'sess> {
 
             AST::Literal(ref id, ref lit) => Expr::new(*id, Pos::empty(), ExprKind::Literal(lit.clone())),
             AST::Nil(ref id) => Expr::new(*id, Pos::empty(), ExprKind::Nil),
+
+            AST::Ref(ref id, ref pos, ref expr) => {
+                Expr::new(*id, pos.clone(), ExprKind::Ref(Box::new(self.transform_expr(scope.clone(), expr))))
+            },
 
             AST::Tuple(ref id, ref pos, ref items) => {
                 let items = items.iter().map(|item| self.transform_expr(scope.clone(), item)).collect();

@@ -118,6 +118,8 @@ fn bind_names_node_or_error(session: &Session, scope: ScopeRef, node: &mut AST) 
             bind_names_node(session, lscope, body);
         },
 
+        AST::Ref(_, _, ref mut code) => { bind_names_node(session, scope, code.as_mut()); },
+
         AST::Tuple(_, _, ref mut code) |
         AST::List(_, _, ref mut code) |
         AST::Block(_, _, ref mut code) => { bind_names_vec(session, scope, code); },
@@ -268,13 +270,13 @@ pub fn declare_typevars(session: &Session, scope: ScopeRef, ttype: Option<&mut T
                     _ => {
                         *id = UniqueID::generate();
                         let ttype = Type::Variable(name.clone(), *id);
-                        // TODO i think this contains check should be removable
-                        if !scope.contains_type_local(name) && !scope.is_primative() {
-                            scope.define_type(name.clone(), Some(*id))?;
-                        }
+                        scope.define_type(name.clone(), Some(*id))?;
                         session.set_type(*id, ttype);
                     }
                 }
+            },
+            &mut Type::Ref(ref mut ttype) => {
+                declare_typevars(session, scope.clone(), Some(ttype), always_new)?;
             },
             &mut Type::Ambiguous(_) => { },
         },
