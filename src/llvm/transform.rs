@@ -178,6 +178,8 @@ impl<'sess> Transform<'sess> {
                     let fid = NodeID::generate();
                     //let tscope = Scope::new_ref(Some(scope.clone()));
                     let mut code = vec!();
+                    /*
+                    // TODO this is replaced below...
                     code.push(AST::Definition(cl.varid, pos.clone(), true, Ident::new(fname.clone()), None, Box::new(AST::make_new(pos.clone(), ClassSpec::from_str(format!("{}_context_{}", cl.name, cl.contextid).as_str())))));
                     FuncDef::define(self.session, scope.clone(), fid, &Some(real_fname.clone()), Some(self.session.get_type(*id).unwrap()));
                     for (index, &(ref field, ref ttype)) in cl.context.fields.borrow().iter().enumerate() {
@@ -186,6 +188,15 @@ impl<'sess> Transform<'sess> {
                             AST::make_ident_from_str(pos.clone(), field.as_str()))
                         );
                     }
+                    */
+
+                    FuncDef::define(self.session, scope.clone(), fid, &Some(real_fname.clone()), Some(self.session.get_type(*id).unwrap()));
+
+                    let mut exprs = vec!();
+                    for (index, &(ref field, ref ttype)) in cl.context.fields.borrow().iter().enumerate() {
+                        exprs.push((Ident::from_str(field.as_str()), AST::make_ident_from_str(pos.clone(), field.as_str())));
+                    }
+                    code.push(AST::Definition(cl.varid, pos.clone(), true, Ident::new(fname.clone()), None, Box::new(AST::make_ref(pos.clone(), AST::make_record(pos.clone(), exprs)))));
                     code.push(AST::Tuple(NodeID::generate(), pos.clone(), vec!(AST::make_ident_from_str(pos.clone(), real_fname.as_str()), AST::make_ident(pos.clone(), Ident::new(fname.clone())))));
 
                     binding::bind_names(self.session, scope.clone(), &mut code);
@@ -197,7 +208,6 @@ impl<'sess> Transform<'sess> {
 
                     //self.add_closure(*id, pos.clone(), fid, real_fname.clone(), fname.clone(), args, body);
                     self.toplevel.borrow_mut().insert(index, TopLevel::new(*id, pos.clone(), TopKind::Closure(fid, real_fname.clone(), fname.clone(), args, body)));
-                    //Expr::new(*id, pos.clone(), ExprKind::MakeClosure)
                     Expr::new(*id, pos.clone(), ExprKind::Block(access))
                 } else {
                     self.add_function(*id, pos.clone(), fname.clone(), args, self.transform_expr(fscope.clone(), body));

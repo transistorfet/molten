@@ -1,6 +1,16 @@
 
 * try upgrading to llvm 7
+* replace the typedef stuff with type aliasing
+* once again, can you simplify the closure context construction code, particularly now that we have records and refs
+* should you unify some aspects of references and objects?  at least the codegen stuff, rather than duplicating some code
 
+* you could require that classes explicitly define their type variables by name, to catch type errors.  So every method or definition in the top level of the class
+  could only use explicitly declared type variables
+
+* I think it should be doable to make all functions including methods be closures, especially if you put the context at the end
+* we need to make molten code and transform in order to convert nested closures. We at least need to transform the record constructor to convert the idents
+let context = ref { var1 = ident1, var2 = ident2 }
+return (func, context)
 
 =====
 * ideally, the transformed code should be directly compilable, such that you can use it for defining builtin runtime funcs, and desugared stuff.  It has to be easy to make and build up
@@ -11,7 +21,7 @@
 * make casting transforms that do an LLVM cast (should the transform have LLVM types in it, or should it always convert from molten types? (kinda need more flexability than molten types)
 =====
 
-* in rust, all closures have their own type (because the context is always different), but ocaml doesn't...
+* it makes more sense, if you go for abispecifiers, to make methods use one instead of closures.
 * it might be possible to replace some instances of get_ltype() with a reference to the definition, such that the ltype can be determined by the object type rather than directly correlating
   to the molten type (one molten type -> many llvm types).  Barring that, you could always add an id to the function type, even though it's not at all pretty
 * the current problem with closure code (line 269 of test.ml) is that we're assigning a closure to a struct field but the types don't match, because the get_type function
@@ -19,8 +29,6 @@
 * Builtins are erroniously treated as closures...
 
 
-* fix struct assign to actually work... right now it returns a new struct with the value set rather than modifying the value in place, but in order to modify in place, it must
-  avoid the initial load instruction of the source... and this might not work with register-only refs like arguments (which we might want to use later)
 * either add in the initialization of class variables, possibly limited to constant expressions only, or else raise an error if an initializer is provided
 
 * you might not be making sure that non-closure functions don't access variables outside their scope (methods are never closures)
@@ -49,22 +57,17 @@
 * there are poor error messages when deleting the "=" from a "let something = fn x => ..." both inside and outside classes.... shouldn't be doing this (actually, because of
   let without init, and the lf issue... lf fix would solve this)
 
-* for type defs... should they always be direct data and classes will always be pointers to structs?  How will you initialize/create a struct?  Will it be an alternate "new"
-  format (clunky, overloading meaning of new if struct is not pointer, but if you also allow pointers to structs, then new Struct { ... } would need to be valid)
-  or do you make a bareword-started constructor Struct { field: 3, prop: 6 }, which might be cumbersome or slower to parse
-  how would you do enums, when you get there?  
-
 
 
 * there's still a problem with typevars not resolving fully, where a function that should return a concrete returns a free typevar.... (recursion or forward definition)
 
-* implement type definition ast element (enum type?)
+* implement enums
 * add patterns and matching of patterns
 * add an iterator type
 * get llvm closures working
-* add compiler directives?
 * implement exceptions
 * implement garbage collection
+* add compiler directives?
 
 * better support for generics; right now it just forces everything to/from a pointer type
 * fill in string and list type functions, and finish hashmap (rename to dict?)
