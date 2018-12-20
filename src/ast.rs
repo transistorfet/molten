@@ -95,7 +95,7 @@ pub enum AST {
     Function(NodeID, Pos, Option<Ident>, Vec<Argument>, Option<Type>, Box<AST>, ABI),
     New(NodeID, Pos, ClassSpec),
     Class(NodeID, Pos, ClassSpec, Option<ClassSpec>, Vec<AST>),
-    TypeDef(NodeID, Pos, ClassSpec, Vec<Field>),
+    TypeAlias(NodeID, Pos, ClassSpec, Type),
 
     Import(NodeID, Pos, Ident, Vec<AST>),
     Definition(NodeID, Pos, bool, Ident, Option<Type>, Box<AST>),
@@ -226,7 +226,7 @@ impl AST {
             AST::Definition(_, ref pos, _, _, _, _) |
             AST::Assignment(_, ref pos, _, _) |
             AST::While(_, ref pos, _, _) |
-            AST::TypeDef(_, ref pos, _, _) => { pos.clone() }
+            AST::TypeAlias(_, ref pos, _, _) => { pos.clone() }
             _ => Pos::empty(),
         }
     }
@@ -260,7 +260,7 @@ impl AST {
             AST::Definition(ref id, _, _, _, _, _) |
             AST::Assignment(ref id, _, _, _) |
             AST::While(ref id, _, _, _) |
-            AST::TypeDef(ref id, _, _, _) => { *id }
+            AST::TypeAlias(ref id, _, _, _) => { *id }
             _ => UniqueID(0),
         }
     }
@@ -377,8 +377,8 @@ impl AST {
         AST::While(NodeID::generate(), pos, Box::new(cond), Box::new(body))
     }
 
-    pub fn make_typedef(pos: Pos, classspec: ClassSpec, fields: Vec<Field>) -> AST {
-        AST::TypeDef(NodeID::generate(), pos, classspec, fields)
+    pub fn make_type_alias(pos: Pos, classspec: ClassSpec, ttype: Type) -> AST {
+        AST::TypeAlias(NodeID::generate(), pos, classspec, ttype)
     }
 
     /*

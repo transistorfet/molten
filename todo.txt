@@ -1,16 +1,16 @@
 
-* try upgrading to llvm 7
-* replace the typedef stuff with type aliasing
-* once again, can you simplify the closure context construction code, particularly now that we have records and refs
-* should you unify some aspects of references and objects?  at least the codegen stuff, rather than duplicating some code
-
-* you could require that classes explicitly define their type variables by name, to catch type errors.  So every method or definition in the top level of the class
-  could only use explicitly declared type variables
 
 * I think it should be doable to make all functions including methods be closures, especially if you put the context at the end
 * we need to make molten code and transform in order to convert nested closures. We at least need to transform the record constructor to convert the idents
 let context = ref { var1 = ident1, var2 = ident2 }
 return (func, context)
+
+* try upgrading to llvm 7
+* should you unify some aspects of references and objects?  at least the codegen stuff, rather than duplicating some code
+
+* you could require that classes explicitly define their type variables by name, to catch type errors.  So every method or definition in the top level of the class
+  could only use explicitly declared type variables
+
 
 =====
 * ideally, the transformed code should be directly compilable, such that you can use it for defining builtin runtime funcs, and desugared stuff.  It has to be easy to make and build up
@@ -21,19 +21,25 @@ return (func, context)
 * make casting transforms that do an LLVM cast (should the transform have LLVM types in it, or should it always convert from molten types? (kinda need more flexability than molten types)
 =====
 
-* it makes more sense, if you go for abispecifiers, to make methods use one instead of closures.
+* it makes more sense, if you go for abi specifiers, to make methods use one instead of closures.
 * it might be possible to replace some instances of get_ltype() with a reference to the definition, such that the ltype can be determined by the object type rather than directly correlating
   to the molten type (one molten type -> many llvm types).  Barring that, you could always add an id to the function type, even though it's not at all pretty
 * the current problem with closure code (line 269 of test.ml) is that we're assigning a closure to a struct field but the types don't match, because the get_type function
   returned an actual function type, rather than a pointer to the closure context... so you kinda need a way to distinguish different function types
 * Builtins are erroniously treated as closures...
 
+* add the type param mapping to type aliases
 
+* there was an error where "let ni: newint" with no initializer was causing a type error with "expected class or concrete type", but that was actually because a definition without
+  an initializer is the same as "let ni: newint = nil" and nil could not be cast to a Record, which newint is a typealias of a record
 * either add in the initialization of class variables, possibly limited to constant expressions only, or else raise an error if an initializer is provided
 
 * you might not be making sure that non-closure functions don't access variables outside their scope (methods are never closures)
 * make sure that you don't overload different types of functions (closures, functions, and methods must all be the same type to allow overloading)
 * should you make mutable modifiers more strict, like rust?
+
+* there is no way to assign to a ref
+* add a spread operator or something, for records, to change and manipulate them
 
 * should we factor out some of the code in codegen which builds vtables into transform or classdef, such that you can build the type from either??
 * make a proper patterns tree

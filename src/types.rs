@@ -1,6 +1,7 @@
 
 use std::fmt;
 
+use defs::Def;
 use ast::ClassSpec;
 use utils::UniqueID;
 use session::{ Session, Error };
@@ -379,13 +380,17 @@ pub fn check_type_params(session: &Session, scope: ScopeRef, dtypes: &Vec<Type>,
 pub fn resolve_type(session: &Session, ttype: Type) -> Type {
     match ttype {
         Type::Object(ref name, ref id, ref types) => {
-            match session.get_type(*id) {
-                Some(_) => {
-                    let params = types.iter().map(|ptype| resolve_type(session, ptype.clone())).collect();
-                    // TODO we are purposely returning the original type here so as not to over-resolve types... but we should probably still fully resolve for checking purposes
-                    Type::Object(name.clone(), *id, params)
+            let params = types.iter().map(|ptype| resolve_type(session, ptype.clone())).collect();
+
+            match session.get_def(*id) {
+                Ok(Def::TypeAlias(alias)) => {
+                    alias.resolve(session, params)
                 },
-                None => panic!("TypeError: undefined type {:?}", name),
+                _ => match session.get_type(*id) {
+                    // TODO we are purposely returning the original type here so as not to over-resolve types... but we should probably still fully resolve for checking purposes
+                    Some(_) => Type::Object(name.clone(), *id, params),
+                    None => panic!("TypeError: undefined type {:?}", name),
+                },
             }
         },
         Type::Variable(_, ref id) => {

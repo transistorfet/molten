@@ -8,6 +8,7 @@ use scope::{ ScopeRef };
 use utils::UniqueID;
 
 use defs::functions::AnyFunc;
+use defs::types::{ TypeAliasDef };
 use defs::classes::{ ClassDef, StructDef };
 use defs::variables::{ AnyVar, ArgDef, FieldDef };
 
@@ -169,7 +170,8 @@ fn bind_names_node_or_error(session: &Session, scope: ScopeRef, node: &mut AST) 
             bind_names_vec(session, tscope, body);
         },
 
-        AST::TypeDef(ref id, _, ref mut classspec, ref mut fields) => {
+        AST::TypeAlias(ref id, _, ref mut classspec, ref mut ttype) => {
+            /*
             let structtype = Type::Object(classspec.ident.name.clone(), *id, classspec.types.clone());
             StructDef::define(session, scope.clone(), *id, structtype)?;
 
@@ -184,6 +186,14 @@ fn bind_names_node_or_error(session: &Session, scope: ScopeRef, node: &mut AST) 
                 // TODO this is assumed to be mutable always, but maybe not
                 FieldDef::define(session, tscope.clone(), field.id, true, &field.ident.name, field.ttype.clone())?;
             }
+            */
+            declare_classspec_typevars(session, scope.clone(), classspec, true)?;
+            declare_typevars(session, scope.clone(), Some(ttype), false)?;
+
+            let deftype = Type::Object(classspec.ident.name.clone(), *id, classspec.types.clone());
+            TypeAliasDef::define(session, scope.clone(), *id, deftype, ttype.clone());
+            //scope.define_type(classspec.ident.name.clone(), Some(*id));
+            //session.set_type(*id, ttype.clone());
         },
 
         AST::Resolver(ref id, _, ref mut left, _) => {
@@ -231,9 +241,9 @@ pub fn declare_typevars(session: &Session, scope: ScopeRef, ttype: Option<&mut T
     match ttype {
         Some(ttype) => match ttype {
             &mut Type::Object(ref name, ref mut id, ref mut types) => {
-                match scope.find_type(session, name) {
-                    Some(Type::Object(_, ref eid, _)) => *id = *eid,
-                    _ => if !always_new {
+                match scope.get_type_def(name) {
+                    Some(defid) => *id = defid,
+                    None => if !always_new {
                         panic!("UndefinedType: {:?}", name)
                     } else if *id == UniqueID(0) {
                         *id = UniqueID::generate();
@@ -280,7 +290,7 @@ pub fn declare_typevars(session: &Session, scope: ScopeRef, ttype: Option<&mut T
             },
             &mut Type::Ambiguous(_) => { },
         },
-        _ => { },
+        None => { },
     }
     Ok(())
 }

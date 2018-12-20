@@ -361,14 +361,20 @@
             stuff: Int
         }
 
-        //type newreal = Real
-        let ni: newint
+        type newreal = Real
+        let ni: newint = { things = 1, stuff = 2 }
+        println(str(ni.stuff))
+
+        /*
+        // TODO these features wont be supported after all
+        // these are now records instead of structs and cannot be assigned to at the moment, because literal values are not mutable
         ni.things = 745
         println(str(ni.things))
 
         fn thi(a: newint) {
             //a.things = 5
         }
+        */
 
 
         /// Tuples

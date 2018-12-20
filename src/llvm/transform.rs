@@ -355,7 +355,8 @@ impl<'sess> Transform<'sess> {
                 }
             },
 
-            AST::TypeDef(ref id, ref pos, _, ref fields) => {
+            AST::TypeAlias(ref id, ref pos, _, ref ttype) => {
+                /*
                 let structdef = self.session.get_def(*id).unwrap().as_struct().unwrap();
                 for field in fields {
                     structdef.add_field(self.session, true, field.ident.as_str(), self.session.get_type(field.id).unwrap());
@@ -363,6 +364,7 @@ impl<'sess> Transform<'sess> {
 
                 let tscope = self.session.map.get(id);
                 self.add_top(*id, pos.clone(), TopKind::StructDef(tscope.get_basename()));
+                */
                 Expr::new(*id, pos.clone(), ExprKind::Nil)
             },
 

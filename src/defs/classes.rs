@@ -2,8 +2,8 @@
 use std::rc::Rc;
 use std::cell::RefCell;
  
-use types::Type;
 use defs::Def;
+use types::Type;
 use scope::{ Scope, ScopeRef };
 use session::{ Session, Error };
 use types::{ check_type, Check };

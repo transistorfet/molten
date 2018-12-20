@@ -146,7 +146,7 @@ named!(statement(Span) -> (AST, Option<AST>),
             assignment |
             whileloop |
             class |
-            typedef |
+            typealias |
             expression
             // TODO should class be here too?
         )) >>
@@ -208,7 +208,7 @@ named!(class(Span) -> AST,
         p: opt!(preceded!(wscom!(tag_word!("extends")), class_spec)) >>
         wscom!(tag!("{")) >>
         s: many0!(alt_complete!(
-                typedef |
+                typealias |
                 definition |
                 declare |
                 function
@@ -218,17 +218,14 @@ named!(class(Span) -> AST,
         )
     );
 
-named!(typedef(Span) -> AST,
+named!(typealias(Span) -> AST,
     do_parse!(
         pos: position!() >>
         wscom!(tag_word!("type")) >>
         c: class_spec >>
         wscom!(tag!("=")) >>
-        ts: alt!(
-            map!(type_description, |i| vec!((Pos::new(pos), Ident::from_str(""), Some(i)))) |
-            delimited!(wscom!(tag!("{")), separated_list_complete!(wscom!(tag!(",")), identifier_typed), wscom!(tag!("}")))
-        ) >>
-        (AST::make_typedef(Pos::new(pos), c, ts.into_iter().map(|f| Field::new(f.0, f.1, f.2)).collect()))
+        ts: type_description >>
+        (AST::make_type_alias(Pos::new(pos), c, ts))
     )
 );
 
@@ -679,14 +676,14 @@ named!(type_tuple(Span) -> Type,
 named!(type_record(Span) -> Type,
     wscom!(do_parse!(
         types: delimited!(
-            tag!("{"),
+            wscom!(tag!("{")),
             separated_list_complete!(wscom!(tag!(",")), do_parse!(
                 i: identifier >>
                 wscom!(tag!(":")) >>
                 t: type_description >>
                 ((i.name, t))
             )),
-            tag!("}")
+            wscom!(tag!("}"))
         ) >>
         (Type::Record(types))
     ))

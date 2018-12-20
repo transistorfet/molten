@@ -3,10 +3,12 @@ use scope::ScopeRef;
 use session::{ Session, Error };
 
 pub mod traits;
+pub mod types;
 pub mod classes;
 pub mod variables;
 pub mod functions;
 
+use defs::types::{ TypeAliasDefRef };
 use defs::variables::{ VarDefRef, ArgDefRef, FieldDefRef };
 use defs::classes::{ ClassDefRef, StructDefRef };
 use defs::functions::{ FuncDefRef, OverloadDefRef, ClosureDefRef, MethodDefRef, CFuncDefRef };
@@ -14,6 +16,7 @@ use defs::functions::{ FuncDefRef, OverloadDefRef, ClosureDefRef, MethodDefRef, 
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Def {
+    TypeAlias(TypeAliasDefRef),
     Var(VarDefRef),
     Arg(ArgDefRef),
     Field(FieldDefRef),
