@@ -365,6 +365,11 @@
         let ni: newint = { things = 1, stuff = 2 }
         println(str(ni.stuff))
 
+        type newvar<'v> = { data: 'v, count: Int }
+        let nv: newvar<String> = { data = "Places", count = 0 }
+        println(nv.data)
+        println(str(nv.count))
+
         /*
         // TODO these features wont be supported after all
         // these are now records instead of structs and cannot be assigned to at the moment, because literal values are not mutable

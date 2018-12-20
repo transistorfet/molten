@@ -384,7 +384,7 @@ pub fn resolve_type(session: &Session, ttype: Type) -> Type {
 
             match session.get_def(*id) {
                 Ok(Def::TypeAlias(alias)) => {
-                    alias.resolve(session, params)
+                    alias.resolve(session, params).unwrap()
                 },
                 _ => match session.get_type(*id) {
                     // TODO we are purposely returning the original type here so as not to over-resolve types... but we should probably still fully resolve for checking purposes

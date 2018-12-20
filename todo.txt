@@ -9,9 +9,9 @@ return (func, context)
 
 * try upgrading to llvm 7
 * should you unify some aspects of references and objects?  at least the codegen stuff, rather than duplicating some code
+* modify resolve to return a result rather than unwrapping
 
 
-* add the type param mapping to type aliases
 * you can put a restriction on type aliases such that a type can only use type vars defined in the declaration
 * you could require that classes explicitly define their type variables by name, to catch type errors.  So every method or definition in the top level of the class
   could only use explicitly declared type variables
