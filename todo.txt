@@ -1,16 +1,20 @@
 
+* there is no way to assign to a ref
 
 * I think it should be doable to make all functions including methods be closures, especially if you put the context at the end
 * we need to make molten code and transform in order to convert nested closures. We at least need to transform the record constructor to convert the idents
 let context = ref { var1 = ident1, var2 = ident2 }
 return (func, context)
+* it makes more sense, if you go for abi specifiers, to make methods use one instead of closures.
 
 * try upgrading to llvm 7
 * should you unify some aspects of references and objects?  at least the codegen stuff, rather than duplicating some code
 
+
+* add the type param mapping to type aliases
+* you can put a restriction on type aliases such that a type can only use type vars defined in the declaration
 * you could require that classes explicitly define their type variables by name, to catch type errors.  So every method or definition in the top level of the class
   could only use explicitly declared type variables
-
 
 =====
 * ideally, the transformed code should be directly compilable, such that you can use it for defining builtin runtime funcs, and desugared stuff.  It has to be easy to make and build up
@@ -21,91 +25,81 @@ return (func, context)
 * make casting transforms that do an LLVM cast (should the transform have LLVM types in it, or should it always convert from molten types? (kinda need more flexability than molten types)
 =====
 
-* it makes more sense, if you go for abi specifiers, to make methods use one instead of closures.
-* it might be possible to replace some instances of get_ltype() with a reference to the definition, such that the ltype can be determined by the object type rather than directly correlating
-  to the molten type (one molten type -> many llvm types).  Barring that, you could always add an id to the function type, even though it's not at all pretty
 * the current problem with closure code (line 269 of test.ml) is that we're assigning a closure to a struct field but the types don't match, because the get_type function
   returned an actual function type, rather than a pointer to the closure context... so you kinda need a way to distinguish different function types
 * Builtins are erroniously treated as closures...
 
-* add the type param mapping to type aliases
 
+* there are poor error messages when deleting the "=" from a "let something = fn x => ..." both inside and outside classes.... shouldn't be doing this (actually, because of
+  let without init, and the lf issue... lf fix would solve this)
 * there was an error where "let ni: newint" with no initializer was causing a type error with "expected class or concrete type", but that was actually because a definition without
   an initializer is the same as "let ni: newint = nil" and nil could not be cast to a Record, which newint is a typealias of a record
 * either add in the initialization of class variables, possibly limited to constant expressions only, or else raise an error if an initializer is provided
+* there must be a way to fix the 'scope exceptions' (Scope::target) that we're doing to make class bodies work... pass in an argument to all scoped functions?  or use scopemap and scope ids?
 
 * you might not be making sure that non-closure functions don't access variables outside their scope (methods are never closures)
 * make sure that you don't overload different types of functions (closures, functions, and methods must all be the same type to allow overloading)
 * should you make mutable modifiers more strict, like rust?
 
-* there is no way to assign to a ref
-* add a spread operator or something, for records, to change and manipulate them
-
-* should we factor out some of the code in codegen which builds vtables into transform or classdef, such that you can build the type from either??
-* make a proper patterns tree
-* get rid of unwind argument, and put it in an object
 
 * improve storing of file info in the Pos structs (maybe rename to Span?)
 * change parser to take session argument or something so it can record the file info, and maybe do other advanced things
 * should you add session to refinery and process imports there
+* one thing i'm seeing a lot of now is stuff like classspec.ident.name... can we prevent so many levels deep?
+* do you need a BuiltinDef type? a GlobalVarDef type?
+* add the .set_id() functions to simpliy ast builders
 
-* make the top level module function be a closure instead of using global vars?? there were a bunch of errors
+* should we factor out some of the code in codegen which builds vtables into transform or classdef, such that you can build the type from either??
+* get rid of unwind argument, and put it in an object
+
 * it might also make it easier/generic to allow compiling to object files?  So no linking, but it would do optimization and object file output
 * how does rust do "use" if there is a circular dependency?
 * put intermediate files somewhere else, at least as controlled by the molten script, so as not to clutter source directories
 
-* there must be a way to fix the 'scope exceptions' (Scope::target) that we're doing to make class bodies work... pass in an argument to all scoped functions?  or use scopemap and scope ids?
-* one thing i'm seeing a lot of now is stuff like classspec.ident.name... can we prevent so many levels deep?
-
-* eventually we want to make a visitor
-* do you need a BuiltinDef type? a GlobalVarDef type?
-* add the .set_id() functions to simpliy ast builders
-* there are poor error messages when deleting the "=" from a "let something = fn x => ..." both inside and outside classes.... shouldn't be doing this (actually, because of
-  let without init, and the lf issue... lf fix would solve this)
-
-
-
 * there's still a problem with typevars not resolving fully, where a function that should return a concrete returns a free typevar.... (recursion or forward definition)
+
 
 * implement enums
 * add patterns and matching of patterns
+* add a spread operator for records
 * add an iterator type
 * get llvm closures working
 * implement exceptions
 * implement garbage collection
 * add compiler directives?
+* use customizer visitors throughout
 
+* issue with separator/lf not working when two expressions are on the same line (it should produce a parse error)
 * better support for generics; right now it just forces everything to/from a pointer type
 * fill in string and list type functions, and finish hashmap (rename to dict?)
-* issue with separator/lf not working when two expressions are on the same line (it should produce a parse error)
 
 
 
 
+* should you make the top level module functions be closures, instead of using global vars
 * if even the global/module scope was a closure, then you could make a module be equivallent to an implicit function that is called when the module is imported, which could have the name of the
   module; so a module called main would become the main() function
-* what if you have a 'context' passed to the node visitors that would allow "if" to know if its' return is used or not, and so whether typechecking must match
-* if you make ops methods, then everything has to be type annotated, with the type system as it is; you'd need constrained types, or multiple paths, or bidirectional or something
-  make typed functions for all math operations, with the inlinealways attribute, if you decide to make operators methods
+
+
+* should exports also list all the modules that the file imports, so that class definitions in other imports can be found, if needed for arguments
+* should you add access modifiers to classes, and maybe functions; public, private, protected
+* should you fix scope resolution to also work on objects, so that you can have static methods from the object without explicitly referencing its type
+* should you remove the Nil type?
+* should you add break/continue statements for loops
+* should you add a return statement?  It's not functional, but it's practial
+* should you change Real to Float?  also should you change them to lower case names, which is in line with sml, ocmal, f#
+* should you allow keyword arguments in invoke; foo(a=10, b=20)
+* should you allow arguments with a default value to be omitted from a function call?, that would require a bunch of changes to typechecking
+* should local variables be allowed to be mutable...
+* should you require an override keyword when masking definitions in lower scopes? like class definitions
+* should you add macros and expandable forms (like lisp)
 
 * is it even possible to add a special "constrained" type, which has &AST that must type check correctly in order to match (checks done in check_type)
 * you might need to integrate type restrictions which have to get resolved later; like 'a where 'a is object with add(Int) method; not sure how you could be so specific without complexity
 * what if you generalize overloaded types, such that they're checked in check_type, and options are eliminated, or resolved to one type over the course of checking
-
-
-* should you add access modifiers to classes, and maybe functions; public, private, protected
-* should you add break/continue statements for loops
-* should you add a return statement?  It's not functional, but it's practial
-* should you change Real to Float?  also should you change them to lower case names, which is in line with sml, ocmal, f#
-* should you remove the Nil type?
-* should you allow keyword arguments in invoke; foo(a=10, b=20)
-* should you allow arguments with a default value to be omitted from a function call?, that would require a bunch of changes to typechecking
-* should you fix scope resolution to also work on objects, so that you can have static methods from the object without explicitly referencing its type
-* should exports also list all the modules that the file imports, so that class definitions in other imports can be found, if needed for arguments
-* should local variables be allowed to be mutable...
-* should you require an override keyword when masking definitions in lower scopes? like class definitions
-* should you add dicts syntax
-* should you add macros and expandable forms (like lisp)
+* if you make ops methods, then everything has to be type annotated, with the type system as it is; you'd need constrained types, or multiple paths, or bidirectional or something
+  make typed functions for all math operations, with the inlinealways attribute, if you decide to make operators methods
+* what if you have a 'context' passed to the node visitors that would allow "if" to know if its' return is used or not, and so whether typechecking must match
 
 
 
