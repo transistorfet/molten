@@ -228,6 +228,8 @@ pub fn get_builtins<'sess>() -> Vec<BuiltinDef<'sess>> {
         )),
 
 
+        BuiltinDef::Func(id(), "sizeof",    "('ptr) -> Int",    Func::Comptime(sizeof_value)),
+
         BuiltinDef::Func(id(), "!",   "(ref 'ptr) -> 'ptr",   Func::Comptime(deref)),
 
 
@@ -315,6 +317,12 @@ fn sprintf(data: &LLVM, mut args: Vec<LLVMValueRef>) -> LLVMValueRef {
     }
 }
 
+unsafe fn sizeof_value(data: &LLVM, mut args: Vec<LLVMValueRef>) -> LLVMValueRef {
+    let ltype = LLVMPointerType(LLVMTypeOf(args[0]), 0);
+    let mut indices = vec!(i32_value(data, 1));
+    let pointer = LLVMBuildGEP(data.builder, null_value(ltype), indices.as_mut_ptr(), indices.len() as u32, label("tmp"));
+    LLVMBuildPtrToInt(data.builder, pointer, int_type(data), label("ptr"))
+}
 
 unsafe fn build_buffer_allocator(data: &LLVM, id: NodeID, name: &str, objtype: LLVMTypeRef) -> LLVMValueRef {
     let function = build_function_start_lib(data, id, name, vec!(), objtype);

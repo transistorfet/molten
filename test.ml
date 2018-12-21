@@ -399,6 +399,7 @@
         let v = !rr
         println(str(v))
 
+        println(str(sizeof(1)))
 
 /*
         /// Closures
