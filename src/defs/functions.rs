@@ -34,7 +34,7 @@ impl AnyFunc {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct FuncDef {
-
+    pub id: NodeID,
 }
 
 pub type FuncDefRef = Rc<FuncDef>;
@@ -43,7 +43,7 @@ impl FuncDef {
     pub fn define(session: &Session, scope: ScopeRef, id: NodeID, name: &Option<String>, ttype: Option<Type>) -> Result<Def, Error> {
 
         let def = Def::Func(Rc::new(FuncDef {
-
+            id: id,
         }));
 
         FuncDef::set_func_def(session, scope.clone(), id, name, def.clone(), ttype)?;
@@ -104,8 +104,9 @@ impl OverloadDef {
                     prev.add_variant(session, id);
                 },
                 Ok(Def::Func(_)) |
+                Ok(Def::Method(_)) |
                 Ok(Def::Closure(_)) |
-                Ok(Def::Method(_)) => {
+                Ok(Def::Builtin(_)) => {
                     let defid = OverloadDef::create(session, None, vec!(previd, id));
                     dscope.set_var_def(&name, defid);
                 }
@@ -187,8 +188,8 @@ impl OverloadDef {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct ClosureDef {
-    pub id: UniqueID,
-    pub varid: UniqueID,
+    pub id: NodeID,
+    pub varid: NodeID,
     pub name: String,
     pub contextid: NodeID,
     pub contexttype: Type,
@@ -230,19 +231,22 @@ impl ClosureDef {
     pub fn add_context_to_ftype(&self, session: &Session, scope: ScopeRef) -> Type {
         match session.get_type(self.id) {
             Some(Type::Function(mut args, ret, abi)) => {
-                let args = match *args {
-                    Type::Tuple(mut items) => {
-                        //items.push(self.contexttype.clone());
-                        items.push(scope.new_typevar(session));
-                        Type::Tuple(items)
-                    },
-                    ttype @ _ => Type::Tuple(vec!(ttype, self.contexttype.clone())),
-                };
-                let ftype = Type::Function(Box::new(args), ret, abi);
+                let args = ClosureDef::add_context_to_args(session, scope.clone(), *args);
+                let ftype = Type::Function(Box::new(args), ret, ABI::C);
                 session.set_type(self.id, ftype.clone());
                 ftype
             },
             ttype @ _ => panic!("Unexpected type when transforming closure: expected function but got {:?}", ttype),
+        }
+    }
+
+    pub fn add_context_to_args(session: &Session, scope: ScopeRef, args: Type) -> Type {
+        match args {
+            Type::Tuple(mut items) => {
+                items.push(scope.new_typevar(session));
+                Type::Tuple(items)
+            },
+            ttype @ _ => Type::Tuple(vec!(ttype, scope.new_typevar(session))),
         }
     }
 }
@@ -250,7 +254,7 @@ impl ClosureDef {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct MethodDef {
-    //pub id: UniqueID,
+    pub id: NodeID,
 
 }
 
@@ -259,7 +263,7 @@ pub type MethodDefRef = Rc<MethodDef>;
 impl MethodDef {
     pub fn define(session: &Session, scope: ScopeRef, id: NodeID, name: &Option<String>, ttype: Option<Type>) -> Result<Def, Error> {
         let def = Def::Method(Rc::new(MethodDef {
-
+            id: id,
         }));
 
         FuncDef::set_func_def(session, scope.clone(), id, name, def.clone(), ttype)?;
@@ -267,36 +271,10 @@ impl MethodDef {
     }
 }
 
-mod llvm {
-    //use llvm::compiler as llvm;
-
-    /*
-    impl CompileInvoke for MethodDef {
-        fn compile(&self, ) -> Box<Compilable> {
-            // this is a method, so a method call
-            let lfunc = llvm::compile(session, 
-        }
-    }
-    */
-
-    /*
-    impl Compilable for MethodDef {
-        fn box_clone(&self) -> Box<Compilable> {
-            Box::new((*self).clone())
-        }
-
-        fn get_ref(&self) -> LLVMValueRef {
-            self.0
-        }
-    }
-    */
-}
-
-
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct CFuncDef {
-    //pub id: UniqueID,
+    pub id: NodeID,
     //pub ftype: Type,
 }
 
@@ -314,6 +292,7 @@ impl CFuncDef {
         };
 
         let def = Def::CFunc(Rc::new(CFuncDef {
+            id: id,
 
         }));
 
@@ -326,4 +305,22 @@ impl CFuncDef {
     }
 }
 
+#[derive(Clone, Debug, PartialEq)]
+pub struct BuiltinFuncDef {
+    pub id: NodeID,
+}
+
+pub type BuiltinFuncDefRef = Rc<BuiltinFuncDef>;
+
+impl BuiltinFuncDef {
+    pub fn define(session: &Session, scope: ScopeRef, id: NodeID, name: &Option<String>, ttype: Option<Type>) -> Result<Def, Error> {
+        let def = Def::Builtin(Rc::new(BuiltinFuncDef {
+            id: id,
+
+        }));
+
+        FuncDef::set_func_def(session, scope.clone(), id, name, def.clone(), ttype)?;
+        Ok(def)
+    }
+}
 

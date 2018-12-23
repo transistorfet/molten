@@ -155,6 +155,7 @@ impl Scope {
         self.names.borrow().contains_key(name)
     }
 
+    // TODO remove this; it's only used by forloops atm, and there should be a way to refactor forloops
     pub fn get_variable_type(&self, session: &Session, name: &String) -> Option<Type> {
         match self.get_var_def(name) {
             Some(defid) => session.get_type(defid),

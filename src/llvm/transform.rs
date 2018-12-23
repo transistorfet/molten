@@ -159,15 +159,14 @@ impl<'sess> Transform<'sess> {
                 let mut args = self.transform_args(args);
 
                 if let Def::Closure(ref cl) = def {
-                    let cid = NodeID::generate();
-                    let cname = String::from("__context__");
-                    args.push((cid, cname.clone()));
-                    ArgDef::define(self.session, fscope.clone(), cid, false, &cname, Some(cl.contexttype.clone())).unwrap();
+                    let aid = NodeID::generate();
+                    let aname = String::from("__context__");
+                    ArgDef::define(self.session, fscope.clone(), aid, false, &aname, Some(cl.contexttype.clone())).unwrap();
+                    args.push((aid, aname));
                     let ftype = cl.add_context_to_ftype(self.session, scope.clone());
                     let real_fname = fname.clone() + &"_func";
-                    //cl.add_field(self.session, real_fname.as_str(), ftype);
-                    let index = self.toplevel.borrow().len();
 
+                    let index = self.toplevel.borrow().len();
                     self.set_context(CodeContext::Closure(*id));
                     let body = self.transform_expr(fscope.clone(), body);
                     self.restore_context();
@@ -175,13 +174,14 @@ impl<'sess> Transform<'sess> {
                     use binding;
                     use typecheck;
                     use scope::Scope;
-                    let fid = NodeID::generate();
+                    let rfid = NodeID::generate();
+                    let cname = fname.clone() + &"_context";
                     //let tscope = Scope::new_ref(Some(scope.clone()));
                     let mut code = vec!();
                     /*
                     // TODO this is replaced below...
                     code.push(AST::Definition(cl.varid, pos.clone(), true, Ident::new(fname.clone()), None, Box::new(AST::make_new(pos.clone(), ClassSpec::from_str(format!("{}_context_{}", cl.name, cl.contextid).as_str())))));
-                    FuncDef::define(self.session, scope.clone(), fid, &Some(real_fname.clone()), Some(self.session.get_type(*id).unwrap()));
+                    FuncDef::define(self.session, scope.clone(), rfid, &Some(real_fname.clone()), Some(self.session.get_type(*id).unwrap()));
                     for (index, &(ref field, ref ttype)) in cl.context.fields.borrow().iter().enumerate() {
                         code.push(AST::make_assign(pos.clone(),
                             AST::make_access(pos.clone(), AST::make_ident(pos.clone(), Ident::new(fname.clone())), Ident::from_str(field.as_str())),
@@ -190,14 +190,13 @@ impl<'sess> Transform<'sess> {
                     }
                     */
 
-                    FuncDef::define(self.session, scope.clone(), fid, &Some(real_fname.clone()), Some(self.session.get_type(*id).unwrap()));
-
+                    FuncDef::define(self.session, scope.clone(), rfid, &Some(real_fname.clone()), Some(self.session.get_type(*id).unwrap()));
                     let mut exprs = vec!();
                     for (index, &(ref field, ref ttype)) in cl.context.fields.borrow().iter().enumerate() {
                         exprs.push((Ident::from_str(field.as_str()), AST::make_ident_from_str(pos.clone(), field.as_str())));
                     }
-                    code.push(AST::Definition(cl.varid, pos.clone(), true, Ident::new(fname.clone()), None, Box::new(AST::make_ref(pos.clone(), AST::make_record(pos.clone(), exprs)))));
-                    code.push(AST::Tuple(NodeID::generate(), pos.clone(), vec!(AST::make_ident_from_str(pos.clone(), real_fname.as_str()), AST::make_ident(pos.clone(), Ident::new(fname.clone())))));
+                    code.push(AST::Definition(cl.varid, pos.clone(), true, Ident::new(cname.clone()), None, Box::new(AST::make_ref(pos.clone(), AST::make_record(pos.clone(), exprs)))));
+                    code.push(AST::Tuple(NodeID::generate(), pos.clone(), vec!(AST::make_ident_from_str(pos.clone(), real_fname.as_str()), AST::make_ident(pos.clone(), Ident::new(cname.clone())))));
 
                     binding::bind_names(self.session, scope.clone(), &mut code);
                     typecheck::check_types(self.session, scope.clone(), &code);
@@ -206,8 +205,8 @@ impl<'sess> Transform<'sess> {
                     access.push(Expr::new(*id, pos.clone(), ExprKind::SetValue(Box::new(last))));
                     println!("THE THING: {:#?}", access);
 
-                    //self.add_closure(*id, pos.clone(), fid, real_fname.clone(), fname.clone(), args, body);
-                    self.toplevel.borrow_mut().insert(index, TopLevel::new(*id, pos.clone(), TopKind::Closure(fid, real_fname.clone(), fname.clone(), args, body)));
+                    //self.add_closure(*id, pos.clone(), rfid, real_fname.clone(), fname.clone(), args, body);
+                    self.toplevel.borrow_mut().insert(index, TopLevel::new(*id, pos.clone(), TopKind::Closure(rfid, real_fname.clone(), fname.clone(), args, body)));
                     Expr::new(*id, pos.clone(), ExprKind::Block(access))
                 } else {
                     self.add_function(*id, pos.clone(), fname.clone(), args, self.transform_expr(fscope.clone(), body));

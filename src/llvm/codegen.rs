@@ -393,13 +393,19 @@ pub unsafe fn ptr_type(data: &LLVM) -> LLVMTypeRef {
     LLVMPointerType(LLVMPointerType(LLVMInt8TypeInContext(data.context), 0), 0)
 }
 
-pub unsafe fn cfunc_type(data: &LLVM, args: Type, ret: Type) -> LLVMTypeRef {
+pub unsafe fn cfunc_type(data: &LLVM, args: Type, ret: Type, as_fptr: bool) -> LLVMTypeRef {
     let mut atypes = vec!();
     for ttype in args.as_vec() {
         atypes.push(get_ltype(data, ttype, true));
     }
     let rtype = get_ltype(data, ret, true);
-    LLVMFunctionType(rtype, atypes.as_mut_ptr(), atypes.len() as u32, false as i32)
+    let lftype = LLVMFunctionType(rtype, atypes.as_mut_ptr(), atypes.len() as u32, false as i32);
+
+    if as_fptr {
+        LLVMPointerType(lftype, 0)
+    } else {
+        lftype
+    }
 }
 
 
@@ -490,10 +496,9 @@ pub unsafe fn build_function_start(data: &LLVM, id: NodeID, name: String, lftype
     function
 }
 
-unsafe fn build_function_body(data: &LLVM, id: NodeID, body: &Expr) {
+unsafe fn build_function_body(data: &LLVM, id: NodeID, fscope: ScopeRef, body: &Expr) {
     debug!("BUILD FUNC BODY: {:?}", id);
     // TODO do you need to take into account abi?
-    let fscope = data.map.get(&id);
     let function = data.get_value(id).unwrap().get_ref();
 
     let bb = LLVMAppendBasicBlockInContext(data.context, function, label("entry"));
@@ -509,7 +514,9 @@ unsafe fn build_function_body(data: &LLVM, id: NodeID, body: &Expr) {
 
 pub unsafe fn generate_func_start(data: &LLVM, scope: ScopeRef, id: NodeID, name: String, args: &Vec<(NodeID, String)>) -> Value {
     let ttype = data.session.get_type(id).unwrap();
-    let lftype = get_ltype(data, ttype.clone(), false);
+//println!("######### {:?}", ttype);
+    //let lftype = get_ltype(data, ttype.clone(), false);
+    let lftype = cfunc_type(data, ttype.get_argtypes().unwrap().clone(), ttype.get_rettype().unwrap().clone(), false);
     let abi = ttype.get_abi().unwrap();
     let function = build_function_start(data, id, name, lftype, args.len(), abi);
     //LLVMSetGC(function, label("shadow-stack"));
@@ -669,21 +676,36 @@ pub unsafe fn get_ltype(data: &LLVM, ttype: Type, use_fptrs: bool) -> LLVMTypeRe
             LLVMStructType(ltypes.as_mut_ptr(), ltypes.len() as u32, false as i32)
         },
         Type::Function(ref args, ref ret, ref abi) => {
-            let lftype = match abi {
-                ABI::C => cfunc_type(data, *args.clone(), *ret.clone()),
+            match abi {
+                ABI::C => cfunc_type(data, *args.clone(), *ret.clone(), use_fptrs),
                 ABI::Molten | ABI::Unknown => {
                     // TODO How the hell do you know the closure id to get the context type??? You need an ID here, to base it off the def instead of the molten type...
                     // I don't think there's an alternative
                     //str_type(data)
-                    cfunc_type(data, *args.clone(), *ret.clone())
+                    cfunc_type(data, *args.clone(), *ret.clone(), use_fptrs)
+
+                    /*
+                    let mut atypes = vec!();
+                    for ttype in args.as_vec() {
+                        atypes.push(get_ltype(data, ttype, true));
+                    }
+                    //atypes.push(str_type(data));
+                    let rtype = get_ltype(data, *ret.clone(), true);
+                    let ftype = LLVMFunctionType(rtype, atypes.as_mut_ptr(), atypes.len() as u32, false as i32);
+
+                    let ftype = if use_fptrs {
+                        LLVMPointerType(ftype, 0)
+                    } else {
+                        ftype
+                    };
+
+                    let mut ltypes = vec!();
+                    ltypes.push(ftype);
+                    ltypes.push(str_type(data));
+                    LLVMStructType(ltypes.as_mut_ptr(), ltypes.len() as u32, false as i32)
+                    */
                 },
                 _ => panic!("Unsupported ABI: {:?}", abi),
-            };
-
-            if use_fptrs {
-                LLVMPointerType(lftype, 0)
-            } else {
-                lftype
             }
         },
         // TODO this is not the correct way to deal with type variables... there should be overloaded functions generated
@@ -713,7 +735,7 @@ pub unsafe fn generate_declarations(data: &LLVM, scope: ScopeRef, transform: &Ve
             },
             TopKind::Closure(ref fid, ref fname, ref name, ref args, _) => {
                 let cl = data.session.get_def(element.id).unwrap().as_closure().unwrap();
-                build_struct_type(data, cl.contextid, name, cl.context.clone(), true);
+                //build_struct_type(data, cl.contextid, name, cl.context.clone(), true);
                 generate_func_start(data, scope.clone(), *fid, fname.clone(), args);
             },
             TopKind::Declare(ref name) => {
@@ -782,10 +804,13 @@ pub unsafe fn generate_definitions(data: &LLVM, scope: ScopeRef, transform: &Vec
     for element in transform {
         match element.kind {
             TopKind::Func(_, _, ref body) => {
-                build_function_body(data, element.id, body);
+                build_function_body(data, element.id, data.map.get(&element.id), body);
+            },
+            TopKind::Closure(ref fid, _, _, _, ref body) => {
+                build_function_body(data, *fid, data.map.get(&element.id), body);
             },
             TopKind::Method(_, _, ref body) => {
-                build_function_body(data, element.id, body);
+                build_function_body(data, element.id, data.map.get(&element.id), body);
             },
             _ => { },
         }

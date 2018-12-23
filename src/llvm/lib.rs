@@ -19,7 +19,7 @@ use binding::{ declare_typevars };
 use utils::UniqueID;
 
 use defs::classes::ClassDef;
-use defs::functions::{ AnyFunc, CFuncDef, FuncDef };
+use defs::functions::{ AnyFunc, CFuncDef, FuncDef, BuiltinFuncDef };
 
 use llvm::codegen::*;
 
@@ -28,7 +28,7 @@ pub type RuntimeFunction = unsafe fn(&LLVM, NodeID, &str, LLVMTypeRef) -> LLVMVa
 pub type ComptimeFunction = unsafe fn(&LLVM, Vec<LLVMValueRef>) -> LLVMValueRef;
 
 #[derive(Clone)]
-pub enum Func {
+pub enum FuncKind {
     Undefined,
     External,
     Runtime(RuntimeFunction),
@@ -37,7 +37,7 @@ pub enum Func {
 
 #[derive(Clone)]
 pub enum BuiltinDef<'sess> {
-    Func(NodeID, &'sess str, &'sess str, Func),
+    Func(NodeID, &'sess str, &'sess str, FuncKind),
     Class(NodeID, &'sess str, Vec<Type>, Vec<(String, Type)>, Vec<BuiltinDef<'sess>>),
 }
 
@@ -72,8 +72,8 @@ pub fn declare_builtins_node<'sess>(session: &Session, scope: ScopeRef, node: &B
             debug!("BUILTIN TYPE: {:?}", ftype);
             let abi = ftype.as_ref().map(|t| t.get_abi().unwrap()).unwrap_or(ABI::Molten);
             match *func {
-                Func::Comptime(_) => {
-                    FuncDef::define(session, scope.clone(), *id, &Some(String::from(*name)), ftype.clone()).unwrap();
+                FuncKind::Comptime(_) => {
+                    BuiltinFuncDef::define(session, scope.clone(), *id, &Some(String::from(*name)), ftype.clone()).unwrap();
                 },
                 _ => {
                     AnyFunc::define(session, scope.clone(), *id, &Some(String::from(*name)), abi, ftype.clone()).unwrap();
@@ -106,20 +106,20 @@ pub unsafe fn define_builtins_vec<'sess>(data: &mut LLVM<'sess>, objtype: LLVMTy
 pub unsafe fn define_builtins_node<'sess>(data: &mut LLVM<'sess>, objtype: LLVMTypeRef, scope: ScopeRef, node: &BuiltinDef<'sess>) {
     match *node {
         BuiltinDef::Func(ref id, ref sname, ref types, ref func) => {
-            let mut name = String::from(*sname);
             let ftype = parse_type(types).unwrap();
+            let mut name = ftype.get_abi().unwrap_or(ABI::Molten).mangle_name(sname, ftype.get_argtypes().unwrap(), 2);
             match *func {
-                Func::External => {
+                FuncKind::External => {
                     let func = LLVMAddFunction(data.module, label(name.as_str()), get_ltype(data, ftype.clone(), false));
                     data.set_value(*id, from_abi(&ftype.get_abi().unwrap(), func));
                 },
-                Func::Runtime(func) => {
+                FuncKind::Runtime(func) => {
                     data.set_value(*id, from_type(&ftype, func(data, *id, name.as_str(), objtype)));
                 },
-                Func::Comptime(func) => {
+                FuncKind::Comptime(func) => {
                     data.set_value(*id, Box::new(Builtin(BuiltinFunction(func), ftype)));
                 },
-                Func::Undefined => { },
+                FuncKind::Undefined => { },
             }
         },
         BuiltinDef::Class(ref id, ref name, _, ref structdef, ref entries) => {
@@ -184,97 +184,95 @@ pub fn get_builtins<'sess>() -> Vec<BuiltinDef<'sess>> {
         BuiltinDef::Class(id(), "Nil",    vec!(), vec!(), vec!()),
         BuiltinDef::Class(id(), "Bool",   vec!(), vec!(), vec!()),
         BuiltinDef::Class(id(), "Byte",   vec!(), vec!(), vec!()),
+        BuiltinDef::Class(id(), "Int",    vec!(), vec!(), vec!()),
         BuiltinDef::Class(id(), "Real",   vec!(), vec!(), vec!()),
         BuiltinDef::Class(id(), "String", vec!(), vec!(), vec!()),
+        //    BuiltinDef::Func(id(), "[]",   "(String, Int) -> Int",            FuncKind::Runtime(build_string_get)),
         //BuiltinDef::Class(id(), "List",   vec!(Type::Variable(String::from("item"), UniqueID(0))), vec!(), vec!()),
         //BuiltinDef::Class(id(), "Class",  Type::Object(String::from("Class"), vec!())),
 
-        BuiltinDef::Class(id(), "Int", vec!(), vec!(), vec!(
-            BuiltinDef::Func(id(), "+",   "(Int, Int) -> Int", Func::Comptime(add_int)),
-            BuiltinDef::Func(id(), "add", "(Int, Int) -> Int", Func::Runtime(build_lib_add)),
-        )),
+        BuiltinDef::Func(id(), "getindex",   "(String, Int) -> Int / C",        FuncKind::Runtime(build_string_get)),
 
         /*
-        BuiltinDef::Class(id(), "String", vec!(), vec!(
-            //BuiltinDef::Func(id(), "push", "(String, String) -> String", Func::Comptime(add_int)),
-            BuiltinDef::Func(id(), "[]",   "(String, Int) -> Int",       Func::Runtime(build_string_get)),
+        BuiltinDef::Class(id(), "Int", vec!(), vec!(), vec!(
+            BuiltinDef::Func(id(), "+",   "(Int, Int) -> Int",                  FuncKind::Comptime(add_int)),
+            BuiltinDef::Func(id(), "add", "(Int, Int) -> Int",                  FuncKind::Runtime(build_lib_add)),
         )),
         */
-        BuiltinDef::Func(id(), "getindex",   "(String, Int) -> Int / C",      Func::Runtime(build_string_get)),
 
+        BuiltinDef::Func(id(), "malloc",     "(Int) -> 'ptr / C",               FuncKind::External),
+        BuiltinDef::Func(id(), "realloc",    "('ptr, Int) -> 'ptr / C",         FuncKind::External),
+        BuiltinDef::Func(id(), "free",       "('ptr) -> () / C",                FuncKind::External),
+        BuiltinDef::Func(id(), "memcpy",     "('ptr, 'ptr, Int) -> 'ptr / C",   FuncKind::External),
+        BuiltinDef::Func(id(), "strcmp",     "(String, String) -> Int / C",     FuncKind::External),
+        BuiltinDef::Func(id(), "puts",       "(String) -> () / C",              FuncKind::External),
+        BuiltinDef::Func(id(), "gets",       "(String) -> String / C",          FuncKind::External),
+        BuiltinDef::Func(id(), "strlen",     "(String) -> Int / C",             FuncKind::External),
+        //BuiltinDef::Func(id(), "sprintf",    "'tmp",                          FuncKind::Undefined),
+        BuiltinDef::Func(id(), "sprintf",    "(String, String, 'sess1, 'sess2) -> () / C", FuncKind::Comptime(sprintf)),
 
-        BuiltinDef::Func(id(), "malloc",     "(Int) -> 'ptr / C",             Func::External),
-        BuiltinDef::Func(id(), "realloc",    "('ptr, Int) -> 'ptr / C",       Func::External),
-        BuiltinDef::Func(id(), "free",       "('ptr) -> () / C",              Func::External),
-        BuiltinDef::Func(id(), "memcpy",     "('ptr, 'ptr, Int) -> 'ptr / C", Func::External),
-        BuiltinDef::Func(id(), "strcmp",     "(String, String) -> Int / C",   Func::External),
-        BuiltinDef::Func(id(), "puts",       "(String) -> () / C",            Func::External),
-        BuiltinDef::Func(id(), "gets",       "(String) -> String / C",        Func::External),
-        BuiltinDef::Func(id(), "strlen",     "(String) -> Int / C",           Func::External),
-        //BuiltinDef::Func(id(), "sprintf",    "'tmp",                          Func::Undefined),
-        //BuiltinDef::Func(id(), "sprintf",    "(String, String, 'sess1, 'sess2) -> () / C", Func::Undefined),
-        BuiltinDef::Func(id(), "sprintf",    "(String, String, 'sess1, 'sess2) -> () / C", Func::Comptime(sprintf)),
+        BuiltinDef::Func(id(), "println",    "(String) -> () / C",              FuncKind::Runtime(build_lib_println)),
+        BuiltinDef::Func(id(), "readline",   "() -> String / C",                FuncKind::Runtime(build_lib_readline)),
 
-        BuiltinDef::Func(id(), "println",    "(String) -> () / C",            Func::Runtime(build_lib_println)),
-        BuiltinDef::Func(id(), "readline",   "() -> String / C",              Func::Runtime(build_lib_readline)),
+        BuiltinDef::Func(id(), "sizeof",    "('ptr) -> Int",                    FuncKind::Comptime(sizeof_value)),
 
 
         BuiltinDef::Class(id(), "Buffer", vec!(Type::Variable(String::from("item"), UniqueID(0))), vec!(), vec!(
-            BuiltinDef::Func(id(), "__alloc__",  "() -> Buffer<'item>",                      Func::Runtime(build_buffer_allocator)),
-            BuiltinDef::Func(id(), "new",        "(Buffer<'item>, Int) -> Buffer<'item>",    Func::Runtime(build_buffer_constructor)),
-            BuiltinDef::Func(id(), "resize",     "(Buffer<'item>, Int) -> Buffer<'item>",    Func::Runtime(build_buffer_resize)),
-            BuiltinDef::Func(id(), "[]",         "(Buffer<'item>, Int) -> 'item",            Func::Runtime(build_buffer_get)),
-            BuiltinDef::Func(id(), "[]",         "(Buffer<'item>, Int, 'item) -> 'item",     Func::Runtime(build_buffer_set)),
+            BuiltinDef::Func(id(), "__alloc__",  "() -> Buffer<'item>",                      FuncKind::Runtime(build_buffer_allocator)),
+            BuiltinDef::Func(id(), "new",        "(Buffer<'item>, Int) -> Buffer<'item>",    FuncKind::Runtime(build_buffer_constructor)),
+            BuiltinDef::Func(id(), "resize",     "(Buffer<'item>, Int) -> Buffer<'item>",    FuncKind::Runtime(build_buffer_resize)),
+            BuiltinDef::Func(id(), "[]",         "(Buffer<'item>, Int) -> 'item",            FuncKind::Runtime(build_buffer_get)),
+            BuiltinDef::Func(id(), "[]",         "(Buffer<'item>, Int, 'item) -> 'item",     FuncKind::Runtime(build_buffer_set)),
         )),
 
 
-        BuiltinDef::Func(id(), "sizeof",    "('ptr) -> Int",    Func::Comptime(sizeof_value)),
-
-        BuiltinDef::Func(id(), "!",   "(ref 'ptr) -> 'ptr",   Func::Comptime(deref)),
-
-
-        BuiltinDef::Func(id(), "+",   "(Int, Int) -> Int",    Func::Comptime(add_int)),
-        BuiltinDef::Func(id(), "-",   "(Int, Int) -> Int",    Func::Comptime(sub_int)),
-        BuiltinDef::Func(id(), "*",   "(Int, Int) -> Int",    Func::Comptime(mul_int)),
-        BuiltinDef::Func(id(), "/",   "(Int, Int) -> Int",    Func::Comptime(div_int)),
-        BuiltinDef::Func(id(), "%",   "(Int, Int) -> Int",    Func::Comptime(mod_int)),
-        //BuiltinDef::Func(id(), "^",   "(Int, Int) -> Int",    Func::Comptime(pow_int)),
-        //BuiltinDef::Func(id(), "<<",  "(Int, Int) -> Int",    Func::Comptime(shl_int)),
-        //BuiltinDef::Func(id(), ">>",  "(Int, Int) -> Int",    Func::Comptime(shr_int)),
-        BuiltinDef::Func(id(), "&",   "(Int, Int) -> Int",    Func::Comptime(and_int)),
-        BuiltinDef::Func(id(), "|",   "(Int, Int) -> Int",    Func::Comptime(or_int)),
-        BuiltinDef::Func(id(), "<",   "(Int, Int) -> Bool",   Func::Comptime(lt_int)),
-        BuiltinDef::Func(id(), ">",   "(Int, Int) -> Bool",   Func::Comptime(gt_int)),
-        BuiltinDef::Func(id(), "<=",  "(Int, Int) -> Bool",   Func::Comptime(lte_int)),
-        BuiltinDef::Func(id(), ">=",  "(Int, Int) -> Bool",   Func::Comptime(gte_int)),
-        BuiltinDef::Func(id(), "==",  "(Int, Int) -> Bool",   Func::Comptime(eq_int)),
-        BuiltinDef::Func(id(), "!=",  "(Int, Int) -> Bool",   Func::Comptime(ne_int)),
-        BuiltinDef::Func(id(), "~",   "(Int) -> Int",         Func::Comptime(com_int)),
-        BuiltinDef::Func(id(), "not", "(Int) -> Bool",        Func::Comptime(not_int)),
+        //// Integer Builtins ////
+        BuiltinDef::Func(id(), "+",   "(Int, Int) -> Int",      FuncKind::Comptime(add_int)),
+        BuiltinDef::Func(id(), "-",   "(Int, Int) -> Int",      FuncKind::Comptime(sub_int)),
+        BuiltinDef::Func(id(), "*",   "(Int, Int) -> Int",      FuncKind::Comptime(mul_int)),
+        BuiltinDef::Func(id(), "/",   "(Int, Int) -> Int",      FuncKind::Comptime(div_int)),
+        BuiltinDef::Func(id(), "%",   "(Int, Int) -> Int",      FuncKind::Comptime(mod_int)),
+        //BuiltinDef::Func(id(), "^",   "(Int, Int) -> Int",    FuncKind::Comptime(pow_int)),
+        //BuiltinDef::Func(id(), "<<",  "(Int, Int) -> Int",    FuncKind::Comptime(shl_int)),
+        //BuiltinDef::Func(id(), ">>",  "(Int, Int) -> Int",    FuncKind::Comptime(shr_int)),
+        BuiltinDef::Func(id(), "&",   "(Int, Int) -> Int",      FuncKind::Comptime(and_int)),
+        BuiltinDef::Func(id(), "|",   "(Int, Int) -> Int",      FuncKind::Comptime(or_int)),
+        BuiltinDef::Func(id(), "<",   "(Int, Int) -> Bool",     FuncKind::Comptime(lt_int)),
+        BuiltinDef::Func(id(), ">",   "(Int, Int) -> Bool",     FuncKind::Comptime(gt_int)),
+        BuiltinDef::Func(id(), "<=",  "(Int, Int) -> Bool",     FuncKind::Comptime(lte_int)),
+        BuiltinDef::Func(id(), ">=",  "(Int, Int) -> Bool",     FuncKind::Comptime(gte_int)),
+        BuiltinDef::Func(id(), "==",  "(Int, Int) -> Bool",     FuncKind::Comptime(eq_int)),
+        BuiltinDef::Func(id(), "!=",  "(Int, Int) -> Bool",     FuncKind::Comptime(ne_int)),
+        BuiltinDef::Func(id(), "~",   "(Int) -> Int",           FuncKind::Comptime(com_int)),
+        BuiltinDef::Func(id(), "not", "(Int) -> Bool",          FuncKind::Comptime(not_int)),
 
 
-        BuiltinDef::Func(id(), "+",   "(Real, Real) -> Real", Func::Comptime(add_real)),
-        BuiltinDef::Func(id(), "-",   "(Real, Real) -> Real", Func::Comptime(sub_real)),
-        BuiltinDef::Func(id(), "*",   "(Real, Real) -> Real", Func::Comptime(mul_real)),
-        BuiltinDef::Func(id(), "/",   "(Real, Real) -> Real", Func::Comptime(div_real)),
-        BuiltinDef::Func(id(), "%",   "(Real, Real) -> Real", Func::Comptime(mod_real)),
-        BuiltinDef::Func(id(), "^",   "(Real, Real) -> Real", Func::Comptime(pow_real)),
-        BuiltinDef::Func(id(), "<",   "(Real, Real) -> Bool", Func::Comptime(lt_real)),
-        BuiltinDef::Func(id(), ">",   "(Real, Real) -> Bool", Func::Comptime(gt_real)),
-        BuiltinDef::Func(id(), "<=",  "(Real, Real) -> Bool", Func::Comptime(lte_real)),
-        BuiltinDef::Func(id(), ">=",  "(Real, Real) -> Bool", Func::Comptime(gte_real)),
-        BuiltinDef::Func(id(), "==",  "(Real, Real) -> Bool", Func::Comptime(eq_real)),
-        BuiltinDef::Func(id(), "!=",  "(Real, Real) -> Bool", Func::Comptime(ne_real)),
-        BuiltinDef::Func(id(), "not", "(Real) -> Bool",       Func::Comptime(not_real)),
+        //// Real Builtins ////
+        BuiltinDef::Func(id(), "+",   "(Real, Real) -> Real",   FuncKind::Comptime(add_real)),
+        BuiltinDef::Func(id(), "-",   "(Real, Real) -> Real",   FuncKind::Comptime(sub_real)),
+        BuiltinDef::Func(id(), "*",   "(Real, Real) -> Real",   FuncKind::Comptime(mul_real)),
+        BuiltinDef::Func(id(), "/",   "(Real, Real) -> Real",   FuncKind::Comptime(div_real)),
+        BuiltinDef::Func(id(), "%",   "(Real, Real) -> Real",   FuncKind::Comptime(mod_real)),
+        BuiltinDef::Func(id(), "^",   "(Real, Real) -> Real",   FuncKind::Comptime(pow_real)),
+        BuiltinDef::Func(id(), "<",   "(Real, Real) -> Bool",   FuncKind::Comptime(lt_real)),
+        BuiltinDef::Func(id(), ">",   "(Real, Real) -> Bool",   FuncKind::Comptime(gt_real)),
+        BuiltinDef::Func(id(), "<=",  "(Real, Real) -> Bool",   FuncKind::Comptime(lte_real)),
+        BuiltinDef::Func(id(), ">=",  "(Real, Real) -> Bool",   FuncKind::Comptime(gte_real)),
+        BuiltinDef::Func(id(), "==",  "(Real, Real) -> Bool",   FuncKind::Comptime(eq_real)),
+        BuiltinDef::Func(id(), "!=",  "(Real, Real) -> Bool",   FuncKind::Comptime(ne_real)),
+        BuiltinDef::Func(id(), "not", "(Real) -> Bool",         FuncKind::Comptime(not_real)),
 
 
-        BuiltinDef::Func(id(), "==",  "(Bool, Bool) -> Bool", Func::Comptime(eq_bool)),
-        BuiltinDef::Func(id(), "!=",  "(Bool, Bool) -> Bool", Func::Comptime(ne_bool)),
-        BuiltinDef::Func(id(), "not", "(Bool) -> Bool",       Func::Comptime(not_bool)),
+        //// Boolean Builtins ////
+        BuiltinDef::Func(id(), "==",  "(Bool, Bool) -> Bool",   FuncKind::Comptime(eq_bool)),
+        BuiltinDef::Func(id(), "!=",  "(Bool, Bool) -> Bool",   FuncKind::Comptime(ne_bool)),
+        BuiltinDef::Func(id(), "not", "(Bool) -> Bool",         FuncKind::Comptime(not_bool)),
+
+
+        //// Ref Builtins ////
+        BuiltinDef::Func(id(), "!",   "(ref 'ptr) -> 'ptr",     FuncKind::Comptime(deref)),
     )
 }
-
-fn deref(data: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildLoad(data.builder, args[0], label("tmp")) } }
 
 
 fn add_int(data: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildAdd(data.builder, args[0], args[1], label("tmp")) } }
@@ -310,6 +308,8 @@ fn not_real(data: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLV
 fn eq_bool(data: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildICmp(data.builder, llvm::LLVMIntPredicate::LLVMIntEQ, args[0], args[1], label("tmp")) } }
 fn ne_bool(data: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildICmp(data.builder, llvm::LLVMIntPredicate::LLVMIntNE, args[0], args[1], label("tmp")) } }
 fn not_bool(data: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildNot(data.builder, args[0], label("tmp")) } }
+
+fn deref(data: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildLoad(data.builder, args[0], label("tmp")) } }
 
 fn sprintf(data: &LLVM, mut args: Vec<LLVMValueRef>) -> LLVMValueRef {
     unsafe {

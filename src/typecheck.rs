@@ -141,7 +141,18 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &AST,
 
         AST::Identifier(_, _, ref ident) => {
             //session.get_type_from_ref(*id)?;
-            scope.get_variable_type(session, &ident.name).unwrap_or_else(|| expected.unwrap_or_else(|| scope.new_typevar(session)))
+            //scope.get_variable_type(session, &ident.name).unwrap_or_else(|| expected.unwrap_or_else(|| scope.new_typevar(session)))
+            match scope.get_var_def(&ident.name) {
+                //Some(defid) => match session.get_def(defid) {
+                //    Ok(Def::Overload(_)) => return Err(Error::new(format!("TypeError: reference is overloaded for {:?}", ident.name))),
+                //    _ => session.get_type(defid).unwrap(),
+                //},
+                Some(defid) => match session.get_type(defid) {
+                    Some(ttype) => ttype,
+                    None => return Err(Error::new(format!("TypeError: the reference {:?} has no type or has an ambiguous type", ident.name))),
+                }
+                None => panic!("InternalError: ident {:?} is undefined, but should have been caught in the name binding phase", ident.name),
+            }
         },
 
         AST::Block(_, _, ref body) => check_types_vec(session, scope, body),
