@@ -19,20 +19,15 @@ Installing
 
 You will need `rustc` and `cargo` installed.  It's recommended that you use
 `rustup` to install these.  I've most recently tested it with rustc version 1.28.
-You will also need LLVM 5.0 installed.
+You will also need LLVM 7 installed.
 
 On Debian/Ubuntu, run:
-`sudo apt-get install llvm-5.0 llvm-5.0-runtime llvm-5.0-dev`
-
-You may need to run the following before the rust llvm package will compile:
-```
-sudo ln -s /usr/bin/llvm-config-5.0 /usr/bin/llvm-config
-```
+`sudo apt-get install llvm-7 llvm-7-runtime llvm-7-dev`
 
 On macOS, run:
-`brew install llvm@5`
+`brew install llvm@7`
 
-You may need to add /usr/local/opt/llvm@5/bin to your path
+You may need to add /usr/local/opt/llvm@7/bin to your path
 
 Running
 -------
@@ -45,12 +40,12 @@ The `molten` script helps with compiling and linking IR files.  To run an exampl
 
 This will run cargo to build the compiler if needed, then compile the fac.ml
 file, as well as the libcore.ml library, link them together, and then run the
-output using `lli-5.0`
+output using `lli-7`
 
 The `*.ll` files contain IR code for a single file.  The `*.dec` files contain
 declarations for use when importing from another file.  The `*.bc` files
-contain LLVM Bitcode, which can be executed using `lli-5.0` or compiled using
-`llc-5.0`
+contain LLVM Bitcode, which can be executed using `lli-7` or compiled using
+`llc-7`
 
 
 Example

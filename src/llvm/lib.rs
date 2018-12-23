@@ -439,19 +439,6 @@ unsafe fn build_string_get(data: &LLVM, id: NodeID, name: &str, _objtype: LLVMTy
     function
 }
 
-unsafe fn build_lib_add(data: &LLVM, id: NodeID, name: &str, _objtype: LLVMTypeRef) -> LLVMValueRef {
-    let dtype = int_type(data);
-    let mut atypes = vec!(dtype, dtype);
-    let function = LLVMAddFunction(data.module, label("builtin.add"), LLVMFunctionType(dtype, atypes.as_mut_ptr(), atypes.len() as u32, false as i32));
-    LLVMSetLinkage(function, llvm::LLVMLinkage::LLVMLinkOnceODRLinkage);
-    //LLVMAddAttributeAtIndex(function, 0, get_attribute(data, "inlinealways"));
-    LLVMPositionBuilderAtEnd(data.builder, LLVMAppendBasicBlockInContext(data.context, function, label("entry")));
-    let value = LLVMBuildAdd(data.builder, LLVMGetParam(function, 0), LLVMGetParam(function, 1), label("tmp"));
-    LLVMBuildRet(data.builder, value);
-    function
-}
-
-
 
 unsafe fn build_lib_println(data: &LLVM, id: NodeID, name: &str, _objtype: LLVMTypeRef) -> LLVMValueRef {
     let function = build_function_start_lib(data, id, name, vec!(str_type(data)), int_type(data));
@@ -473,11 +460,4 @@ unsafe fn build_lib_readline(data: &LLVM, id: NodeID, name: &str, _objtype: LLVM
     LLVMBuildRet(data.builder, value);
     function
 }
-
-
-//    let mut types = vec!(cint_type, bool_type(data));
-//    let rtype = LLVMStructTypeInContext(data.context, types.as_mut_ptr(), types.len() as u32, false as i32);
-
-//    declare_function(data.module, pscope, "llvm.sadd.with.overflow.i64", &mut [cint_type, cint_type], rtype, false);
-
 

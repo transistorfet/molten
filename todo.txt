@@ -12,7 +12,6 @@ let context = ref { var1 = ident1, var2 = ident2 }
 return (func, context)
 * it makes more sense, if you go for abi specifiers, to make methods use one instead of closures.
 
-* try upgrading to llvm 7
 * should you unify some aspects of references and objects?  at least the codegen stuff, rather than duplicating some code
 * modify resolve to return a result rather than unwrapping
 

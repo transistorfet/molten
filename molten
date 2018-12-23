@@ -11,11 +11,11 @@ import subprocess
 if shutil.which("lli") is not None:
     # MacOS
     EXT = ""
-elif shutil.which("lli-5.0") is not None:
+elif shutil.which("lli-7") is not None:
     # Debian
-    EXT = "-5.0"
+    EXT = "-7"
 else:
-    print("Error: unable to locate LLVM command line program \"lli\".  Please ensure that the LLVM 5.0 tools are included in your $PATH")
+    print("Error: unable to locate LLVM command line program \"lli\".  Please ensure that the LLVM 7 tools are included in your $PATH")
     sys.exit(-1)
 
 RM = "rm"
