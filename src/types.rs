@@ -83,6 +83,13 @@ impl Type {
         }
     }
 
+    pub fn get_function_types(&self) -> Result<(&Type, &Type, ABI), Error> {
+        match self {
+            Type::Function(atypes, rtype, abi) => Ok((atypes, rtype, *abi)),
+            ftype @ _ => Err(Error::new(format!("TypeError: expected function type: {:?}", ftype))),
+        }
+    }
+
 
     pub fn is_variable(&self) -> bool {
         match *self {

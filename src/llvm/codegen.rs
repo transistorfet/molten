@@ -432,18 +432,30 @@ pub unsafe fn int_value(data: &LLVM, num: usize) -> LLVMValueRef {
 pub unsafe fn build_generic_cast(data: &LLVM, value: LLVMValueRef, ltype: LLVMTypeRef) -> LLVMValueRef {
     if ltype != LLVMTypeOf(value) {
         debug!("{:?} -> {:?}", LLVMGetTypeKind(LLVMTypeOf(value)), LLVMGetTypeKind(ltype));
-        if LLVMGetTypeKind(LLVMTypeOf(value)) == LLVMTypeKind::LLVMPointerTypeKind {
-            if LLVMGetTypeKind(ltype) == LLVMTypeKind::LLVMPointerTypeKind {
-                LLVMBuildPointerCast(data.builder, value, ltype, label("ptr"))
-            } else {
-                LLVMBuildPtrToInt(data.builder, value, ltype, label("ptr"))
+
+        let sourcekind = LLVMGetTypeKind(LLVMTypeOf(value));
+        let destkind = LLVMGetTypeKind(ltype);
+
+        match (sourcekind, destkind) {
+            (LLVMTypeKind::LLVMPointerTypeKind, LLVMTypeKind::LLVMPointerTypeKind) =>
+                LLVMBuildPointerCast(data.builder, value, ltype, label("ptr")),
+            (LLVMTypeKind::LLVMPointerTypeKind, _) =>
+                LLVMBuildPtrToInt(data.builder, value, ltype, label("ptr")),
+            (_, LLVMTypeKind::LLVMPointerTypeKind) =>
+                LLVMBuildIntToPtr(data.builder, value, ltype, label("ptr")),
+            (LLVMTypeKind::LLVMIntegerTypeKind, LLVMTypeKind::LLVMDoubleTypeKind) =>
+                LLVMBuildCast(data.builder, llvm_sys::LLVMOpcode::LLVMSIToFP, value, ltype, label("tmp")),
+            (LLVMTypeKind::LLVMDoubleTypeKind, LLVMTypeKind::LLVMIntegerTypeKind) =>
+                LLVMBuildCast(data.builder, llvm_sys::LLVMOpcode::LLVMFPToSI, value, ltype, label("tmp")),
+            (LLVMTypeKind::LLVMIntegerTypeKind, LLVMTypeKind::LLVMIntegerTypeKind) => {
+                if (LLVMGetIntTypeWidth(LLVMTypeOf(value)) > LLVMGetIntTypeWidth(ltype)) {
+                    LLVMBuildCast(data.builder, llvm_sys::LLVMOpcode::LLVMTrunc, value, ltype, label("tmp"))
+                } else {
+                    LLVMBuildCast(data.builder, llvm_sys::LLVMOpcode::LLVMZExt, value, ltype, label("tmp"))
+                }
             }
-        } else {
-            if LLVMGetTypeKind(ltype) == LLVMTypeKind::LLVMPointerTypeKind {
-                LLVMBuildIntToPtr(data.builder, value, ltype, label("ptr"))
-            } else {
-                panic!("I HAVEN'T DONE THIS");
-            }
+            _ =>
+                panic!("I HAVEN'T DONE THIS"),
         }
     } else {
         value
@@ -1248,10 +1260,8 @@ pub unsafe fn generate_expr(data: &LLVM, func: LLVMValueRef, unwind: Unwind, sco
 
 pub fn get_function_types(data: &LLVM, id: NodeID) -> (Type, Type, ABI) {
     let ftype = data.session.get_type(id).unwrap();
-    match ftype.clone() {
-        Type::Function(atypes, rtype, abi) => (*atypes, *rtype, abi),
-        ftype @ _ => panic!("TypeError: expected function type: {:?}", ftype),
-    }
+    let (argtypes, rettype, abi) = ftype.get_function_types().unwrap();
+    (argtypes.clone(), rettype.clone(), abi)
 }
 
 pub unsafe fn generate_invoke_args(data: &LLVM, func: LLVMValueRef, unwind: Unwind, scope: ScopeRef, atypes: &Type, args: &Vec<Expr>) -> Vec<LLVMValueRef> {

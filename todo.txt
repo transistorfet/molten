@@ -1,4 +1,9 @@
 
+* add a lib function wrapper that calls the comptime funcs
+* switch everything to actual functions
+* get rid of those traits
+* add transformed types to transform code
+
 * there is no way to assign to a ref
 
 * I think it should be doable to make all functions including methods be closures, especially if you put the context at the end

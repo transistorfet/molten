@@ -29,7 +29,7 @@ pub type ComptimeFunction = unsafe fn(&LLVM, Vec<LLVMValueRef>) -> LLVMValueRef;
 
 #[derive(Clone)]
 pub enum FuncKind {
-    Undefined,
+    FromNamed,
     External,
     Runtime(RuntimeFunction),
     Comptime(ComptimeFunction)
@@ -92,9 +92,9 @@ pub fn declare_builtins_node<'sess>(session: &Session, scope: ScopeRef, node: &B
 }
 
 pub unsafe fn initialize_builtins<'sess>(data: &mut LLVM<'sess>, scope: ScopeRef, entries: &Vec<BuiltinDef<'sess>>) {
-    define_builtins_vec(data, ptr::null_mut(), scope.clone(), entries);
     let pscope = scope.get_parent().unwrap();
     declare_irregular_functions(data, pscope.clone());
+    define_builtins_vec(data, ptr::null_mut(), scope.clone(), entries);
 }
 
 pub unsafe fn define_builtins_vec<'sess>(data: &mut LLVM<'sess>, objtype: LLVMTypeRef, scope: ScopeRef, entries: &Vec<BuiltinDef<'sess>>) {
@@ -117,9 +117,13 @@ pub unsafe fn define_builtins_node<'sess>(data: &mut LLVM<'sess>, objtype: LLVMT
                     data.set_value(*id, from_type(&ftype, func(data, *id, name.as_str(), objtype)));
                 },
                 FuncKind::Comptime(func) => {
-                    data.set_value(*id, Box::new(Builtin(BuiltinFunction(func), ftype)));
+                    //data.set_value(*id, Box::new(Builtin(BuiltinFunction(func), ftype)));
+                    //data.set_value(*id, Box::new(CFunction(build_lib_function(data, *id, name.as_str(), ftype.clone(), func))));
+                    build_lib_function(data, *id, name.as_str(), ftype.clone(), func);
                 },
-                FuncKind::Undefined => { },
+                FuncKind::FromNamed => {
+                    data.set_value(*id, Box::new(CFunction(LLVMGetNamedFunction(data.module, label(&name)))));
+                },
             }
         },
         BuiltinDef::Class(ref id, ref name, _, ref structdef, ref entries) => {
@@ -144,13 +148,14 @@ pub unsafe fn define_builtins_node<'sess>(data: &mut LLVM<'sess>, objtype: LLVMT
 }
 
 
-pub unsafe fn declare_c_function(data: &LLVM, scope: ScopeRef, name: &str, args: &mut [LLVMTypeRef], ret_type: LLVMTypeRef, vargs: bool) {
+pub unsafe fn declare_c_function(data: &LLVM, scope: ScopeRef, name: &str, args: &mut [LLVMTypeRef], ret_type: LLVMTypeRef, vargs: bool) -> LLVMValueRef {
     let ftype = LLVMFunctionType(ret_type, args.as_mut_ptr(), args.len() as u32, vargs as i32);
-    let func = LLVMAddFunction(data.module, label(name), ftype);
+    let function = LLVMAddFunction(data.module, label(name), ftype);
     let name = &String::from(name);
     //if scope.contains(name) {
-    //    data.set_value(scope.variable_id(name).unwrap(), Box::new(CFunction(func)));
+    //    data.set_value(scope.variable_id(name).unwrap(), Box::new(CFunction(function)));
     //}
+    function
 }
 
 unsafe fn declare_irregular_functions(data: &LLVM, scope: ScopeRef) {
@@ -208,8 +213,9 @@ pub fn get_builtins<'sess>() -> Vec<BuiltinDef<'sess>> {
         BuiltinDef::Func(id(), "puts",       "(String) -> () / C",              FuncKind::External),
         BuiltinDef::Func(id(), "gets",       "(String) -> String / C",          FuncKind::External),
         BuiltinDef::Func(id(), "strlen",     "(String) -> Int / C",             FuncKind::External),
-        //BuiltinDef::Func(id(), "sprintf",    "'tmp",                          FuncKind::Undefined),
-        BuiltinDef::Func(id(), "sprintf",    "(String, String, 'sess1, 'sess2) -> () / C", FuncKind::Comptime(sprintf)),
+        //BuiltinDef::Func(id(), "sprintf",    "'tmp",                          FuncKind::FromNamed),
+        //BuiltinDef::Func(id(), "sprintf2",    "(String, String, '__a1, '__a2) -> () / C", FuncKind::Comptime(sprintf)),
+        BuiltinDef::Func(id(), "sprintf",    "(String, String, '__a1, '__a2) -> () / C", FuncKind::FromNamed),
 
         BuiltinDef::Func(id(), "println",    "(String) -> () / C",              FuncKind::Runtime(build_lib_println)),
         BuiltinDef::Func(id(), "readline",   "() -> String / C",                FuncKind::Runtime(build_lib_readline)),
@@ -260,7 +266,6 @@ pub fn get_builtins<'sess>() -> Vec<BuiltinDef<'sess>> {
         BuiltinDef::Func(id(), ">=",  "(Real, Real) -> Bool",   FuncKind::Comptime(gte_real)),
         BuiltinDef::Func(id(), "==",  "(Real, Real) -> Bool",   FuncKind::Comptime(eq_real)),
         BuiltinDef::Func(id(), "!=",  "(Real, Real) -> Bool",   FuncKind::Comptime(ne_real)),
-        BuiltinDef::Func(id(), "not", "(Real) -> Bool",         FuncKind::Comptime(not_real)),
 
 
         //// Boolean Builtins ////
@@ -303,7 +308,6 @@ fn lt_real(data: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVM
 fn gt_real(data: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildFCmp(data.builder, llvm::LLVMRealPredicate::LLVMRealOGT, args[0], args[1], label("tmp")) } }
 fn lte_real(data: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildFCmp(data.builder, llvm::LLVMRealPredicate::LLVMRealOLE, args[0], args[1], label("tmp")) } }
 fn gte_real(data: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildFCmp(data.builder, llvm::LLVMRealPredicate::LLVMRealOGE, args[0], args[1], label("tmp")) } }
-fn not_real(data: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildNot(data.builder, args[0], label("tmp")) } }
 
 fn eq_bool(data: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildICmp(data.builder, llvm::LLVMIntPredicate::LLVMIntEQ, args[0], args[1], label("tmp")) } }
 fn ne_bool(data: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildICmp(data.builder, llvm::LLVMIntPredicate::LLVMIntNE, args[0], args[1], label("tmp")) } }
@@ -324,16 +328,41 @@ unsafe fn sizeof_value(data: &LLVM, mut args: Vec<LLVMValueRef>) -> LLVMValueRef
     LLVMBuildPtrToInt(data.builder, pointer, int_type(data), label("ptr"))
 }
 
+
+unsafe fn build_lib_function(data: &LLVM, id: NodeID, name: &str, ftype: Type, func: ComptimeFunction) -> LLVMValueRef {
+    let (argtypes, rettype, abi) = ftype.get_function_types().unwrap();
+    let lftype = cfunc_type(data, argtypes.clone(), rettype.clone(), false);
+
+    let argcount = argtypes.as_vec().len();
+    let function = build_function_start(data, id, String::from(name), lftype, argcount, ABI::Molten);
+    LLVMSetLinkage(function, llvm::LLVMLinkage::LLVMLinkOnceODRLinkage);
+
+    //let name = "alwaysinline";
+    //let kind = LLVMGetEnumAttributeKindForName(label(name), name.len());
+    //let attribute = LLVMCreateEnumAttribute(data.context, kind, 0);
+    //LLVMAddAttributeAtIndex(function, 0, attribute);
+
+    let bb = LLVMAppendBasicBlockInContext(data.context, function, label("entry"));
+    LLVMPositionBuilderAtEnd(data.builder, bb);
+
+    let args = (0..argcount).map(|i| LLVMGetParam(function, i as u32)).collect();
+    let ret = func(data, args);
+    LLVMBuildRet(data.builder, generate_cast(data, rettype.clone(), ret));
+
+    function
+}
+
+
 unsafe fn build_buffer_allocator(data: &LLVM, id: NodeID, name: &str, objtype: LLVMTypeRef) -> LLVMValueRef {
     let function = build_function_start_lib(data, id, name, vec!(), objtype);
-    LLVMSetLinkage(function, llvm::LLVMLinkage::LLVMLinkOnceAnyLinkage);
+    LLVMSetLinkage(function, llvm::LLVMLinkage::LLVMLinkOnceODRLinkage);
     LLVMBuildRet(data.builder, null_value(objtype));
     function
 }
 
 unsafe fn build_buffer_constructor(data: &LLVM, id: NodeID, name: &str, objtype: LLVMTypeRef) -> LLVMValueRef {
     let function = build_function_start_lib(data, id, name, vec!(objtype, int_type(data)), objtype);
-    LLVMSetLinkage(function, llvm::LLVMLinkage::LLVMLinkOnceAnyLinkage);
+    LLVMSetLinkage(function, llvm::LLVMLinkage::LLVMLinkOnceODRLinkage);
 
     let ptr = LLVMBuildArrayMalloc(data.builder, LLVMInt64TypeInContext(data.context), LLVMGetParam(function, 1), label("tmp"));
     let castptr = LLVMBuildPointerCast(data.builder, ptr, objtype, label("ptr"));
@@ -343,7 +372,7 @@ unsafe fn build_buffer_constructor(data: &LLVM, id: NodeID, name: &str, objtype:
 
 unsafe fn build_buffer_resize(data: &LLVM, id: NodeID, name: &str, objtype: LLVMTypeRef) -> LLVMValueRef {
     let function = build_function_start_lib(data, id, name, vec!(objtype, int_type(data)), objtype);
-    LLVMSetLinkage(function, llvm::LLVMLinkage::LLVMLinkOnceAnyLinkage);
+    LLVMSetLinkage(function, llvm::LLVMLinkage::LLVMLinkOnceODRLinkage);
 
     let buffer = LLVMBuildPointerCast(data.builder, LLVMGetParam(function, 0), str_type(data), label("tmp"));
     let size = LLVMBuildMul(data.builder, LLVMGetParam(function, 1), LLVMSizeOf(LLVMInt64TypeInContext(data.context)), label("tmp"));
@@ -355,7 +384,7 @@ unsafe fn build_buffer_resize(data: &LLVM, id: NodeID, name: &str, objtype: LLVM
 
 unsafe fn build_buffer_get(data: &LLVM, id: NodeID, name: &str, objtype: LLVMTypeRef) -> LLVMValueRef {
     let function = build_function_start_lib(data, id, name, vec!(objtype, int_type(data)), str_type(data));
-    LLVMSetLinkage(function, llvm::LLVMLinkage::LLVMLinkOnceAnyLinkage);
+    LLVMSetLinkage(function, llvm::LLVMLinkage::LLVMLinkOnceODRLinkage);
 
     // TODO generate this in place of the custom function
     //Return(
@@ -381,7 +410,7 @@ unsafe fn build_buffer_get(data: &LLVM, id: NodeID, name: &str, objtype: LLVMTyp
 
 unsafe fn build_buffer_set(data: &LLVM, id: NodeID, name: &str, objtype: LLVMTypeRef) -> LLVMValueRef {
     let function = build_function_start_lib(data, id, name, vec!(objtype, int_type(data), str_type(data)), str_type(data));
-    LLVMSetLinkage(function, llvm::LLVMLinkage::LLVMLinkOnceAnyLinkage);
+    LLVMSetLinkage(function, llvm::LLVMLinkage::LLVMLinkOnceODRLinkage);
 
     let buffer = LLVMGetParam(function, 0);
     let index = LLVMBuildCast(data.builder, llvm::LLVMOpcode::LLVMTrunc, LLVMGetParam(function, 1), i32_type(data), label("tmp"));
@@ -398,7 +427,7 @@ unsafe fn build_buffer_set(data: &LLVM, id: NodeID, name: &str, objtype: LLVMTyp
 
 unsafe fn build_string_get(data: &LLVM, id: NodeID, name: &str, _objtype: LLVMTypeRef) -> LLVMValueRef {
     let function = build_function_start_lib(data, id, name, vec!(str_type(data), int_type(data)), int_type(data));
-    LLVMSetLinkage(function, llvm::LLVMLinkage::LLVMLinkOnceAnyLinkage);
+    LLVMSetLinkage(function, llvm::LLVMLinkage::LLVMLinkOnceODRLinkage);
 
     let string = LLVMGetParam(function, 0);
     let mut indices = vec!(LLVMGetParam(function, 1));
@@ -414,7 +443,7 @@ unsafe fn build_lib_add(data: &LLVM, id: NodeID, name: &str, _objtype: LLVMTypeR
     let dtype = int_type(data);
     let mut atypes = vec!(dtype, dtype);
     let function = LLVMAddFunction(data.module, label("builtin.add"), LLVMFunctionType(dtype, atypes.as_mut_ptr(), atypes.len() as u32, false as i32));
-    LLVMSetLinkage(function, llvm::LLVMLinkage::LLVMLinkOnceAnyLinkage);
+    LLVMSetLinkage(function, llvm::LLVMLinkage::LLVMLinkOnceODRLinkage);
     //LLVMAddAttributeAtIndex(function, 0, get_attribute(data, "inlinealways"));
     LLVMPositionBuilderAtEnd(data.builder, LLVMAppendBasicBlockInContext(data.context, function, label("entry")));
     let value = LLVMBuildAdd(data.builder, LLVMGetParam(function, 0), LLVMGetParam(function, 1), label("tmp"));
@@ -426,7 +455,7 @@ unsafe fn build_lib_add(data: &LLVM, id: NodeID, name: &str, _objtype: LLVMTypeR
 
 unsafe fn build_lib_println(data: &LLVM, id: NodeID, name: &str, _objtype: LLVMTypeRef) -> LLVMValueRef {
     let function = build_function_start_lib(data, id, name, vec!(str_type(data)), int_type(data));
-    LLVMSetLinkage(function, llvm::LLVMLinkage::LLVMLinkOnceAnyLinkage);
+    LLVMSetLinkage(function, llvm::LLVMLinkage::LLVMLinkOnceODRLinkage);
 
     let value = build_c_call(data, "puts", &mut vec!(LLVMGetParam(function, 0)));
     LLVMBuildRet(data.builder, value);
@@ -435,7 +464,7 @@ unsafe fn build_lib_println(data: &LLVM, id: NodeID, name: &str, _objtype: LLVMT
 
 unsafe fn build_lib_readline(data: &LLVM, id: NodeID, name: &str, _objtype: LLVMTypeRef) -> LLVMValueRef {
     let function = build_function_start_lib(data, id, name, vec!(), str_type(data));
-    LLVMSetLinkage(function, llvm::LLVMLinkage::LLVMLinkOnceAnyLinkage);
+    LLVMSetLinkage(function, llvm::LLVMLinkage::LLVMLinkOnceODRLinkage);
 
     let buffer = build_c_call(data, "malloc", &mut vec!(int_value(data, 2048)));
     build_c_call(data, "gets", &mut vec!(buffer));
