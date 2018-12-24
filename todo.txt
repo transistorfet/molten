@@ -1,7 +1,6 @@
 
-* add a lib function wrapper that calls the comptime funcs
-* switch everything to actual functions
-* get rid of those traits
+* remove builtin stuff that's usused
+* get rid of those compilable traits
 * add transformed types to transform code
 
 * there is no way to assign to a ref

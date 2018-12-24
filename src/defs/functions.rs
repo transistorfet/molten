@@ -23,8 +23,8 @@ impl AnyFunc {
                 if scope.is_redirect() && name.is_some() {
                     MethodDef::define(session, scope.clone(), id, name, ttype)
                 } else {
-                    FuncDef::define(session, scope.clone(), id, name, ttype)
-                    //ClosureDef::define(session, scope.clone(), id, name, ttype)
+                    //FuncDef::define(session, scope.clone(), id, name, ttype)
+                    ClosureDef::define(session, scope.clone(), id, name, ttype)
                 }
             },
             _ => return Err(Error::new(format!("DefError: unsupported ABI {:?}", abi))),

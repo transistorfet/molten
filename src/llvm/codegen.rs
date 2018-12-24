@@ -694,9 +694,10 @@ pub unsafe fn get_ltype(data: &LLVM, ttype: Type, use_fptrs: bool) -> LLVMTypeRe
                     // TODO How the hell do you know the closure id to get the context type??? You need an ID here, to base it off the def instead of the molten type...
                     // I don't think there's an alternative
                     //str_type(data)
-                    cfunc_type(data, *args.clone(), *ret.clone(), use_fptrs)
-
                     /*
+                    cfunc_type(data, *args.clone(), *ret.clone(), use_fptrs)
+                    */
+
                     let mut atypes = vec!();
                     for ttype in args.as_vec() {
                         atypes.push(get_ltype(data, ttype, true));
@@ -715,7 +716,6 @@ pub unsafe fn get_ltype(data: &LLVM, ttype: Type, use_fptrs: bool) -> LLVMTypeRe
                     ltypes.push(ftype);
                     ltypes.push(str_type(data));
                     LLVMStructType(ltypes.as_mut_ptr(), ltypes.len() as u32, false as i32)
-                    */
                 },
                 _ => panic!("Unsupported ABI: {:?}", abi),
             }
@@ -866,7 +866,15 @@ pub unsafe fn generate_expr(data: &LLVM, func: LLVMValueRef, unwind: Unwind, sco
                 InvokeKind::Closure(ref fexpr) => {
                     let closure = generate_expr(data, func, unwind, scope.clone(), fexpr).get_ref();
                     largs.push(closure);
-                    Box::new(Closure(closure))
+                    let function = Box::new(Closure(closure));
+
+                    // TODO this is an experiment
+                    let func = build_struct_load(data, function.0, 0);
+                    generate_cast_args(data, func, &mut largs);
+                    let value = function.invoke(data, unwind, largs);
+                    let value = generate_cast(data, rtype.clone(), value);
+
+                    return from_type(&rtype, value);
                 },
                 InvokeKind::CFunc(ref fexpr) |
                 InvokeKind::Func(ref fexpr) => generate_expr(data, func, unwind, scope.clone(), fexpr),
