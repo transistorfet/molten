@@ -24,6 +24,7 @@ use scope::{ ScopeRef, ScopeMapRef };
 use ast::{ NodeID, Pos, Literal, Ident, ClassSpec, AST };
 
 use defs::classes::{ ClassDefRef, StructDef, StructDefRef };
+use defs::functions::{ ClosureDef };
 
 use llvm::lib::{ BuiltinDef, initialize_builtins };
 
@@ -119,8 +120,7 @@ impl Compilable for Closure {
     unsafe fn invoke(&self, data: &LLVM, unwind: Unwind, mut largs: Vec<LLVMValueRef>) -> LLVMValueRef {
         LLVMDumpValue(self.0);
         let func = build_struct_load(data, self.0, 0);
-        let context = build_struct_load(data, self.0, 1);
-        largs.push(context);
+        //largs.push(self.0);
         LLVMBuildCall(data.builder, func, largs.as_mut_ptr(), largs.len() as u32, label("cloj"))
         //self.0
     }
@@ -513,10 +513,12 @@ unsafe fn build_function_body(data: &LLVM, id: NodeID, fscope: ScopeRef, body: &
     // TODO do you need to take into account abi?
     let function = data.get_value(id).unwrap().get_ref();
 
+    let (_, rettype, _) = get_function_types(data, id);
+
     let bb = LLVMAppendBasicBlockInContext(data.context, function, label("entry"));
     LLVMPositionBuilderAtEnd(data.builder, bb);
     let ret = generate_expr(data, function, None, fscope.clone(), body);
-    LLVMBuildRet(data.builder, ret.get_ref());
+    LLVMBuildRet(data.builder, build_generic_cast(data, ret.get_ref(), get_ltype(data, rettype, true)));
 
     //if llvm::analysis::LLVMVerifyFunction(function, llvm::analysis::LLVMVerifierFailureAction::LLVMPrintMessageAction) != 0 {
     //    panic!("VerifyError: verification failed");
@@ -693,10 +695,9 @@ pub unsafe fn get_ltype(data: &LLVM, ttype: Type, use_fptrs: bool) -> LLVMTypeRe
                 ABI::Molten | ABI::Unknown => {
                     // TODO How the hell do you know the closure id to get the context type??? You need an ID here, to base it off the def instead of the molten type...
                     // I don't think there's an alternative
-                    //str_type(data)
+                    str_type(data)
                     /*
                     cfunc_type(data, *args.clone(), *ret.clone(), use_fptrs)
-                    */
 
                     let mut atypes = vec!();
                     for ttype in args.as_vec() {
@@ -716,6 +717,7 @@ pub unsafe fn get_ltype(data: &LLVM, ttype: Type, use_fptrs: bool) -> LLVMTypeRe
                     ltypes.push(ftype);
                     ltypes.push(str_type(data));
                     LLVMStructType(ltypes.as_mut_ptr(), ltypes.len() as u32, false as i32)
+                    */
                 },
                 _ => panic!("Unsupported ABI: {:?}", abi),
             }
@@ -868,10 +870,17 @@ pub unsafe fn generate_expr(data: &LLVM, func: LLVMValueRef, unwind: Unwind, sco
                     largs.push(closure);
                     let function = Box::new(Closure(closure));
 
+                    let thing = ClosureDef::add_context_to_ftype_raw(data.session, scope.clone(), data.session.get_type(expr.id).unwrap());
+                    let (argtypes, rettype, abi) = thing.get_function_types().unwrap();
+                    let mut ltypes = vec!(cfunc_type(data, argtypes.clone(), rettype.clone(), true));
+                    let cltype = LLVMPointerType(LLVMStructType(ltypes.as_mut_ptr(), ltypes.len() as u32, false as i32), 0);
+                    let closure = build_generic_cast(data, function.0, cltype);
+
                     // TODO this is an experiment
-                    let func = build_struct_load(data, function.0, 0);
+                    let func = build_struct_load(data, closure, 0);
                     generate_cast_args(data, func, &mut largs);
-                    let value = function.invoke(data, unwind, largs);
+                    //let value = function.invoke(data, unwind, largs);
+                    let value = LLVMBuildCall(data.builder, func, largs.as_mut_ptr(), largs.len() as u32, label("cloj"));
                     let value = generate_cast(data, rtype.clone(), value);
 
                     return from_type(&rtype, value);
@@ -886,6 +895,7 @@ pub unsafe fn generate_expr(data: &LLVM, func: LLVMValueRef, unwind: Unwind, sco
             let value = function.invoke(data, unwind, largs);
             let value = generate_cast(data, rtype.clone(), value);
 
+            println!("\nRETURNING");
             from_type(&rtype, value)
         },
 

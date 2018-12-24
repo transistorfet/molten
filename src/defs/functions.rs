@@ -190,6 +190,7 @@ impl OverloadDef {
 pub struct ClosureDef {
     pub id: NodeID,
     pub varid: NodeID,
+    pub argid: NodeID,
     pub name: String,
     pub contextid: NodeID,
     pub contexttype: Type,
@@ -213,6 +214,7 @@ impl ClosureDef {
         let def = Def::Closure(Rc::new(ClosureDef {
             id: id,
             varid: NodeID::generate(),
+            argid: NodeID::generate(),
             name: fname,
             contextid: ctid,
             contexttype: ctype,
@@ -230,13 +232,22 @@ impl ClosureDef {
     // TODO I don't like this
     pub fn add_context_to_ftype(&self, session: &Session, scope: ScopeRef) -> Type {
         match session.get_type(self.id) {
-            Some(Type::Function(mut args, ret, abi)) => {
-                let args = ClosureDef::add_context_to_args(session, scope.clone(), *args);
-                let ftype = Type::Function(Box::new(args), ret, ABI::C);
+            Some(ttype) => {
+                let ftype = ClosureDef::add_context_to_ftype_raw(session, scope, ttype);
                 session.set_type(self.id, ftype.clone());
                 ftype
             },
             ttype @ _ => panic!("Unexpected type when transforming closure: expected function but got {:?}", ttype),
+        }
+    }
+
+    pub fn add_context_to_ftype_raw(session: &Session, scope: ScopeRef, ttype: Type) -> Type {
+        if let Type::Function(mut args, ret, abi) = ttype {
+            let args = ClosureDef::add_context_to_args(session, scope.clone(), *args);
+            let ftype = Type::Function(Box::new(args), ret, ABI::C);
+            ftype
+        } else {
+            panic!("Must give a function type");
         }
     }
 
@@ -248,6 +259,16 @@ impl ClosureDef {
             },
             ttype @ _ => Type::Tuple(vec!(ttype, scope.new_typevar(session))),
         }
+    }
+
+    pub fn get_context_type(&self, session: &Session) -> Type {
+        let mut fields = vec!();
+        //fields.push(self.add_context_to_ftype(self.session, scope.clone()););
+        fields.push(session.get_type(self.id).unwrap());
+        for &(ref field, ref ttype) in self.context.fields.borrow().iter() {
+            fields.push(ttype.clone());
+        }
+        Type::Ref(Box::new(Type::Tuple(fields)))
     }
 }
 

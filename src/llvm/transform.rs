@@ -159,10 +159,9 @@ impl<'sess> Transform<'sess> {
                 let mut args = self.transform_args(args);
 
                 if let Def::Closure(ref cl) = def {
-                    let aid = NodeID::generate();
                     let aname = String::from("__context__");
-                    ArgDef::define(self.session, fscope.clone(), aid, false, &aname, Some(cl.contexttype.clone())).unwrap();
-                    args.push((aid, aname));
+                    ArgDef::define(self.session, fscope.clone(), cl.argid, false, &aname, Some(cl.contexttype.clone())).unwrap();
+                    args.push((cl.argid, aname));
                     let ftype = cl.add_context_to_ftype(self.session, scope.clone());
                     let real_fname = fname.clone() + &"_func";
 
@@ -192,11 +191,15 @@ impl<'sess> Transform<'sess> {
 
                     FuncDef::define(self.session, scope.clone(), rfid, &Some(real_fname.clone()), Some(self.session.get_type(*id).unwrap()));
                     let mut exprs = vec!();
-                    for (index, &(ref field, ref ttype)) in cl.context.fields.borrow().iter().enumerate() {
+                    exprs.push((Ident::from_str("__func__"), AST::make_ident_from_str(pos.clone(), real_fname.as_str())));
+                    for &(ref field, ref ttype) in cl.context.fields.borrow().iter() {
                         exprs.push((Ident::from_str(field.as_str()), AST::make_ident_from_str(pos.clone(), field.as_str())));
                     }
                     code.push(AST::Definition(cl.varid, pos.clone(), true, Ident::new(cname.clone()), None, Box::new(AST::make_ref(pos.clone(), AST::make_record(pos.clone(), exprs)))));
-                    code.push(AST::Tuple(NodeID::generate(), pos.clone(), vec!(AST::make_ident_from_str(pos.clone(), real_fname.as_str()), AST::make_ident(pos.clone(), Ident::new(cname.clone())))));
+                    // TODO I'm going back on my decision to use a tuple pair to represent the function and context reference because it can't be converted to i8* (the generics type)
+                    //      Once I have generics that can operate on different sized data instead of only references, I can switch back
+                    //code.push(AST::Tuple(NodeID::generate(), pos.clone(), vec!(AST::make_ident_from_str(pos.clone(), real_fname.as_str()), AST::make_ident(pos.clone(), Ident::new(cname.clone())))));
+                    code.push(AST::make_ident(pos.clone(), Ident::new(cname.clone())));
 
                     binding::bind_names(self.session, scope.clone(), &mut code);
                     typecheck::check_types(self.session, scope.clone(), &code);
@@ -236,12 +239,21 @@ impl<'sess> Transform<'sess> {
                             ABI::Unknown |
                             ABI::Molten => {
                                 // TODO this might cause you problems, if the ref is not always set (calculated calls).
+                                /*
                                 if let Ok(Def::Closure(ref cl)) = self.session.get_def_from_ref(*id) {
                                     debug!("===== So a closure: {:?}", cl);
                                     InvokeKind::Closure(Box::new(self.transform_expr(scope.clone(), fexpr)))
                                 } else {
                                     debug!("===== much function: {:?}", self.session.get_ref(*id));
                                     InvokeKind::Func(Box::new(self.transform_expr(scope.clone(), fexpr)))
+                                }
+                                */
+                                if let Ok(Def::Builtin(_)) = self.session.get_def_from_ref(*id) {
+                                    debug!("===== much function: {:?}", self.session.get_ref(*id));
+                                    InvokeKind::Func(Box::new(self.transform_expr(scope.clone(), fexpr)))
+                                } else {
+                                    debug!("===== So a closure: {:?}", fexpr);
+                                    InvokeKind::Closure(Box::new(self.transform_expr(scope.clone(), fexpr)))
                                 }
                             },
                             _ => panic!("Unsupported ABI type {:?} for {:?}", abi, fexpr),
@@ -281,8 +293,9 @@ impl<'sess> Transform<'sess> {
                                     cl.add_field(self.session, ident.as_str(), self.session.get_type_from_ref(*id).unwrap());
 
                                     let oid = NodeID::generate();
-                                    let objexpr = Expr::new(oid, pos.clone(), ExprKind::AccessValue(String::from("__context__")));
+                                    let objexpr = Expr::new(NodeID::generate(), pos.clone(), ExprKind::PtrCast(cl.get_context_type(self.session), Box::new(Expr::new(oid, pos.clone(), ExprKind::AccessValue(String::from("__context__"))))));
                                     self.session.set_type(oid, cl.contexttype.clone());
+                                    self.session.set_ref(oid, cl.argid);
 
                                     let objdef = self.session.get_def(cl.contexttype.get_id().unwrap()).unwrap();
                                     if let Some((structindex, ftype)) = objdef.as_struct().unwrap().find_field(ident.as_str()) {

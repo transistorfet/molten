@@ -30,8 +30,10 @@ return (func, context)
 
 * the current problem with closure code (line 269 of test.ml) is that we're assigning a closure to a struct field but the types don't match, because the get_type function
   returned an actual function type, rather than a pointer to the closure context... so you kinda need a way to distinguish different function types
-* Builtins are erroniously treated as closures...
 
+
+* there was a problem with generics when using tuple pair closures, because a tuple pair was too big to coerce into an i8*. You can convert back when generics
+  are fixed to adjust to their size
 
 * there are poor error messages when deleting the "=" from a "let something = fn x => ..." both inside and outside classes.... shouldn't be doing this (actually, because of
   let without init, and the lf issue... lf fix would solve this)
@@ -70,7 +72,7 @@ return (func, context)
 * implement exceptions
 * implement garbage collection
 * add compiler directives?
-* use customizer visitors throughout
+* use customized visitors throughout
 
 * issue with separator/lf not working when two expressions are on the same line (it should produce a parse error)
 * better support for generics; right now it just forces everything to/from a pointer type
