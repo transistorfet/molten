@@ -57,12 +57,15 @@ pub struct Field {
     pub ttype: Option<Type>
 }
 
+#[derive(Clone, Debug, PartialEq)]
+pub enum Pattern {
+    Underscore,
+    Literal(AST),
+}
+
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum AST {
-    //Comment(String),
-
-    Underscore,
     Literal(NodeID, Literal),
     Nil(NodeID),
     PtrCast(Type, Box<AST>),
@@ -86,8 +89,8 @@ pub enum AST {
     Block(NodeID, Pos, Vec<AST>),
     If(NodeID, Pos, Box<AST>, Box<AST>, Box<AST>),
     Raise(NodeID, Pos, Box<AST>),
-    Try(NodeID, Pos, Box<AST>, Vec<(AST, AST)>, NodeID),
-    Match(NodeID, Pos, Box<AST>, Vec<(AST, AST)>, NodeID),
+    Try(NodeID, Pos, Box<AST>, Vec<(Pattern, AST)>, NodeID),
+    Match(NodeID, Pos, Box<AST>, Vec<(Pattern, AST)>, NodeID),
     For(NodeID, Pos, Ident, Box<AST>, Box<AST>),
     While(NodeID, Pos, Box<AST>, Box<AST>),
 
@@ -333,11 +336,11 @@ impl AST {
         AST::Raise(NodeID::generate(), pos, Box::new(expr))
     }
 
-    pub fn make_try(pos: Pos, cond: AST, cases: Vec<(AST, AST)>) -> AST {
+    pub fn make_try(pos: Pos, cond: AST, cases: Vec<(Pattern, AST)>) -> AST {
         AST::Try(NodeID::generate(), pos, Box::new(cond), cases, NodeID::generate())
     }
 
-    pub fn make_match(pos: Pos, cond: AST, cases: Vec<(AST, AST)>) -> AST {
+    pub fn make_match(pos: Pos, cond: AST, cases: Vec<(Pattern, AST)>) -> AST {
         AST::Match(NodeID::generate(), pos, Box::new(cond), cases, NodeID::generate())
     }
 

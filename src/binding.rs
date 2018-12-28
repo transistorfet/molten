@@ -2,15 +2,15 @@
 
 use abi::ABI;
 use types::Type;
-use ast::{ NodeID, Ident, ClassSpec, AST };
-use session::{ Session, Error };
 use scope::{ ScopeRef };
+use session::{ Session, Error };
+use ast::{ ClassSpec, Pattern, AST };
 use utils::UniqueID;
 
 use defs::functions::AnyFunc;
+use defs::classes::{ ClassDef };
 use defs::types::{ TypeAliasDef };
-use defs::classes::{ ClassDef, StructDef };
-use defs::variables::{ AnyVar, ArgDef, FieldDef };
+use defs::variables::{ AnyVar, ArgDef };
 
 
 pub fn bind_names(session: &Session, scope: ScopeRef, code: &mut Vec<AST>) {
@@ -98,7 +98,7 @@ fn bind_names_node_or_error(session: &Session, scope: ScopeRef, node: &mut AST) 
             bind_names_node(session, scope.clone(), cond);
             // TODO check to make sure AST::Underscore only occurs as the last case, if at all
             for &mut (ref mut case, ref mut body) in cases {
-                bind_names_node(session, scope.clone(), case);
+                bind_names_pattern(session, scope.clone(), case);
                 bind_names_node(session, scope.clone(), body);
             }
         },
@@ -230,7 +230,7 @@ fn bind_names_node_or_error(session: &Session, scope: ScopeRef, node: &mut AST) 
         },
 
         AST::Recall(_, _) |
-        AST::Underscore | AST::Nil(_) |
+        AST::Nil(_) |
         AST::Literal(_, _) => { }
     }
     Ok(())
@@ -294,6 +294,11 @@ pub fn declare_typevars(session: &Session, scope: ScopeRef, ttype: Option<&mut T
     }
     Ok(())
 }
+
+pub fn bind_names_pattern(session: &Session, scope: ScopeRef, pat: &mut Pattern) {
+    // TODO nothing to do yet
+}
+
 
 #[must_use]
 pub fn declare_classspec_typevars(session: &Session, scope: ScopeRef, classspec: &mut ClassSpec, always_new: bool) -> Result<(), Error> {

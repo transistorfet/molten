@@ -1,4 +1,13 @@
 
+* remove AST::Recall
+* implement records and refs
+* there's probably an issue with records in that we might not take into account different orders of items... { a=1, b=2 } might not equal { b=2, a=1 }
+
+ISSUES TO CONSIDER:
+* passing non ref return values back
+* generics of variable sizes
+* closure conversion
+
 * remove builtin stuff that's usused
 * get rid of those compilable traits
 * add transformed types to transform code

@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use std::collections::hash_map::Entry;
 
 use types::Type;
-use ast::{ NodeID, Ident };
+use ast::{ NodeID };
 use session::{ Session, Error };
 use utils::UniqueID;
 use defs::Def;

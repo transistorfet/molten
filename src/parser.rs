@@ -31,7 +31,7 @@ use std::str::FromStr;
 use abi::ABI;
 use types::Type;
 use utils::UniqueID;
-use ast::{ Pos, Literal, Ident, Argument, ClassSpec, Field, AST };
+use ast::{ Pos, Literal, Ident, Argument, ClassSpec, Field, Pattern, AST };
 
 
 ///// Parsing Macros /////
@@ -233,7 +233,7 @@ named!(typealias(Span) -> AST,
 
 named!(expression(Span) -> AST,
     alt_complete!(
-        underscore |
+        //underscore |
         //block |
         ifexpr |
         trywith |
@@ -250,9 +250,9 @@ named!(expression(Span) -> AST,
 
 
 
-named!(underscore(Span) -> AST,
-    value!(AST::Underscore, tag!("_"))
-);
+//named!(underscore(Span) -> AST,
+//    value!(AST::Underscore, tag!("_"))
+//);
 
 named!(block(Span) -> AST,
     delimited!(
@@ -313,16 +313,23 @@ named!(matchcase(Span) -> AST,
     )
 );
 
-named!(caselist(Span) -> Vec<(AST, AST)>,
+named!(caselist(Span) -> Vec<(Pattern, AST)>,
     //separated_list_complete!(wscom!(tag!(",")), do_parse!(
     many1!(do_parse!(
         //wscom!(tag!("|")) >>
-        c: alt_complete!(value!(AST::Underscore, tag!("_")) | literal) >>
+        c: pattern >>
         wscom!(tag!("=>")) >>
         e: expression >>
         //wscom!(tag!(",")) >>
         (c, e)
     ))
+);
+
+named!(pattern(Span) -> Pattern,
+    alt_complete!(
+        value!(Pattern::Underscore, tag!("_")) |
+        map!(literal, |l| Pattern::Literal(l))
+    )
 );
 
 named!(forloop(Span) -> AST,

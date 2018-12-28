@@ -91,19 +91,19 @@ pub fn declare_builtins_node<'sess>(session: &Session, scope: ScopeRef, node: &B
     }
 }
 
-pub unsafe fn initialize_builtins<'sess>(data: &mut LLVM<'sess>, scope: ScopeRef, entries: &Vec<BuiltinDef<'sess>>) {
+pub unsafe fn initialize_builtins<'sess>(data: &LLVM<'sess>, scope: ScopeRef, entries: &Vec<BuiltinDef<'sess>>) {
     let pscope = scope.get_parent().unwrap();
     declare_irregular_functions(data, pscope.clone());
     define_builtins_vec(data, ptr::null_mut(), scope.clone(), entries);
 }
 
-pub unsafe fn define_builtins_vec<'sess>(data: &mut LLVM<'sess>, objtype: LLVMTypeRef, scope: ScopeRef, entries: &Vec<BuiltinDef<'sess>>) {
+pub unsafe fn define_builtins_vec<'sess>(data: &LLVM<'sess>, objtype: LLVMTypeRef, scope: ScopeRef, entries: &Vec<BuiltinDef<'sess>>) {
     for node in entries {
         define_builtins_node(data, objtype, scope.clone(), node);
     }
 }
 
-pub unsafe fn define_builtins_node<'sess>(data: &mut LLVM<'sess>, objtype: LLVMTypeRef, scope: ScopeRef, node: &BuiltinDef<'sess>) {
+pub unsafe fn define_builtins_node<'sess>(data: &LLVM<'sess>, objtype: LLVMTypeRef, scope: ScopeRef, node: &BuiltinDef<'sess>) {
     match *node {
         BuiltinDef::Func(ref id, ref sname, ref types, ref func) => {
             let ftype = parse_type(types).unwrap();

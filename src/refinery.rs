@@ -1,10 +1,9 @@
 
 use rand;
 
-use abi::ABI;
 use types::Type;
 use utils::UniqueID;
-use ast::{ NodeID, Pos, AST, Ident, ClassSpec };
+use ast::{ NodeID, AST, Ident, ClassSpec, Pattern };
 
 pub fn refine(code: Vec<AST>) -> Vec<AST> {
     //vec!(AST::make_func(Pos::empty(), Some(Ident::new(Pos::empty(), format!("init.{}", "test"))), vec!(), None,
@@ -58,12 +57,12 @@ pub fn refine_node(node: AST) -> AST {
         },
 
         AST::Match(id, pos, cond, cases, cid) => {
-            let cases = cases.into_iter().map(move |(case, body)| ( refine_node(case), refine_node(body) )).collect();
+            let cases = cases.into_iter().map(move |(case, body)| ( refine_pattern(case), refine_node(body) )).collect();
             AST::Match(id, pos, Box::new(refine_node(*cond)), cases, cid)
         },
 
         AST::Try(id, pos, cond, cases, cid) => {
-            let cases = cases.into_iter().map(move |(case, body)| ( refine_node(case), refine_node(body) )).collect();
+            let cases = cases.into_iter().map(move |(case, body)| ( refine_pattern(case), refine_node(body) )).collect();
             AST::Try(id, pos, Box::new(refine_node(*cond)), cases, cid)
         },
 
@@ -83,7 +82,10 @@ pub fn refine_node(node: AST) -> AST {
 
         AST::Tuple(id, pos, items) => { AST::Tuple(id, pos, refine_vec(items)) },
 
-        AST::Record(id, pos, items) => { AST::Record(id, pos, items.into_iter().map(|(i, e)| (i, refine_node(e))).collect()) },
+        AST::Record(id, pos, mut items) => {
+            items.sort_unstable_by(|a, b| a.0.name.cmp(&b.0.name));
+            AST::Record(id, pos, items.into_iter().map(|(i, e)| (i, refine_node(e))).collect())
+        },
 
         //AST::List(id, pos, items, ttype) => { AST::List(id, pos, refine_vec(items), ttype) },
         AST::List(id, pos, items) => {
@@ -177,7 +179,6 @@ pub fn refine_node(node: AST) -> AST {
         //    AST::Import(id, pos, ident, refine_vec(decls))
         //},
 
-        AST::Underscore => { node },
         AST::Literal(_, _) => { node },
         AST::Nil(_) => { node },
         AST::PtrCast(_, _) => { node },
@@ -188,5 +189,10 @@ pub fn refine_node(node: AST) -> AST {
 
         //node @ _ => { node }
     }
+}
+
+pub fn refine_pattern(pat: Pattern) -> Pattern {
+    // TODO refine the pattern, if needed
+    pat
 }
 

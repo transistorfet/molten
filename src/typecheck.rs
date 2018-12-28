@@ -3,7 +3,7 @@
 use defs::Def;
 use session::{ Session, Error };
 use scope::{ Scope, ScopeRef };
-use ast::{ NodeID, ClassSpec, Literal, AST };
+use ast::{ NodeID, ClassSpec, Literal, Pattern, AST };
 use types::{ Type, Check, ABI, expect_type, resolve_type, check_type_params };
 
 
@@ -27,7 +27,6 @@ pub fn check_types_node(session: &Session, scope: ScopeRef, node: &AST, expected
     match check_types_node_or_error(session, scope.clone(), node, expected) {
         Ok(ttype) => ttype,
         Err(err) => {
-
             session.print_error(err.add_pos(&node.get_pos()));
             //Type::Object(String::from("Nil"), vec!())
             scope.new_typevar(session)
@@ -170,7 +169,7 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &AST,
             let mut ctype = check_types_node(session, scope.clone(), cond, None);
             let mut rtype = None;
             for &(ref case, ref expr) in cases {
-                ctype = expect_type(session, scope.clone(), Some(ctype.clone()), Some(check_types_node(session, scope.clone(), case, Some(ctype.clone()))), Check::List)?;
+                ctype = expect_type(session, scope.clone(), Some(ctype.clone()), Some(check_types_pattern(session, scope.clone(), case, Some(ctype.clone()))?), Check::List)?;
                 rtype = Some(expect_type(session, scope.clone(), rtype.clone(), Some(check_types_node(session, scope.clone(), expr, rtype.clone())), Check::List)?);
             }
             //*condtype = ctype;
@@ -311,8 +310,6 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &AST,
             scope.make_obj(session, String::from("Nil"), vec!())?
         },
 
-        AST::Underscore => expected.unwrap_or_else(|| scope.new_typevar(session)),
-
         AST::Recall(_, _) => panic!("InternalError: Recall ast element shouldn't appear this early"),
         AST::Index(_, _, _, _) => panic!("InternalError: ast element shouldn't appear at this late phase: {:?}", node),
     };
@@ -320,6 +317,14 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &AST,
     debug!("CHECK: {:?} {:?}", rtype, node);
     Ok(rtype)
 }
+
+pub fn check_types_pattern(session: &Session, scope: ScopeRef, pat: &Pattern, expected: Option<Type>) -> Result<Type, Error> {
+    match pat {
+        Pattern::Underscore => Ok(expected.unwrap_or_else(|| scope.new_typevar(session))),
+        Pattern::Literal(node) => check_types_node_or_error(session, scope.clone(), node, expected),
+    }
+}
+
 
 pub fn get_access_ids(session: &Session, scope: ScopeRef, node: &AST) -> Result<Option<(NodeID, NodeID)>, Error> {
     match node {

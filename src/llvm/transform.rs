@@ -6,7 +6,7 @@ use defs::Def;
 use types::Type;
 use scope::{ Scope, ScopeRef };
 use session::{ Error, Session };
-use ast::{ NodeID, Pos, Ident, Literal, Argument, ClassSpec, AST };
+use ast::{ NodeID, Pos, Ident, Literal, Argument, ClassSpec, Pattern, AST };
 
 use defs::variables::ArgDef;
 use defs::functions::FuncDef;
@@ -421,7 +421,7 @@ impl<'sess> Transform<'sess> {
             },
 
             AST::Match(ref id, ref pos, ref cond, ref cases, ref cid) => {
-                let cases = cases.iter().map(|(pat, body)| (self.transform_expr(scope.clone(), pat), self.transform_expr(scope.clone(), body))).collect();
+                let cases = cases.iter().map(|(pat, body)| (self.transform_pattern(scope.clone(), pat), self.transform_expr(scope.clone(), body))).collect();
                 let ctype = self.session.get_type(*cid).unwrap();
                 let compid = scope.get_var_def(&String::from("==")).unwrap();
                 let compid = match self.session.get_def(compid) {
@@ -443,7 +443,7 @@ impl<'sess> Transform<'sess> {
             /////// Exceptions ///////
 
             AST::Try(ref id, ref pos, ref cond, ref cases, ref cid) => {
-                let cases = cases.iter().map(|(pat, body)| (self.transform_expr(scope.clone(), pat), self.transform_expr(scope.clone(), body))).collect();
+                let cases = cases.iter().map(|(pat, body)| (self.transform_pattern(scope.clone(), pat), self.transform_expr(scope.clone(), body))).collect();
                 Expr::new(*id, pos.clone(), ExprKind::Try(Box::new(self.transform_expr(scope.clone(), cond)), cases, *cid))
             },
             AST::Raise(ref id, ref pos, ref value) => {
@@ -472,11 +472,16 @@ impl<'sess> Transform<'sess> {
 
             AST::PtrCast(ref ttype, ref node) => Expr::new(NodeID::generate(), Pos::empty(), ExprKind::PtrCast(ttype.clone(), Box::new(self.transform_expr(scope.clone(), node)))),
 
-            AST::Underscore => Expr::new(NodeID::generate(), Pos::empty(), ExprKind::Underscore),
-
             AST::List(_, _, _) |
             AST::Index(_, _, _, _) => panic!("InternalError: ast element shouldn't appear at this late phase: {:?}", node),
 
+        }
+    }
+
+    pub fn transform_pattern(&self, scope: ScopeRef, pat: &Pattern) -> Expr {
+        match pat {
+            Pattern::Underscore => Expr::new(NodeID::generate(), Pos::empty(), ExprKind::Underscore),
+            Pattern::Literal(expr) => self.transform_expr(scope.clone(), expr),
         }
     }
 
