@@ -18,7 +18,7 @@ use scope::{ Scope, ScopeRef, ScopeMapRef, Context };
 use binding::{ declare_typevars };
 use utils::UniqueID;
 
-use defs::classes::ClassDef;
+use defs::classes::{ Define, ClassDef };
 use defs::functions::{ AnyFunc, CFuncDef, FuncDef, BuiltinFuncDef };
 
 use llvm::codegen::*;
@@ -133,7 +133,7 @@ pub unsafe fn define_builtins_node<'sess>(data: &LLVM<'sess>, objtype: LLVMTypeR
 
             let lltype = if structdef.len() > 0 {
                 for (ref field, ref ttype) in structdef {
-                    classdef.structdef.add_field(data.session, true, field, ttype.clone());
+                    classdef.structdef.add_field(data.session, NodeID::generate(), true, field, ttype.clone(), Define::IfNotExists);
                 }
                 build_class_type(data, scope.clone(), *id, &cname, classdef.clone())
             } else {

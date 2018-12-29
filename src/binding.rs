@@ -191,7 +191,7 @@ fn bind_names_node_or_error(session: &Session, scope: ScopeRef, node: &mut AST) 
             declare_typevars(session, scope.clone(), Some(ttype), false)?;
 
             let deftype = Type::Object(classspec.ident.name.clone(), *id, classspec.types.clone());
-            TypeAliasDef::define(session, scope.clone(), *id, deftype, ttype.clone());
+            TypeAliasDef::define(session, scope.clone(), *id, deftype, ttype.clone())?;
             //scope.define_type(classspec.ident.name.clone(), Some(*id));
             //session.set_type(*id, ttype.clone());
         },

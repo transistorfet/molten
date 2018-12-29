@@ -10,12 +10,13 @@ use scope::{ Scope, ScopeRef };
 use session::{ Session, Error };
 
 use defs::traits::{  };
-use defs::classes::{ StructDef, StructDefRef };
+use defs::classes::{ Define, StructDef, StructDefRef };
 
 
 pub struct AnyFunc();
 
 impl AnyFunc {
+    #[must_use]
     pub fn define(session: &Session, scope: ScopeRef, id: NodeID, name: &Option<String>, abi: ABI, ttype: Option<Type>) -> Result<Def, Error> {
         match abi {
             ABI::C => CFuncDef::define(session, scope.clone(), id, name, ttype),
@@ -40,6 +41,7 @@ pub struct FuncDef {
 pub type FuncDefRef = Rc<FuncDef>;
 
 impl FuncDef {
+    #[must_use]
     pub fn define(session: &Session, scope: ScopeRef, id: NodeID, name: &Option<String>, ttype: Option<Type>) -> Result<Def, Error> {
 
         let def = Def::Func(Rc::new(FuncDef {
@@ -95,6 +97,7 @@ impl OverloadDef {
         defid
     }
 
+    #[must_use]
     pub fn define(session: &Session, scope: ScopeRef, name: &String, id: NodeID, previd: NodeID, ttype: Option<Type>) -> Result<(), Error> {
         let dscope = Scope::target(session, scope.clone());
 
@@ -185,7 +188,7 @@ impl OverloadDef {
     }
 }
 
-
+/*
 #[derive(Clone, Debug, PartialEq)]
 pub struct ClosureDef {
     pub id: NodeID,
@@ -271,6 +274,50 @@ impl ClosureDef {
         Type::Ref(Box::new(Type::Tuple(fields)))
     }
 }
+*/
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct ClosureDef {
+    pub id: NodeID,
+    pub context_arg_id: NodeID,
+    pub context_type_id: NodeID,
+    pub context_struct: StructDefRef,
+}
+
+pub type ClosureDefRef = Rc<ClosureDef>;
+
+impl ClosureDef {
+    #[must_use]
+    pub fn define(session: &Session, scope: ScopeRef, id: NodeID, name: &Option<String>, ttype: Option<Type>) -> Result<Def, Error> {
+        let ctid = NodeID::generate();
+        let structdef = StructDef::new_ref(Scope::new_ref(Some(scope.clone())));
+
+        let def = Def::Closure(Rc::new(ClosureDef {
+            id: id,
+            context_arg_id: NodeID::generate(),
+            context_type_id: ctid,
+            context_struct: structdef,
+        }));
+
+        FuncDef::set_func_def(session, scope.clone(), id, name, def.clone(), ttype)?;
+        Ok(def)
+    }
+
+    pub fn add_field(&self, session: &Session, id: NodeID, name: &str, ttype: Type, define: Define) {
+        self.context_struct.add_field(session, id, true, name, ttype, define);
+    }
+
+    pub fn find_or_add_field(&self, session: &Session, id: NodeID, name: &str, ttype: Type) -> usize {
+        // TODO you should probably modify this to use the IDs
+        match self.context_struct.find_field_by_id(id) {
+            Some((index, _)) => index,
+            None => {
+                self.add_field(session, id, name, ttype, Define::IfNotExists);
+                self.context_struct.fields.borrow().len() - 1
+            }
+        }
+    }
+}
 
 
 #[derive(Clone, Debug, PartialEq)]
@@ -282,6 +329,7 @@ pub struct MethodDef {
 pub type MethodDefRef = Rc<MethodDef>;
 
 impl MethodDef {
+    #[must_use]
     pub fn define(session: &Session, scope: ScopeRef, id: NodeID, name: &Option<String>, ttype: Option<Type>) -> Result<Def, Error> {
         let def = Def::Method(Rc::new(MethodDef {
             id: id,
@@ -302,6 +350,7 @@ pub struct CFuncDef {
 pub type CFuncDefRef = Rc<CFuncDef>;
 
 impl CFuncDef {
+    #[must_use]
     pub fn define(session: &Session, scope: ScopeRef, id: NodeID, name: &Option<String>, ttype: Option<Type>) -> Result<Def, Error> {
         if scope.is_redirect() {
             return Err(Error::new(format!("DefError: cannot declare a C ABI function within a class body")));
@@ -334,6 +383,7 @@ pub struct BuiltinFuncDef {
 pub type BuiltinFuncDefRef = Rc<BuiltinFuncDef>;
 
 impl BuiltinFuncDef {
+    #[must_use]
     pub fn define(session: &Session, scope: ScopeRef, id: NodeID, name: &Option<String>, ttype: Option<Type>) -> Result<Def, Error> {
         let def = Def::Builtin(Rc::new(BuiltinFuncDef {
             id: id,

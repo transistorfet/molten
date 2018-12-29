@@ -17,6 +17,7 @@ use types::Type;
 pub enum ABI {
     Unknown,
     Molten,
+    MoltenFunc,
     C,
     Cpp,
     Rust,
@@ -28,10 +29,11 @@ impl ABI {
         match *name {
             None => ABI::Molten,
             Some(ref name) => match name.as_str() {
-                "" | "molten" => ABI::Molten,
+                "" | "Molten" | "M" => ABI::Molten,
+                "" | "MoltenFunction" | "MF" => ABI::MoltenFunc,
                 "C" => ABI::C,
                 "C++" => ABI::Cpp,
-                "rust" => ABI::Rust,
+                "Rust" => ABI::Rust,
                 _ => panic!("Unknown ABI: {:?}", name)
             }
         }
@@ -40,10 +42,11 @@ impl ABI {
     pub fn as_str(&self) -> &str {
         match *self {
             ABI::Unknown => "unknown",
-            ABI::Molten => "molten",
+            ABI::Molten => "Molten",
+            ABI::MoltenFunc => "MF",
             ABI::C => "C",
             ABI::Cpp => "C++",
-            ABI::Rust => "rust",
+            ABI::Rust => "Rust",
         }
     }
 
@@ -60,7 +63,8 @@ impl ABI {
     pub fn can_overload(&self) -> bool {
         match *self {
             ABI::Cpp |
-            ABI::Molten => true,
+            ABI::Molten |
+            ABI::MoltenFunc => true,
             ABI::C |
             ABI::Rust |
             ABI::Unknown => false,
@@ -69,7 +73,8 @@ impl ABI {
 
     pub fn mangle_name(&self, name: &str, argtypes: &Type, funcdefs: i32) -> String {
         match *self {
-            ABI::Molten => molten_mangle_name(name, argtypes, funcdefs),
+            ABI::Molten |
+            ABI::MoltenFunc => molten_mangle_name(name, argtypes, funcdefs),
             // TODO C++, etc
             _ => String::from(name),
         }

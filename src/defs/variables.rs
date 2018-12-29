@@ -13,6 +13,7 @@ use session::{ Session, Error };
 pub struct AnyVar();
 
 impl AnyVar {
+    #[must_use]
     pub fn define(session: &Session, scope: ScopeRef, id: NodeID, mutable: bool, name: &String, ttype: Option<Type>) -> Result<Def, Error> {
         // TODO should you have a different one for Global, given that it'll compile to something different, until you remove it via closures...
         if scope.is_redirect() {
@@ -33,6 +34,7 @@ pub struct VarDef {
 pub type VarDefRef = Rc<VarDef>;
 
 impl VarDef {
+    #[must_use]
     pub fn define(session: &Session, scope: ScopeRef, id: NodeID, mutable: bool, name: &String, ttype: Option<Type>) -> Result<Def, Error> {
 
         let def = Def::Var(Rc::new(VarDef {
@@ -66,6 +68,7 @@ pub struct ArgDef {
 pub type ArgDefRef = Rc<ArgDef>;
 
 impl ArgDef {
+    #[must_use]
     pub fn define(session: &Session, scope: ScopeRef, id: NodeID, mutable: bool, name: &String, ttype: Option<Type>) -> Result<Def, Error> {
         let def = Def::Arg(Rc::new(ArgDef {
             mutable: mutable,
@@ -87,6 +90,7 @@ pub struct FieldDef {
 pub type FieldDefRef = Rc<FieldDef>;
 
 impl FieldDef {
+    #[must_use]
     pub fn define(session: &Session, scope: ScopeRef, id: NodeID, mutable: bool, name: &String, ttype: Option<Type>) -> Result<Def, Error> {
 
         let def = Def::Field(Rc::new(FieldDef {

@@ -158,6 +158,7 @@ impl<'sess> Transform<'sess> {
                 let fname = self.transform_func_name(scope.clone(), ident.as_ref(), *id);
                 let mut args = self.transform_args(args);
 
+                /*
                 if let Def::Closure(ref cl) = def {
                     let aname = String::from("__context__");
                     ArgDef::define(self.session, fscope.clone(), cl.argid, false, &aname, Some(cl.contexttype.clone())).unwrap();
@@ -212,9 +213,10 @@ impl<'sess> Transform<'sess> {
                     self.toplevel.borrow_mut().insert(index, TopLevel::new(*id, pos.clone(), TopKind::Closure(rfid, real_fname.clone(), fname.clone(), args, body)));
                     Expr::new(*id, pos.clone(), ExprKind::Block(access))
                 } else {
+                */
                     self.add_function(*id, pos.clone(), fname.clone(), args, self.transform_expr(fscope.clone(), body));
                     self.access_def(*id, pos.clone(), fname.clone())
-                }
+                //}
             },
 
             AST::Declare(ref id, ref pos, ref ident, _) => {
@@ -288,6 +290,7 @@ impl<'sess> Transform<'sess> {
                         // TODO actually we shouldn't access scope, because that wont get us the overloaded target, but how will we tell if a reference is local???
                         if !scope.contains_local(&ident.name) && !Scope::global(scope.clone()).contains(&ident.name) {
                             match self.get_context() {
+                                /*
                                 Some(CodeContext::Closure(ref cid)) => {
                                     let cl = self.session.get_def(*cid).unwrap().as_closure().unwrap();
                                     cl.add_field(self.session, ident.as_str(), self.session.get_type_from_ref(*id).unwrap());
@@ -304,6 +307,7 @@ impl<'sess> Transform<'sess> {
                                         panic!("Attempting to access a closure context member that doesn't exist: {:?}", ident.name);
                                     }
                                 },
+                                */
                                 _ => panic!("Cannot access variable outside of scope: {:?}", node),
                             }
                         } else if let Def::Var(_) = def {

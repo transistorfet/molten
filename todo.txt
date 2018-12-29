@@ -1,17 +1,38 @@
 
-* remove AST::Recall
-* implement records and refs
-* there's probably an issue with records in that we might not take into account different orders of items... { a=1, b=2 } might not equal { b=2, a=1 }
+
+* implement phi/flow control
+* implement objects
+
+* figure out a better way of doing variables/generics
+* implement return value conversion
+* try to reuse as much code in transform as possible
+
+
+
+
+
 
 ISSUES TO CONSIDER:
 * passing non ref return values back
 * generics of variable sizes
-* closure conversion
+
+
+* can you factor out phi statements? (use as part of if, match, sideeffect)
+* can you factor out for and while loops into a set of things that do both
+* factor conditionals
+* add return transform
+
+
+* make test for function pointers, assign to local, call as ref
+
+
+* remove AST::Recall when you switch over to llvm2
 
 * remove builtin stuff that's usused
 * get rid of those compilable traits
 * add transformed types to transform code
 
+* there's probably an issue with records in that we might not take into account different orders of items... { a=1, b=2 } might not equal { b=2, a=1 }
 * there is no way to assign to a ref
 
 * I think it should be doable to make all functions including methods be closures, especially if you put the context at the end
@@ -27,15 +48,6 @@ return (func, context)
 * you can put a restriction on type aliases such that a type can only use type vars defined in the declaration
 * you could require that classes explicitly define their type variables by name, to catch type errors.  So every method or definition in the top level of the class
   could only use explicitly declared type variables
-
-=====
-* ideally, the transformed code should be directly compilable, such that you can use it for defining builtin runtime funcs, and desugared stuff.  It has to be easy to make and build up
-* can you factor out phi statements? (use as part of if, match, sideeffect)
-* can you factor out for and while loops into a set of things that do both
-* factor conditionals
-* add return transform
-* make casting transforms that do an LLVM cast (should the transform have LLVM types in it, or should it always convert from molten types? (kinda need more flexability than molten types)
-=====
 
 * the current problem with closure code (line 269 of test.ml) is that we're assigning a closure to a struct field but the types don't match, because the get_type function
   returned an actual function type, rather than a pointer to the closure context... so you kinda need a way to distinguish different function types

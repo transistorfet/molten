@@ -46,6 +46,7 @@ impl ClassDef {
         tscope
     }
 
+    #[must_use]
     pub fn define(session: &Session, scope: ScopeRef, id: NodeID, classtype: Type, parenttype: Option<Type>) -> Result<ClassDefRef, Error> {
         debug!("DEF CLASS: {:?}", classtype);
         let name = classtype.get_name()?;
@@ -116,15 +117,15 @@ impl ClassDef {
         let vtype = session.get_type(self.vtable.id).unwrap();
         if self.has_vtable() {
             if let Some(index) = self.get_struct_vtable_index() {
-                self.structdef.fields.borrow_mut()[index].1 = vtype;
+                self.structdef.fields.borrow_mut()[index].2 = vtype;
             } else {
-                self.structdef.add_field(session, false, "__vtable__", vtype);
+                self.structdef.add_field(session, self.vtable.id, false, "__vtable__", vtype, Define::IfNotExists);
             }
         }
         for ref node in body.iter() {
             match **node {
                 AST::Definition(ref id, _, ref mutable, ref ident, _, ref value) => {
-                    self.structdef.add_field(session, *mutable, ident.name.as_str(), session.get_type(*id).unwrap());
+                    self.structdef.add_field(session, *id, *mutable, ident.name.as_str(), session.get_type(*id).unwrap(), Define::IfNotExists);
                 },
                 _ => { }
             }
@@ -167,10 +168,17 @@ pub mod llvm {
     */
 }
 
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Define {
+    IfNotExists,
+    Never,
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct StructDef {
     pub vars: ScopeRef,
-    pub fields: RefCell<Vec<(String, Type)>>,
+    pub fields: RefCell<Vec<(NodeID, String, Type)>>,
 }
 
 pub type StructDefRef = Rc<StructDef>;
@@ -187,6 +195,7 @@ impl StructDef {
         Rc::new(Self::new(vars))
     }
 
+    #[must_use]
     pub fn define(session: &Session, scope: ScopeRef, id: NodeID, ttype: Type) -> Result<StructDefRef, Error> {
         let vars = Scope::new_ref(None);
         vars.set_basename(ttype.get_name()?);
@@ -202,25 +211,40 @@ impl StructDef {
         *self.fields.borrow_mut() = inherit.fields.borrow().clone();
     }
 
-    pub fn add_field(&self, session: &Session, mutable: bool, name: &str, ttype: Type) {
+    pub fn add_field(&self, session: &Session, id: NodeID, mutable: bool, name: &str, ttype: Type, define: Define) {
         let sname = String::from(name);
-        if self.vars.get_var_def(&sname).is_none() {
-            FieldDef::define(session, self.vars.clone(), NodeID::generate(), mutable, &sname, Some(ttype.clone())).unwrap();
+        if define == Define::IfNotExists && self.vars.get_var_def(&sname).is_none() {
+            FieldDef::define(session, self.vars.clone(), id, mutable, &sname, Some(ttype.clone())).unwrap();
         }
-        self.fields.borrow_mut().push((sname, ttype));
+        self.fields.borrow_mut().push((id, sname, ttype));
     }
 
     pub fn find_field(&self, field: &str) -> Option<(usize, Type)> {
         let index = self.get_index(field)?;
-        Some((index, self.fields.borrow()[index].1.clone()))
+        Some((index, self.fields.borrow()[index].2.clone()))
     }
 
     pub fn get_index(&self, field: &str) -> Option<usize> {
-        self.fields.borrow().iter().position(|ref r| r.0.as_str() == field)
+        self.fields.borrow().iter().position(|ref r| r.1.as_str() == field)
     }
 
     pub fn get_type(&self, index: usize) -> Type {
-        self.fields.borrow()[index].1.clone()
+        self.fields.borrow()[index].2.clone()
+    }
+
+    pub fn find_field_by_id(&self, id: NodeID) -> Option<(usize, Type)> {
+        let index = self.get_index_by_id(id)?;
+        Some((index, self.fields.borrow()[index].2.clone()))
+    }
+
+    pub fn get_index_by_id(&self, id: NodeID) -> Option<usize> {
+        self.fields.borrow().iter().position(|ref r| r.0 == id)
+    }
+
+    pub fn foreach_field<F>(&self, mut f: F) where F: FnMut(&String, &Type) -> () {
+        for field in self.fields.borrow().iter() {
+            f(&field.1, &field.2);
+        }
     }
 }
 

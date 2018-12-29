@@ -602,7 +602,7 @@ pub unsafe fn build_class_type(data: &LLVM, scope: ScopeRef, id: NodeID, name: &
     data.set_type(id, TypeValue { value: pltype, vttype: pvttype });
 
     let mut types = vec!();
-    for &(_, ref ttype) in classdef.structdef.fields.borrow().iter() {
+    for &(_, _, ref ttype) in classdef.structdef.fields.borrow().iter() {
         types.push(get_ltype(data, ttype.clone(), true))
     }
     LLVMStructSetBody(lltype, types.as_mut_ptr(), types.len() as u32, false as i32);
@@ -624,7 +624,7 @@ pub unsafe fn build_struct_type(data: &LLVM, id: NodeID, name: &String, structde
     data.set_type(id, TypeValue { value: pltype, vttype: None });
 
     let mut types = vec!();
-    for &(_, ref ttype) in structdef.fields.borrow().iter() {
+    for &(_, _, ref ttype) in structdef.fields.borrow().iter() {
         types.push(get_ltype(data, ttype.clone(), true))
     }
     LLVMStructSetBody(lltype, types.as_mut_ptr(), types.len() as u32, false as i32);
@@ -866,6 +866,7 @@ pub unsafe fn generate_expr(data: &LLVM, func: LLVMValueRef, unwind: Unwind, sco
                     generate_expr(data, func, unwind, scope.clone(), access)
                 },
                 InvokeKind::Closure(ref fexpr) => {
+                    /*
                     let closure = generate_expr(data, func, unwind, scope.clone(), fexpr).get_ref();
                     largs.push(closure);
                     let function = Box::new(Closure(closure));
@@ -884,6 +885,8 @@ pub unsafe fn generate_expr(data: &LLVM, func: LLVMValueRef, unwind: Unwind, sco
                     let value = generate_cast(data, rtype.clone(), value);
 
                     return from_type(&rtype, value);
+                    */
+                    panic!("")
                 },
                 InvokeKind::CFunc(ref fexpr) |
                 InvokeKind::Func(ref fexpr) => generate_expr(data, func, unwind, scope.clone(), fexpr),
