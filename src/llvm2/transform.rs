@@ -11,10 +11,10 @@ use defs::Def;
 use types::Type;
 use session::Session;
 use scope::{ Scope, ScopeRef };
-use ast::{ NodeID, Pos, Literal, Ident, ClassSpec, Argument, AST };
+use ast::{ NodeID, Pos, Literal, Ident, ClassSpec, Argument, Pattern, AST };
 
 use defs::functions::FuncDef;
-use defs::classes::{ Define, StructDefRef };
+use defs::classes::{ ClassDefRef, StructDefRef, Define, Vtable };
 
 use llvm2::llcode::{ r, LLABI, LLType, LLLit, LLRef, LLExpr, LLGlobal };
 //use llvm2::lib::{ BuiltinDef, initialize_builtins };
@@ -63,6 +63,10 @@ impl<'sess> Transformer<'sess> {
         self.types.borrow_mut().insert(id, ltype);
     }
 
+    fn get_type(&self, id: NodeID) -> Option<LLType> {
+        self.types.borrow_mut().get(&id).map(|ltype| ltype.clone())
+    }
+
     fn add_global(&self, global: LLGlobal) {
         self.globals.borrow_mut().push(global);
     }
@@ -92,24 +96,6 @@ impl<'sess> Transformer<'sess> {
         let ftype = LLType::Function(vec!(), r(LLType::I64), LLABI::C);
         self.set_type(mainid, ftype.clone());
 
-/*
-//((((
-let local = NodeID::generate();
-//toplevel.push(LLExpr::CallC(r(LLExpr::GetValue(mainid)), vec!()));
-toplevel.push(LLExpr::DefLocal(local, String::from("test"), LLType::I64, r(LLExpr::Literal(LLLit::I64(0)))));
-
-let tuple = NodeID::generate();
-toplevel.push(LLExpr::DefStruct(tuple, LLType::Struct(vec!(LLType::I64, LLType::I64)), vec!(LLExpr::Literal(LLLit::I64(421)), LLExpr::Literal(LLLit::I64(764)))));
-
-let refcell = NodeID::generate();
-toplevel.push(LLExpr::AllocRef(refcell, LLType::Ptr(r(LLType::I64)), r(LLExpr::Literal(LLLit::I64(421)))));
-toplevel.push(LLExpr::LoadRef(r(LLExpr::GetValue(refcell))));
-
-
-toplevel.push(LLExpr::GetLocal(local));
-//))))
-*/
-
         self.add_global(LLGlobal::DefCFunc(mainid, String::from("main"), ftype, vec!(), toplevel));
     }
 
@@ -121,11 +107,20 @@ toplevel.push(LLExpr::GetLocal(local));
         exprs
     }
 
+    fn transform_as_result(&self, exprs: &mut Vec<LLExpr>, scope: ScopeRef, node: &AST) -> Option<LLExpr> {
+        let mut newexprs = self.transform_node(scope.clone(), node);
+        let last = newexprs.pop();
+        exprs.extend(newexprs);
+        last
+    }
+
     fn transform_node(&self, scope: ScopeRef, node: &AST) -> Vec<LLExpr> {
         match &node {
             AST::Literal(_, lit) => vec!(LLExpr::Literal(self.transform_lit(lit))),
 
             AST::Block(_, _, code) => self.transform_vec(scope.clone(), code),
+            AST::Import(_, _, _, decls) => self.transform_vec(scope.clone(), decls),
+
 
             AST::Function(id, _, ident, args, _, body, abi) => {
                 self.transform_func_def(scope.clone(), *abi, *id, ident.as_ref().map(|ident| &ident.name), args, body)
@@ -150,6 +145,7 @@ toplevel.push(LLExpr::GetLocal(local));
                 self.transform_reference(scope.clone(), defid, &ident.name)
             },
 
+
             AST::Ref(id, _, value) => {
                 self.transform_alloc_ref(scope.clone(), *id, value)
             },
@@ -166,18 +162,67 @@ toplevel.push(LLExpr::GetLocal(local));
                 self.transform_tuple_lit(scope.clone(), *id, &items)
             },
 
+
+            AST::New(id, _, _) => {
+                self.transform_new_object(scope.clone(), *id)
+            },
+
+            AST::Class(id, _, _, _, body) => {
+                let mut exprs = self.transform_class_body(scope.clone(), *id, body);
+                exprs.push(LLExpr::Literal(self.transform_lit(&Literal::Unit)));
+                exprs
+            },
+
+            AST::Resolver(id, _, _, _) => {
+                // TODO this is temporary and due to the fact that we're accessing a local def containing the closure
+                vec!(LLExpr::LoadRef(r(LLExpr::GetValue(self.session.get_ref(*id).unwrap()))))
+                //self.transform_reference(scope.clone(), self.session.get_ref(*id).unwrap(), &String::from(""))
+            },
+
+            AST::PtrCast(ttype, node) => {
+                let mut exprs = vec!();
+                let ltype = self.transform_value_type(ttype);
+                let result = self.transform_as_result(&mut exprs, scope.clone(), node).unwrap();
+                exprs.push(LLExpr::Cast(ltype, r(result)));
+                exprs
+            },
+
+            AST::Accessor(id, _, obj, ident, oid) => {
+                let otype = self.session.get_type(*oid).unwrap();
+                self.transform_accessor(scope.clone(), *id, obj, &ident.name, otype)
+            },
+
+            AST::Assignment(id, _, left, right) => {
+                self.transform_assignment(scope.clone(), *id, left, right)
+            },
+
+
+            AST::If(_, _, cond, texpr, fexpr) => {
+                self.transform_if_expr(scope.clone(), cond, texpr, fexpr)
+            },
+
+            AST::Match(_, _, cond, cases, compid) => {
+                let ctype = self.session.get_type(*compid).unwrap();
+                self.transform_match(scope.clone(), &ctype, cond, cases)
+            },
+
+            AST::SideEffect(_, _, ident, args) => {
+                self.transform_side_effect(scope.clone(), ident.name.as_str(), args)
+            },
+
+
             _ => panic!("Not Implemented: {:?}", node),
         }
     }
 
     fn transform_lit(&self, lit: &Literal) -> LLLit {
         match lit {
-            Literal::Unit => LLLit::I64(0),
+            Literal::Unit => LLLit::I32(0),
             Literal::Boolean(num) => LLLit::I1(*num as bool),
             Literal::Integer(num) => LLLit::I64(*num as i64),
             Literal::Real(num) => LLLit::F64(*num),
-            // TODO not sure how you'll do strings yet
-            //Literal::String(string) => ,
+            // TODO not sure how you'll do strings yet.... maybe it shouldn't even be a literal here
+            Literal::String(string) => LLLit::ConstStr(string.clone()),
             _ => panic!("Not Implemented: {:?}", lit),
         }
     }
@@ -198,14 +243,6 @@ toplevel.push(LLExpr::GetLocal(local));
         let valexpr = self.transform_as_result(&mut exprs, scope.clone(), value).unwrap();
         let ltype = self.transform_value_type(&self.session.get_type(id).unwrap());
         exprs.push(LLExpr::DefLocal(id, name.clone(), ltype, r(valexpr)));
-        exprs
-    }
-
-    fn transform_alloc_ref(&self, scope: ScopeRef, id: NodeID, value: &AST) -> Vec<LLExpr> {
-        let mut exprs = vec!();
-        let valexpr = self.transform_as_result(&mut exprs, scope.clone(), value).unwrap();
-        let ltype = self.transform_value_type(&self.session.get_type(id).unwrap());
-        exprs.push(LLExpr::AllocRef(id, ltype, r(valexpr)));
         exprs
     }
 
@@ -349,7 +386,7 @@ toplevel.push(LLExpr::GetLocal(local));
 
         let atype = self.convert_to_closure_value_type(cftype);
         let stype = atype.get_element();
-        let aexpr = LLExpr::AllocRef(NodeID::generate(), atype.clone(), r(LLExpr::DefStruct(id, stype, vec!(LLExpr::GetValue(cfid)))));
+        let aexpr = LLExpr::AllocRef(NodeID::generate(), atype.clone(), Some(r(LLExpr::DefStruct(id, stype, vec!(LLExpr::GetValue(cfid))))));
         vec!(LLExpr::DefLocal(id, fname.clone(), atype, r(aexpr)))
     }
 
@@ -369,8 +406,9 @@ toplevel.push(LLExpr::GetLocal(local));
         let (argtypes, rettype, abi) = ftype.get_function_types().unwrap();
         let lftype = self.transform_closure_def_type(&argtypes.as_vec(), rettype);
         self.set_type(cfid, lftype.clone());
-        // TODO this needs to be added, doesn't it?
-        cl.add_field(self.session, cfid, "__func__", ftype.clone(), Define::Never);
+
+        let ptype = self.make_closure_type(scope.clone(), self.session.get_type(id).unwrap());
+        cl.add_field(self.session, cfid, "__func__", ptype.clone(), Define::Never);
 
         // Transforms body and create C function definition
         let index = self.globals.borrow().len();
@@ -382,7 +420,6 @@ toplevel.push(LLExpr::GetLocal(local));
         let structtype = LLType::Ptr(r(self.transform_struct_def(&cl.context_struct)));
         self.insert_global(index, LLGlobal::DefType(cl.context_type_id, format!("__context_{}__", cl.context_type_id), structtype));
 
-        let ptype = self.make_closure_type(scope.clone(), self.session.get_type(id).unwrap());
         FuncDef::define(self.session, scope.clone(), cfid, &Some(cfname.clone()), Some(ptype)).unwrap();
         let mut fields = vec!();
         cl.context_struct.foreach_field(|field, _| {
@@ -405,7 +442,7 @@ toplevel.push(LLExpr::GetLocal(local));
         typecheck::check_types(self.session, scope.clone(), &code);
         let mut make_context = self.transform_vec(scope.clone(), &code);
         let last = make_context.pop().unwrap();
-        make_context.push(LLExpr::SetValue(id, Box::new(last)));
+        make_context.push(LLExpr::SetValue(id, r(last)));
         make_context.push(LLExpr::GetValue(id));
 
         make_context
@@ -433,7 +470,8 @@ toplevel.push(LLExpr::GetLocal(local));
 
     fn transform_reference(&self, scope: ScopeRef, defid: NodeID, name: &String) -> Vec<LLExpr> {
         // TODO temporarily disabling global variables
-        if !scope.contains_local(name) && !Scope::global(scope.clone()).contains(name) {
+        let dscope = Scope::target(self.session, scope.clone());
+        if !dscope.contains_local(name) && !Scope::global(dscope.clone()).contains(name) {
         //if !scope.contains_local(name) {
             match self.get_context() {
                 Some(CodeContext::Closure(ref cid)) => {
@@ -455,12 +493,212 @@ toplevel.push(LLExpr::GetLocal(local));
 
 
 
-    fn transform_as_result(&self, exprs: &mut Vec<LLExpr>, scope: ScopeRef, node: &AST) -> Option<LLExpr> {
-        let mut newexprs = self.transform_node(scope.clone(), node);
-        let last = newexprs.pop();
-        exprs.extend(newexprs);
-        last
+    fn transform_alloc_ref(&self, scope: ScopeRef, id: NodeID, value: &AST) -> Vec<LLExpr> {
+        let mut exprs = vec!();
+        let valexpr = self.transform_as_result(&mut exprs, scope.clone(), value).unwrap();
+        let ltype = self.transform_value_type(&self.session.get_type(id).unwrap());
+        exprs.push(LLExpr::AllocRef(id, ltype, Some(r(valexpr))));
+        exprs
     }
+
+    fn transform_new_object(&self, scope: ScopeRef, id: NodeID) -> Vec<LLExpr> {
+        let mut exprs = vec!();
+        let defid = self.session.get_ref(id).unwrap();
+        let ltype = self.transform_value_type(&self.session.get_type(defid).unwrap());
+
+        exprs.push(LLExpr::AllocRef(id, ltype, None));
+        if let Def::Class(classdef) = self.session.get_def(defid).unwrap() {
+            exprs.push(LLExpr::StoreRef(r(LLExpr::AccessRef(r(LLExpr::GetValue(id)), vec!(LLRef::Field(0)))), r(LLExpr::GetLocal(classdef.vtable.id))));
+            exprs.push(LLExpr::GetValue(id));
+        }
+        exprs
+    }
+
+    fn transform_class_type_data(&self, scope: ScopeRef, classdef: ClassDefRef, body: &Vec<AST>) {
+        classdef.build_vtable(self.session, scope.clone(), body);
+        classdef.build_structdef(self.session, scope.clone(), body);
+
+        self.add_global(LLGlobal::DefNamedStruct(classdef.id, classdef.classname.clone()));
+        self.set_type(classdef.id, LLType::Alias(classdef.id));
+        self.add_global(LLGlobal::DefNamedStruct(classdef.vtable.id, format!("{}_vtable", classdef.classname.clone())));
+        self.set_type(classdef.vtable.id, LLType::Alias(classdef.vtable.id));
+
+        let stype = self.transform_struct_def(&classdef.structdef);
+        self.add_global(LLGlobal::SetStructBody(classdef.id, stype.get_items()));
+
+        let vtype = self.transform_vtable_def(&classdef.vtable);
+        self.add_global(LLGlobal::SetStructBody(classdef.vtable.id, vtype.get_items()));
+    }
+
+    fn transform_vtable_def(&self, vtable: &Vtable) -> LLType {
+        let mut items = vec!();
+        vtable.foreach_entry(|name, ttype| {
+            items.push(self.transform_value_type(ttype));
+        });
+        LLType::Struct(items)
+    }
+
+    fn transform_vtable_init(&self, scope: ScopeRef, classdef: ClassDefRef) -> Vec<LLExpr> {
+        if !classdef.has_vtable() {
+            return vec!();
+        }
+
+        let mut exprs = vec!();
+        let tscope = self.session.map.get(&classdef.id);
+
+        self.add_global(LLGlobal::DefGlobal(classdef.vtable.id, format!("__{}_vtable", tscope.get_basename()), self.get_type(classdef.vtable.id).unwrap()));
+        // TODO should vtables be dynamically allocated, or should we add a LLType::ElementOf() type or something to GetElement an aliased type
+        exprs.push(LLExpr::SetGlobal(classdef.vtable.id, r(LLExpr::AllocRef(NodeID::generate(), self.get_type(classdef.vtable.id).unwrap(), None))));
+        classdef.vtable.foreach_enumerated(|i, id, name, ttype| {
+            let ltype = self.transform_value_type(ttype);
+            let field = LLExpr::AccessRef(r(LLExpr::GetGlobal(classdef.vtable.id)), vec!(LLRef::Field(i)));
+            exprs.push(LLExpr::StoreRef(r(field), r(LLExpr::Cast(ltype, r(LLExpr::GetLocal(id))))));
+            //exprs.push(LLExpr::SetItem(r(LLExpr::GetLocal(classdef.vtable.id)), i, r(LLExpr::Cast(ltype, r(LLExpr::GetValue(id))))));
+        });
+
+        exprs
+    }
+
+    fn transform_class_body(&self, scope: ScopeRef, id: NodeID, body: &Vec<AST>) -> Vec<LLExpr> {
+        let mut exprs = vec!();
+        let tscope = self.session.map.get(&id);
+        let classdef = self.session.get_def(id).unwrap().as_class().unwrap();
+
+        self.transform_class_type_data(scope.clone(), classdef.clone(), body);
+
+        //let mut index = self.globals.borrow().len();
+        //self.set_context(CodeContext::ClassBody);
+        for node in body {
+            match node {
+                AST::Function(id, _, ident, args, _, body, abi) => {
+                    exprs.extend(self.transform_func_def(tscope.clone(), *abi, *id, ident.as_ref().map(|ident| &ident.name), args, body));
+                },
+                AST::Definition(_, _, _, _, _, _) => { },
+                _ => panic!("Not Implemented"),
+            }
+        }
+        //self.restore_context();
+
+        exprs.extend(self.transform_vtable_init(scope.clone(), classdef));
+        exprs
+    }
+
+    fn transform_accessor(&self, scope: ScopeRef, id: NodeID, obj: &AST, field: &String, otype: Type) -> Vec<LLExpr> {
+        let mut exprs = vec!();
+        let objval = self.transform_as_result(&mut exprs, scope.clone(), obj).unwrap();
+
+        let defid = self.session.get_ref(id).unwrap();
+        match otype {
+            Type::Object(_, objid, _) => {
+                let objdef = self.session.get_def(objid).unwrap();
+                match self.session.get_def(defid) {
+                    Ok(Def::Method(meth)) => {
+                        let index = objdef.as_class().unwrap().vtable.get_index_by_id(defid).unwrap();
+                        let vtable = LLExpr::LoadRef(r(LLExpr::AccessRef(r(objval), vec!(LLRef::Field(0)))));
+                        exprs.push(LLExpr::LoadRef(r(LLExpr::AccessRef(r(vtable), vec!(LLRef::Field(index))))));
+                    },
+                    Ok(Def::Field(field)) => {
+                        let (index, _) = objdef.as_struct().unwrap().find_field_by_id(defid).unwrap();
+                        exprs.push(LLExpr::LoadRef(r(LLExpr::AccessRef(r(objval), vec!(LLRef::Field(index))))));
+                    },
+                    Err(_) => {
+                        return vec!(LLExpr::GetValue(defid));
+                    },
+                    Ok(def) => panic!("Not Implemented: {:?}", def),
+                }
+            },
+            Type::Record(items) => {
+                let index = items.iter().position(|(name, _)| name == field).unwrap();
+                exprs.push(LLExpr::GetItem(r(objval), index));
+            },
+            Type::Tuple(items) => {
+                let index = field.parse::<usize>().unwrap();
+                exprs.push(LLExpr::GetItem(r(objval), index));
+            },
+            _ => panic!("Not Implemented: {:?}", otype),
+        }
+
+        exprs
+    }
+
+    fn transform_assignment(&self, scope: ScopeRef, id: NodeID, left: &AST, right: &AST) -> Vec<LLExpr> {
+        let mut exprs = vec!();
+
+        let value = self.transform_as_result(&mut exprs, scope.clone(), right).unwrap();
+        match left {
+            AST::Accessor(aid, _, obj, field, oid) => {
+                let objval = self.transform_as_result(&mut exprs, scope.clone(), obj).unwrap();
+                let fieldid = self.session.get_ref(*aid).unwrap();
+                let objdef = self.session.get_def(self.session.get_type(*oid).unwrap().get_id().unwrap()).unwrap();
+                let (index, _) = objdef.as_struct().unwrap().find_field_by_id(fieldid).unwrap();
+                exprs.push(LLExpr::StoreRef(r(LLExpr::AccessRef(r(objval), vec!(LLRef::Field(index)))), r(value)));
+            },
+            _ => panic!("InternalError: attempting to assign to an invalid pattern, {:?}", left),
+        }
+        exprs
+    }
+
+
+
+    fn transform_if_expr(&self, scope: ScopeRef, cond: &AST, texpr: &AST, fexpr: &AST) -> Vec<LLExpr> {
+        let mut conds = vec!();
+        conds.push(self.transform_node(scope.clone(), cond));
+        conds.push(vec!(LLExpr::Literal(LLLit::I1(true))));
+
+        let mut blocks = vec!();
+        blocks.push(self.transform_node(scope.clone(), texpr));
+        blocks.push(self.transform_node(scope.clone(), fexpr));
+
+        vec!(LLExpr::Phi(conds, blocks))
+    }
+
+    fn transform_match(&self, scope: ScopeRef, ctype: &Type, cond: &AST, cases: &Vec<(Pattern, AST)>) -> Vec<LLExpr> {
+        let mut exprs = vec!();
+        let mut conds = vec!();
+        let mut blocks = vec!();
+
+        let condid = NodeID::generate();
+        let condval = self.transform_as_result(&mut exprs, scope.clone(), cond).unwrap();
+        exprs.push(LLExpr::SetValue(condid, r(condval)));
+
+        // TODO there might be an issue with the lack of closure conversion here
+        let compid = self.find_comparison_func(scope.clone(), ctype);
+
+        panic!("Not Implemented");
+        for (pat, block) in cases {
+            // TODO get the equals function in order to compare
+            //let caseval = self.transform_pattern(&mut exprs, scope.clone(), pat);
+            //call with (LLExpr::GetValue(condid), caseval)
+            blocks.push(self.transform_node(scope.clone(), block));
+        }
+
+        exprs.push(LLExpr::Phi(conds, blocks));
+        exprs
+    }
+
+    fn transform_pattern(&self, scope: ScopeRef, pat: Pattern) -> Vec<LLExpr> {
+        panic!("Not Implemented");
+    }
+
+    fn find_comparison_func(&self, scope: ScopeRef, ctype: &Type) -> NodeID {
+        let compid = scope.get_var_def(&String::from("==")).unwrap();
+        match self.session.get_def(compid) {
+            Ok(Def::Overload(ol)) => ol.find_variant(self.session, scope.clone(), Type::Tuple(vec!(ctype.clone(), ctype.clone()))).unwrap().0,
+            _ => compid,
+        }
+    }
+
+    fn transform_side_effect(&self, scope: ScopeRef, op: &str, args: &Vec<AST>) -> Vec<LLExpr> {
+        let mut conds = vec!();
+        let mut blocks = vec!();
+
+        // TODO this doesn't work with non-boolean values
+        conds.push(self.transform_node(scope.clone(), &args[0]));
+        blocks.push(self.transform_node(scope.clone(), &args[1]));
+        vec!(LLExpr::Phi(conds, blocks))
+    }
+
+
 
     pub fn transform_value_type(&self, ttype: &Type) -> LLType {
         match &ttype {

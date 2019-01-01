@@ -3,7 +3,7 @@ use rand;
 
 use types::Type;
 use utils::UniqueID;
-use ast::{ NodeID, AST, Ident, ClassSpec, Pattern };
+use ast::{ NodeID, AST, Ident, ClassSpec, Pattern, Literal };
 
 pub fn refine(code: Vec<AST>) -> Vec<AST> {
     //vec!(AST::make_func(Pos::empty(), Some(Ident::new(Pos::empty(), format!("init.{}", "test"))), vec!(), None,
@@ -24,7 +24,7 @@ pub fn refine_node(node: AST) -> AST {
     match node {
         AST::Block(id, pos, mut code) => {
             if code.len() == 0 {
-                code.push(AST::make_nil())
+                code.push(AST::make_lit(Literal::Unit))
             }
             AST::Block(id, pos, refine_vec(code))
         },

@@ -49,6 +49,13 @@ impl LLType {
             _ => self.clone(),
         }
     }
+
+    pub fn get_items(&self) -> Vec<LLType> {
+        match self {
+            LLType::Struct(items) => items.clone(),
+            _ => panic!("InternalError: attempting to get items from a non-struct type {:?}", self),
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -70,13 +77,12 @@ pub enum LLRef {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub enum LLPhiType {
-    Match,
-    Loop,
-    Chain,
+pub enum LLCmpType {
+    Equal,
+    NotEqual,
 }
 
-type BasicBlock = Vec<LLExpr>;
+pub type LLBlock = Vec<LLExpr>;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum LLExpr {
@@ -98,20 +104,24 @@ pub enum LLExpr {
     GetItem(R<LLExpr>, usize),
     SetItem(R<LLExpr>, usize, R<LLExpr>),
 
-    AllocRef(NodeID, LLType, R<LLExpr>),
+    AllocRef(NodeID, LLType, Option<R<LLExpr>>),
     AccessRef(R<LLExpr>, Vec<LLRef>),
     LoadRef(R<LLExpr>),
     StoreRef(R<LLExpr>, R<LLExpr>),
 
-    Phi(Vec<LLExpr>, Vec<BasicBlock>, LLPhiType),
+    Phi(Vec<LLBlock>, Vec<LLBlock>),
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum LLGlobal {
     DefType(NodeID, String, LLType),
-    DefGlobal(NodeID, String, LLType, R<LLExpr>),
+
+    DefGlobal(NodeID, String, LLType),
     DefCFunc(NodeID, String, LLType, Vec<(NodeID, String)>, Vec<LLExpr>),
     DeclCFunc(NodeID, String, LLType),
+
+    DefNamedStruct(NodeID, String),
+    SetStructBody(NodeID, Vec<LLType>),
 }
 
 

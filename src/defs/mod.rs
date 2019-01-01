@@ -65,6 +65,7 @@ impl Def {
     pub fn as_closure(&self) -> Result<ClosureDefRef, Error> {
         match *self {
             Def::Closure(ref cl) => Ok(cl.clone()),
+            Def::Method(ref meth) => Ok(meth.closure.clone()),
             _ => Err(Error::new(format!("DefError: expected closure def but found {:#?}", self))),
         }
     }

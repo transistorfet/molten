@@ -248,7 +248,7 @@ pub fn get_builtins<'sess>() -> Vec<BuiltinDef<'sess>> {
         )),
         */
 
-        //BuiltinDef::Func(id(), "malloc",     "(Int) -> 'ptr / C",               FuncKind::External),
+        BuiltinDef::Func(id(), "malloc",     "(Int) -> 'ptr / C",               FuncKind::External),
         BuiltinDef::Func(id(), "realloc",    "('ptr, Int) -> 'ptr / C",         FuncKind::External),
         BuiltinDef::Func(id(), "free",       "('ptr) -> () / C",                FuncKind::External),
         BuiltinDef::Func(id(), "memcpy",     "('ptr, 'ptr, Int) -> 'ptr / C",   FuncKind::External),
@@ -266,7 +266,6 @@ pub fn get_builtins<'sess>() -> Vec<BuiltinDef<'sess>> {
         BuiltinDef::Func(id(), "sizeof",    "('ptr) -> Int",                    FuncKind::Function(sizeof_value)),
 
 
-/*
         BuiltinDef::Class(id(), "Buffer", vec!(Type::Variable(String::from("item"), UniqueID(0))), vec!(), vec!(
             BuiltinDef::Func(id(), "__alloc__",  "() -> Buffer<'item>",                      FuncKind::Method(buffer_allocator)),
             BuiltinDef::Func(id(), "new",        "(Buffer<'item>, Int) -> Buffer<'item>",    FuncKind::Method(buffer_constructor)),
@@ -274,7 +273,6 @@ pub fn get_builtins<'sess>() -> Vec<BuiltinDef<'sess>> {
             BuiltinDef::Func(id(), "[]",         "(Buffer<'item>, Int) -> 'item",            FuncKind::Method(buffer_get)),
             BuiltinDef::Func(id(), "[]",         "(Buffer<'item>, Int, 'item) -> 'item",     FuncKind::Method(buffer_set)),
         )),
-*/
 
         //// Integer Builtins ////
         BuiltinDef::Func(id(), "+",   "(Int, Int) -> Int / MF",      FuncKind::Function(add_int)),

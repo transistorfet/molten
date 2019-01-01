@@ -1,37 +1,42 @@
 
+* fix hardcoded vtable index
+* convert invoke to add the object arg (it's actually not needed, but the AST is duplicated)
+* also support the __alloc__ thing, which is needed by some
+* how do you get the function to compare values? (for match)
 
-* implement phi/flow control
-* implement objects
+* implement match
+* implement sideeffect
+* implement resolve properly
+* implement loops (for, while)
+* implement try, raise
 
 * figure out a better way of doing variables/generics
 * implement return value conversion
+
+* should vtables be dynamically allocated, or should we add a LLType::ElementOf() type or something to GetElement an aliased type
 * try to reuse as much code in transform as possible
+* should you implement strings differently?
+* refactor access transform
 
 
 
+BUGS:
+* if there are brackets after a record literal, it will try to call it as a function: let bar = ref { a = 1, b = 2 } \n (!x).a    parses incorrectly,
+  but adding a semi-colon will fix it
+* prefix operations should bind closer than subatomic_operations: !x.a should be parsed as (!x).a but instead is !(x.a)
+* there is still a bug with the Phi statement, in that it will return null if you don't cover all cases. there is no check for coverage
 
 
-
-ISSUES TO CONSIDER:
-* passing non ref return values back
-* generics of variable sizes
-
-
-* can you factor out phi statements? (use as part of if, match, sideeffect)
-* can you factor out for and while loops into a set of things that do both
-* factor conditionals
-* add return transform
-
-
+TESTS:
 * make test for function pointers, assign to local, call as ref
+* test for match, if, sideeffects
+* test for references, records, tuples, used in local vars, func args, return values, etc
 
 
 * remove AST::Recall when you switch over to llvm2
-
 * remove builtin stuff that's usused
-* get rid of those compilable traits
-* add transformed types to transform code
 
+* implement assignment of tuples and records?
 * there's probably an issue with records in that we might not take into account different orders of items... { a=1, b=2 } might not equal { b=2, a=1 }
 * there is no way to assign to a ref
 

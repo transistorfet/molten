@@ -15,6 +15,7 @@ use defs::variables::FieldDef;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct ClassDef {
+    pub id: NodeID,
     pub classname: String,
     pub classtype: Type,
     pub parenttype: Option<Type>,
@@ -26,8 +27,9 @@ pub type ClassDefRef = Rc<ClassDef>;
 
 
 impl ClassDef {
-    pub fn new(classname: String, classtype: Type, parenttype: Option<Type>, vars: ScopeRef, vtable: Vtable) -> Self {
+    pub fn new(id: NodeID, classname: String, classtype: Type, parenttype: Option<Type>, vars: ScopeRef, vtable: Vtable) -> Self {
         Self {
+            id: id,
             classname: classname,
             classtype: classtype,
             parenttype: parenttype,
@@ -36,8 +38,8 @@ impl ClassDef {
         }
     }
 
-    pub fn new_ref(classname: String, classtype: Type, parenttype: Option<Type>, vars: ScopeRef, vtable: Vtable) -> ClassDefRef {
-        Rc::new(Self::new(classname, classtype, parenttype, vars, vtable))
+    pub fn new_ref(id: NodeID, classname: String, classtype: Type, parenttype: Option<Type>, vars: ScopeRef, vtable: Vtable) -> ClassDefRef {
+        Rc::new(Self::new(id, classname, classtype, parenttype, vars, vtable))
     }
 
     pub fn create_class_scope(session: &Session, scope: ScopeRef, id: NodeID) -> ScopeRef {
@@ -87,7 +89,7 @@ impl ClassDef {
 
         session.set_type(id, classtype.clone());
         let vtable = Vtable::create(session, NodeID::generate(), format!("{}_vtable", name.clone()))?;
-        let classdef = ClassDef::new_ref(name, classtype, parenttype, vars, vtable);
+        let classdef = ClassDef::new_ref(id, name, classtype, parenttype, vars, vtable);
         Ok(classdef)
     }
 
@@ -316,8 +318,24 @@ impl Vtable {
         self.table.borrow()[index].2.clone()
     }
 
+    pub fn get_index_by_id(&self, id: NodeID) -> Option<usize> {
+        self.table.borrow().iter().position(|ref r| r.0 == id)
+    }
+
     pub fn len(&self) -> usize {
         self.table.borrow().len()
+    }
+
+    pub fn foreach_entry<F>(&self, mut f: F) where F: FnMut(&String, &Type) -> () {
+        for entry in self.table.borrow().iter() {
+            f(&entry.1, &entry.2);
+        }
+    }
+
+    pub fn foreach_enumerated<F>(&self, mut f: F) where F: FnMut(usize, NodeID, &String, &Type) -> () {
+        for (i, entry) in self.table.borrow().iter().enumerate() {
+            f(i, entry.0, &entry.1, &entry.2);
+        }
     }
 }
 

@@ -277,7 +277,7 @@ named!(ifexpr(Span) -> AST,
             wscom!(tag_word!("else")),
             expression
         )) >>
-        (AST::make_if(Pos::new(pos), c, t, if f.is_some() { f.unwrap() } else { AST::make_nil() }))
+        (AST::make_if(Pos::new(pos), c, t, if f.is_some() { f.unwrap() } else { AST::make_lit(Literal::Unit) }))
     )
 );
 
@@ -529,7 +529,6 @@ named!(prefix(Span) -> AST,
         a: atomic >>
         //(AST::Prefix(op, Box::new(a)))
         (AST::make_invoke(Pos::new(pos), AST::make_ident(Pos::new(pos), op), vec!(a)))
-        //(AST::make_invoke(AST::make_access(Pos::new(pos), a, op), vec!()))
     )
 );
 

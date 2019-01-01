@@ -16,7 +16,7 @@ pub fn check_types(session: &Session, scope: ScopeRef, code: &Vec<AST>) -> Type 
 }
 
 pub fn check_types_vec(session: &Session, scope: ScopeRef, code: &Vec<AST>) -> Type {
-    let mut last: Type = scope.make_obj(session, String::from("Nil"), vec!()).unwrap();
+    let mut last: Type = scope.make_obj(session, String::from("()"), vec!()).unwrap();
     for node in code {
         last = check_types_node(session, scope.clone(), node, None);
     }
@@ -28,7 +28,7 @@ pub fn check_types_node(session: &Session, scope: ScopeRef, node: &AST, expected
         Ok(ttype) => ttype,
         Err(err) => {
             session.print_error(err.add_pos(&node.get_pos()));
-            //Type::Object(String::from("Nil"), vec!())
+            //Type::Object(String::from("()"), vec!())
             scope.new_typevar(session)
         }
     }
@@ -141,7 +141,8 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &AST,
         AST::Identifier(_, _, ref ident) => {
             //session.get_type_from_ref(*id)?;
             //scope.get_variable_type(session, &ident.name).unwrap_or_else(|| expected.unwrap_or_else(|| scope.new_typevar(session)))
-            match scope.get_var_def(&ident.name) {
+            let dscope = Scope::target(session, scope.clone());
+            match dscope.get_var_def(&ident.name) {
                 //Some(defid) => match session.get_def(defid) {
                 //    Ok(Def::Overload(_)) => return Err(Error::new(format!("TypeError: reference is overloaded for {:?}", ident.name))),
                 //    _ => session.get_type(defid).unwrap(),
@@ -186,8 +187,7 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &AST,
             // TODO should this require the cond type to be Bool?
             check_types_node(session, scope.clone(), cond, None);
             check_types_node(session, scope.clone(), body, None);
-            //Type::Object(String::from("Nil"), vec!())
-            scope.make_obj(session, String::from("Nil"), vec!())?
+            scope.make_obj(session, String::from("()"), vec!())?
         },
 
         AST::For(ref id, _, ref ident, ref list, ref body) => {
@@ -259,7 +259,7 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &AST,
                 //expect_type(session, tscope, Some(ttype.clone()), Some(ctype), Check::List)?;
             }
             */
-            scope.make_obj(session, String::from("Nil"), vec!())?
+            scope.make_obj(session, String::from("()"), vec!())?
         },
 
         AST::PtrCast(ref ttype, ref code) => {
@@ -281,8 +281,7 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &AST,
         AST::Class(ref id, _, _, _, ref body) => {
             let tscope = session.map.get(id);
             check_types_vec(session, tscope.clone(), body);
-            //Type::Object(String::from("Nil"), vec!())
-            scope.make_obj(session, String::from("Nil"), vec!())?
+            scope.make_obj(session, String::from("()"), vec!())?
         },
 
         AST::Resolver(_, _, _, _) |
@@ -306,8 +305,7 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &AST,
 
         AST::Import(_, _, _, ref decls) => {
             check_types_vec(session, scope.clone(), decls);
-            //Type::Object(String::from("Nil"), vec!())
-            scope.make_obj(session, String::from("Nil"), vec!())?
+            scope.make_obj(session, String::from("()"), vec!())?
         },
 
         AST::Recall(_, _) => panic!("InternalError: Recall ast element shouldn't appear this early"),
@@ -372,12 +370,10 @@ pub fn session_find_variant(session: &Session, scope: ScopeRef, invid: NodeID, f
     };
 
     let def = session.get_def(defid)?;
-    debug!("***: {:?} {:#?}", defid, def);
     let (fid, ftype) = match def {
         Def::Overload(ref ol) => ol.find_variant(session, scope.clone(), argtypes.clone())?,
         _ => (defid, session.get_type(defid).unwrap_or_else(|| scope.new_typevar(session)))
     };
-    debug!("&&&: {:?} {:?} {:?}", fid, ftype, refid);
 
     session.set_ref(refid, fid);
     session.set_ref(invid, fid);

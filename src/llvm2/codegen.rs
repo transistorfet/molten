@@ -26,7 +26,7 @@ use defs::Def;
 use defs::classes::{ ClassDefRef, StructDef, StructDefRef };
 use defs::functions::{ ClosureDef };
 
-use llvm2::llcode::{ LLType, LLLit, LLRef, LLExpr, LLGlobal };
+use llvm2::llcode::{ LLType, LLLit, LLRef, LLCmpType, LLExpr, LLGlobal, LLBlock };
 //use llvm2::lib::{ BuiltinDef, initialize_builtins };
 
 
@@ -242,6 +242,7 @@ impl<'sess> LLVM<'sess> {
             LLLit::I32(num) => LLVMConstInt(self.i32_type(), *num as u64, 0),
             LLLit::I64(num) => LLVMConstInt(self.i64_type(), *num as u64, 0),
             LLLit::F64(num) => LLVMConstReal(self.f64_type(), *num),
+            LLLit::ConstStr(string) => LLVMBuildGlobalStringPtr(self.builder, cstr(string.as_str()), cstr("__string")),
             _ => panic!("Not Implemented: {:?}", lit),
         }
     }
@@ -311,6 +312,54 @@ impl<'sess> LLVM<'sess> {
         reference
     }
 
+    pub unsafe fn build_basic_blocks(&self, label: &str, conds: &Vec<LLBlock>, blocks: &Vec<LLBlock>) -> (Vec<LLVMValueRef>, Vec<*mut LLVMBasicBlock>) {
+        let mut cond_vals = vec!();
+        let mut block_vals = vec!();
+        let mut return_vals = vec!();
+
+        for block in blocks {
+            cond_vals.push(LLVMAppendBasicBlockInContext(self.context, *self.curfunc.borrow(), cstring(&format!("{}_cond", label))));
+            block_vals.push(LLVMAppendBasicBlockInContext(self.context, *self.curfunc.borrow(), cstring(&format!("{}_block", label))));
+        }
+        let merge_block = LLVMAppendBasicBlockInContext(self.context, *self.curfunc.borrow(), cstring(&format!("{}_end", label)));
+        cond_vals.push(merge_block);
+
+        LLVMBuildBr(self.builder, cond_vals[0]);
+
+        let mut last_cond = ptr::null_mut();
+        for i in 0 .. blocks.len() {
+            LLVMPositionBuilderAtEnd(self.builder, cond_vals[i]);
+            let result = self.build_expr_list(&conds[i]);
+            LLVMBuildCondBr(self.builder, result, block_vals[i], cond_vals[i + 1]);
+            last_cond = LLVMGetInsertBlock(self.builder);
+
+            LLVMPositionBuilderAtEnd(self.builder, block_vals[i]);
+            return_vals.push(self.build_expr_list(&blocks[i]));
+            LLVMBuildBr(self.builder, merge_block);
+            block_vals[i] = LLVMGetInsertBlock(self.builder);
+        }
+        LLVMPositionBuilderAtEnd(self.builder, merge_block);
+        let lltype = LLVMTypeOf(return_vals[0]);
+        return_vals.push(self.null_const(lltype));
+        block_vals.push(last_cond);
+
+        (return_vals, block_vals)
+    }
+
+    pub unsafe fn build_phi(&self, values: &mut Vec<LLVMValueRef>, blocks: &mut Vec<*mut LLVMBasicBlock>) -> LLVMValueRef {
+        let phi = LLVMBuildPhi(self.builder, LLVMTypeOf(values[0]), cstr("phi"));
+        LLVMAddIncoming(phi, values.as_mut_ptr(), blocks.as_mut_ptr(), values.len() as u32);
+        phi
+    }
+
+    pub unsafe fn build_expr_list(&self, exprs: &Vec<LLExpr>) -> LLVMValueRef {
+        let mut last = ptr::null_mut();
+        for expr in exprs {
+            last = self.build_expr(expr);
+        }
+        last
+    }
+
     pub unsafe fn build_expr(&self, expr: &LLExpr) -> LLVMValueRef {
         match expr {
             LLExpr::Literal(lit) => self.build_literal(lit),
@@ -343,12 +392,12 @@ impl<'sess> LLVM<'sess> {
                 def
             },
 
-            LLExpr::GetLocal(id) => {
+            LLExpr::GetLocal(id) | LLExpr::GetGlobal(id) => {
                 let pointer = self.get_value(*id).unwrap();
                 self.build_load(pointer)
             },
 
-            LLExpr::SetLocal(id, expr) => {
+            LLExpr::SetLocal(id, expr) | LLExpr::SetGlobal(id, expr) => {
                 let value = self.build_expr(expr);
                 let pointer = self.get_value(*id).unwrap();
                 self.build_store(pointer, value)
@@ -375,17 +424,20 @@ impl<'sess> LLVM<'sess> {
             },
 
             LLExpr::AllocRef(id, ltype, code) => {
-                let value = self.build_expr(code);
                 let rtype = self.build_type(ltype);
+                let value = match code {
+                    Some(code) => self.build_expr(code),
+                    None => LLVMConstNull(LLVMGetElementType(rtype)),
+                };
                 let pointer = self.build_boxed(rtype, value);
                 self.set_value(*id, pointer);
                 pointer
             },
 
-            LLExpr::AccessRef(expr, refs) => {
-                let base = self.build_expr(expr);
+            LLExpr::AccessRef(objexpr, refs) => {
+                let base = self.build_expr(objexpr);
                 LLVMDumpType(LLVMTypeOf(base));
-                debug!("\n{:?}", refs);
+                debug!("\n{:?}", expr);
                 self.build_access(base, refs)
             },
 
@@ -400,6 +452,11 @@ impl<'sess> LLVM<'sess> {
                 self.build_store(pointer, value)
             },
 
+            LLExpr::Phi(conds, blocks) => {
+                let (mut return_vals, mut block_vals) = self.build_basic_blocks("match", conds, blocks);
+                self.build_phi(&mut return_vals, &mut block_vals)
+            },
+
             _ => panic!("Not Implemented: {:?}", expr),
         }
     }
@@ -412,11 +469,31 @@ impl<'sess> LLVM<'sess> {
                     self.set_type(*id, self.build_type(ltype));
                 },
 
+                LLGlobal::DefGlobal(id, name, ltype) => {
+                    let rtype = self.build_type(ltype);
+                    let global = LLVMAddGlobal(self.module, rtype, cstr(name.as_str()));
+                    LLVMSetInitializer(global, self.null_const(rtype));
+                    // TODO this is uesd by vtables but might not be wanted for other uses...
+                    LLVMSetLinkage(global, LLVMLinkage::LLVMLinkOnceAnyLinkage);
+                    self.set_value(*id, global);
+                },
+
                 LLGlobal::DeclCFunc(id, name, ltype) |
                 LLGlobal::DefCFunc(id, name, ltype, _, _) => {
                     let ftype = self.build_type(ltype);
                     let function = LLVMAddFunction(self.module, cstring(&name), ftype);
                     self.set_value(*id, function);
+                },
+
+
+                LLGlobal::DefNamedStruct(id, name) => {
+                    self.set_type(*id, LLVMPointerType(LLVMStructCreateNamed(self.context, cstr(name.as_str())), 0));
+                },
+
+                LLGlobal::SetStructBody(id, items) => {
+                    let rtype = LLVMGetElementType(self.get_type(*id).unwrap());
+                    let mut items: Vec<LLVMTypeRef> = items.iter().map(|item| self.build_type(item)).collect();
+                    LLVMStructSetBody(rtype, items.as_mut_ptr(), items.len() as u32, false as i32);
                 },
 
                 _ => panic!("Not Implemented: {:?}", global),
@@ -435,11 +512,8 @@ impl<'sess> LLVM<'sess> {
             self.set_value(arg.0, llarg);
         }
 
-        let mut last = ptr::null_mut();
-        for expr in body {
-            last = self.build_expr(expr);
-        }
-        LLVMBuildRet(self.builder, last);
+        let ret = self.build_expr_list(body);
+        LLVMBuildRet(self.builder, ret);
     }
 
     pub unsafe fn build_definitions(&self, globals: &Vec<LLGlobal>) {
@@ -451,7 +525,10 @@ impl<'sess> LLVM<'sess> {
                 },
 
                 LLGlobal::DefType(_, _, _) |
-                LLGlobal::DeclCFunc(_, _, _) => { /* Nothing Needs To Be Done */ }
+                LLGlobal::DefGlobal(_, _, _) |
+                LLGlobal::DeclCFunc(_, _, _) |
+                LLGlobal::DefNamedStruct(_, _) |
+                LLGlobal::SetStructBody(_, _) => { /* Nothing Needs To Be Done */ }
 
                 _ => panic!("Not Implemented: {:?}", global),
             }

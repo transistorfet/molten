@@ -81,12 +81,12 @@ pub enum AST {
     Resolver(NodeID, Pos, Box<AST>, Ident),
     Accessor(NodeID, Pos, Box<AST>, Ident, NodeID),
 
+    Block(NodeID, Pos, Vec<AST>),
     Invoke(NodeID, Pos, Box<AST>, Vec<AST>),
-    SideEffect(NodeID, Pos, Ident, Vec<AST>),
     //Prefix(NodeID, Pos, Ident, Box<AST>),
     //Infix(NodeID, Pos, Ident, Box<AST>, Box<AST>),
 
-    Block(NodeID, Pos, Vec<AST>),
+    SideEffect(NodeID, Pos, Ident, Vec<AST>),
     If(NodeID, Pos, Box<AST>, Box<AST>, Box<AST>),
     Raise(NodeID, Pos, Box<AST>),
     Try(NodeID, Pos, Box<AST>, Vec<(Pattern, AST)>, NodeID),

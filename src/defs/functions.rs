@@ -188,94 +188,6 @@ impl OverloadDef {
     }
 }
 
-/*
-#[derive(Clone, Debug, PartialEq)]
-pub struct ClosureDef {
-    pub id: NodeID,
-    pub varid: NodeID,
-    pub argid: NodeID,
-    pub name: String,
-    pub contextid: NodeID,
-    pub contexttype: Type,
-    pub context: StructDefRef,
-}
-
-pub type ClosureDefRef = Rc<ClosureDef>;
-
-impl ClosureDef {
-    pub fn define(session: &Session, scope: ScopeRef, id: NodeID, name: &Option<String>, ttype: Option<Type>) -> Result<Def, Error> {
-
-        // TODO this isn't correct, it needs to mangle
-        let fname = scope.get_full_name(name.clone(), id);
-
-        // create and register new closure context type
-        let ctid = NodeID::generate();
-        // TODO the name is sloppy here
-        let ctype = Type::Object(format!("{}_context_{}", fname, ctid), ctid, vec!());
-        let structdef = StructDef::define(session, scope.clone(), ctid, ctype.clone())?;
-
-        let def = Def::Closure(Rc::new(ClosureDef {
-            id: id,
-            varid: NodeID::generate(),
-            argid: NodeID::generate(),
-            name: fname,
-            contextid: ctid,
-            contexttype: ctype,
-            context: structdef,
-        }));
-
-        FuncDef::set_func_def(session, scope.clone(), id, name, def.clone(), ttype)?;
-        Ok(def)
-    }
-
-    pub fn add_field(&self, session: &Session, name: &str, ttype: Type) {
-        self.context.add_field(session, true, name, ttype);
-    }
-
-    // TODO I don't like this
-    pub fn add_context_to_ftype(&self, session: &Session, scope: ScopeRef) -> Type {
-        match session.get_type(self.id) {
-            Some(ttype) => {
-                let ftype = ClosureDef::add_context_to_ftype_raw(session, scope, ttype);
-                session.set_type(self.id, ftype.clone());
-                ftype
-            },
-            ttype @ _ => panic!("Unexpected type when transforming closure: expected function but got {:?}", ttype),
-        }
-    }
-
-    pub fn add_context_to_ftype_raw(session: &Session, scope: ScopeRef, ttype: Type) -> Type {
-        if let Type::Function(mut args, ret, abi) = ttype {
-            let args = ClosureDef::add_context_to_args(session, scope.clone(), *args);
-            let ftype = Type::Function(Box::new(args), ret, ABI::C);
-            ftype
-        } else {
-            panic!("Must give a function type");
-        }
-    }
-
-    pub fn add_context_to_args(session: &Session, scope: ScopeRef, args: Type) -> Type {
-        match args {
-            Type::Tuple(mut items) => {
-                items.push(scope.new_typevar(session));
-                Type::Tuple(items)
-            },
-            ttype @ _ => Type::Tuple(vec!(ttype, scope.new_typevar(session))),
-        }
-    }
-
-    pub fn get_context_type(&self, session: &Session) -> Type {
-        let mut fields = vec!();
-        //fields.push(self.add_context_to_ftype(self.session, scope.clone()););
-        fields.push(session.get_type(self.id).unwrap());
-        for &(ref field, ref ttype) in self.context.fields.borrow().iter() {
-            fields.push(ttype.clone());
-        }
-        Type::Ref(Box::new(Type::Tuple(fields)))
-    }
-}
-*/
-
 #[derive(Clone, Debug, PartialEq)]
 pub struct ClosureDef {
     pub id: NodeID,
@@ -323,7 +235,7 @@ impl ClosureDef {
 #[derive(Clone, Debug, PartialEq)]
 pub struct MethodDef {
     pub id: NodeID,
-
+    pub closure: ClosureDefRef,
 }
 
 pub type MethodDefRef = Rc<MethodDef>;
@@ -331,11 +243,18 @@ pub type MethodDefRef = Rc<MethodDef>;
 impl MethodDef {
     #[must_use]
     pub fn define(session: &Session, scope: ScopeRef, id: NodeID, name: &Option<String>, ttype: Option<Type>) -> Result<Def, Error> {
+        let closure = match ClosureDef::define(session, scope, id, name, ttype) {
+            Ok(Def::Closure(cl)) => cl,
+            result @ _ => return result,
+        };
+
         let def = Def::Method(Rc::new(MethodDef {
             id: id,
+            closure: closure,
         }));
 
-        FuncDef::set_func_def(session, scope.clone(), id, name, def.clone(), ttype)?;
+        //FuncDef::set_func_def(session, scope.clone(), id, name, def.clone(), ttype)?;
+        session.set_def(id, def.clone());
         Ok(def)
     }
 }
