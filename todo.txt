@@ -1,5 +1,6 @@
 
-* fix hardcoded vtable index
+* strings might have issues because of their irregularity
+* fix buffer builtin class, or circumvent somehow 
 * convert invoke to add the object arg (it's actually not needed, but the AST is duplicated)
 * also support the __alloc__ thing, which is needed by some
 * how do you get the function to compare values? (for match)
@@ -9,6 +10,7 @@
 * implement resolve properly
 * implement loops (for, while)
 * implement try, raise
+* implement modules
 
 * figure out a better way of doing variables/generics
 * implement return value conversion
@@ -36,6 +38,7 @@ TESTS:
 * remove AST::Recall when you switch over to llvm2
 * remove builtin stuff that's usused
 
+* make an "as" for of decl, like decl buffer_resize as resize: () -> ??
 * implement assignment of tuples and records?
 * there's probably an issue with records in that we might not take into account different orders of items... { a=1, b=2 } might not equal { b=2, a=1 }
 * there is no way to assign to a ref

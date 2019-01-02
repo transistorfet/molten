@@ -165,16 +165,23 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &AST,
             expect_type(session, scope, Some(ttype), Some(ftype), Check::List)?
         },
 
-        AST::Try(ref id, _, ref cond, ref cases, ref cid) |
-        AST::Match(ref id, _, ref cond, ref cases, ref cid) => {
+        AST::Try(ref id, _, ref cond, ref cases, ref compid) |
+        AST::Match(ref id, _, ref cond, ref cases, ref compid) => {
             let mut ctype = check_types_node(session, scope.clone(), cond, None);
             let mut rtype = None;
             for &(ref case, ref expr) in cases {
                 ctype = expect_type(session, scope.clone(), Some(ctype.clone()), Some(check_types_pattern(session, scope.clone(), case, Some(ctype.clone()))?), Check::List)?;
                 rtype = Some(expect_type(session, scope.clone(), rtype.clone(), Some(check_types_node(session, scope.clone(), expr, rtype.clone())), Check::List)?);
             }
-            //*condtype = ctype;
-            session.set_type(*cid, ctype);
+
+            match scope.get_var_def(&String::from("==")) {
+                None => return Err(Error::new(format!("NameError: no \"==\" function defined for type {:?}", ctype))),
+                Some(defid) => {
+                    let (fid, ftype) = session_find_variant_id(session, scope.clone(), defid, &Type::Tuple(vec!(ctype.clone(), ctype.clone())))?;
+                    session.set_ref(*compid, fid);
+                    session.set_type(*compid, ctype);
+                }
+            }
             rtype.unwrap()
         },
 
@@ -369,17 +376,19 @@ pub fn session_find_variant(session: &Session, scope: ScopeRef, invid: NodeID, f
         None => { return check_types_node_or_error(session, scope.clone(), fexpr, None); },
     };
 
-    let def = session.get_def(defid)?;
-    let (fid, ftype) = match def {
-        Def::Overload(ref ol) => ol.find_variant(session, scope.clone(), argtypes.clone())?,
-        _ => (defid, session.get_type(defid).unwrap_or_else(|| scope.new_typevar(session)))
-    };
 
+    let (fid, ftype) = session_find_variant_id(session, scope.clone(), defid, argtypes)?;
     session.set_ref(refid, fid);
     session.set_ref(invid, fid);
     Ok(ftype)
 }
 
-
+pub fn session_find_variant_id(session: &Session, scope: ScopeRef, defid: NodeID, argtypes: &Type) -> Result<(NodeID, Type), Error> {
+    let def = session.get_def(defid)?;
+    Ok(match def {
+        Def::Overload(ref ol) => ol.find_variant(session, scope.clone(), argtypes.clone())?,
+        _ => (defid, session.get_type(defid).unwrap_or_else(|| scope.new_typevar(session)))
+    })
+}
 
 

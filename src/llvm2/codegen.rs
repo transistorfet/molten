@@ -242,6 +242,7 @@ impl<'sess> LLVM<'sess> {
             LLLit::I32(num) => LLVMConstInt(self.i32_type(), *num as u64, 0),
             LLLit::I64(num) => LLVMConstInt(self.i64_type(), *num as u64, 0),
             LLLit::F64(num) => LLVMConstReal(self.f64_type(), *num),
+            LLLit::Null(ltype) => self.null_const(self.build_type(ltype)),
             LLLit::ConstStr(string) => LLVMBuildGlobalStringPtr(self.builder, cstr(string.as_str()), cstr("__string")),
             _ => panic!("Not Implemented: {:?}", lit),
         }

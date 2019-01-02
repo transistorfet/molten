@@ -261,6 +261,7 @@ pub fn declare_typevars(session: &Session, scope: ScopeRef, ttype: Option<&mut T
                 }
             },
             &mut Type::Record(ref mut types) => {
+                types.sort_unstable_by(|a, b| a.0.cmp(&b.0));
                 for (name, ttype) in types.iter_mut() {
                     declare_typevars(session, scope.clone(), Some(ttype), always_new)?;
                 }

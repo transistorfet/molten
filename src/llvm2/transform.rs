@@ -114,9 +114,19 @@ impl<'sess> Transformer<'sess> {
         last
     }
 
+    fn transform_as_args(&self, exprs: &mut Vec<LLExpr>, scope: ScopeRef, args: &Vec<AST>) -> Vec<LLExpr> {
+        let mut fargs = vec!();
+        for arg in args {
+            fargs.push(self.transform_as_result(exprs, scope.clone(), arg).unwrap());
+        }
+        fargs
+    }
+
     fn transform_node(&self, scope: ScopeRef, node: &AST) -> Vec<LLExpr> {
         match &node {
             AST::Literal(_, lit) => vec!(LLExpr::Literal(self.transform_lit(lit))),
+
+            AST::Nil(id) => vec!(LLExpr::Literal(LLLit::Null(self.transform_value_type(&self.session.get_type(*id).unwrap())))),
 
             AST::Block(_, _, code) => self.transform_vec(scope.clone(), code),
             AST::Import(_, _, _, decls) => self.transform_vec(scope.clone(), decls),
@@ -133,7 +143,7 @@ impl<'sess> Transformer<'sess> {
 
             AST::Invoke(id, _, func, args) => {
                 let abi = self.session.get_type(*id).unwrap().get_abi().unwrap();
-                self.transform_func_invoke(scope.clone(), abi, *id, func, args)
+                self.transform_func_invoke(scope.clone(), abi, func, args)
             },
 
             AST::Definition(id, _, mutable, ident, _, value) => {
@@ -203,13 +213,16 @@ impl<'sess> Transformer<'sess> {
 
             AST::Match(_, _, cond, cases, compid) => {
                 let ctype = self.session.get_type(*compid).unwrap();
-                self.transform_match(scope.clone(), &ctype, cond, cases)
+                let compfunc = self.session.get_ref(*compid).unwrap();
+                self.transform_match(scope.clone(), &ctype, compfunc, cond, cases)
             },
 
             AST::SideEffect(_, _, ident, args) => {
                 self.transform_side_effect(scope.clone(), ident.name.as_str(), args)
             },
 
+
+            AST::TypeAlias(_, _, _, _) => { /* Nothing Needs To Be Done */ vec!() }
 
             _ => panic!("Not Implemented: {:?}", node),
         }
@@ -277,13 +290,44 @@ impl<'sess> Transformer<'sess> {
         }
     }
 
-    fn transform_func_invoke(&self, scope: ScopeRef, abi: ABI, id: NodeID, func: &AST, args: &Vec<AST>) -> Vec<LLExpr> {
+    fn transform_func_invoke(&self, scope: ScopeRef, abi: ABI, func: &AST, args: &Vec<AST>) -> Vec<LLExpr> {
         match abi {
-            ABI::C | ABI::MoltenFunc => self.transform_cfunc_invoke(scope.clone(), id, func, args),
-            ABI::Molten | ABI::Unknown => self.transform_closure_invoke(scope.clone(), id, func, args),
+            ABI::C | ABI::MoltenFunc => self.transform_cfunc_invoke(scope.clone(), func, args),
+            ABI::Molten | ABI::Unknown => self.transform_closure_invoke(scope.clone(), func, args),
             _ => panic!("Not Implemented: {:?}", abi),
         }
     }
+
+    /*
+    fn transform_func_as_result(&self, exprs: &mut Vec<LLExpr>, scope: ScopeRef, func: &AST) -> LLExpr {
+        match func {
+            AST::Accessor(id, _, obj, ident, oid) => {
+                let fid = NodeID::generate();
+                let objval = self.transform_as_result(exprs, scope.clone(), obj).unwrap();
+                exprs.push(LLExpr::SetValue(fid, objval));
+                LLExpr::GetValue(fid)
+            },
+            _ => self.transform_as_result(exprs, scope, func).unwrap(),
+        }
+    }
+
+    fn transform_func_reference(&self, &mut exprs, scope: ScopeRef, func: &AST, fargs: &mut Vec<LLExpr>) -> NodeID {
+        let fid = NodeID::generate();
+        let funcresult = match func {
+            AST::Accessor(id, _, obj, ident, oid) => {
+                let objval = fargs[0];
+                let fid = NodeID::generate();
+                let objval = self.transform_as_result(exprs, scope.clone(), obj).unwrap();
+                exprs.push(LLExpr::SetValue(fid, objval));
+                fargs[0] = LLExpr
+                LLExpr::GetValue(fid)
+            }
+            _ => self.transform_as_result(&mut exprs, scope.clone(), func).unwrap(),
+        }
+        exprs.push(LLExpr::SetValue(fid, r(funcresult)));
+        fid
+    }
+    */
 
 
 
@@ -323,15 +367,12 @@ impl<'sess> Transformer<'sess> {
         vec!(LLExpr::GetValue(id))
     }
 
-    fn transform_cfunc_invoke(&self, scope: ScopeRef, id: NodeID, func: &AST, args: &Vec<AST>) -> Vec<LLExpr> {
+    fn transform_cfunc_invoke(&self, scope: ScopeRef, func: &AST, args: &Vec<AST>) -> Vec<LLExpr> {
         let mut exprs = vec!();
-        let mut fargs = vec!();
 
         let funcresult = self.transform_as_result(&mut exprs, scope.clone(), func).unwrap();
 
-        for arg in args {
-            fargs.push(self.transform_as_result(&mut exprs, scope.clone(), arg).unwrap());
-        }
+        let mut fargs = self.transform_as_args(&mut exprs, scope.clone(), args);
 
         exprs.push(LLExpr::CallC(r(funcresult), fargs));
         exprs
@@ -363,7 +404,7 @@ impl<'sess> Transformer<'sess> {
         LLType::Ptr(r(LLType::Struct(vec!(LLType::Ptr(r(ltype))))))
     }
 
-    fn make_closure_type(&self, scope: ScopeRef, ttype: Type) -> Type {
+    fn create_closure_type(&self, scope: ScopeRef, ttype: Type) -> Type {
         match ttype {
             Type::Function(mut argtypes, rettype, abi) => {
                 let mut argtypes = argtypes.as_vec();
@@ -407,7 +448,7 @@ impl<'sess> Transformer<'sess> {
         let lftype = self.transform_closure_def_type(&argtypes.as_vec(), rettype);
         self.set_type(cfid, lftype.clone());
 
-        let ptype = self.make_closure_type(scope.clone(), self.session.get_type(id).unwrap());
+        let ptype = self.create_closure_type(scope.clone(), self.session.get_type(id).unwrap());
         cl.add_field(self.session, cfid, "__func__", ptype.clone(), Define::Never);
 
         // Transforms body and create C function definition
@@ -448,17 +489,14 @@ impl<'sess> Transformer<'sess> {
         make_context
     }
 
-    fn transform_closure_invoke(&self, scope: ScopeRef, id: NodeID, func: &AST, args: &Vec<AST>) -> Vec<LLExpr> {
+    fn transform_closure_invoke(&self, scope: ScopeRef, func: &AST, args: &Vec<AST>) -> Vec<LLExpr> {
         let mut exprs = vec!();
-        let mut fargs = vec!();
 
         let fid = NodeID::generate();
         let funcresult = self.transform_as_result(&mut exprs, scope.clone(), func).unwrap();
         exprs.push(LLExpr::SetValue(fid, r(funcresult)));
 
-        for arg in args {
-            fargs.push(self.transform_as_result(&mut exprs, scope.clone(), arg).unwrap());
-        }
+        let mut fargs = self.transform_as_args(&mut exprs, scope.clone(), args);
         fargs.push(LLExpr::Cast(LLType::Ptr(r(LLType::I8)), r(LLExpr::GetValue(fid))));
 
         let function = LLExpr::LoadRef(r(LLExpr::AccessRef(r(LLExpr::GetValue(fid)), vec!(LLRef::Field(0)))));
@@ -508,8 +546,10 @@ impl<'sess> Transformer<'sess> {
 
         exprs.push(LLExpr::AllocRef(id, ltype, None));
         if let Def::Class(classdef) = self.session.get_def(defid).unwrap() {
-            exprs.push(LLExpr::StoreRef(r(LLExpr::AccessRef(r(LLExpr::GetValue(id)), vec!(LLRef::Field(0)))), r(LLExpr::GetLocal(classdef.vtable.id))));
-            exprs.push(LLExpr::GetValue(id));
+            if let Some(index) = classdef.get_struct_vtable_index() {
+                exprs.push(LLExpr::StoreRef(r(LLExpr::AccessRef(r(LLExpr::GetValue(id)), vec!(LLRef::Field(index)))), r(LLExpr::GetLocal(classdef.vtable.id))));
+                exprs.push(LLExpr::GetValue(id));
+            }
         }
         exprs
     }
@@ -566,18 +606,18 @@ impl<'sess> Transformer<'sess> {
 
         self.transform_class_type_data(scope.clone(), classdef.clone(), body);
 
-        //let mut index = self.globals.borrow().len();
-        //self.set_context(CodeContext::ClassBody);
         for node in body {
             match node {
                 AST::Function(id, _, ident, args, _, body, abi) => {
                     exprs.extend(self.transform_func_def(tscope.clone(), *abi, *id, ident.as_ref().map(|ident| &ident.name), args, body));
                 },
+                AST::Declare(id, _, ident, ttype) => {
+                    exprs.extend(self.transform_func_decl(tscope.clone(), ttype.get_abi().unwrap(), *id, &ident.name, ttype));
+                },
                 AST::Definition(_, _, _, _, _, _) => { },
-                _ => panic!("Not Implemented"),
+                _ => panic!("Not Implemented: {:?}", node),
             }
         }
-        //self.restore_context();
 
         exprs.extend(self.transform_vtable_init(scope.clone(), classdef));
         exprs
@@ -593,8 +633,10 @@ impl<'sess> Transformer<'sess> {
                 let objdef = self.session.get_def(objid).unwrap();
                 match self.session.get_def(defid) {
                     Ok(Def::Method(meth)) => {
-                        let index = objdef.as_class().unwrap().vtable.get_index_by_id(defid).unwrap();
-                        let vtable = LLExpr::LoadRef(r(LLExpr::AccessRef(r(objval), vec!(LLRef::Field(0)))));
+                        let classdef = objdef.as_class().unwrap();
+                        let vindex = classdef.get_struct_vtable_index().unwrap();
+                        let index = classdef.vtable.get_index_by_id(defid).unwrap();
+                        let vtable = LLExpr::LoadRef(r(LLExpr::AccessRef(r(objval), vec!(LLRef::Field(vindex)))));
                         exprs.push(LLExpr::LoadRef(r(LLExpr::AccessRef(r(vtable), vec!(LLRef::Field(index))))));
                     },
                     Ok(Def::Field(field)) => {
@@ -652,7 +694,7 @@ impl<'sess> Transformer<'sess> {
         vec!(LLExpr::Phi(conds, blocks))
     }
 
-    fn transform_match(&self, scope: ScopeRef, ctype: &Type, cond: &AST, cases: &Vec<(Pattern, AST)>) -> Vec<LLExpr> {
+    fn transform_match(&self, scope: ScopeRef, ctype: &Type, compfunc: NodeID, cond: &AST, cases: &Vec<(Pattern, AST)>) -> Vec<LLExpr> {
         let mut exprs = vec!();
         let mut conds = vec!();
         let mut blocks = vec!();
@@ -662,13 +704,20 @@ impl<'sess> Transformer<'sess> {
         exprs.push(LLExpr::SetValue(condid, r(condval)));
 
         // TODO there might be an issue with the lack of closure conversion here
-        let compid = self.find_comparison_func(scope.clone(), ctype);
+        //let compid = self.find_comparison_func(scope.clone(), ctype);
+        //let refexprs = self.transform_reference(scope.clone(), compfunc, &String::from("=="));
+        //let compfunc = refexprs.pop().unwrap();
+        //exprs.extend(refexprs);
 
-        panic!("Not Implemented");
         for (pat, block) in cases {
             // TODO get the equals function in order to compare
             //let caseval = self.transform_pattern(&mut exprs, scope.clone(), pat);
             //call with (LLExpr::GetValue(condid), caseval)
+            //match pat {
+            //    Pattern::Underscore => LLExpr::Literal(LLLit::I1(true)),
+            //    //Pattern::Literal(lit) => self.transform_func_invoke(scope.clone(), abi, AST::Identifier(compfunc, Pos::empty(), &String::from("==")), 
+            //    _ => panic!("Not Implemented: {:?}", pat),
+            //}
             blocks.push(self.transform_node(scope.clone(), block));
         }
 

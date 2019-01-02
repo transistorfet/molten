@@ -15,12 +15,10 @@
         else
             e
 
-/*
-        /* this ends up causing various problems */
-        (12).add(3)
-        e.add(3)
-        fn test(x: Int) => x.add(2)
-*/
+        // TODO this ends up causing various problems
+        //(12).add(3)
+        //e.add(3)
+        //fn test(x: Int) => x.add(2)
 
         let a = 5 * 5
         let b : Real = 123.24

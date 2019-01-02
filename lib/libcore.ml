@@ -53,25 +53,25 @@ fn str(num: Bool) -> String {
 
 fn str(num: Int) -> String {
     let buffer: String = malloc(22)
-    sprintf(buffer, "%ld", num, nil)
+    sprintf(buffer, "%ld", num, ())
     buffer
 }
 
 fn hex(num: Int) -> String {
     let buffer: String = malloc(22)
-    sprintf(buffer, "0x%lX", num, nil)
+    sprintf(buffer, "0x%lX", num, ())
     buffer
 }
 
 fn str(num: Real) -> String {
     let buffer: String = malloc(22)
-    sprintf(buffer, "%f", num, nil)
+    sprintf(buffer, "%f", num, ())
     buffer
 }
 
 
 
-
+/*
 class List<'item> {
     let mut capacity: Int
     let mut length: Int
@@ -89,8 +89,7 @@ class List<'item> {
 
     fn resize(self, capacity) {
         self.capacity = capacity
-        self.data = self.data.resize(self.capacity)
-        nil
+        self.data = self.data.resize(self.capacity);
     }
 
     fn push(self, item: 'item) {
@@ -137,9 +136,8 @@ class List<'item> {
 
     fn insert(self, index: Int, item: 'item) {
         if index >= self.length then {
-            self.push(item)
+            self.push(item);
             // TODO this is here because of a bug during the type refactor that was creating invalid IR fur the return type
-            nil
         } else {
             let cur = self.data[index]
             self.data[index] = item
@@ -147,7 +145,9 @@ class List<'item> {
         }
     }
 }
+*/
 
+/*
 class HashMapNode<'item> {
     let mut key: String
     let mut data: 'item
@@ -185,7 +185,6 @@ class HashMap<'item> {
     }
 }
 
-/*
 class Iter<'item> {
     fn next(self) -> 'item {
         //raise error notimplemented?

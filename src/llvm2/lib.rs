@@ -18,7 +18,7 @@ use scope::{ Scope, ScopeRef, ScopeMapRef, Context };
 use binding::{ declare_typevars };
 use utils::UniqueID;
 
-use defs::classes::ClassDef;
+use defs::classes::{ ClassDef, Define };
 use defs::functions::{ AnyFunc, CFuncDef, FuncDef, BuiltinFuncDef };
 
 use llvm2::llcode::*;
@@ -138,10 +138,14 @@ pub unsafe fn define_builtins_node<'sess>(llvm: &LLVM<'sess>, transformer: &Tran
             let ltype = transformer.transform_value_type(&llvm.session.get_type(*id).unwrap());
 
             let lltype = if structdef.len() > 0 {
-                //for (ref field, ref ttype) in structdef {
-                //    classdef.structdef.add_field(llvm.session, true, field, ttype.clone(), Define::IfNotExists);
-                //}
+                for (ref field, ref ttype) in structdef {
+                    classdef.structdef.add_field(llvm.session, NodeID::generate(), true, field, ttype.clone(), Define::IfNotExists);
+                }
                 //build_class_type(llvm, scope.clone(), *id, &cname, classdef.clone())
+
+                //self.transform_class_type_data(scope.clone(), classdef.clone(), body);
+                //exprs.extend(self.transform_vtable_init(scope.clone(), classdef));
+
                 llvm.ptr_type()
             } else {
                 let lltype = llvm.build_type(&ltype);
@@ -149,7 +153,7 @@ pub unsafe fn define_builtins_node<'sess>(llvm: &LLVM<'sess>, transformer: &Tran
                 lltype
             };
 
-            //define_builtins_vec(llvm, transformer, lltype, tscope.clone(), entries);
+            define_builtins_vec(llvm, transformer, lltype, tscope.clone(), entries);
         },
     }
 }
@@ -239,14 +243,6 @@ pub fn get_builtins<'sess>() -> Vec<BuiltinDef<'sess>> {
         //BuiltinDef::Class(id(), "List",   vec!(Type::Variable(String::from("item"), UniqueID(0))), vec!(), vec!()),
         //BuiltinDef::Class(id(), "Class",  Type::Object(String::from("Class"), vec!())),
 
-        BuiltinDef::Func(id(), "getindex",   "(String, Int) -> Int / C",        FuncKind::Function(string_get)),
-
-        /*
-        BuiltinDef::Class(id(), "Int", vec!(), vec!(), vec!(
-            BuiltinDef::Func(id(), "+",   "(Int, Int) -> Int",                  FuncKind::Function(add_int)),
-            BuiltinDef::Func(id(), "add", "(Int, Int) -> Int",                  FuncKind::Runtime(build_lib_add)),
-        )),
-        */
 
         BuiltinDef::Func(id(), "malloc",     "(Int) -> 'ptr / C",               FuncKind::External),
         BuiltinDef::Func(id(), "realloc",    "('ptr, Int) -> 'ptr / C",         FuncKind::External),
@@ -266,12 +262,18 @@ pub fn get_builtins<'sess>() -> Vec<BuiltinDef<'sess>> {
         BuiltinDef::Func(id(), "sizeof",    "('ptr) -> Int",                    FuncKind::Function(sizeof_value)),
 
 
+        BuiltinDef::Func(id(), "getindex",   "(String, Int, Int) -> Int / C",           FuncKind::Function(string_get)),
+        //BuiltinDef::Func(id(), "bufalloc",   "(Int, Int) -> String / C",                FuncKind::Function(buffer_alloc)),
+        //BuiltinDef::Func(id(), "getindex",   "(String, Int, Int) -> Int / C",           FuncKind::Function(buffer_get)),
+        //BuiltinDef::Func(id(), "setindex",   "(String, Int, Int, 'item) -> Int / C",    FuncKind::Function(buffer_set)),
+
+
         BuiltinDef::Class(id(), "Buffer", vec!(Type::Variable(String::from("item"), UniqueID(0))), vec!(), vec!(
             BuiltinDef::Func(id(), "__alloc__",  "() -> Buffer<'item>",                      FuncKind::Method(buffer_allocator)),
             BuiltinDef::Func(id(), "new",        "(Buffer<'item>, Int) -> Buffer<'item>",    FuncKind::Method(buffer_constructor)),
             BuiltinDef::Func(id(), "resize",     "(Buffer<'item>, Int) -> Buffer<'item>",    FuncKind::Method(buffer_resize)),
-            BuiltinDef::Func(id(), "[]",         "(Buffer<'item>, Int) -> 'item",            FuncKind::Method(buffer_get)),
-            BuiltinDef::Func(id(), "[]",         "(Buffer<'item>, Int, 'item) -> 'item",     FuncKind::Method(buffer_set)),
+            BuiltinDef::Func(id(), "[]",         "(Buffer<'item>, Int) -> 'item",            FuncKind::Method(buffer_get_method)),
+            BuiltinDef::Func(id(), "[]",         "(Buffer<'item>, Int, 'item) -> 'item",     FuncKind::Method(buffer_set_method)),
         )),
 
         //// Integer Builtins ////
@@ -370,6 +372,18 @@ unsafe fn sizeof_value(llvm: &LLVM, mut args: Vec<LLVMValueRef>) -> LLVMValueRef
     LLVMBuildPtrToInt(llvm.builder, pointer, llvm.i64_type(), cstr(""))
 }
 
+
+/*
+unsafe fn buffer_get(llvm: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef {
+    let size = LLVMBuildMul(llvm.builder, args[1], args[2], cstr(""));
+    let mut indices = vec!(size);
+    let pointer = LLVMBuildGEP(llvm.builder, args[0], indices.as_mut_ptr(), indices.len() as u32, cstr(""));
+    let value = LLVMBuildLoad(llvm.builder, pointer, cstr(""));
+    LLVMBuildCast(llvm.builder, llvm::LLVMOpcode::LLVMZExt, value, llvm.i64_type(), cstr("tmp"))
+}
+*/
+
+
 unsafe fn buffer_allocator(llvm: &LLVM, objtype: LLVMTypeRef, mut args: Vec<LLVMValueRef>) -> LLVMValueRef {
     llvm.null_const(objtype)
 }
@@ -386,7 +400,7 @@ unsafe fn buffer_resize(llvm: &LLVM, objtype: LLVMTypeRef, args: Vec<LLVMValueRe
     LLVMBuildPointerCast(llvm.builder, newptr, objtype, cstr("ptr"))
 }
 
-unsafe fn buffer_get(llvm: &LLVM, objtype: LLVMTypeRef, args: Vec<LLVMValueRef>) -> LLVMValueRef {
+unsafe fn buffer_get_method(llvm: &LLVM, objtype: LLVMTypeRef, args: Vec<LLVMValueRef>) -> LLVMValueRef {
     // TODO generate this in place of the custom function
     //Return(
     //  AccessVar(
@@ -404,11 +418,11 @@ unsafe fn buffer_get(llvm: &LLVM, objtype: LLVMTypeRef, args: Vec<LLVMValueRef>)
     LLVMBuildLoad(llvm.builder, pointer, cstr("tmp"))
 }
 
-unsafe fn buffer_set(llvm: &LLVM, objtype: LLVMTypeRef, args: Vec<LLVMValueRef>) -> LLVMValueRef {
+unsafe fn buffer_set_method(llvm: &LLVM, objtype: LLVMTypeRef, args: Vec<LLVMValueRef>) -> LLVMValueRef {
     let index = LLVMBuildCast(llvm.builder, llvm::LLVMOpcode::LLVMTrunc, args[1], llvm.i32_type(), cstr("tmp"));
     let mut indices = vec!(index);
     let pointer = LLVMBuildGEP(llvm.builder, args[0], indices.as_mut_ptr(), indices.len() as u32, cstr("tmp"));
-    let value = llvm.build_cast(llvm.ptr_type(), args[2]);
+    let value = llvm.build_cast(llvm.str_type(), args[2]);
     LLVMBuildStore(llvm.builder, value, pointer);
 
     llvm.null_const(llvm.str_type())
@@ -436,113 +450,4 @@ unsafe fn println(llvm: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef {
 //    llvm.build_call_by_name("realloc", &mut vec!(buffer, len))
 //}
 
-/*
-unsafe fn build_buffer_allocator(llvm: &LLVM, id: NodeID, name: &str, objtype: LLVMTypeRef) -> LLVMValueRef {
-    let function = build_function_start_lib(llvm, id, name, vec!(), objtype);
-    LLVMSetLinkage(function, llvm::LLVMLinkage::LLVMLinkOnceODRLinkage);
-    LLVMBuildRet(llvm.builder, llvm.null_const(objtype));
-    function
-}
-
-unsafe fn build_buffer_constructor(llvm: &LLVM, id: NodeID, name: &str, objtype: LLVMTypeRef) -> LLVMValueRef {
-    let function = build_function_start_lib(llvm, id, name, vec!(objtype, llvm.i64_type()), objtype);
-    LLVMSetLinkage(function, llvm::LLVMLinkage::LLVMLinkOnceODRLinkage);
-
-    let ptr = LLVMBuildArrayMalloc(llvm.builder, LLVMInt64TypeInContext(llvm.context), LLVMGetParam(function, 1), cstr("tmp"));
-    let castptr = LLVMBuildPointerCast(llvm.builder, ptr, objtype, cstr("ptr"));
-    LLVMBuildRet(llvm.builder, castptr);
-    function
-}
-
-unsafe fn build_buffer_resize(llvm: &LLVM, id: NodeID, name: &str, objtype: LLVMTypeRef) -> LLVMValueRef {
-    let function = build_function_start_lib(llvm, id, name, vec!(objtype, llvm.i64_type()), objtype);
-    LLVMSetLinkage(function, llvm::LLVMLinkage::LLVMLinkOnceODRLinkage);
-
-    let buffer = LLVMBuildPointerCast(llvm.builder, LLVMGetParam(function, 0), llvm.str_type(), cstr("tmp"));
-    let size = LLVMBuildMul(llvm.builder, LLVMGetParam(function, 1), LLVMSizeOf(LLVMInt64TypeInContext(llvm.context)), cstr("tmp"));
-    let newptr = build_c_call(llvm, "realloc", &mut vec!(buffer, size));
-    let castptr = LLVMBuildPointerCast(llvm.builder, newptr, objtype, cstr("ptr"));
-    LLVMBuildRet(llvm.builder, castptr);
-    function
-}
-
-unsafe fn build_buffer_get(llvm: &LLVM, id: NodeID, name: &str, objtype: LLVMTypeRef) -> LLVMValueRef {
-    let function = build_function_start_lib(llvm, id, name, vec!(objtype, llvm.i64_type()), llvm.str_type());
-    LLVMSetLinkage(function, llvm::LLVMLinkage::LLVMLinkOnceODRLinkage);
-
-    // TODO generate this in place of the custom function
-    //Return(
-    //  AccessVar(
-    //    AccessOffset(
-    //        AccessValue(arg 0),
-    //        Cast(AccessValue(arg 1), i32)
-    //    )
-    //  )
-    //)
-    // AccessOffset has one index, AccessField has a (0, fieldnum) to deref it first
-
-    let buffer = LLVMGetParam(function, 0);
-    let index = LLVMBuildCast(llvm.builder, llvm::LLVMOpcode::LLVMTrunc, LLVMGetParam(function, 1), i32_type(llvm), cstr("tmp"));
-    let mut indices = vec!(index);
-    let pointer = LLVMBuildGEP(llvm.builder, buffer, indices.as_mut_ptr(), indices.len() as u32, cstr("tmp"));
-    let value = LLVMBuildLoad(llvm.builder, pointer, cstr("tmp"));
-
-    LLVMBuildRet(llvm.builder, value);
-    //LLVMBuildRet(llvm.builder, llvm.null_const(llvm.str_type()));
-    function
-}
-
-unsafe fn build_buffer_set(llvm: &LLVM, id: NodeID, name: &str, objtype: LLVMTypeRef) -> LLVMValueRef {
-    let function = build_function_start_lib(llvm, id, name, vec!(objtype, llvm.i64_type(), llvm.str_type()), llvm.str_type());
-    LLVMSetLinkage(function, llvm::LLVMLinkage::LLVMLinkOnceODRLinkage);
-
-    let buffer = LLVMGetParam(function, 0);
-    let index = LLVMBuildCast(llvm.builder, llvm::LLVMOpcode::LLVMTrunc, LLVMGetParam(function, 1), i32_type(llvm), cstr("tmp"));
-    let mut indices = vec!(index);
-    let pointer = LLVMBuildGEP(llvm.builder, buffer, indices.as_mut_ptr(), indices.len() as u32, cstr("tmp"));
-    let value = build_cast_to_vartype(llvm, LLVMGetParam(function, 2));
-    LLVMBuildStore(llvm.builder, value, pointer);
-
-    //LLVMBuildRet(llvm.builder, value);
-    LLVMBuildRet(llvm.builder, llvm.null_const(llvm.str_type()));
-    function
-}
-
-
-unsafe fn build_string_get(llvm: &LLVM, id: NodeID, name: &str, _objtype: LLVMTypeRef) -> LLVMValueRef {
-    let function = build_function_start_lib(llvm, id, name, vec!(llvm.str_type(), llvm.i64_type()), llvm.i64_type());
-    LLVMSetLinkage(function, llvm::LLVMLinkage::LLVMLinkOnceODRLinkage);
-
-    let string = LLVMGetParam(function, 0);
-    let mut indices = vec!(LLVMGetParam(function, 1));
-    let pointer = LLVMBuildGEP(llvm.builder, string, indices.as_mut_ptr(), indices.len() as u32, cstr("tmp"));
-    let value = LLVMBuildLoad(llvm.builder, pointer, cstr("tmp"));
-    let value = LLVMBuildCast(llvm.builder, llvm::LLVMOpcode::LLVMZExt, value, llvm.i64_type(), cstr("tmp"));
-    
-    LLVMBuildRet(llvm.builder, value);
-    function
-}
-
-
-unsafe fn build_lib_println(llvm: &LLVM, id: NodeID, name: &str, _objtype: LLVMTypeRef) -> LLVMValueRef {
-    let function = build_function_start_lib(llvm, id, name, vec!(llvm.str_type()), llvm.i64_type());
-    LLVMSetLinkage(function, llvm::LLVMLinkage::LLVMLinkOnceODRLinkage);
-
-    let value = build_c_call(llvm, "puts", &mut vec!(LLVMGetParam(function, 0)));
-    LLVMBuildRet(llvm.builder, value);
-    function
-}
-
-unsafe fn build_lib_readline(llvm: &LLVM, id: NodeID, name: &str, _objtype: LLVMTypeRef) -> LLVMValueRef {
-    let function = build_function_start_lib(llvm, id, name, vec!(), llvm.str_type());
-    LLVMSetLinkage(function, llvm::LLVMLinkage::LLVMLinkOnceODRLinkage);
-
-    let buffer = build_c_call(llvm, "malloc", &mut vec!(date.i32_const(2048)));
-    build_c_call(llvm, "gets", &mut vec!(buffer));
-    let len = build_c_call(llvm, "strlen", &mut vec!(buffer));
-    let value = build_c_call(llvm, "realloc", &mut vec!(buffer, len));
-    LLVMBuildRet(llvm.builder, value);
-    function
-}
-*/
 
