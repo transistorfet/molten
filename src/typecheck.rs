@@ -179,7 +179,8 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &AST,
                 Some(defid) => {
                     let (fid, ftype) = session_find_variant_id(session, scope.clone(), defid, &Type::Tuple(vec!(ctype.clone(), ctype.clone())))?;
                     session.set_ref(*compid, fid);
-                    session.set_type(*compid, ctype);
+                    session.set_type(*compid, ftype);
+                    //session.set_type(*compid, ctype);
                 }
             }
             rtype.unwrap()
@@ -384,11 +385,10 @@ pub fn session_find_variant(session: &Session, scope: ScopeRef, invid: NodeID, f
 }
 
 pub fn session_find_variant_id(session: &Session, scope: ScopeRef, defid: NodeID, argtypes: &Type) -> Result<(NodeID, Type), Error> {
-    let def = session.get_def(defid)?;
-    Ok(match def {
-        Def::Overload(ref ol) => ol.find_variant(session, scope.clone(), argtypes.clone())?,
-        _ => (defid, session.get_type(defid).unwrap_or_else(|| scope.new_typevar(session)))
-    })
+    match session.get_def(defid) {
+        Ok(Def::Overload(ref ol)) => ol.find_variant(session, scope.clone(), argtypes.clone()),
+        _ => Ok((defid, session.get_type(defid).unwrap_or_else(|| scope.new_typevar(session))))
+    }
 }
 
 
