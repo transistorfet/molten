@@ -1,36 +1,34 @@
 
+* there is an issue with creating closures that reference overloaded values... str in particular.  The AST::Identifier cannot resolve the correct version of str
+
 * issue with string push, requires vtable but there isn't one, i think. is issue for other types too... cannot inherit from them because of that
 * issue with buffers not compiling correctly
 * fix lib to allow builtin classes. Make more use of transform, including refactoring to allow partial transformation (call methods, define closures, etc, with partially transformed inputs)
 * fix buffer builtin class, or circumvent somehow 
+* can you have a vtable for builtin types that it uses statically?  still doesn't allow inheritence though
 * also support the __alloc__ thing, which is needed by buffer? string?
 
-* implement sideeffect
 * implement modules
 * implement loops (for, while)
 * implement resolve properly
 * implement try, raise
 
+* rather than coercising a non pointer type into a pointer, you can box any such types, possibly adding a vtablu of sorts in the process
+  possibly containing functions and metadata for copying. You could also make buffer copying functions that take the element size and copy
+  the buffer data into the boxed location.
+
 * figure out a better way of doing variables/generics
 * implement return value conversion
-* can you have a vtable for builtin types that it uses statically?  still doesn't allow inheritence though
-* should compare use a trait/typeclass? that would have to come later
+* if and sideeffects need bool comparison results to work correctly.  You can either force that in type checking or somehow desugar or use the comps style from match
 
-* issue with calling function references store in structs or tuples... it converts them to methods incorrectly
 * should vtables be dynamically allocated, or should we add a LLType::ElementOf() type or something to GetElement an aliased type
-* try to reuse as much code in transform as possible
-* should you implement strings differently?
-* refactor access transform
-
-
-* the 'if' expression requires a bool value to test comparison, and the easy fix is to require bool during type checking...
-  It might be easier to somehow desugar into a boolean comparison at some point... or you can do the match comp func idea for if and sideeffect
-* should you do the same thing for side effects that you did for matching?  Would you need an equals and not equals function depending on if it's 'and' or 'or'??
+* unable to defined a method as / MF or / C ABI
 
 
 
 
 BUGS:
+* issue with calling function references store in structs or tuples... it converts them to methods incorrectly
 * if there are brackets after a record literal, it will try to call it as a function: let bar = ref { a = 1, b = 2 } \n (!x).a    parses incorrectly,
   but adding a semi-colon will fix it
 * prefix operations should bind closer than subatomic_operations: !x.a should be parsed as (!x).a but instead is !(x.a)
@@ -50,6 +48,8 @@ TESTS:
 * implement assignment of tuples and records?
 * there's probably an issue with records in that we might not take into account different orders of items... { a=1, b=2 } might not equal { b=2, a=1 }
 * there is no way to assign to a ref
+* if you made typechecking an object like transform, and had a context, you could do extended checks of what's allowed in a C function, like exceptions (disallowed in C, but allowed in M and MF)
+* should compare use a trait/typeclass? that would have to come later
 
 * I think it should be doable to make all functions including methods be closures, especially if you put the context at the end
 * we need to make molten code and transform in order to convert nested closures. We at least need to transform the record constructor to convert the idents

@@ -1,5 +1,6 @@
 
 use std::rc::Rc;
+use std::cell::Cell;
 use std::cell::RefCell;
  
 use defs::Def;
@@ -16,6 +17,7 @@ use defs::variables::FieldDef;
 #[derive(Clone, Debug, PartialEq)]
 pub struct ClassDef {
     pub id: NodeID,
+    pub primative: Cell<bool>,
     pub classname: String,
     pub classtype: Type,
     pub parenttype: Option<Type>,
@@ -30,6 +32,7 @@ impl ClassDef {
     pub fn new(id: NodeID, classname: String, classtype: Type, parenttype: Option<Type>, vars: ScopeRef, vtable: Vtable) -> Self {
         Self {
             id: id,
+            primative: Cell::new(false),
             classname: classname,
             classtype: classtype,
             parenttype: parenttype,
@@ -91,6 +94,15 @@ impl ClassDef {
         let vtable = Vtable::create(session, NodeID::generate(), format!("{}_vtable", name.clone()))?;
         let classdef = ClassDef::new_ref(id, name, classtype, parenttype, vars, vtable);
         Ok(classdef)
+    }
+
+
+    pub fn set_primative(&self) {
+        self.primative.set(true);
+    }
+
+    pub fn is_primative(&self) -> bool {
+        self.primative.get()
     }
 
 
@@ -243,9 +255,9 @@ impl StructDef {
         self.fields.borrow().iter().position(|ref r| r.0 == id)
     }
 
-    pub fn foreach_field<F>(&self, mut f: F) where F: FnMut(&String, &Type) -> () {
+    pub fn foreach_field<F>(&self, mut f: F) where F: FnMut(NodeID, &String, &Type) -> () {
         for field in self.fields.borrow().iter() {
-            f(&field.1, &field.2);
+            f(field.0, &field.1, &field.2);
         }
     }
 }
@@ -326,9 +338,9 @@ impl Vtable {
         self.table.borrow().len()
     }
 
-    pub fn foreach_entry<F>(&self, mut f: F) where F: FnMut(&String, &Type) -> () {
+    pub fn foreach_entry<F>(&self, mut f: F) where F: FnMut(NodeID, &String, &Type) -> () {
         for entry in self.table.borrow().iter() {
-            f(&entry.1, &entry.2);
+            f(entry.0, &entry.1, &entry.2);
         }
     }
 

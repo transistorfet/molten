@@ -135,6 +135,9 @@ pub unsafe fn define_builtins_node<'sess>(llvm: &LLVM<'sess>, transformer: &Tran
             let tscope = llvm.session.map.get(id);
             let cname = String::from(*name);
             let classdef = llvm.session.get_def(*id).unwrap().as_class().unwrap();
+            if entries.len() <= 0 {
+                classdef.set_primative();
+            }
             let ltype = transformer.transform_value_type(&llvm.session.get_type(*id).unwrap());
 
             let lltype = if structdef.len() > 0 {

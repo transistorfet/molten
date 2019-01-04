@@ -20,8 +20,10 @@ impl AnyFunc {
     pub fn define(session: &Session, scope: ScopeRef, id: NodeID, name: &Option<String>, abi: ABI, ttype: Option<Type>) -> Result<Def, Error> {
         match abi {
             ABI::C => CFuncDef::define(session, scope.clone(), id, name, ttype),
+            ABI::MoltenFunc => FuncDef::define(session, scope.clone(), id, name, ttype),
             ABI::Molten => {
                 if scope.is_redirect() && name.is_some() {
+                    // TODO do you need a separate or selectable somehow method def for MoltenFunc types
                     MethodDef::define(session, scope.clone(), id, name, ttype)
                 } else {
                     //FuncDef::define(session, scope.clone(), id, name, ttype)

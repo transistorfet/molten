@@ -460,9 +460,10 @@ impl<'sess> Transformer<'sess> {
         let structtype = LLType::Ptr(r(self.transform_struct_def(&cl.context_struct)));
         self.insert_global(index, LLGlobal::DefType(cl.context_type_id, format!("__context_{}__", cl.context_type_id), structtype));
 
+
         FuncDef::define(self.session, scope.clone(), cfid, &Some(cfname.clone()), Some(ptype)).unwrap();
         let mut fields = vec!();
-        cl.context_struct.foreach_field(|field, _| {
+        cl.context_struct.foreach_field(|_, field, _| {
             if field.as_str() == "__func__" {
                 fields.push((Ident::from_str("__func__"), AST::make_ident_from_str(Pos::empty(), cfname.as_str())));
             } else {
@@ -471,21 +472,21 @@ impl<'sess> Transformer<'sess> {
         });
 
         let mut code = vec!();
-        // TODO this must be changed back to "id"
-        code.push(AST::Definition(/*id*/ NodeID::generate(), Pos::empty(), true, Ident::new(fname.clone()), None, Box::new(AST::make_ref(Pos::empty(), AST::make_record(Pos::empty(), fields)))));
+        code.push(AST::Definition(NodeID::generate(), Pos::empty(), true, Ident::new(fname.clone()), None, Box::new(AST::make_ref(Pos::empty(), AST::make_record(Pos::empty(), fields)))));
         // TODO I'm going back on my decision to use a tuple pair to represent the function and context reference because it can't be converted to i8* (the generics type)
         //      Once I have generics that can operate on different sized data instead of only references, I can switch back
         //code.push(AST::Tuple(NodeID::generate(), Pos::empty(), vec!(AST::make_ident_from_str(Pos::empty(), real_fname.as_str()), AST::make_ident(Pos::empty(), Ident::new(cname.clone())))));
         code.push(AST::make_ident(Pos::empty(), Ident::new(fname.clone())));
+        println!("CLOSURE CREATION CODE {:?}: {:#?}", id, code);
 
         binding::bind_names(self.session, scope.clone(), &mut code);
         typecheck::check_types(self.session, scope.clone(), &code);
-        let mut make_context = self.transform_vec(scope.clone(), &code);
-        let last = make_context.pop().unwrap();
-        make_context.push(LLExpr::SetValue(id, r(last)));
-        make_context.push(LLExpr::GetValue(id));
+        let mut exprs = self.transform_vec(scope.clone(), &code);
+        let last = exprs.pop().unwrap();
+        exprs.push(LLExpr::SetValue(id, r(last)));
+        exprs.push(LLExpr::GetValue(id));
 
-        make_context
+        exprs
     }
 
     fn transform_closure_invoke(&self, scope: ScopeRef, func: &AST, args: &Vec<AST>) -> Vec<LLExpr> {
@@ -514,10 +515,8 @@ impl<'sess> Transformer<'sess> {
 
 
     fn transform_reference(&self, scope: ScopeRef, defid: NodeID, name: &String) -> Vec<LLExpr> {
-        // TODO temporarily disabling global variables
         let dscope = Scope::target(self.session, scope.clone());
         if !dscope.contains_local(name) && !Scope::global(dscope.clone()).contains(name) {
-        //if !scope.contains_local(name) {
             match self.get_context() {
                 Some(CodeContext::Closure(ref cid)) => {
                     let cl = self.session.get_def(*cid).unwrap().as_closure().unwrap();
@@ -579,7 +578,7 @@ impl<'sess> Transformer<'sess> {
 
     fn transform_vtable_def(&self, vtable: &Vtable) -> LLType {
         let mut items = vec!();
-        vtable.foreach_entry(|name, ttype| {
+        vtable.foreach_entry(|id, name, ttype| {
             items.push(self.transform_value_type(ttype));
         });
         LLType::Struct(items)
@@ -794,7 +793,7 @@ impl<'sess> Transformer<'sess> {
 
     fn transform_struct_def(&self, structdef: &StructDefRef) -> LLType {
         let mut items = vec!();
-        structdef.foreach_field(|name, ttype| {
+        structdef.foreach_field(|id, name, ttype| {
             items.push(self.transform_value_type(ttype));
         });
         LLType::Struct(items)
