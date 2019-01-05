@@ -8,7 +8,6 @@
 * can you have a vtable for builtin types that it uses statically?  still doesn't allow inheritence though
 * also support the __alloc__ thing, which is needed by buffer? string?
 
-* implement modules
 * implement loops (for, while)
 * implement resolve properly
 * implement try, raise
@@ -43,7 +42,6 @@ TESTS:
 
 
 * remove AST::Recall when you switch over to llvm2
-* remove builtin stuff that's usused
 
 * make an "as" for of decl, like decl buffer_resize as resize: () -> ??
 * implement assignment of tuples and records?

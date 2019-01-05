@@ -30,7 +30,6 @@ mod typecheck;
 mod defs;
 mod export;
 mod llvm;
-mod llvm2;
 
 use config::Options;
 
@@ -78,8 +77,8 @@ fn compile_file(input: &str, output: Option<&str>) {
     session.name = source.replace("/", ".");
     session.target = output.map(|s| String::from(s)).unwrap_or_else(|| String::from(source));
 
-    let builtins = llvm2::lib::get_builtins();
-    llvm2::lib::make_global(&session, &builtins);
+    let builtins = llvm::lib::get_builtins();
+    llvm::lib::make_global(&session, &builtins);
 
     let mut code = session.parse_file(input, false);
     binding::bind_names(&session, session.map.get_global(), &mut code);
@@ -96,7 +95,7 @@ fn compile_file(input: &str, output: Option<&str>) {
 
     export::write_exports(&session, session.map.get_global(), format!("{}.dec", session.target).as_str(), &code);
 
-    let transformer = llvm2::transform::Transformer::new(&session);
+    let transformer = llvm::transform::Transformer::new(&session);
     transformer.transform_code(session.map.get_global(), &code);
     if Options::as_ref().debug {
         println!("===================");
@@ -104,8 +103,8 @@ fn compile_file(input: &str, output: Option<&str>) {
         println!("===================");
     }
 
-    let llvm = llvm2::codegen::LLVM::new(&session);
-    llvm2::lib::initialize_builtins(&llvm, &transformer, session.map.get_global(), &builtins);
+    let llvm = llvm::codegen::LLVM::new(&session);
+    llvm::lib::initialize_builtins(&llvm, &transformer, session.map.get_global(), &builtins);
     llvm.build_module(&transformer.globals.borrow());
     llvm.print_module();
     llvm.write_module(format!("{}.ll", session.target).as_str());

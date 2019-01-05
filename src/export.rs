@@ -2,12 +2,11 @@
 use std::fs::File;
 use std::io::prelude::*;
 
-use abi::ABI;
+use ast::AST;
 use types::Type;
 use utils::UniqueID;
 use config::Options;
 use session::Session;
-use ast::{ NodeID, AST };
 use scope::{ Scope, ScopeRef };
 
 

@@ -88,7 +88,7 @@ pub fn refine_node(node: AST) -> AST {
         },
 
         //AST::List(id, pos, items, ttype) => { AST::List(id, pos, refine_vec(items), ttype) },
-        AST::List(id, pos, items) => {
+        AST::List(_, pos, items) => {
             let mut block = vec!();
             let tmplist = format!("{}", UniqueID::generate());
             let typevar = rand::random::<i32>();

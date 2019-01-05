@@ -128,7 +128,7 @@ fn bind_names_node_or_error(session: &Session, scope: ScopeRef, node: &mut AST) 
         AST::Block(_, _, ref mut code) => { bind_names_vec(session, scope, code); },
 
         AST::Record(_, _, ref mut items) => {
-            for &mut (ref mut name, ref mut expr) in items {
+            for &mut (_, ref mut expr) in items {
                 bind_names_node(session, scope.clone(), expr);
             }
         },
@@ -263,7 +263,7 @@ pub fn declare_typevars(session: &Session, scope: ScopeRef, ttype: Option<&mut T
             },
             &mut Type::Record(ref mut types) => {
                 types.sort_unstable_by(|a, b| a.0.cmp(&b.0));
-                for (name, ttype) in types.iter_mut() {
+                for (_, ttype) in types.iter_mut() {
                     declare_typevars(session, scope.clone(), Some(ttype), always_new)?;
                 }
             },

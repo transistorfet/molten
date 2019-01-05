@@ -31,7 +31,7 @@ use std::str::FromStr;
 use abi::ABI;
 use types::Type;
 use utils::UniqueID;
-use ast::{ Pos, Literal, Ident, Argument, ClassSpec, Field, Pattern, AST };
+use ast::{ Pos, Literal, Ident, Argument, ClassSpec, Pattern, AST };
 
 
 ///// Parsing Macros /////

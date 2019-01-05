@@ -11,7 +11,7 @@ pub mod functions;
 use defs::types::{ TypeAliasDefRef };
 use defs::variables::{ VarDefRef, ArgDefRef, FieldDefRef };
 use defs::classes::{ ClassDefRef, StructDefRef };
-use defs::functions::{ FuncDefRef, OverloadDefRef, ClosureDefRef, MethodDefRef, CFuncDefRef, BuiltinFuncDefRef };
+use defs::functions::{ FuncDefRef, OverloadDefRef, ClosureDefRef, MethodDefRef, CFuncDefRef };
 
 
 #[derive(Clone, Debug, PartialEq)]
@@ -27,7 +27,6 @@ pub enum Def {
     Closure(ClosureDefRef),
     Method(MethodDefRef),
     CFunc(CFuncDefRef),
-    Builtin(BuiltinFuncDefRef),
 }
 
 

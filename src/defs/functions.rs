@@ -4,12 +4,10 @@ use std::cell::RefCell;
 
 use types::*;
 use defs::Def;
-use utils::UniqueID;
-use ast::{ NodeID, Ident, AST };
+use ast::{ NodeID };
 use scope::{ Scope, ScopeRef };
 use session::{ Session, Error };
 
-use defs::traits::{  };
 use defs::classes::{ Define, StructDef, StructDefRef };
 
 
@@ -110,8 +108,7 @@ impl OverloadDef {
                 },
                 Ok(Def::Func(_)) |
                 Ok(Def::Method(_)) |
-                Ok(Def::Closure(_)) |
-                Ok(Def::Builtin(_)) => {
+                Ok(Def::Closure(_)) => {
                     let defid = OverloadDef::create(session, None, vec!(previd, id));
                     dscope.set_var_def(&name, defid);
                 }
@@ -296,23 +293,4 @@ impl CFuncDef {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
-pub struct BuiltinFuncDef {
-    pub id: NodeID,
-}
-
-pub type BuiltinFuncDefRef = Rc<BuiltinFuncDef>;
-
-impl BuiltinFuncDef {
-    #[must_use]
-    pub fn define(session: &Session, scope: ScopeRef, id: NodeID, name: &Option<String>, ttype: Option<Type>) -> Result<Def, Error> {
-        let def = Def::Builtin(Rc::new(BuiltinFuncDef {
-            id: id,
-
-        }));
-
-        FuncDef::set_func_def(session, scope.clone(), id, name, def.clone(), ttype)?;
-        Ok(def)
-    }
-}
 

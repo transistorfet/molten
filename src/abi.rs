@@ -3,11 +3,11 @@
 use std::fmt;
 use std::str;
 
-extern crate nom;
-use nom::{ digit };
-use nom::types::CompleteByteSlice;
+//extern crate nom;
+//use nom::{ digit };
+//use nom::types::CompleteByteSlice;
+//use parser;
 
-use parser;
 use ast::Ident;
 use types::Type;
 
@@ -30,7 +30,7 @@ impl ABI {
             None => ABI::Molten,
             Some(ref name) => match name.as_str() {
                 "" | "Molten" | "M" => ABI::Molten,
-                "" | "MoltenFunction" | "MF" => ABI::MoltenFunc,
+                "MoltenFunction" | "MF" => ABI::MoltenFunc,
                 "C" => ABI::C,
                 "C++" => ABI::Cpp,
                 "Rust" => ABI::Rust,

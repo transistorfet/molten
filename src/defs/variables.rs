@@ -4,8 +4,7 @@ use std::cell::RefCell;
 
 use defs::Def;
 use types::Type;
-use utils::UniqueID;
-use ast::{ NodeID, Ident, AST };
+use ast::{ NodeID };
 use scope::{ Scope, ScopeRef };
 use session::{ Session, Error };
 
