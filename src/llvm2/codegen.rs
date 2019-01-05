@@ -184,6 +184,7 @@ impl<'sess> LLVM<'sess> {
             LLType::I32 => self.i32_type(),
             LLType::I64 => self.i64_type(),
             LLType::F64 => self.f64_type(),
+            LLType::Var => self.str_type(),
             LLType::Ptr(etype) => LLVMPointerType(self.build_type(etype), 0),
             LLType::Struct(etypes) => self.struct_type(etypes),
             LLType::Function(argtypes, rettype, abi) => self.cfunc_type(argtypes, rettype),
@@ -200,10 +201,10 @@ impl<'sess> LLVM<'sess> {
             match (sourcekind, destkind) {
                 (LLVMTypeKind::LLVMPointerTypeKind, LLVMTypeKind::LLVMPointerTypeKind) =>
                     LLVMBuildPointerCast(self.builder, value, rtype, cstr("ptr")),
-                (LLVMTypeKind::LLVMPointerTypeKind, _) =>
-                    LLVMBuildPtrToInt(self.builder, value, rtype, cstr("ptr")),
-                (_, LLVMTypeKind::LLVMPointerTypeKind) =>
-                    LLVMBuildIntToPtr(self.builder, value, rtype, cstr("ptr")),
+                //(LLVMTypeKind::LLVMPointerTypeKind, _) =>
+                //    LLVMBuildPtrToInt(self.builder, value, rtype, cstr("ptr")),
+                //(_, LLVMTypeKind::LLVMPointerTypeKind) =>
+                //    LLVMBuildIntToPtr(self.builder, value, rtype, cstr("ptr")),
                 (LLVMTypeKind::LLVMIntegerTypeKind, LLVMTypeKind::LLVMDoubleTypeKind) =>
                     LLVMBuildCast(self.builder, llvm_sys::LLVMOpcode::LLVMSIToFP, value, rtype, cstr("tmp")),
                 (LLVMTypeKind::LLVMDoubleTypeKind, LLVMTypeKind::LLVMIntegerTypeKind) =>
@@ -252,12 +253,27 @@ impl<'sess> LLVM<'sess> {
         }
     }
 
-    pub unsafe fn build_args(&self, args: &Vec<LLExpr>) -> Vec<LLVMValueRef> {
-        let mut argvals = vec!();
-        for argexpr in args {
-            argvals.push(self.build_expr(argexpr));
+    pub unsafe fn build_list(&self, exprs: &Vec<LLExpr>) -> Vec<LLVMValueRef> {
+        let mut values = vec!();
+        for expr in exprs {
+            values.push(self.build_expr(expr));
         }
-        argvals
+        values
+    }
+
+    pub unsafe fn build_args(&self, args: &Vec<LLExpr>, lftype: LLVMTypeRef) -> Vec<LLVMValueRef> {
+        let mut values = self.build_list(args);
+
+        let lftype = LLVMGetElementType(lftype);
+        let mut ltypes = Vec::with_capacity(LLVMCountParamTypes(lftype) as usize);
+        ltypes.set_len(LLVMCountParamTypes(lftype) as usize);
+        LLVMGetParamTypes(lftype, ltypes.as_mut_ptr());
+
+        for i in 0 .. ltypes.len() {
+            values[i] = self.build_cast(ltypes[i], values[i]);
+        }
+
+        values
     }
 
     pub unsafe fn build_call_by_name(&self, name: &str, largs: &mut Vec<LLVMValueRef>) -> LLVMValueRef {
@@ -385,7 +401,7 @@ impl<'sess> LLVM<'sess> {
 
             LLExpr::CallC(fexpr, args) => {
                 let function = self.build_expr(fexpr);
-                let mut argvals = self.build_args(args);
+                let mut argvals = self.build_args(args, LLVMTypeOf(function));
                 LLVMBuildCall(self.builder, function, argvals.as_mut_ptr(), argvals.len() as u32, cstr(""))
             },
 
@@ -411,7 +427,7 @@ impl<'sess> LLVM<'sess> {
 
 
             LLExpr::DefStruct(id, ltype, elements) => {
-                let evalues = self.build_args(elements);
+                let evalues = self.build_list(elements);
                 let rtype = self.build_type(ltype);
                 let data = self.build_struct(rtype, evalues);
                 self.set_value(*id, data);
@@ -544,9 +560,11 @@ impl<'sess> LLVM<'sess> {
         }
     }
 
-    pub unsafe fn build_module(&self, globals: &Vec<LLGlobal>) {
-        self.build_declarations(globals);
-        self.build_definitions(globals);
+    pub fn build_module(&self, globals: &Vec<LLGlobal>) {
+        unsafe {
+            self.build_declarations(globals);
+            self.build_definitions(globals);
+        }
     }
 }
 

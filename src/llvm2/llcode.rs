@@ -22,6 +22,7 @@ pub enum LLType {
     I32,
     I64,
     F64,
+    Var,
     Ptr(R<LLType>),
     Struct(Vec<LLType>),
     Function(Vec<LLType>, R<LLType>, LLABI),

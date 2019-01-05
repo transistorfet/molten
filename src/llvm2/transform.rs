@@ -160,7 +160,7 @@ impl<'sess> Transformer<'sess> {
 
             AST::Invoke(id, _, func, args) => {
                 let abi = self.session.get_type(*id).unwrap().get_abi().unwrap();
-                self.transform_func_invoke(scope.clone(), abi, func, args)
+                self.transform_func_invoke(scope.clone(), abi, *id, func, args)
             },
 
             AST::Definition(id, _, mutable, ident, _, value) => {
@@ -315,10 +315,10 @@ impl<'sess> Transformer<'sess> {
         }
     }
 
-    fn transform_func_invoke(&self, scope: ScopeRef, abi: ABI, func: &AST, args: &Vec<AST>) -> Vec<LLExpr> {
+    fn transform_func_invoke(&self, scope: ScopeRef, abi: ABI, id: NodeID, func: &AST, args: &Vec<AST>) -> Vec<LLExpr> {
         match abi {
-            ABI::C | ABI::MoltenFunc => self.transform_cfunc_invoke(scope.clone(), func, args),
-            ABI::Molten | ABI::Unknown => self.transform_closure_invoke(scope.clone(), func, args),
+            ABI::C | ABI::MoltenFunc => self.transform_cfunc_invoke(scope.clone(), id, func, args),
+            ABI::Molten | ABI::Unknown => self.transform_closure_invoke(scope.clone(), id, func, args),
             _ => panic!("Not Implemented: {:?}", abi),
         }
     }
@@ -389,7 +389,7 @@ impl<'sess> Transformer<'sess> {
         vec!(LLExpr::GetValue(id))
     }
 
-    fn transform_cfunc_invoke(&self, scope: ScopeRef, func: &AST, args: &Vec<AST>) -> Vec<LLExpr> {
+    fn transform_cfunc_invoke(&self, scope: ScopeRef, id: NodeID, func: &AST, args: &Vec<AST>) -> Vec<LLExpr> {
         let mut exprs = vec!();
 
         let mut fargs = self.transform_as_args(&mut exprs, scope.clone(), args);
@@ -453,21 +453,6 @@ impl<'sess> Transformer<'sess> {
 
     fn transform_closure_decl(&self, scope: ScopeRef, id: NodeID, name: &String, ttype: &Type) -> Vec<LLExpr> {
         let fname = self.transform_func_name(scope.clone(), Some(name), id);
-        /*
-        let (cfid, cfname, cftype) = self.transform_closure_c_func(scope.clone(), id, &fname);
-
-        self.add_global(LLGlobal::DeclCFunc(cfid, cfname, cftype.clone()));
-
-        // TODO this is very wrong because the context will not be correct... you need to use a global var pointer
-        let mut exprs = vec!();
-        let atype = self.convert_to_closure_value_type(cftype);
-        let stype = atype.get_element();
-        let aexpr = LLExpr::AllocRef(NodeID::generate(), atype.clone(), Some(r(LLExpr::DefStruct(NodeID::generate(), stype, vec!(LLExpr::GetValue(cfid))))));
-        let did = NodeID::generate();
-        exprs.push(LLExpr::DefLocal(did, fname.clone(), atype, r(aexpr)));
-        exprs.push(LLExpr::SetValue(id, r(LLExpr::GetLocal(did))));
-        exprs
-        */
 
         let did = NodeID::generate();
         self.add_global(LLGlobal::DefGlobal(did, fname.clone(), self.transform_value_type(ttype)));
@@ -534,7 +519,7 @@ impl<'sess> Transformer<'sess> {
         exprs
     }
 
-    fn transform_closure_invoke(&self, scope: ScopeRef, func: &AST, args: &Vec<AST>) -> Vec<LLExpr> {
+    fn transform_closure_invoke(&self, scope: ScopeRef, id: NodeID, func: &AST, args: &Vec<AST>) -> Vec<LLExpr> {
         let mut exprs = vec!();
 
         let mut fargs = self.transform_as_args(&mut exprs, scope.clone(), args);
@@ -667,7 +652,7 @@ impl<'sess> Transformer<'sess> {
         for node in body {
             match node {
                 AST::Function(id, _, ident, args, _, body, abi) => {
-                    // TODO i switched to using scope here instead of tscope because it was causing problems
+                    // TODO i switched to using scope here instead of tscope because it was causing problems with references inside closures
                     exprs.extend(self.transform_func_def(scope.clone(), *abi, *id, ident.as_ref().map(|ident| &ident.name), args, body));
                 },
                 AST::Declare(id, _, ident, ttype) => {
@@ -832,7 +817,8 @@ impl<'sess> Transformer<'sess> {
             Type::Record(items) => LLType::Struct(items.iter().map(|item| self.transform_value_type(&item.1)).collect()),
             // TODO how will you do generics
             //Type::Variable(name, id) => { panic!("") },
-            Type::Variable(name, id) => LLType::Ptr(r(LLType::I8)),
+            //Type::Variable(name, id) => LLType::Ptr(r(LLType::I8)),
+            Type::Variable(name, id) => LLType::Var,
             Type::Function(args, ret, abi) => {
                 match abi {
                     ABI::C | ABI::MoltenFunc => LLType::Ptr(r(self.transform_cfunc_def_type(&args.as_vec(), &*ret))),

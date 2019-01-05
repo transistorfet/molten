@@ -94,10 +94,12 @@ pub fn declare_builtins_node<'sess>(session: &Session, scope: ScopeRef, node: &B
 }
 
 
-pub unsafe fn initialize_builtins<'sess>(llvm: &LLVM<'sess>, transformer: &Transformer, scope: ScopeRef, entries: &Vec<BuiltinDef<'sess>>) {
-    let pscope = scope.get_parent().unwrap();
-    declare_irregular_functions(llvm);
-    define_builtins_vec(llvm, transformer, ptr::null_mut(), scope.clone(), entries);
+pub fn initialize_builtins<'sess>(llvm: &LLVM<'sess>, transformer: &Transformer, scope: ScopeRef, entries: &Vec<BuiltinDef<'sess>>) {
+    unsafe {
+        let pscope = scope.get_parent().unwrap();
+        declare_irregular_functions(llvm);
+        define_builtins_vec(llvm, transformer, ptr::null_mut(), scope.clone(), entries);
+    }
 }
 
 pub unsafe fn define_builtins_vec<'sess>(llvm: &LLVM<'sess>, transformer: &Transformer, objtype: LLVMTypeRef, scope: ScopeRef, entries: &Vec<BuiltinDef<'sess>>) {
@@ -202,8 +204,8 @@ unsafe fn build_lib_function(llvm: &LLVM, id: NodeID, name: &str, ltype: &LLType
 
     let args = (0..ltype.argcount()).map(|i| LLVMGetParam(function, i as u32)).collect();
     let ret = func(llvm, args);
-    LLVMBuildRet(llvm.builder, llvm.build_cast(llvm.build_type(&ltype.get_rettype()), ret));
-    //LLVMBuildRet(llvm.builder, ret);
+    //LLVMBuildRet(llvm.builder, llvm.build_cast(llvm.build_type(&ltype.get_rettype()), ret));
+    LLVMBuildRet(llvm.builder, ret);
 
     function
 }
@@ -271,7 +273,7 @@ pub fn get_builtins<'sess>() -> Vec<BuiltinDef<'sess>> {
         BuiltinDef::Func(id(), "bufalloc",  "(Int) -> Buffer<'item> / C",                   FuncKind::Function(buffer_alloc)),
         BuiltinDef::Func(id(), "bufresize", "(Buffer<'item>, Int) -> Buffer<'item> / C",    FuncKind::Function(buffer_resize)),
         BuiltinDef::Func(id(), "bufget",    "(Buffer<'item>, Int) -> 'item / C",            FuncKind::Function(buffer_get)),
-        BuiltinDef::Func(id(), "bufset",    "(Buffer<'item>, Int, 'item) -> Int / C",       FuncKind::Function(buffer_set)),
+        BuiltinDef::Func(id(), "bufset",    "(Buffer<'item>, Int, 'item) -> () / C",        FuncKind::Function(buffer_set)),
 
 
         /*
@@ -346,7 +348,7 @@ fn gt_int(llvm: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMB
 fn lte_int(llvm: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildICmp(llvm.builder, llvm::LLVMIntPredicate::LLVMIntSLE, args[0], args[1], cstr("")) } }
 fn gte_int(llvm: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildICmp(llvm.builder, llvm::LLVMIntPredicate::LLVMIntSGE, args[0], args[1], cstr("")) } }
 fn com_int(llvm: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildXor(llvm.builder, args[0], llvm.u64_const(0xFFFFFFFFFFFFFFFF), cstr("")) } }
-fn not_int(llvm: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildNot(llvm.builder, args[0], cstr("")) } }
+fn not_int(llvm: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { llvm.build_cast(llvm.i1_type(), LLVMBuildNot(llvm.builder, args[0], cstr(""))) } }
 
 fn add_real(llvm: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildFAdd(llvm.builder, args[0], args[1], cstr("")) } }
 fn sub_real(llvm: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildFSub(llvm.builder, args[0], args[1], cstr("")) } }
@@ -429,7 +431,7 @@ unsafe fn buffer_set(llvm: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef {
     let value = llvm.build_cast(llvm.str_type(), args[2]);
     LLVMBuildStore(llvm.builder, value, pointer);
 
-    llvm.null_const(llvm.ptr_type())
+    llvm.i32_const(0)
 }
 
 
@@ -443,8 +445,7 @@ unsafe fn string_get(llvm: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef {
 
 unsafe fn println(llvm: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef {
     llvm.build_call_by_name("puts", &mut vec!(args[0]));
-    //llvm.i64_const(0)
-    llvm.null_const(llvm.str_type())
+    llvm.i32_const(0)
 }
 
 //unsafe fn readline(llvm: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef {

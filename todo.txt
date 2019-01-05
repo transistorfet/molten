@@ -1,4 +1,6 @@
 
+* pointers between inherited classes aren't being cast: calling a parent method with the child's pointer reference... it has to be cast, but that requires knowing the type...
+
 * issue with string push, requires vtable but there isn't one, i think. is issue for other types too... cannot inherit from them because of that
 * issue with buffers not compiling correctly
 * fix lib to allow builtin classes. Make more use of transform, including refactoring to allow partial transformation (call methods, define closures, etc, with partially transformed inputs)

@@ -33,9 +33,6 @@ mod llvm;
 mod llvm2;
 
 use config::Options;
-use llvm::transform;
-use llvm::codegen;
-use llvm::lib;
 
 fn main() {
     let matches =
@@ -81,8 +78,6 @@ fn compile_file(input: &str, output: Option<&str>) {
     session.name = source.replace("/", ".");
     session.target = output.map(|s| String::from(s)).unwrap_or_else(|| String::from(source));
 
-    //let builtins = lib::get_builtins();
-    //lib::make_global(&session, &builtins);
     let builtins = llvm2::lib::get_builtins();
     llvm2::lib::make_global(&session, &builtins);
 
@@ -93,7 +88,6 @@ fn compile_file(input: &str, output: Option<&str>) {
     if Options::as_ref().debug {
         let global = session.map.get_global();
         println!("\n{:#?}\n", code);
-        //println!("\n{:?}\n\n{:?}", &code, global);
         debug::print_types(&session, global.clone(), &code);
         debug::print_types_scope(&session, global);
     }
@@ -102,25 +96,7 @@ fn compile_file(input: &str, output: Option<&str>) {
 
     export::write_exports(&session, session.map.get_global(), format!("{}.dec", session.target).as_str(), &code);
 
-/*
-    let transform = transform::Transform::new(&session);
-    transform.transform_program(session.map.get_global(), &code);
-    //println!("TRANSFORM:\n{:#?}", &*transform.toplevel.borrow());
-    codegen::generate(&builtins, &session, &*transform.toplevel.borrow());
-
-    if Options::as_ref().debug {
-        for (ref id, ref ttype) in session.types.borrow().iter() {
-            println!("{:?} -> {:?}", id, ttype);
-        }
-    }
-*/
-
-    use ast::{ NodeID };
-    use llvm2::llcode::{ r, LLType, LLLit, LLExpr, LLGlobal, LLABI };
-    use llvm2::transform::{ Transformer };
-    use llvm2::codegen::{ LLVM };
-
-    let transformer = Transformer::new(&session);
+    let transformer = llvm2::transform::Transformer::new(&session);
     transformer.transform_code(session.map.get_global(), &code);
     if Options::as_ref().debug {
         println!("===================");
@@ -128,16 +104,11 @@ fn compile_file(input: &str, output: Option<&str>) {
         println!("===================");
     }
 
-    unsafe {
-        let llvm = LLVM::new(&session);
-        //llvm.build_expr(
-        //    LLExpr::Literal(LLLit::I32(4))
-        //);
-        llvm2::lib::initialize_builtins(&llvm, &transformer, session.map.get_global(), &builtins);
-        llvm.build_module(&transformer.globals.borrow());
-        llvm.print_module();
-        llvm.write_module(format!("{}.ll", session.target).as_str());
-    }
+    let llvm = llvm2::codegen::LLVM::new(&session);
+    llvm2::lib::initialize_builtins(&llvm, &transformer, session.map.get_global(), &builtins);
+    llvm.build_module(&transformer.globals.borrow());
+    llvm.print_module();
+    llvm.write_module(format!("{}.ll", session.target).as_str());
 }
 
 
