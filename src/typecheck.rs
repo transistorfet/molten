@@ -138,14 +138,17 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &AST,
             ttype.clone()
         },
 
-        AST::Identifier(_, _, ref ident) => {
-            let dscope = Scope::target(session, scope.clone());
-            match dscope.get_var_def(&ident.name) {
-                Some(defid) => match session.get_type(defid) {
-                    Some(ttype) => ttype,
-                    None => return Err(Error::new(format!("TypeError: the reference {:?} has no type or has an ambiguous type", ident.name))),
+        AST::Identifier(ref id, _, ref ident) => {
+            if let Ok(ttype) = session.get_type_from_ref(*id) {
+                ttype
+            } else {
+                match scope.get_var_def(&ident.name) {
+                    Some(defid) => match session.get_type(defid) {
+                        Some(ttype) => ttype,
+                        None => return Err(Error::new(format!("TypeError: the reference {:?} has no type or has an ambiguous type", ident.name))),
+                    }
+                    None => panic!("InternalError: ident {:?} is undefined, but should have been caught in the name binding phase", ident.name),
                 }
-                None => panic!("InternalError: ident {:?} is undefined, but should have been caught in the name binding phase", ident.name),
             }
         },
 

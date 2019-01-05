@@ -9,6 +9,7 @@ use typecheck;
 use abi::ABI;
 use defs::Def;
 use types::Type;
+use config::Options;
 use session::Session;
 use scope::{ Scope, ScopeRef };
 use ast::{ NodeID, Pos, Literal, Ident, ClassSpec, Argument, Pattern, AST };
@@ -92,11 +93,18 @@ impl<'sess> Transformer<'sess> {
 
         toplevel.push(LLExpr::Literal(LLLit::I64(0)));
 
-        let mainid = NodeID::generate();
-        let ftype = LLType::Function(vec!(), r(LLType::I64), LLABI::C);
-        self.set_type(mainid, ftype.clone());
+        let runid = NodeID::generate();
+        let rftype = LLType::Function(vec!(), r(LLType::I64), LLABI::C);
+        self.set_type(runid, rftype.clone());
 
-        self.add_global(LLGlobal::DefCFunc(mainid, String::from("main"), ftype, vec!(), toplevel));
+        let module_run_name = format!("run.{}", self.session.name);
+        self.add_global(LLGlobal::DefCFunc(runid, module_run_name, rftype, vec!(), toplevel));
+
+        if !Options::as_ref().is_library {
+            let mainid = NodeID::generate();
+            let mftype = LLType::Function(vec!(), r(LLType::I64), LLABI::C);
+            self.add_global(LLGlobal::DefCFunc(mainid, String::from("main"), mftype, vec!(), self.create_cfunc_invoke(LLExpr::GetValue(runid), vec!())));
+        }
     }
 
     pub fn transform_vec(&self, scope: ScopeRef, code: &Vec<AST>) -> Vec<LLExpr> {
@@ -129,7 +137,16 @@ impl<'sess> Transformer<'sess> {
             AST::Nil(id) => vec!(LLExpr::Literal(LLLit::Null(self.transform_value_type(&self.session.get_type(*id).unwrap())))),
 
             AST::Block(_, _, code) => self.transform_vec(scope.clone(), code),
-            AST::Import(_, _, _, decls) => self.transform_vec(scope.clone(), decls),
+            AST::Import(_, _, ident, decls) => {
+                let mut exprs = vec!();
+                let rid = NodeID::generate();
+                let module_run_name = format!("run.{}", &ident.name);
+                let rftype = LLType::Function(vec!(), r(LLType::I64), LLABI::C);
+                self.add_global(LLGlobal::DeclCFunc(rid, module_run_name, rftype));
+                exprs.extend(self.create_cfunc_invoke(LLExpr::GetValue(rid), vec!()));
+                exprs.extend(self.transform_vec(scope.clone(), decls));
+                exprs
+            },
 
 
             AST::Function(id, _, ident, args, _, body, abi) => {
@@ -185,8 +202,18 @@ impl<'sess> Transformer<'sess> {
 
             AST::Resolver(id, _, _, _) => {
                 // TODO this is temporary and due to the fact that we're accessing a local def containing the closure
-                vec!(LLExpr::LoadRef(r(LLExpr::GetValue(self.session.get_ref(*id).unwrap()))))
                 //self.transform_reference(scope.clone(), self.session.get_ref(*id).unwrap(), &String::from(""))
+
+                vec!(LLExpr::GetValue(self.session.get_ref(*id).unwrap()))
+
+                /*
+                println!("^^^^^^^^^^^^^^^^^^^ {:?} {:?}", *id, self.session.get_def_from_ref(*id));
+                let defid = self.session.get_ref(*id).unwrap();
+                match self.session.get_def(defid).unwrap() {
+                    Def::Method(_) => vec!(LLExpr::LoadRef(r(LLExpr::GetValue(defid)))),
+                    def @ _ => panic!("SOMETHING {:?}", def),
+                }
+                */
             },
 
             AST::PtrCast(ttype, node) => {
@@ -310,7 +337,7 @@ impl<'sess> Transformer<'sess> {
                 let otype = self.session.get_type(*oid).unwrap();
                 match otype {
                     Type::Object(_, _, _) => {
-                        // Convert method-style calls into 
+                        // Convert method-style calls
                         let defid = self.session.get_ref(*id).unwrap();
                         exprs.push(LLExpr::SetValue(*oid, r(fargs[0].clone())));
                         fargs[0] = LLExpr::GetValue(*oid);
@@ -414,77 +441,95 @@ impl<'sess> Transformer<'sess> {
         }
     }
 
-    fn transform_closure_decl(&self, scope: ScopeRef, id: NodeID, name: &String, ttype: &Type) -> Vec<LLExpr> {
-        let fname = self.transform_func_name(scope.clone(), Some(name), id);
+    fn transform_closure_c_func(&self, scope: ScopeRef, id: NodeID, fname: &String) -> (NodeID, String, LLType) {
         let ftype = self.session.get_type(id).unwrap();
         let (argtypes, rettype, abi) = ftype.get_function_types().unwrap();
         let cftype = self.transform_closure_def_type(&argtypes.as_vec(), rettype);
         let cfid = NodeID::generate();
         let cfname = format!("{}_func", fname);
         self.set_type(cfid, cftype.clone());
+        (cfid, cfname, cftype)
+    }
+
+    fn transform_closure_decl(&self, scope: ScopeRef, id: NodeID, name: &String, ttype: &Type) -> Vec<LLExpr> {
+        let fname = self.transform_func_name(scope.clone(), Some(name), id);
+        /*
+        let (cfid, cfname, cftype) = self.transform_closure_c_func(scope.clone(), id, &fname);
+
         self.add_global(LLGlobal::DeclCFunc(cfid, cfname, cftype.clone()));
 
+        // TODO this is very wrong because the context will not be correct... you need to use a global var pointer
+        let mut exprs = vec!();
         let atype = self.convert_to_closure_value_type(cftype);
         let stype = atype.get_element();
-        let aexpr = LLExpr::AllocRef(NodeID::generate(), atype.clone(), Some(r(LLExpr::DefStruct(id, stype, vec!(LLExpr::GetValue(cfid))))));
-        vec!(LLExpr::DefLocal(id, fname.clone(), atype, r(aexpr)))
+        let aexpr = LLExpr::AllocRef(NodeID::generate(), atype.clone(), Some(r(LLExpr::DefStruct(NodeID::generate(), stype, vec!(LLExpr::GetValue(cfid))))));
+        let did = NodeID::generate();
+        exprs.push(LLExpr::DefLocal(did, fname.clone(), atype, r(aexpr)));
+        exprs.push(LLExpr::SetValue(id, r(LLExpr::GetLocal(did))));
+        exprs
+        */
+
+        let did = NodeID::generate();
+        self.add_global(LLGlobal::DefGlobal(did, fname.clone(), self.transform_value_type(ttype)));
+        vec!(LLExpr::SetValue(id, r(LLExpr::GetLocal(did))))
     }
 
     fn transform_closure_def(&self, scope: ScopeRef, id: NodeID, name: Option<&String>, args: &Vec<Argument>, body: &AST) -> Vec<LLExpr> {
-        let fscope = self.session.map.get(&id);
         let fname = self.transform_func_name(scope.clone(), name, id);
+        let (cfid, cfname, cftype) = self.transform_closure_c_func(scope.clone(), id, &fname);
+
         let cl = self.session.get_def(id).unwrap().as_closure().unwrap();
-        let cfid = NodeID::generate();
-        let cfname = format!("{}_func", fname);
 
         // Add context argument to transformed arguments list
         let mut fargs: Vec<(NodeID, String)> = args.iter().map(|arg| (arg.id, arg.ident.name.clone())).collect();
         fargs.push((cl.context_arg_id, String::from("__context__")));
 
-        // Transform function type and add context argument
-        let ftype = self.session.get_type(id).unwrap();
-        let (argtypes, rettype, abi) = ftype.get_function_types().unwrap();
-        let lftype = self.transform_closure_def_type(&argtypes.as_vec(), rettype);
-        self.set_type(cfid, lftype.clone());
-
         let ptype = self.create_closure_type(scope.clone(), self.session.get_type(id).unwrap());
         cl.add_field(self.session, cfid, "__func__", ptype.clone(), Define::Never);
 
         // Transforms body and create C function definition
+        let fscope = self.session.map.get(&id);
         let index = self.globals.borrow().len();
         self.set_context(CodeContext::Closure(id));
         let body = self.transform_node(fscope.clone(), body);
         self.restore_context();
-        self.insert_global(index, LLGlobal::DefCFunc(cfid, cfname.clone(), lftype, fargs, body));
+        self.insert_global(index, LLGlobal::DefCFunc(cfid, cfname.clone(), cftype, fargs, body));
 
         let structtype = LLType::Ptr(r(self.transform_struct_def(&cl.context_struct)));
-        self.insert_global(index, LLGlobal::DefType(cl.context_type_id, format!("__context_{}__", cl.context_type_id), structtype));
+        self.insert_global(index, LLGlobal::DefType(cl.context_type_id, format!("__context_{}__", cl.context_type_id), structtype.clone()));
 
 
         FuncDef::define(self.session, scope.clone(), cfid, &Some(cfname.clone()), Some(ptype)).unwrap();
         let mut fields = vec!();
-        cl.context_struct.foreach_field(|_, field, _| {
+        cl.context_struct.foreach_field(|defid, field, _| {
+            let rid = NodeID::generate();
+            self.session.set_ref(rid, defid);
             if field.as_str() == "__func__" {
-                fields.push((Ident::from_str("__func__"), AST::make_ident_from_str(Pos::empty(), cfname.as_str())));
+                fields.push((Ident::from_str("__func__"), AST::Identifier(rid, Pos::empty(), Ident::new(cfname.clone()))));
             } else {
-                fields.push((Ident::from_str(field.as_str()), AST::make_ident_from_str(Pos::empty(), field.as_str())));
+                fields.push((Ident::from_str(field.as_str()), AST::Identifier(rid, Pos::empty(), Ident::new(field.clone()))));
             }
         });
 
         let mut code = vec!();
-        code.push(AST::Definition(NodeID::generate(), Pos::empty(), true, Ident::new(fname.clone()), None, Box::new(AST::make_ref(Pos::empty(), AST::make_record(Pos::empty(), fields)))));
+        let did = NodeID::generate();
+        code.push(AST::Definition(did, Pos::empty(), true, Ident::new(fname.clone()), None, Box::new(AST::make_ref(Pos::empty(), AST::make_record(Pos::empty(), fields)))));
         // TODO I'm going back on my decision to use a tuple pair to represent the function and context reference because it can't be converted to i8* (the generics type)
         //      Once I have generics that can operate on different sized data instead of only references, I can switch back
         //code.push(AST::Tuple(NodeID::generate(), Pos::empty(), vec!(AST::make_ident_from_str(Pos::empty(), real_fname.as_str()), AST::make_ident(Pos::empty(), Ident::new(cname.clone())))));
-        code.push(AST::make_ident(Pos::empty(), Ident::new(fname.clone())));
-        println!("CLOSURE CREATION CODE {:?}: {:#?}", id, code);
 
         binding::bind_names(self.session, scope.clone(), &mut code);
         typecheck::check_types(self.session, scope.clone(), &code);
         let mut exprs = self.transform_vec(scope.clone(), &code);
-        let last = exprs.pop().unwrap();
-        exprs.push(LLExpr::SetValue(id, r(last)));
+        exprs.push(LLExpr::SetValue(id, r(LLExpr::GetLocal(did))));
         exprs.push(LLExpr::GetValue(id));
+
+        // TODO this is a hack to export functions that are in the global scope
+        if scope.get_parent().map(|s| s.is_primative()).unwrap_or(false) {
+            let gid = NodeID::generate();
+            self.add_global(LLGlobal::DefGlobal(gid, fname.clone(), structtype));
+            exprs.push(LLExpr::SetGlobal(gid, r(LLExpr::GetLocal(did))));
+        }
 
         exprs
     }
@@ -514,9 +559,20 @@ impl<'sess> Transformer<'sess> {
 
 
 
+    fn create_reference(&self, defid: NodeID) -> Vec<LLExpr> {
+        match self.session.get_def(defid) {
+            Ok(Def::Var(_)) => vec!(LLExpr::GetLocal(defid)),
+            Ok(_) => vec!(LLExpr::GetValue(defid)),
+            Err(_) => panic!("TransformError: attempting to reference a non-existent value"),
+        }
+    }
+
     fn transform_reference(&self, scope: ScopeRef, defid: NodeID, name: &String) -> Vec<LLExpr> {
-        let dscope = Scope::target(self.session, scope.clone());
-        if !dscope.contains_local(name) && !Scope::global(dscope.clone()).contains(name) {
+        if
+            !scope.contains_local(name)
+            && !Scope::global(scope.clone()).contains(name)
+            && !self.session.get_def(defid).unwrap().is_globally_accessible()
+        {
             match self.get_context() {
                 Some(CodeContext::Closure(ref cid)) => {
                     let cl = self.session.get_def(*cid).unwrap().as_closure().unwrap();
@@ -524,14 +580,10 @@ impl<'sess> Transformer<'sess> {
                     let context = LLExpr::Cast(LLType::Alias(cl.context_type_id), r(LLExpr::GetValue(cl.context_arg_id)));
                     vec!(LLExpr::LoadRef(r(LLExpr::AccessRef(r(context), vec!(LLRef::Field(index))))))
                 },
-                _ => panic!("Cannot access variable outside of scope: {:?}", name),
+                _ => panic!("Cannot access variable outside of scope: {:?} {:#?}", name, scope),
             }
         } else {
-            match self.session.get_def(defid) {
-                Ok(Def::Var(_)) => vec!(LLExpr::GetLocal(defid)),
-                Ok(_) => vec!(LLExpr::GetValue(defid)),
-                Err(_) => panic!("TransformError: attempting to reference a non-existent value"),
-            }
+            self.create_reference(defid)
         }
     }
 
@@ -598,7 +650,7 @@ impl<'sess> Transformer<'sess> {
         classdef.vtable.foreach_enumerated(|i, id, name, ttype| {
             let ltype = self.transform_value_type(ttype);
             let field = LLExpr::AccessRef(r(LLExpr::GetGlobal(classdef.vtable.id)), vec!(LLRef::Field(i)));
-            exprs.push(LLExpr::StoreRef(r(field), r(LLExpr::Cast(ltype, r(LLExpr::GetLocal(id))))));
+            exprs.push(LLExpr::StoreRef(r(field), r(LLExpr::Cast(ltype, r(LLExpr::GetValue(id))))));
             //exprs.push(LLExpr::SetItem(r(LLExpr::GetLocal(classdef.vtable.id)), i, r(LLExpr::Cast(ltype, r(LLExpr::GetValue(id))))));
         });
 
@@ -615,10 +667,11 @@ impl<'sess> Transformer<'sess> {
         for node in body {
             match node {
                 AST::Function(id, _, ident, args, _, body, abi) => {
-                    exprs.extend(self.transform_func_def(tscope.clone(), *abi, *id, ident.as_ref().map(|ident| &ident.name), args, body));
+                    // TODO i switched to using scope here instead of tscope because it was causing problems
+                    exprs.extend(self.transform_func_def(scope.clone(), *abi, *id, ident.as_ref().map(|ident| &ident.name), args, body));
                 },
                 AST::Declare(id, _, ident, ttype) => {
-                    exprs.extend(self.transform_func_decl(tscope.clone(), ttype.get_abi().unwrap(), *id, &ident.name, ttype));
+                    exprs.extend(self.transform_func_decl(scope.clone(), ttype.get_abi().unwrap(), *id, &ident.name, ttype));
                 },
                 AST::Definition(_, _, _, _, _, _) => { },
                 _ => panic!("Not Implemented: {:?}", node),

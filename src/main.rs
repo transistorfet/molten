@@ -87,7 +87,6 @@ fn compile_file(input: &str, output: Option<&str>) {
     llvm2::lib::make_global(&session, &builtins);
 
     let mut code = session.parse_file(input, false);
-        println!("\n{:#?}\n", code);
     binding::bind_names(&session, session.map.get_global(), &mut code);
     typecheck::check_types(&session, session.map.get_global(), &code);
 
@@ -123,9 +122,11 @@ fn compile_file(input: &str, output: Option<&str>) {
 
     let transformer = Transformer::new(&session);
     transformer.transform_code(session.map.get_global(), &code);
-    println!("===================");
-    println!("{:#?}", &transformer.globals.borrow());
-    println!("===================");
+    if Options::as_ref().debug {
+        println!("===================");
+        println!("{:#?}", &transformer.globals.borrow());
+        println!("===================");
+    }
 
     unsafe {
         let llvm = LLVM::new(&session);

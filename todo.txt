@@ -1,6 +1,4 @@
 
-* there is an issue with creating closures that reference overloaded values... str in particular.  The AST::Identifier cannot resolve the correct version of str
-
 * issue with string push, requires vtable but there isn't one, i think. is issue for other types too... cannot inherit from them because of that
 * issue with buffers not compiling correctly
 * fix lib to allow builtin classes. Make more use of transform, including refactoring to allow partial transformation (call methods, define closures, etc, with partially transformed inputs)
@@ -21,6 +19,7 @@
 * implement return value conversion
 * if and sideeffects need bool comparison results to work correctly.  You can either force that in type checking or somehow desugar or use the comps style from match
 
+* you really need a better way of doing modules
 * should vtables be dynamically allocated, or should we add a LLType::ElementOf() type or something to GetElement an aliased type
 * unable to defined a method as / MF or / C ABI
 

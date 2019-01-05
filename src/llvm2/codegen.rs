@@ -231,6 +231,10 @@ impl<'sess> LLVM<'sess> {
         LLVMConstInt(self.i64_type(), num as u64, 0)
     }
 
+    pub unsafe fn u64_const(&self, num: u64) -> LLVMValueRef {
+        LLVMConstInt(self.i64_type(), num as u64, 0)
+    }
+
     pub unsafe fn null_const(&self, ltype: LLVMTypeRef) -> LLVMValueRef {
         LLVMConstNull(ltype)
     }
@@ -272,7 +276,8 @@ impl<'sess> LLVM<'sess> {
     }
 
     pub unsafe fn build_store(&self, pointer: LLVMValueRef, value: LLVMValueRef) -> LLVMValueRef {
-        LLVMBuildStore(self.builder, value, pointer)
+        LLVMBuildStore(self.builder, value, pointer);
+        value
     }
 
     pub unsafe fn build_access(&self, base: LLVMValueRef, refs: &Vec<LLRef>) -> LLVMValueRef {
@@ -437,8 +442,11 @@ impl<'sess> LLVM<'sess> {
 
             LLExpr::AccessRef(objexpr, refs) => {
                 let base = self.build_expr(objexpr);
-                LLVMDumpType(LLVMTypeOf(base));
-                debug!("\n{:?}", expr);
+                // TODO this is temporary, for debugging
+                if Options::as_ref().debug {
+                    LLVMDumpType(LLVMTypeOf(base));
+                    debug!("\n{:?}", expr);
+                }
                 self.build_access(base, refs)
             },
 

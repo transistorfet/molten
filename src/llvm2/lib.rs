@@ -345,7 +345,7 @@ fn lt_int(llvm: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMB
 fn gt_int(llvm: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildICmp(llvm.builder, llvm::LLVMIntPredicate::LLVMIntSGT, args[0], args[1], cstr("")) } }
 fn lte_int(llvm: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildICmp(llvm.builder, llvm::LLVMIntPredicate::LLVMIntSLE, args[0], args[1], cstr("")) } }
 fn gte_int(llvm: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildICmp(llvm.builder, llvm::LLVMIntPredicate::LLVMIntSGE, args[0], args[1], cstr("")) } }
-fn com_int(llvm: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildXor(llvm.builder, args[0], llvm.i64_const(0x7FFFFFFFFFFFFFFF), cstr("")) } }
+fn com_int(llvm: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildXor(llvm.builder, args[0], llvm.u64_const(0xFFFFFFFFFFFFFFFF), cstr("")) } }
 fn not_int(llvm: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildNot(llvm.builder, args[0], cstr("")) } }
 
 fn add_real(llvm: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildFAdd(llvm.builder, args[0], args[1], cstr("")) } }

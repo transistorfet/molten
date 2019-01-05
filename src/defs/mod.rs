@@ -80,6 +80,13 @@ impl Def {
     }
     */
 
+    pub fn is_globally_accessible(&self) -> bool {
+        match self {
+            Def::CFunc(_) | Def::Func(_) => true,
+            _ => false,
+        }
+    }
+
     pub fn is_mutable(&self) -> bool {
         match self {
             Def::Var(def) => def.mutable,

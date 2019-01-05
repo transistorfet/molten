@@ -1,4 +1,5 @@
 
+/*
 class String {
     fn [](self, index: Int) {
         getindex(self, index)
@@ -20,23 +21,29 @@ class String {
         //newstr[length] = 0
     }
 }
+*/
 
-fn ==(str1: String, str2: String) -> Bool {
+fn ==(str1: String, str2: String) -> Bool / MF {
     if strcmp(str1, str2) == 0 then
         true
     else
         false
 }
 
-fn !=(str1: String, str2: String) -> Bool {
+fn !=(str1: String, str2: String) -> Bool / MF {
     if strcmp(str1, str2) != 0 then
         true
     else
         false
 }
 
-fn +(s1: String, s2: String) -> String {
-    s1.push(s2)
+fn +(s1: String, s2: String) -> String / MF {
+    //s1.push(s2)
+    let s1length = strlen(s1)
+    let s2length = strlen(s2)
+    let buffer: String = malloc(s1length + s2length + 1)
+    sprintf(buffer, "%s%s", s1, s2)
+    buffer
 }
 
 
@@ -70,7 +77,6 @@ fn str(num: Real) -> String {
 }
 
 
-
 /*
 class List<'item> {
     let mut capacity: Int
@@ -80,7 +86,8 @@ class List<'item> {
     fn new(self) {
         self.length = 0
         self.capacity = 10
-        self.data = new Buffer<'item>(self.capacity)
+        //self.data = new Buffer<'item>(self.capacity)
+        self.data = bufalloc(self.capacity)
     }
 
     fn len(self) {
@@ -89,13 +96,13 @@ class List<'item> {
 
     fn resize(self, capacity) {
         self.capacity = capacity
-        self.data = self.data.resize(self.capacity);
+        self.data = bufresize(self.data, self.capacity);
     }
 
     fn push(self, item: 'item) {
         if self.length + 1 >= self.capacity then
             self.resize(self.capacity + 10)
-        self.data[self.length] = item
+        bufset(self.data, self.length, item)
         self.length = self.length + 1
     }
 
@@ -103,14 +110,14 @@ class List<'item> {
         if index >= self.length then
             nil //raise -1
         else
-            self.data[index]
+            bufget(self.data, index)
     }
 
     fn [](self, index: Int, item: 'item) -> 'item {
         if index >= self.length then
             nil //raise "IndexError: array index is out of bounds"
         else {
-            self.data[index] = item
+            bufset(self.data, index, item)
         }
     }
 
@@ -127,8 +134,8 @@ class List<'item> {
         if index >= self.length then {
             self.push(item)
         } else {
-            let cur = self.data[index]
-            self.data[index] = item
+            let cur = bufget(self.data, index)
+            bufset(self.data, index, item)
             self.move_right(index + 1, cur)
         }
     }
@@ -139,8 +146,8 @@ class List<'item> {
             self.push(item);
             // TODO this is here because of a bug during the type refactor that was creating invalid IR fur the return type
         } else {
-            let cur = self.data[index]
-            self.data[index] = item
+            let cur = bufget(self.data, index)
+            bufset(self.data, index, item)
             self.insert(index + 1, cur)
         }
     }

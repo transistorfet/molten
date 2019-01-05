@@ -75,12 +75,13 @@ fn bind_names_node_or_error(session: &Session, scope: ScopeRef, node: &mut AST) 
         },
 
         AST::Identifier(ref id, _, ref ident) => {
-            // TODO you must check to make sure if we are accessing a variable or argument, that it is either local or we are in a closure...
-            //      (the latter being more difficult to figure out; we need to some kind of context value)
-            let dscope = Scope::target(session, scope.clone());
-            match dscope.get_var_def(&ident.name) {
-                Some(defid) => session.set_ref(*id, defid),
-                None => return Err(Error::new(format!("NameError: undefined identifier {:?}", ident.name)))
+            if session.get_ref(*id).is_err() {
+                // TODO you must check to make sure if we are accessing a variable or argument, that it is either local or we are in a closure...
+                //      (the latter being more difficult to figure out; we need to some kind of context value)
+                match scope.get_var_def(&ident.name) {
+                    Some(defid) => session.set_ref(*id, defid),
+                    None => return Err(Error::new(format!("NameError: undefined identifier {:?}", ident.name)))
+                }
             }
         },
 
