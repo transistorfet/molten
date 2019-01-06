@@ -77,7 +77,6 @@ fn str(num: Real) -> String {
 }
 
 
-/*
 class List<'item> {
     let mut capacity: Int
     let mut length: Int
@@ -117,7 +116,8 @@ class List<'item> {
         if index >= self.length then
             nil //raise "IndexError: array index is out of bounds"
         else {
-            bufset(self.data, index, item)
+            bufset(self.data, index, item);
+            item
         }
     }
 
@@ -152,7 +152,6 @@ class List<'item> {
         }
     }
 }
-*/
 
 /*
 class HashMapNode<'item> {

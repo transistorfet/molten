@@ -194,10 +194,21 @@ impl<'sess> LLVM<'sess> {
             match (sourcekind, destkind) {
                 (LLVMTypeKind::LLVMPointerTypeKind, LLVMTypeKind::LLVMPointerTypeKind) =>
                     LLVMBuildPointerCast(self.builder, value, rtype, cstr("ptr")),
+
                 //(LLVMTypeKind::LLVMPointerTypeKind, _) =>
                 //    LLVMBuildPtrToInt(self.builder, value, rtype, cstr("ptr")),
                 //(_, LLVMTypeKind::LLVMPointerTypeKind) =>
                 //    LLVMBuildIntToPtr(self.builder, value, rtype, cstr("ptr")),
+
+                (LLVMTypeKind::LLVMPointerTypeKind, _) => {
+                    let reference = LLVMBuildPointerCast(self.builder, value, LLVMPointerType(rtype, 0), cstr(""));
+                    LLVMBuildLoad(self.builder, reference, cstr(""))
+                },
+                (_, LLVMTypeKind::LLVMPointerTypeKind) => {
+                    let boxed = self.build_boxed(LLVMPointerType(LLVMTypeOf(value), 0), value);
+                    LLVMBuildPointerCast(self.builder, boxed, rtype, cstr(""))
+                },
+
                 (LLVMTypeKind::LLVMIntegerTypeKind, LLVMTypeKind::LLVMDoubleTypeKind) =>
                     LLVMBuildCast(self.builder, llvm_sys::LLVMOpcode::LLVMSIToFP, value, rtype, cstr("tmp")),
                 (LLVMTypeKind::LLVMDoubleTypeKind, LLVMTypeKind::LLVMIntegerTypeKind) =>
@@ -243,6 +254,14 @@ impl<'sess> LLVM<'sess> {
             LLLit::Null(ltype) => self.null_const(self.build_type(ltype)),
             LLLit::ConstStr(string) => LLVMBuildGlobalStringPtr(self.builder, cstr(string.as_str()), cstr("__string")),
         }
+    }
+
+    pub unsafe fn build_expr_block(&self, exprs: &Vec<LLExpr>) -> LLVMValueRef {
+        let mut last = ptr::null_mut();
+        for expr in exprs {
+            last = self.build_expr(expr);
+        }
+        last
     }
 
     pub unsafe fn build_list(&self, exprs: &Vec<LLExpr>) -> Vec<LLVMValueRef> {
@@ -343,12 +362,12 @@ impl<'sess> LLVM<'sess> {
         let mut last_cond = ptr::null_mut();
         for i in 0 .. blocks.len() {
             LLVMPositionBuilderAtEnd(self.builder, cond_vals[i]);
-            let result = self.build_expr_list(&conds[i]);
+            let result = self.build_expr_block(&conds[i]);
             LLVMBuildCondBr(self.builder, result, block_vals[i], cond_vals[i + 1]);
             last_cond = LLVMGetInsertBlock(self.builder);
 
             LLVMPositionBuilderAtEnd(self.builder, block_vals[i]);
-            return_vals.push(self.build_expr_list(&blocks[i]));
+            return_vals.push(self.build_expr_block(&blocks[i]));
             LLVMBuildBr(self.builder, merge_block);
             block_vals[i] = LLVMGetInsertBlock(self.builder);
         }
@@ -364,14 +383,6 @@ impl<'sess> LLVM<'sess> {
         let phi = LLVMBuildPhi(self.builder, LLVMTypeOf(values[0]), cstr("phi"));
         LLVMAddIncoming(phi, values.as_mut_ptr(), blocks.as_mut_ptr(), values.len() as u32);
         phi
-    }
-
-    pub unsafe fn build_expr_list(&self, exprs: &Vec<LLExpr>) -> LLVMValueRef {
-        let mut last = ptr::null_mut();
-        for expr in exprs {
-            last = self.build_expr(expr);
-        }
-        last
     }
 
     pub unsafe fn build_expr(&self, expr: &LLExpr) -> LLVMValueRef {
@@ -473,6 +484,7 @@ impl<'sess> LLVM<'sess> {
                 let (mut return_vals, mut block_vals) = self.build_basic_blocks("match", conds, blocks);
                 self.build_phi(&mut return_vals, &mut block_vals)
             },
+
         }
     }
 
@@ -525,7 +537,7 @@ impl<'sess> LLVM<'sess> {
             self.set_value(arg.0, llarg);
         }
 
-        let ret = self.build_expr_list(body);
+        let ret = self.build_expr_block(body);
         LLVMBuildRet(self.builder, ret);
     }
 
