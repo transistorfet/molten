@@ -112,6 +112,7 @@ pub enum LLExpr {
     StoreRef(R<LLExpr>, R<LLExpr>),
 
     Phi(Vec<LLBlock>, Vec<LLBlock>),
+    Loop(LLBlock, LLBlock),
 }
 
 #[derive(Clone, Debug, PartialEq)]

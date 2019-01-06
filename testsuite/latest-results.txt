@@ -1,4 +1,4 @@
-Sun Jan  6 10:20:30 PST 2019
+Sun Jan  6 10:22:16 PST 2019
 [01/40] basic/abi-across-exprs.mol......................................success
 [02/40] basic/block-assign.mol..........................................success
 [03/40] basic/block-invoke.mol..........................................success
@@ -20,7 +20,7 @@ Sun Jan  6 10:20:30 PST 2019
 [19/40] basic/operators.mol.............................................success
 [20/40] basic/recursion.mol.............................................FAIL
 [21/40] basic/string-escapes.mol........................................success
-[22/40] basic/whileloops.mol............................................FAIL
+[22/40] basic/whileloops.mol............................................success
 [23/40] binding/definition-fail.mol.....................................success
 [24/40] binding/function-fail.mol.......................................success
 [25/40] binding/method-fail.mol.........................................success
@@ -39,4 +39,4 @@ Sun Jan  6 10:20:30 PST 2019
 [38/40] typecheck/definition-fail.mol...................................success
 [39/40] typecheck/infer-arg-as-typevar.mol..............................FAIL
 [40/40] typecheck/infer-forward-method.mol..............................FAIL
-28 tests passed, 12 tests failed, 40 total
+29 tests passed, 11 tests failed, 40 total

@@ -246,6 +246,11 @@ impl<'sess> Transformer<'sess> {
             },
 
 
+            AST::While(_, _, cond, body) => {
+                vec!(LLExpr::Loop(self.transform_node(scope.clone(), cond), self.transform_node(scope.clone(), body)))
+            },
+
+
             AST::TypeAlias(_, _, _, _) => { /* Nothing Needs To Be Done */ vec!() }
 
             _ => panic!("Not Implemented: {:?}", node),

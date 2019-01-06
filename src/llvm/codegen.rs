@@ -385,6 +385,26 @@ impl<'sess> LLVM<'sess> {
         phi
     }
 
+    pub unsafe fn build_loop(&self, cond: &LLBlock, body: &LLBlock) -> LLVMValueRef {
+        let before_block = LLVMAppendBasicBlockInContext(self.context, *self.curfunc.borrow(), cstr("loop_before"));
+        let body_block = LLVMAppendBasicBlockInContext(self.context, *self.curfunc.borrow(), cstr("loop_body"));
+        let after_block = LLVMAppendBasicBlockInContext(self.context, *self.curfunc.borrow(), cstr("loop_after"));
+
+        LLVMBuildBr(self.builder, before_block);
+
+        LLVMPositionBuilderAtEnd(self.builder, before_block);
+        let cond_val = self.build_expr_block(cond);
+        LLVMBuildCondBr(self.builder, cond_val, body_block, after_block);
+
+        LLVMPositionBuilderAtEnd(self.builder, body_block);
+        self.build_expr_block(body);
+        LLVMBuildBr(self.builder, before_block);
+
+        LLVMPositionBuilderAtEnd(self.builder, after_block);
+
+        self.i32_const(0)
+    }
+
     pub unsafe fn build_expr(&self, expr: &LLExpr) -> LLVMValueRef {
         match expr {
             LLExpr::Literal(lit) => self.build_literal(lit),
@@ -485,6 +505,9 @@ impl<'sess> LLVM<'sess> {
                 self.build_phi(&mut return_vals, &mut block_vals)
             },
 
+            LLExpr::Loop(cond, body) => {
+                self.build_loop(cond, body)
+            },
         }
     }
 
