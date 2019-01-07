@@ -198,13 +198,13 @@ fn bind_names_node_or_error(session: &Session, scope: ScopeRef, node: &mut AST) 
             //session.set_type(*id, ttype.clone());
         },
 
-        AST::Resolver(ref id, _, ref mut left, _) => {
+        AST::Resolver(ref id, _, ref mut left, _, ref oid) => {
             // TODO should this always work on a type reference, or should classes be added as values as well as types?
             //bind_names_node(session, scope, left);
             match **left {
                 AST::Identifier(_, _, ref ident) => {
                     match scope.get_type_def(&ident.name) {
-                        Some(defid) => session.set_ref(*id, defid),
+                        Some(defid) => session.set_ref(*oid, defid),
                         None => return Err(Error::new(format!("NameError: undefined type {:?}", ident.name)))
                     }
                 },
@@ -217,10 +217,6 @@ fn bind_names_node_or_error(session: &Session, scope: ScopeRef, node: &mut AST) 
         },
 
         AST::Assignment(_, _, ref mut left, ref mut right) => {
-            match **left {
-                AST::Accessor(_, _, _, _, _) | AST::Index(_, _, _, _) => { },
-                _ => return Err(Error::new(format!("SyntaxError: assignment to something other than a list or class element: {:?}", left))),
-            };
             bind_names_node(session, scope.clone(), left);
             bind_names_node(session, scope, right);
         },

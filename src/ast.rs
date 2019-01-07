@@ -78,7 +78,7 @@ pub enum AST {
     Recall(NodeID, Pos),
     Identifier(NodeID, Pos, Ident),
     Index(NodeID, Pos, Box<AST>, Box<AST>),
-    Resolver(NodeID, Pos, Box<AST>, Ident),
+    Resolver(NodeID, Pos, Box<AST>, Ident, NodeID),
     Accessor(NodeID, Pos, Box<AST>, Ident, NodeID),
 
     Block(NodeID, Pos, Vec<AST>),
@@ -211,7 +211,7 @@ impl AST {
             AST::Recall(_, ref pos) |
             AST::Identifier(_, ref pos, _) |
             AST::Index(_, ref pos, _, _) |
-            AST::Resolver(_, ref pos, _, _) |
+            AST::Resolver(_, ref pos, _, _, _) |
             AST::Accessor(_, ref pos, _, _, _) |
             AST::Invoke(_, ref pos, _, _) |
             AST::SideEffect(_, ref pos, _, _) |
@@ -245,7 +245,7 @@ impl AST {
             AST::Recall(ref id, _) |
             AST::Identifier(ref id, _, _) |
             AST::Index(ref id, _, _, _) |
-            AST::Resolver(ref id, _, _, _) |
+            AST::Resolver(ref id, _, _, _, _) |
             AST::Accessor(ref id, _, _, _, _) |
             AST::Invoke(ref id, _, _, _) |
             AST::SideEffect(ref id, _, _, _) |
@@ -309,7 +309,7 @@ impl AST {
     }
 
     pub fn make_resolve(pos: Pos, object: AST, ident: Ident) -> AST {
-        AST::Resolver(NodeID::generate(), pos, Box::new(object), ident)
+        AST::Resolver(NodeID::generate(), pos, Box::new(object), ident, NodeID::generate())
     }
 
     pub fn make_access(pos: Pos, object: AST, ident: Ident) -> AST {

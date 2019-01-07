@@ -74,8 +74,43 @@ pub fn refine_node(node: AST) -> AST {
             AST::While(id, pos, Box::new(refine_node(*cond)), Box::new(refine_node(*body)))
         },
 
-        AST::For(id, pos, ident, cond, body) => {
-            AST::For(id, pos, ident, Box::new(refine_node(*cond)), Box::new(refine_node(*body)))
+        AST::For(id, pos, ident, list, body) => {
+            let mut block = vec!();
+            let mut cond_block = vec!();
+            let mut body_block = vec!();
+
+            let iter = format!("{}", NodeID::generate());
+            let listname = format!("{}", NodeID::generate());
+
+            let access_iter = || AST::make_ident(pos.clone(), Ident::new(iter.clone()));
+            let access_item = || AST::make_ident(pos.clone(), ident.clone());
+            let access_list = || AST::make_ident(pos.clone(), Ident::new(listname.clone()));
+            let access_list_field = |field| AST::make_access(pos.clone(), access_list(), Ident::from_str(field));
+            let invoke = |func, args| AST::make_invoke(pos.clone(), func, args);
+
+            // define the list variable
+            block.push(AST::make_def(pos.clone(), true, Ident::new(listname.clone()), None, refine_node(*list)));
+
+            // define the iterator index variable
+            block.push(AST::make_def(pos.clone(), true, Ident::new(iter.clone()), None, AST::make_lit(Literal::Integer(0))));
+
+            // compare if iterator index is < length of list
+            cond_block.push(refine_node(invoke(AST::make_ident(pos.clone(), Ident::from_str("<")),
+                vec!(access_iter(), invoke(access_list_field("len"), vec!())))));
+
+            // assign the next value to the item variable
+            body_block.push(AST::make_def(pos.clone(), false, ident.clone(), None,
+                refine_node(invoke(access_list_field("get"), vec!(access_iter())))));
+
+            body_block.push(refine_node(*body));
+
+            // increment the iterator index variable
+            body_block.push(AST::make_assign(pos.clone(), access_iter(), refine_node(invoke(AST::make_ident(pos.clone(), Ident::from_str("+")),
+                vec!(access_iter(), AST::make_lit(Literal::Integer(1)))))));
+
+            block.push(AST::While(id, pos.clone(), Box::new(AST::make_block(pos.clone(), cond_block)), Box::new(AST::make_block(pos.clone(), body_block))));
+            AST::make_block(pos.clone(), block)
+            //AST::For(id, pos, ident, Box::new(refine_node(*cond)), Box::new(refine_node(*body)))
         },
 
         AST::Ref(id, pos, expr) => { AST::Ref(id, pos, Box::new(refine_node(*expr))) },
@@ -146,13 +181,13 @@ pub fn refine_node(node: AST) -> AST {
             refine_node(AST::Invoke(id, pos.clone(), Box::new(AST::Accessor(NodeID::generate(), pos.clone(), base, Ident::new(String::from("[]")), NodeID::generate())), vec!(*index)))
         },
 
-        AST::Resolver(id, pos, left, right) => {
+        AST::Resolver(id, pos, left, right, oid) => {
             // TODO should this also allow a non-type specifier?
             match *left {
                 AST::Identifier(_, _, _) => { },
                 _ => panic!("SyntaxError: left-hand side of scope resolver must be identifier")
             }
-            AST::Resolver(id, pos, Box::new(refine_node(*left)), right)
+            AST::Resolver(id, pos, Box::new(refine_node(*left)), right, oid)
         },
 
         AST::Accessor(id, pos, left, right, oid) => {
@@ -162,13 +197,14 @@ pub fn refine_node(node: AST) -> AST {
         AST::Assignment(id, pos, left, right) => {
             let left = *left;
             match left {
+                //AST::Identifier(_, _, _) |
                 AST::Accessor(_, _, _, _, _) => {
                     AST::Assignment(id, pos, Box::new(refine_node(left)), Box::new(refine_node(*right)))
                 },
                 AST::Index(iid, ipos, base, index) => {
                     refine_node(AST::Invoke(id, pos, Box::new(AST::Accessor(iid, ipos.clone(), base, Ident::new(String::from("[]")), NodeID::generate())), vec!(*index, *right)))
                 },
-                _ => panic!("SyntaxError: assignment to something other than a list or class element: {:?}", left),
+                _ => panic!("SyntaxError: assignment to to an invalid element: {:?}", left),
             }
         },
 

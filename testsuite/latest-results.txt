@@ -1,4 +1,4 @@
-Sun Jan  6 10:22:16 PST 2019
+Sun Jan  6 21:53:38 PST 2019
 [01/40] basic/abi-across-exprs.mol......................................success
 [02/40] basic/block-assign.mol..........................................success
 [03/40] basic/block-invoke.mol..........................................success
@@ -7,7 +7,7 @@ Sun Jan  6 10:22:16 PST 2019
 [06/40] basic/conditionals-reals.mol....................................success
 [07/40] basic/conditionals-strings.mol..................................success
 [08/40] basic/exceptions.mol............................................FAIL
-[09/40] basic/forloops.mol..............................................FAIL
+[09/40] basic/forloops.mol..............................................success
 [10/40] basic/func-with-func-arg.mol....................................success
 [11/40] basic/funcs-lambda-direct.mol...................................success
 [12/40] basic/funcs-lambda-variable.mol.................................success
@@ -28,15 +28,15 @@ Sun Jan  6 10:22:16 PST 2019
 [27/40] binding/overload.mol............................................success
 [28/40] objects/basic.mol...............................................success
 [29/40] objects/constructors.mol........................................success
-[30/40] objects/funcptr-member.mol......................................FAIL
+[30/40] objects/funcptr-member.mol......................................success
 [31/40] objects/funcptr-uninitialized-issue.mol.........................FAIL
-[32/40] objects/inheritence-super.mol...................................FAIL
+[32/40] objects/inheritence-super.mol...................................success
 [33/40] objects/inheritence-third.mol...................................success
 [34/40] objects/inheritence-vtable.mol..................................FAIL
 [35/40] objects/inheritence.mol.........................................success
-[36/40] objects/interface.mol...........................................FAIL
+[36/40] objects/interface.mol...........................................success
 [37/40] typecheck/basic.mol.............................................success
 [38/40] typecheck/definition-fail.mol...................................success
 [39/40] typecheck/infer-arg-as-typevar.mol..............................FAIL
 [40/40] typecheck/infer-forward-method.mol..............................FAIL
-29 tests passed, 11 tests failed, 40 total
+33 tests passed, 7 tests failed, 40 total

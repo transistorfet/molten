@@ -190,27 +190,53 @@ class HashMap<'item> {
 
     }
 }
+*/
 
-class Iter<'item> {
-    fn next(self) -> 'item {
-        //raise error notimplemented?
+/*
+class Option<'item> {
+    let mut has = false
+    let mut item: 'item = nil
+
+    fn new(self) { }
+
+    fn some(item) {
+        let opt = new Option<'item>()
+        opt.has = true
+        opt.item = item
+        opt
+    }
+
+    fn none() {
+        let opt = new Option<'item>()
+        opt.has = true
+        opt.item = nil
+        opt
     }
 }
 
+class Iterator<'item> {
+    fn next(self) -> Option<'item> {
+        Option::none()
+    }
+}
 
-class ListIter<'item> extends Iter<'item> {
-    let mut list: List<'item>
-    let mut index: Int
+class ListIterator<'item> {
+    let mut index = 0
+    let mut list: List<'item> = nil
 
     fn new(self, list) {
-        self.list = list
         self.index = 0
+        self.list = list
     }
 
-    fn next(self) -> 'item {
-        let item = self.list[self.index]
-        self.index = self.index + 1
-        item
+    fn next(self) -> Option<'item> {
+        if self.index < self.list.len() then {
+            let item = self.list[self.index]
+            self.index = self.index + 1
+            Option::some(item)
+        } else {
+            Option::none()
+        }
     }
 }
 */

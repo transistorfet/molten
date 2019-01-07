@@ -289,7 +289,7 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &AST,
             scope.make_obj(session, String::from("()"), vec!())?
         },
 
-        AST::Resolver(_, _, _, _) |
+        AST::Resolver(_, _, _, _, _) |
         AST::Accessor(_, _, _, _, _) => {
             let (refid, defid) = get_access_ids(session, scope.clone(), node)?.unwrap();
             session.set_ref(refid, defid);
@@ -334,8 +334,8 @@ pub fn get_access_ids(session: &Session, scope: ScopeRef, node: &AST) -> Result<
         AST::Identifier(ref id, _, _) => {
             Ok(Some((*id, session.get_ref(*id)?)))
         },
-        AST::Resolver(ref id, _, ref left, ref field) => {
-            let ltype = session.get_type_from_ref(*id).unwrap();
+        AST::Resolver(ref id, _, ref left, ref field, ref oid) => {
+            let ltype = session.get_type_from_ref(*oid).unwrap();
 
             let vars = session.get_def(ltype.get_id()?)?.get_vars()?;
             Ok(Some((*id, vars.get_var_def(&field.name).ok_or(Error::new(format!("VarError: definition not set for {:?}", field.name)))?)))

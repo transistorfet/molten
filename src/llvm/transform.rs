@@ -199,22 +199,6 @@ impl<'sess> Transformer<'sess> {
                 exprs
             },
 
-            AST::Resolver(id, _, _, _) => {
-                // TODO this is temporary and due to the fact that we're accessing a local def containing the closure
-                //self.transform_reference(scope.clone(), self.session.get_ref(*id).unwrap(), &String::from(""))
-
-                vec!(LLExpr::GetValue(self.session.get_ref(*id).unwrap()))
-
-                /*
-                println!("^^^^^^^^^^^^^^^^^^^ {:?} {:?}", *id, self.session.get_def_from_ref(*id));
-                let defid = self.session.get_ref(*id).unwrap();
-                match self.session.get_def(defid).unwrap() {
-                    Def::Method(_) => vec!(LLExpr::LoadRef(r(LLExpr::GetValue(defid)))),
-                    def @ _ => panic!("SOMETHING {:?}", def),
-                }
-                */
-            },
-
             AST::PtrCast(ttype, node) => {
                 let mut exprs = vec!();
                 let ltype = self.transform_value_type(ttype);
@@ -226,6 +210,11 @@ impl<'sess> Transformer<'sess> {
             AST::Accessor(id, _, obj, ident, oid) => {
                 let otype = self.session.get_type(*oid).unwrap();
                 self.transform_accessor(scope.clone(), *id, obj, &ident.name, otype)
+            },
+
+            AST::Resolver(id, _, path, field, oid) => {
+                let otype = self.session.get_type_from_ref(*oid).unwrap();
+                self.transform_resolve(scope.clone(), *id, path, &field.name, otype)
             },
 
             AST::Assignment(id, _, left, right) => {
@@ -714,6 +703,13 @@ impl<'sess> Transformer<'sess> {
         exprs
     }
 
+    fn transform_resolve(&self, scope: ScopeRef, id: NodeID, path: &AST, field: &String, otype: Type) -> Vec<LLExpr> {
+        let defid = self.session.get_ref(id).unwrap();
+        let classdef = self.session.get_def(otype.get_id().unwrap()).unwrap().as_class().unwrap();
+        let index = classdef.vtable.get_index_by_id(defid).unwrap();
+        vec!(LLExpr::LoadRef(r(LLExpr::AccessRef(r(LLExpr::GetGlobal(classdef.vtable.id)), vec!(LLRef::Field(index))))))
+    }
+
     fn transform_assignment(&self, scope: ScopeRef, id: NodeID, left: &AST, right: &AST) -> Vec<LLExpr> {
         let mut exprs = vec!();
 
@@ -725,6 +721,10 @@ impl<'sess> Transformer<'sess> {
                 let objdef = self.session.get_def(self.session.get_type(*oid).unwrap().get_id().unwrap()).unwrap();
                 let (index, _) = objdef.as_struct().unwrap().find_field_by_id(fieldid).unwrap();
                 exprs.push(LLExpr::StoreRef(r(LLExpr::AccessRef(r(objval), vec!(LLRef::Field(index)))), r(value)));
+            },
+            AST::Identifier(aid, _, _) => {
+                let defid = self.session.get_ref(*aid).unwrap();
+                exprs.push(LLExpr::StoreRef(r(LLExpr::GetValue(defid)), r(value)));
             },
             _ => panic!("InternalError: attempting to assign to an invalid pattern, {:?}", left),
         }
