@@ -1,0 +1,13 @@
+// test tuple args and returns
+
+//! 256
+
+import lib.libcore
+
+fn test1(arg: (Int, String)) {
+    (arg.0 * 32, arg.1)
+}
+
+let tup2 = test1((8, "Test"))
+println(str(tup2.0))
+

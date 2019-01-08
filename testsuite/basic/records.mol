@@ -1,0 +1,6 @@
+
+//! Hey
+
+let rec1 = { a = 5, b = "Hey" }
+println(rec1.b)
+

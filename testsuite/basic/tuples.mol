@@ -1,0 +1,6 @@
+
+//! Test
+
+let tup1 = (1, "Test", 4.85)
+println(tup1.1)
+

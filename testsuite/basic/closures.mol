@@ -1,0 +1,12 @@
+
+//! It's Outside
+
+import lib.libcore
+
+let b = "It's Outside"
+fn closure() {
+    println(b)
+}
+
+closure()
+

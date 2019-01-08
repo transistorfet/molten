@@ -1,0 +1,22 @@
+
+// test record member order
+
+//! 5
+//! 5
+//! 5
+
+import lib.libcore
+
+let rec1 = { a = 5, b = 10, _1 = 20 }
+let rec2 = { b = 10, _1 = 20, a = 5 }
+let rec3: { _1: Int, b: Int, a: Int } = rec1
+
+fn func(rec: { a: Int, b: Int, _1: Int }) {
+    println(str(rec.a))
+}
+
+func(rec1)
+func(rec2)
+func(rec3)
+
+

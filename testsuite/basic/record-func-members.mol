@@ -1,0 +1,12 @@
+
+// test record and tuple methods
+
+//! It Worked
+
+fn methodtest() {
+    println("It Worked")
+}
+
+let rec4 = { func = methodtest, b = 5 }
+rec4.func()
+

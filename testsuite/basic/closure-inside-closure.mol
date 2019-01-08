@@ -1,0 +1,17 @@
+
+//! It's Outside
+
+import lib.libcore
+
+let b = "It's Outside"
+
+fn closure() {
+    fn closure2() {
+        println(b)
+    }
+    closure2
+}
+
+let inner = closure()
+inner()
+
