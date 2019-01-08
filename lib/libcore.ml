@@ -212,6 +212,13 @@ class Option<'item> {
         opt.item = nil
         opt
     }
+
+    fn unwrap_or(self, item) {
+        if self.has then
+            self.item
+        else
+            item
+    }
 }
 
 class Iterator<'item> {

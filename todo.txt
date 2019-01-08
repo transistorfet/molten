@@ -1,33 +1,35 @@
 
-* for loops are working, but I had to implement mutable variables in order to make it work... there might be a way in refinery to still err on var assignment but bypass that
-  for forloops only
-* I fixed the resolver thing by having it access the global vtable
+* recursive c functions don't work because it's typechecked as unknown abi, which is called as a closure
+* you need to add a public/private flag to definitions, for exporting, along with a "private" attribute in IR
 
-* recursion is still broken
-* options almost work but for some reason unwrapping on none doesn't print the correct value... maybe need return pointer casting
-* you could modify the for loop code to take an iterator in future
+* there is a problem with typechecking Option, where in compiles it as an Option<Int> rather than Option<'item>
+* implement return value conversion
+* remove AST::Recall when you switch over to llvm2
+* unable to defined a method as / MF or / C ABI
+* I fixed the inheritence-vtable test by forcing the typevar to Int, but ideally there'd be an error when overloading.  A function with a typevar cannot be overloaded by a function with a
+  specific type because a typevar function overlaps with the Int version.  It conflicts with the boxing/unboxing of generic primatives
+* implement try, raise
+
+* if, sideeffects, and while loops need bool comparison results to work correctly.  You can either force that in type checking or somehow desugar or use the comps style from match
+* you could modify the forloop code to take an iterator in future
+* you really need a better way of doing modules
+* should vtables be dynamically allocated, or should we add a LLType::ElementOf() type or something to GetElement an aliased type
+
+* make refinery use an object direct traversal, which can store context, which could be used to error when a mut outside a class is used, rather than putting the check in assignment
+* make binding and typechecking use an object, which could help break them down a bit into smaller functions
+* if you made typechecking an object like transform, and had a context, you could do extended checks of what's allowed in a C function, like exceptions (disallowed in C, but allowed in M and MF)
+* update the readme
 
 
 * strings, buffers, and all the primative types require vtables if they have methods, but there aren't vtables stored inside them.  You could make static vtable exceptions for them
 * make primative types unable to inherit from, because there's no vtable
 * fix lib to allow builtin classes
 
-* implement for loops
-* implement resolve properly
-* implement try, raise
-
+* can you make a check for nil before unboxing a type... and somehow return an appropriate default value?  I guess that's feasible because only primative types would be
+  boxed/unboxed, although records and tuples might be an issue
 * rather than coercising a non pointer type into a pointer, you can box any such types, possibly adding a vtablu of sorts in the process
   possibly containing functions and metadata for copying. You could also make buffer copying functions that take the element size and copy
   the buffer data into the boxed location.
-
-* figure out a better way of doing variables/generics
-* implement return value conversion
-* if, sideeffects, and while loops need bool comparison results to work correctly.  You can either force that in type checking or somehow desugar or use the comps style from match
-
-* you really need a better way of doing modules
-* should vtables be dynamically allocated, or should we add a LLType::ElementOf() type or something to GetElement an aliased type
-* unable to defined a method as / MF or / C ABI
-
 
 
 
@@ -43,22 +45,17 @@ TESTS:
 * make test for function pointers, assign to local, call as ref
 * test for match, if, sideeffects
 * test for references, records, tuples, used in local vars, func args, return values, etc
+* test for directly calling functions in records or tuples, which shouldn't add the object argument
+* test for records that have different member orders are still equal
+* test for static method vtable access, dynamic dispatch via that mechanism, and overloading used with resolve
 
 
-* remove AST::Recall when you switch over to llvm2
 
 * make an "as" for of decl, like decl buffer_resize as resize: () -> ??
-* implement assignment of tuples and records?
 * there's probably an issue with records in that we might not take into account different orders of items... { a=1, b=2 } might not equal { b=2, a=1 }
-* there is no way to assign to a ref
-* if you made typechecking an object like transform, and had a context, you could do extended checks of what's allowed in a C function, like exceptions (disallowed in C, but allowed in M and MF)
-* should compare use a trait/typeclass? that would have to come later
 
-* I think it should be doable to make all functions including methods be closures, especially if you put the context at the end
-* we need to make molten code and transform in order to convert nested closures. We at least need to transform the record constructor to convert the idents
-let context = ref { var1 = ident1, var2 = ident2 }
-return (func, context)
-* it makes more sense, if you go for abi specifiers, to make methods use one instead of closures.
+* implement assignment of tuples and records?
+* there is no way to assign to a ref
 
 * should you unify some aspects of references and objects?  at least the codegen stuff, rather than duplicating some code
 * modify resolve to return a result rather than unwrapping
@@ -67,10 +64,6 @@ return (func, context)
 * you can put a restriction on type aliases such that a type can only use type vars defined in the declaration
 * you could require that classes explicitly define their type variables by name, to catch type errors.  So every method or definition in the top level of the class
   could only use explicitly declared type variables
-
-* the current problem with closure code (line 269 of test.ml) is that we're assigning a closure to a struct field but the types don't match, because the get_type function
-  returned an actual function type, rather than a pointer to the closure context... so you kinda need a way to distinguish different function types
-
 
 * there was a problem with generics when using tuple pair closures, because a tuple pair was too big to coerce into an i8*. You can convert back when generics
   are fixed to adjust to their size
@@ -85,6 +78,7 @@ return (func, context)
 * you might not be making sure that non-closure functions don't access variables outside their scope (methods are never closures)
 * make sure that you don't overload different types of functions (closures, functions, and methods must all be the same type to allow overloading)
 * should you make mutable modifiers more strict, like rust?
+* should compare use a trait/typeclass? that would have to come later
 
 
 * improve storing of file info in the Pos structs (maybe rename to Span?)
@@ -93,9 +87,6 @@ return (func, context)
 * one thing i'm seeing a lot of now is stuff like classspec.ident.name... can we prevent so many levels deep?
 * do you need a BuiltinDef type? a GlobalVarDef type?
 * add the .set_id() functions to simpliy ast builders
-
-* should we factor out some of the code in codegen which builds vtables into transform or classdef, such that you can build the type from either??
-* get rid of unwind argument, and put it in an object
 
 * it might also make it easier/generic to allow compiling to object files?  So no linking, but it would do optimization and object file output
 * how does rust do "use" if there is a circular dependency?

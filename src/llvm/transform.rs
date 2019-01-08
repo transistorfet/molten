@@ -553,9 +553,13 @@ impl<'sess> Transformer<'sess> {
             match self.get_context() {
                 Some(CodeContext::Closure(ref cid)) => {
                     let cl = self.session.get_def(*cid).unwrap().as_closure().unwrap();
-                    let index = cl.find_or_add_field(self.session, defid, name.as_str(), self.session.get_type(defid).unwrap());
-                    let context = LLExpr::Cast(LLType::Alias(cl.context_type_id), r(LLExpr::GetValue(cl.context_arg_id)));
-                    vec!(LLExpr::LoadRef(r(LLExpr::AccessRef(r(context), vec!(LLRef::Field(index))))))
+                    if *cid == defid {
+                        vec!(LLExpr::Cast(LLType::Alias(cl.context_type_id), r(LLExpr::GetValue(cl.context_arg_id))))
+                    } else {
+                        let index = cl.find_or_add_field(self.session, defid, name.as_str(), self.session.get_type(defid).unwrap());
+                        let context = LLExpr::Cast(LLType::Alias(cl.context_type_id), r(LLExpr::GetValue(cl.context_arg_id)));
+                        vec!(LLExpr::LoadRef(r(LLExpr::AccessRef(r(context), vec!(LLRef::Field(index))))))
+                    }
                 },
                 _ => panic!("Cannot access variable outside of scope: {:?} {:#?}", name, scope),
             }
