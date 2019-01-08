@@ -1,16 +1,18 @@
 
-* recursive c functions don't work because it's typechecked as unknown abi, which is called as a closure
 * you need to add a public/private flag to definitions, for exporting, along with a "private" attribute in IR
+* update the readme
 
-* there is a problem with typechecking Option, where in compiles it as an Option<Int> rather than Option<'item>
 * implement return value conversion
 * remove AST::Recall when you switch over to llvm2
 * unable to defined a method as / MF or / C ABI
-* I fixed the inheritence-vtable test by forcing the typevar to Int, but ideally there'd be an error when overloading.  A function with a typevar cannot be overloaded by a function with a
-  specific type because a typevar function overlaps with the Int version.  It conflicts with the boxing/unboxing of generic primatives
 * implement try, raise
 
+* recursive c functions don't work because it's typechecked as unknown abi, which is called as a closure
+* there is a problem with typechecking Option, where in compiles it as an Option<Int> rather than Option<'item>
+* I fixed the inheritence-vtable test by forcing the typevar to Int, but ideally there'd be an error when overloading.  A function with a typevar cannot be overloaded by a function with a
+  specific type because a typevar function overlaps with the Int version.  It conflicts with the boxing/unboxing of generic primatives
 * if, sideeffects, and while loops need bool comparison results to work correctly.  You can either force that in type checking or somehow desugar or use the comps style from match
+
 * you could modify the forloop code to take an iterator in future
 * you really need a better way of doing modules
 * should vtables be dynamically allocated, or should we add a LLType::ElementOf() type or something to GetElement an aliased type
@@ -18,7 +20,6 @@
 * make refinery use an object direct traversal, which can store context, which could be used to error when a mut outside a class is used, rather than putting the check in assignment
 * make binding and typechecking use an object, which could help break them down a bit into smaller functions
 * if you made typechecking an object like transform, and had a context, you could do extended checks of what's allowed in a C function, like exceptions (disallowed in C, but allowed in M and MF)
-* update the readme
 
 
 * strings, buffers, and all the primative types require vtables if they have methods, but there aren't vtables stored inside them.  You could make static vtable exceptions for them
@@ -39,6 +40,7 @@ BUGS:
   but adding a semi-colon will fix it
 * prefix operations should bind closer than subatomic_operations: !x.a should be parsed as (!x).a but instead is !(x.a)
 * there is still a bug with the Phi statement, in that it will return null if you don't cover all cases. there is no check for coverage
+* if you only have one element in a tuple, or in a record, it parses it as a block or expression
 
 
 TESTS:
@@ -51,6 +53,7 @@ TESTS:
 
 
 
+* there's no way to genericly compare or print tuples or records
 * make an "as" for of decl, like decl buffer_resize as resize: () -> ??
 * there's probably an issue with records in that we might not take into account different orders of items... { a=1, b=2 } might not equal { b=2, a=1 }
 

@@ -45,6 +45,8 @@ pub struct LLVM<'sess> {
 
 
 
+pub const TYPEVAR_ID: NodeID = UniqueID(2);
+
 pub fn cstr(string: &str) -> *mut i8 {
     CString::new(string).unwrap().into_raw()
 }
@@ -177,7 +179,8 @@ impl<'sess> LLVM<'sess> {
             LLType::I32 => self.i32_type(),
             LLType::I64 => self.i64_type(),
             LLType::F64 => self.f64_type(),
-            LLType::Var => self.str_type(),
+            //LLType::Var => self.str_type(),
+            LLType::Var => self.get_type(TYPEVAR_ID).unwrap(),
             LLType::Ptr(etype) => LLVMPointerType(self.build_type(etype), 0),
             LLType::Struct(etypes) => self.struct_type(etypes),
             LLType::Function(argtypes, rettype, abi) => self.cfunc_type(argtypes, rettype),
@@ -223,6 +226,17 @@ impl<'sess> LLVM<'sess> {
                 _ =>
                     panic!("I HAVEN'T DONE THIS"),
             }
+        } else {
+            value
+        }
+    }
+
+    pub unsafe fn cast_typevars(&self, rtype: LLVMTypeRef, value: LLVMValueRef) -> LLVMValueRef {
+        let vtype = LLVMTypeOf(value);
+        let ttype = self.get_type(TYPEVAR_ID).unwrap();
+
+        if rtype != vtype && rtype == ttype || vtype == ttype {
+            self.build_cast(rtype, value)
         } else {
             value
         }
@@ -561,7 +575,8 @@ impl<'sess> LLVM<'sess> {
         }
 
         let ret = self.build_expr_block(body);
-        LLVMBuildRet(self.builder, ret);
+        let rettype = LLVMGetReturnType(LLVMGetElementType(LLVMTypeOf(function)));
+        LLVMBuildRet(self.builder, self.build_cast(rettype, ret));
     }
 
     pub unsafe fn build_definitions(&self, globals: &Vec<LLGlobal>) {
@@ -589,11 +604,3 @@ impl<'sess> LLVM<'sess> {
     }
 }
 
-
-
-
-
-
-
-
- 

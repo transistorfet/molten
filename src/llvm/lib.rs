@@ -96,6 +96,7 @@ pub fn declare_builtins_node<'sess>(session: &Session, scope: ScopeRef, node: &B
 pub fn initialize_builtins<'sess>(llvm: &LLVM<'sess>, transformer: &Transformer, scope: ScopeRef, entries: &Vec<BuiltinDef<'sess>>) {
     unsafe {
         let pscope = scope.get_parent().unwrap();
+        llvm.set_type(TYPEVAR_ID, LLVMPointerType(LLVMStructCreateNamed(llvm.context, cstr("TypeVar")), 0));
         declare_irregular_functions(llvm);
         define_builtins_vec(llvm, transformer, ptr::null_mut(), scope.clone(), entries);
     }
@@ -203,8 +204,7 @@ unsafe fn build_lib_function(llvm: &LLVM, id: NodeID, name: &str, ltype: &LLType
 
     let args = (0..ltype.argcount()).map(|i| LLVMGetParam(function, i as u32)).collect();
     let ret = func(llvm, args);
-    //LLVMBuildRet(llvm.builder, llvm.build_cast(llvm.build_type(&ltype.get_rettype()), ret));
-    LLVMBuildRet(llvm.builder, ret);
+    LLVMBuildRet(llvm.builder, llvm.cast_typevars(LLVMGetReturnType(LLVMGetElementType(LLVMTypeOf(function))), ret));
 
     function
 }
@@ -223,8 +223,7 @@ unsafe fn build_lib_method(llvm: &LLVM, id: NodeID, name: &str, objtype: LLVMTyp
 
     let args = (0..ltype.argcount()).map(|i| LLVMGetParam(function, i as u32)).collect();
     let ret = func(llvm, objtype, args);
-    LLVMBuildRet(llvm.builder, llvm.build_cast(llvm.build_type(&ltype.get_rettype()), ret));
-    //LLVMBuildRet(llvm.builder, ret);
+    LLVMBuildRet(llvm.builder, llvm.cast_typevars(LLVMGetReturnType(LLVMGetElementType(LLVMTypeOf(function))), ret));
 
     function
 }
@@ -401,7 +400,7 @@ unsafe fn buffer_alloc(llvm: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef {
 unsafe fn buffer_resize(llvm: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef {
     let buffer = LLVMBuildPointerCast(llvm.builder, args[0], llvm.str_type(), cstr("tmp"));
     let size = LLVMBuildMul(llvm.builder, args[1], LLVMSizeOf(LLVMInt64TypeInContext(llvm.context)), cstr("tmp"));
-    let newptr = llvm.build_call_by_name("realloc", &mut vec!(buffer, size));
+    let newptr = llvm.build_call_by_name("realloc", &mut vec!(llvm.cast_typevars(llvm.build_type(&LLType::Var), buffer), size));
     LLVMBuildPointerCast(llvm.builder, newptr, llvm.ptr_type(), cstr("ptr"))
 }
 
