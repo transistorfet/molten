@@ -1,0 +1,25 @@
+
+//!should_fail
+//!err .*TypeError.*
+
+import lib.libcore
+
+class Parent {
+    fn new(self) { }
+
+    fn test(self, i) {
+        nil
+    }
+}
+
+class Child extends Parent {
+    fn new(self) { }
+
+    fn test(self, i) {
+        i * 2
+    }
+}
+
+let child = new Child()
+println(str(child.test(5)))
+

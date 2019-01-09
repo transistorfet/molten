@@ -1,0 +1,20 @@
+
+//! 5
+
+import lib.libcore
+
+class Test {
+    let mut a
+
+    fn new(self) {
+        self.a = 5
+    }
+
+    fn static() {
+        new Test()
+    }
+}
+
+let test = Test::static()
+println(str(test.a))
+

@@ -15,7 +15,7 @@ class Object {
         self.a = a
     }
 
-    fn test(self, x) {
+    fn test(self, x: Int) {
         println(str(self.a))
     }
 }

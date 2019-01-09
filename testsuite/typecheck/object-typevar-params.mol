@@ -1,0 +1,47 @@
+
+//! 56
+//! 5
+//! Thing
+//! None
+
+import lib.libcore
+
+class Option2<'item> {
+    let mut has = false
+    let mut item: 'item = nil
+
+    fn new(self) {
+        self.has = false
+        self.item = nil
+    }
+
+    fn some(item: 'item) {
+        let opt = new Option2<'item>()
+        opt.has = true
+        opt.item = item
+        opt
+    }
+
+    fn none() {
+        let opt = new Option2<'item2>()
+        opt.has = false
+        opt.item = nil
+        opt
+    }
+
+    fn unwrap_or(self, item: 'item) {
+        if self.has then
+            self.item
+        else
+            item
+    }
+}
+
+let opt1 = Option2::some(56)
+println(str(opt1.unwrap_or(1)))
+println(str(Option2::none().unwrap_or(5)))
+
+let opt2 = Option2::some("Thing")
+println(opt2.unwrap_or("Poop"))
+println(Option2::none().unwrap_or("None"))
+

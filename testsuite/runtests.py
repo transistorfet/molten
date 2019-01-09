@@ -24,6 +24,7 @@ def main():
     parser.add_argument('-f', '--force', action='store_true', help='Force a recompile of all files')
     parser.add_argument('-v', '--verbose', action='store_true', help='Print extended info on why a test fails')
     parser.add_argument('-n', '--no-color', action='store_true', help='Remove color codes from output')
+    parser.add_argument('-F', '--failed-only', action='store_true', help='Show only the failed tests')
     args = parser.parse_args()
 
     if args.no_color:
@@ -55,8 +56,9 @@ def run_all(args):
     passed = 0
     for i, (path, short) in enumerate(testfiles):
         total += 1
-        test = Test(path, verbose=args.verbose)
-        print("[{:02.0f}/{:02.0f}] ".format(i + 1, len(testfiles)), end="")
+        test = Test(path, verbose=args.verbose, failed_only=args.failed_only)
+        if not args.failed_only:
+            print("[{:02.0f}/{:02.0f}] ".format(i + 1, len(testfiles)), end="")
         if test.run_test(args.force, short=short):
             passed += 1
     print("{G}{}{C} tests passed, {R}{}{C} tests failed, {} total".format(passed, total - passed, total, R=RED, G=GREEN, C=CLEAR))
@@ -70,7 +72,8 @@ def find_rootdir():
 
 
 class Test (object):
-    def __init__(self, path, verbose=False):
+    def __init__(self, path, verbose=False, failed_only=False):
+        self.failed_only = failed_only
         self.verbose = verbose
         self.path = path
         self.expected_ret = True
@@ -140,8 +143,9 @@ class Test (object):
         self.load_dec()
 
         if self.check_result(retcode, stdout, stderr):
-            self.print_name(short)
-            print(GREEN + "success" + CLEAR)
+            if not self.failed_only:
+                self.print_name(short)
+                print(GREEN + "success" + CLEAR)
             return True
         else:
             self.print_name(short)

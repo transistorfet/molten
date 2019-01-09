@@ -1,0 +1,30 @@
+
+//! Between
+//! Outside
+//! Excluded
+//! Included
+
+import lib.libcore
+
+let a = 5
+let b = 34
+
+fn test(x) {
+    if x > 0 and x < 10 then
+        println("Between")
+    else
+        println("Outside")
+}
+
+fn testor(x) {
+    if x < 10 or x > 100 then
+        println("Excluded")
+    else
+        println("Included")
+}
+
+test(a)
+test(b)
+testor(a)
+testor(b)
+
