@@ -783,22 +783,36 @@ impl<'sess> Transformer<'sess> {
         panic!("Not Implemented");
     }
 
-    fn find_comparison_func(&self, scope: ScopeRef, ctype: &Type) -> NodeID {
-        let compid = scope.get_var_def(&String::from("==")).unwrap();
+    /*
+    fn find_func(&self, scope: ScopeRef, name: &str, argtypes: &Vec<Type>) -> NodeID {
+        let compid = scope.get_var_def(&String::from(name)).unwrap();
         match self.session.get_def(compid) {
-            Ok(Def::Overload(ol)) => ol.find_variant(self.session, scope.clone(), Type::Tuple(vec!(ctype.clone(), ctype.clone()))).unwrap().0,
+            Ok(Def::Overload(ol)) => ol.find_variant(self.session, scope.clone(), Type::Tuple(argtypes.clone())).unwrap().0,
             _ => compid,
         }
     }
+    */
 
     fn transform_side_effect(&self, scope: ScopeRef, op: &str, args: &Vec<AST>) -> Vec<LLExpr> {
         let mut conds = vec!();
         let mut blocks = vec!();
 
         // TODO this doesn't work with non-boolean values
-        conds.push(self.transform_node(scope.clone(), &args[0]));
-        blocks.push(self.transform_node(scope.clone(), &args[1]));
-        vec!(LLExpr::Phi(conds, blocks))
+        match op {
+            "and" => {
+                conds.push(self.transform_node(scope.clone(), &args[0]));
+                blocks.push(self.transform_node(scope.clone(), &args[1]));
+                vec!(LLExpr::Phi(conds, blocks))
+            },
+            "or" => {
+                conds.push(self.transform_node(scope.clone(), &args[0]));
+                blocks.push(vec!(LLExpr::Literal(LLLit::I1(true))));
+                conds.push(vec!(LLExpr::Literal(LLLit::I1(true))));
+                blocks.push(self.transform_node(scope.clone(), &args[1]));
+                vec!(LLExpr::Phi(conds, blocks))
+            },
+            _ => panic!("Not Implemented: {:?}", op),
+        }
     }
 
 

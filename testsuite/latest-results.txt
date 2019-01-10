@@ -1,4 +1,4 @@
-Wed Jan  9 15:48:06 PST 2019
+Wed Jan  9 16:11:52 PST 2019
 [01/52] basic/abi-across-exprs.mol......................................success
 [02/52] basic/block-assign.mol..........................................success
 [03/52] basic/block-invoke.mol..........................................success
@@ -25,7 +25,7 @@ Wed Jan  9 15:48:06 PST 2019
 [24/52] basic/records.mol...............................................success
 [25/52] basic/recursion.mol.............................................success
 [26/52] basic/refs.mol..................................................FAIL
-[27/52] basic/sideeffects.mol...........................................FAIL
+[27/52] basic/sideeffects.mol...........................................success
 [28/52] basic/string-escapes.mol........................................success
 [29/52] basic/tuples-as-args.mol........................................success
 [30/52] basic/tuples.mol................................................success
@@ -51,4 +51,4 @@ Wed Jan  9 15:48:06 PST 2019
 [50/52] typecheck/infer-forward-method.mol..............................FAIL
 [51/52] typecheck/method-overload-mismatch.mol..........................FAIL
 [52/52] typecheck/object-typevar-params.mol.............................success
-44 tests passed, 8 tests failed, 52 total
+45 tests passed, 7 tests failed, 52 total

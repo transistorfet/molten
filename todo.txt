@@ -33,7 +33,6 @@ Refactoring:
 
 
 BUGS:
-* "or" is not working
 * recursive c functions don't work because it's typechecked as unknown abi, which is called as a closure
 * issue with calling function references store in structs or tuples... it converts them to methods incorrectly
 * if there are brackets after a record literal, it will try to call it as a function: let bar = ref { a = 1, b = 2 } \n (!x).a    parses incorrectly,
