@@ -121,7 +121,8 @@ fn bind_names_node_or_error(session: &Session, scope: ScopeRef, node: &mut AST) 
             bind_names_node(session, lscope, body);
         },
 
-        AST::Ref(_, _, ref mut code) => { bind_names_node(session, scope, code.as_mut()); },
+        AST::Ref(_, _, ref mut code) |
+        AST::Deref(_, _, ref mut code) => { bind_names_node(session, scope, code.as_mut()); },
 
         AST::Tuple(_, _, ref mut code) |
         AST::List(_, _, ref mut code) |

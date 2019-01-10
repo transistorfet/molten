@@ -114,6 +114,7 @@ pub fn refine_node(node: AST) -> AST {
         },
 
         AST::Ref(id, pos, expr) => { AST::Ref(id, pos, Box::new(refine_node(*expr))) },
+        AST::Deref(id, pos, expr) => { AST::Deref(id, pos, Box::new(refine_node(*expr))) },
 
         AST::Tuple(id, pos, items) => { AST::Tuple(id, pos, refine_vec(items)) },
 

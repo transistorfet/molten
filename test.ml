@@ -348,8 +348,8 @@
 
         let numbers = [ 1, 2, 3 ]
         numbers.insert(1, 5)
-        for x in numbers
-            println("Count: " + str(x))
+        for element in numbers
+            println("Count: " + str(element))
 
 
         /// Type Defs

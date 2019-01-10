@@ -324,10 +324,6 @@ pub fn get_builtins<'sess>() -> Vec<BuiltinDef<'sess>> {
         BuiltinDef::Func(id(), "==",  "(Bool, Bool) -> Bool / MF",   FuncKind::Function(eq_bool)),
         BuiltinDef::Func(id(), "!=",  "(Bool, Bool) -> Bool / MF",   FuncKind::Function(ne_bool)),
         BuiltinDef::Func(id(), "not", "(Bool) -> Bool / MF",         FuncKind::Function(not_bool)),
-
-
-        //// Ref Builtins ////
-        BuiltinDef::Func(id(), "!",   "(ref 'ptr) -> 'ptr / MF",     FuncKind::Function(deref)),
     )
 }
 
@@ -364,8 +360,6 @@ fn gte_real(llvm: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLV
 fn eq_bool(llvm: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildICmp(llvm.builder, llvm::LLVMIntPredicate::LLVMIntEQ, args[0], args[1], cstr("")) } }
 fn ne_bool(llvm: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildICmp(llvm.builder, llvm::LLVMIntPredicate::LLVMIntNE, args[0], args[1], cstr("")) } }
 fn not_bool(llvm: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildNot(llvm.builder, args[0], cstr("")) } }
-
-fn deref(llvm: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildLoad(llvm.builder, args[0], cstr("")) } }
 
 fn sprintf(llvm: &LLVM, mut args: Vec<LLVMValueRef>) -> LLVMValueRef {
     unsafe {

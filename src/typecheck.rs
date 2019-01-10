@@ -218,6 +218,23 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &AST,
             rtype
         },
 
+        AST::Deref(ref id, _, ref expr) => {
+            match check_types_node(session, scope.clone(), expr, None) {
+                Type::Ref(etype) => {
+                    let etype = expect_type(session, scope.clone(), expected.clone(), Some(*etype), Check::Def)?;
+                    session.set_type(*id, etype.clone());
+                    etype
+                },
+                Type::Variable(_, vid) => {
+                    let etype = expect_type(session, scope.clone(), expected.clone(), None, Check::Def)?;
+                    session.update_type(scope.clone(), vid, Type::Ref(Box::new(etype.clone())))?;
+                    session.set_type(*id, etype.clone());
+                    etype
+                },
+                ttype @ _ => return Err(Error::new(format!("TypeError: attempting to dereference a non-reference: {:?}", ttype))),
+            }
+        },
+
         AST::Tuple(ref id, _, ref items) => {
             // TODO would this not be a bug if the expected type was for some reason a variable?
             //let etypes = match expected {

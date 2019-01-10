@@ -517,7 +517,6 @@ named!(atomic(Span) -> AST,
 named!(prefix_op(Span) -> Ident,
     map_ident!(alt!(
         tag_word!("not") |
-        tag!("!") |
         tag!("~")
     ))
 );
@@ -571,6 +570,7 @@ named!(subatomic(Span) -> AST,
     alt_complete!(
         delimited!(tag!("("), wscom!(expression), tag!(")")) |
         block |
+        dereference |
         literal |
         identifier_node
     )
@@ -578,6 +578,15 @@ named!(subatomic(Span) -> AST,
 
 named!(expression_list(Span) -> Vec<AST>,
     separated_list_complete!(tag!(","), expression)
+);
+
+named!(dereference(Span) -> AST,
+    do_parse!(
+        pos: position!() >>
+        tag!("!") >>
+        a: subatomic >>
+        (AST::make_deref(Pos::new(pos), a))
+    )
 );
 
 named!(identifier_node(Span) -> AST,

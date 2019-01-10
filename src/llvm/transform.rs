@@ -176,6 +176,10 @@ impl<'sess> Transformer<'sess> {
                 self.transform_alloc_ref(scope.clone(), *id, value)
             },
 
+            AST::Deref(id, _, value) => {
+                self.transform_deref_ref(scope.clone(), value)
+            },
+
             AST::Record(id, _, items) => {
                 let mut nitems = vec!();
                 for item in items {
@@ -575,6 +579,13 @@ impl<'sess> Transformer<'sess> {
         let valexpr = self.transform_as_result(&mut exprs, scope.clone(), value).unwrap();
         let ltype = self.transform_value_type(&self.session.get_type(id).unwrap());
         exprs.push(LLExpr::AllocRef(id, ltype, Some(r(valexpr))));
+        exprs
+    }
+
+    fn transform_deref_ref(&self, scope: ScopeRef, value: &AST) -> Vec<LLExpr> {
+        let mut exprs = vec!();
+        let valexpr = self.transform_as_result(&mut exprs, scope.clone(), value).unwrap();
+        exprs.push(LLExpr::LoadRef(r(valexpr)));
         exprs
     }
 
