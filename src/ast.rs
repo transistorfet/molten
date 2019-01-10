@@ -75,7 +75,6 @@ pub enum AST {
     Record(NodeID, Pos, Vec<(Ident, AST)>),
     List(NodeID, Pos, Vec<AST>),
 
-    Recall(NodeID, Pos),
     Identifier(NodeID, Pos, Ident),
     Index(NodeID, Pos, Box<AST>, Box<AST>),
     Resolver(NodeID, Pos, Box<AST>, Ident, NodeID),
@@ -208,7 +207,6 @@ impl AST {
             AST::Tuple(_, ref pos, _) |
             AST::Record(_, ref pos, _) |
             AST::List(_, ref pos, _) |
-            AST::Recall(_, ref pos) |
             AST::Identifier(_, ref pos, _) |
             AST::Index(_, ref pos, _, _) |
             AST::Resolver(_, ref pos, _, _, _) |
@@ -242,7 +240,6 @@ impl AST {
             AST::Tuple(ref id, _, _) |
             AST::Record(ref id, _, _) |
             AST::List(ref id, _, _) |
-            AST::Recall(ref id, _) |
             AST::Identifier(ref id, _, _) |
             AST::Index(ref id, _, _, _) |
             AST::Resolver(ref id, _, _, _, _) |
@@ -290,10 +287,6 @@ impl AST {
 
     pub fn make_list(pos: Pos, items: Vec<AST>) -> AST {
         AST::List(NodeID::generate(), pos, items)
-    }
-
-    pub fn make_recall(pos: Pos) -> AST {
-        AST::Recall(NodeID::generate(), pos)
     }
 
     pub fn make_ident(pos: Pos, ident: Ident) -> AST {

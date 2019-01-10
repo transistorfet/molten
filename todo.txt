@@ -4,7 +4,6 @@
 
 * implement assignment to refs
 * implement return value conversion
-* remove AST::Recall when you switch over to llvm2
 * unable to defined a method as / MF or / C ABI
 * implement try, raise
 

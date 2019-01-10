@@ -218,7 +218,6 @@ pub fn refine_node(node: AST) -> AST {
         AST::Literal(_, _) => { node },
         AST::Nil(_) => { node },
         AST::PtrCast(_, _) => { node },
-        AST::Recall(_, _) => { node },
         AST::Identifier(_, _, _) => { node },
         AST::New(_, _, _) => { node },
         AST::TypeAlias(_, _, _, _) => { node },

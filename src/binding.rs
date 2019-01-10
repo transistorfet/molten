@@ -227,7 +227,6 @@ fn bind_names_node_or_error(session: &Session, scope: ScopeRef, node: &mut AST) 
             bind_names_vec(session, scope, decls);
         },
 
-        AST::Recall(_, _) |
         AST::Nil(_) |
         AST::Literal(_, _) => { }
     }

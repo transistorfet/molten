@@ -313,7 +313,6 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &AST,
             scope.make_obj(session, String::from("()"), vec!())?
         },
 
-        AST::Recall(_, _) => panic!("InternalError: Recall ast element shouldn't appear this early"),
         AST::Index(_, _, _, _) => panic!("InternalError: ast element shouldn't appear at this late phase: {:?}", node),
     };
     
