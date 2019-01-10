@@ -4,8 +4,8 @@
 
 * implement assignment to refs
 * implement return value conversion
-* unable to defined a method as / MF or / C ABI
 * implement try, raise
+* unable to defined a method as / MF or / C ABI
 
 Typechecking:
 * if you made typechecking an object like transform, and had a context, you could do extended checks of what's allowed in a C function, like exceptions (disallowed in C, but allowed in M and MF)

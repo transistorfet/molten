@@ -257,13 +257,6 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &AST,
         },
 
         AST::TypeAlias(ref id, _, ref classspec, ref ttype) => {
-            /*
-            let tscope = session.map.get(id);
-            for field in fields {
-                // TODO check the types such that any unprovided types are infered
-                //expect_type(session, tscope, Some(ttype.clone()), Some(ctype), Check::List)?;
-            }
-            */
             scope.make_obj(session, String::from("()"), vec!())?
         },
 
