@@ -199,6 +199,7 @@ pub fn refine_node(node: AST) -> AST {
             let left = *left;
             match left {
                 //AST::Identifier(_, _, _) |
+                AST::Deref(_, _, _) |
                 AST::Accessor(_, _, _, _, _) => {
                     AST::Assignment(id, pos, Box::new(refine_node(left)), Box::new(refine_node(*right)))
                 },

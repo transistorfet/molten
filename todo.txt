@@ -2,7 +2,9 @@
 * you need to add a public/private flag to definitions, for exporting, along with a "private" attribute in IR
 * update the readme
 
-* implement assignment to refs
+* improve error checks
+* improve type checker
+* fix parse issue with subops
 * implement return value conversion
 * implement try, raise
 * unable to defined a method as / MF or / C ABI

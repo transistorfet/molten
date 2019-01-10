@@ -308,9 +308,13 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &AST,
 
         AST::Assignment(ref id, _, ref left, ref right) => {
             // TODO this is duplicated in check_types_node(left)... can we avoid that
-            let (refid, defid) = get_access_ids(session, scope.clone(), left)?.unwrap();
-            if !session.get_def(defid).map(|d| d.is_mutable()).unwrap_or(false) {
-                return Err(Error::new(format!("MutableError: attempting to assign to an immutable variable")));
+            match get_access_ids(session, scope.clone(), left)? {
+                Some((refid, defid)) => {
+                    if !session.get_def(defid).map(|d| d.is_mutable()).unwrap_or(false) {
+                        return Err(Error::new(format!("MutableError: attempting to assign to an immutable variable")));
+                    }
+                },
+                None => { }
             }
 
             let ltype = check_types_node(session, scope.clone(), left, None);

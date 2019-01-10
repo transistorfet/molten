@@ -741,6 +741,10 @@ impl<'sess> Transformer<'sess> {
                 let defid = self.session.get_ref(*aid).unwrap();
                 exprs.push(LLExpr::StoreRef(r(LLExpr::GetValue(defid)), r(value)));
             },
+            AST::Deref(aid, _, node) => {
+                let result = self.transform_as_result(&mut exprs, scope.clone(), node).unwrap();
+                exprs.push(LLExpr::StoreRef(r(result), r(value)));
+            },
             _ => panic!("InternalError: attempting to assign to an invalid pattern, {:?}", left),
         }
         exprs

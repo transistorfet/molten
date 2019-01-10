@@ -207,10 +207,6 @@ fn baz(i: Int) / C {
 Yet To Complete
 ---------------
 
-- Closure conversion is not yet fully implemented.  I haven't decided yet
-  whether to make all functions be closures, or to add a distinct type for
-  closures vs non-closure functions
-
 - Exceptions haven't been implemented yet.  This somewhat relates to the
   above issue of making all functions support throwing exceptions, which
   means a need to declare C/C++ functions that do not allow exceptions.
@@ -223,6 +219,13 @@ Yet To Complete
   solution is to just disallow initial values in class members
 
 - Garbage collection is not yet implemented
+
+
+- Closures have been implemented! Most functions and methods are now
+  closures, although there is a new ABI type (MF) which is a
+  non-closure function that can still be overloaded and can still
+  throw exceptions (when they're implemented). It's mostly used by
+  builtin functions
 
 - Dynamic Dispatch/vtables works now!
 
