@@ -6,11 +6,14 @@
 * implement return value conversion
 * implement try, raise
 * unable to defined a method as / MF or / C ABI
+* either add in the initialization of class variables, possibly limited to constant expressions only, or else raise an error if an initializer is provided
+
 
 Typechecking:
 * if you made typechecking an object like transform, and had a context, you could do extended checks of what's allowed in a C function, like exceptions (disallowed in C, but allowed in M and MF)
 * there is a problem with typechecking Option, where in compiles it as an Option<Int> rather than Option<'item>
 * there's still a problem with typevars not resolving fully, where a function that should return a concrete returns a free typevar.... (recursion or forward definition)
+
 
 Error Messages:
 * there are poor error messages when deleting the "=" from a "let something = fn x => ..." both inside and outside classes.... shouldn't be doing this (actually, because of
@@ -25,18 +28,22 @@ Error Messages:
 
 
 Refactoring:
+* modify resolve to return a result rather than unwrapping
+* improve storing of file info in the Pos structs (maybe rename to Span?)
+* change parser to take session argument or something so it can record the file info, and maybe do other advanced things
+* should you add session to refinery and process imports there
 * make refinery use an object direct traversal, which can store context, which could be used to error when a mut outside a class is used, rather than putting the check in assignment
 * make binding and typechecking use an object, which could help break them down a bit into smaller functions
-* modify resolve to return a result rather than unwrapping
+* there must be a way to fix the 'scope exceptions' (Scope::target) that we're doing to make class bodies work... pass in an argument to all scoped functions?  or use scopemap and scope ids?
+* add the .set_id() functions to simpliy ast builders
 
 
 
 BUGS:
+* if there are brackets after a record literal, it will try to call it as a function: let bar = ref { a = 1, b = 2 } \n (!x).a    parses incorrectly,
+  but adding a semi-colon will fix it.  It tries to parse through the line terminator
 * recursive c functions don't work because it's typechecked as unknown abi, which is called as a closure
 * issue with calling function references store in structs or tuples... it converts them to methods incorrectly
-* if there are brackets after a record literal, it will try to call it as a function: let bar = ref { a = 1, b = 2 } \n (!x).a    parses incorrectly,
-  but adding a semi-colon will fix it
-* prefix operations should bind closer than subatomic_operations: !x.a should be parsed as (!x).a but instead is !(x.a)
 * there is still a bug with the Phi statement, in that it will return null if you don't cover all cases. there is no check for coverage
 * if you only have one element in a tuple, or in a record, it parses it as a block or expression
 * there was an error where "let ni: newint" with no initializer was causing a type error with "expected class or concrete type", but that was actually because a definition without
@@ -56,24 +63,16 @@ TESTS:
 
 
 Changes:
-* either add in the initialization of class variables, possibly limited to constant expressions only, or else raise an error if an initializer is provided
 * if, sideeffects, and while loops need bool comparison results to work correctly.  You can either force that in type checking or somehow desugar or use the comps style from match
 * you could modify the forloop code to take an iterator in future
 * you really need a better way of doing modules
 * should vtables be dynamically allocated, or should we add a LLType::ElementOf() type or something to GetElement an aliased type
-
-
-
 * change how you reference an operator function; like op+ or (+)
-* there's no way to genericly compare or print tuples or records
 * make an "as" for of decl, like decl buffer_resize as resize: () -> ??
 
 
-* there must be a way to fix the 'scope exceptions' (Scope::target) that we're doing to make class bodies work... pass in an argument to all scoped functions?  or use scopemap and scope ids?
-* improve storing of file info in the Pos structs (maybe rename to Span?)
-* change parser to take session argument or something so it can record the file info, and maybe do other advanced things
-* should you add session to refinery and process imports there
-* add the .set_id() functions to simpliy ast builders
+
+* there's no way to genericly compare or print tuples or records
 
 
 * it might also make it easier/generic to allow compiling to object files?  So no linking, but it would do optimization and object file output

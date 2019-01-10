@@ -1,0 +1,10 @@
+
+
+// this had been intepreted as (let x = ( (ref { a = 2, b = 5 })(deref x) ) . a)  [ accessor of an invoke of a literal ]
+let x = ref { a = 2, b = 5 }
+(!x).a
+
+// the previous succeeded and the following failed before I modifier the parser
+let x = ref { a = 2, b = 5 }
+!x.a
+

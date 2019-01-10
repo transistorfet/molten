@@ -1,0 +1,16 @@
+
+// test reference assignment
+
+//! 42
+//! 3.300000
+
+import lib.libcore
+
+let r1 = ref 56
+!r1 = 21
+println(str(!r1 * 2))
+
+let r2 = ref { a = 6.2, b = 8 }
+!r2 = { a = 3.3, b = 8 }
+println(str(!r2.a))
+
