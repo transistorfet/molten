@@ -1,0 +1,27 @@
+
+//! It Closure Worked
+//! 8
+
+import lib.libcore
+
+fn test() {
+    let clo = "It Closure Worked"
+
+    class Parent {
+        let mut bar = 8
+
+        fn new(self) { }
+    }
+
+    class Child extends Parent {
+        let mut foo = clo
+
+        fn new(self) { }
+    }
+
+    let child = new Child()
+    println(child.foo)
+    println(str(child.bar))
+}
+test()
+

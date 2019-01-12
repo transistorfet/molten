@@ -1,4 +1,6 @@
 
+* there's still an issue with the transformed name of methods
+
 * change box::news
 * you need to add a public/private flag to definitions, for exporting, along with a "private" attribute in IR
 * update the readme
@@ -7,7 +9,6 @@
 * improve type checker
 * fix parse issue with subops
 * implement try, raise
-* either add in the initialization of class variables, possibly limited to constant expressions only, or else raise an error if an initializer is provided
 
 
 Typechecking:
@@ -53,6 +54,7 @@ BUGS:
 
 
 TESTS:
+* test class init with inherited classes
 * test for static method vtable access, dynamic dispatch via that mechanism, and overloading used with resolve
 * error conditions, lack of typing should error, etc
 * test for recursive C functions, recursive MF functions

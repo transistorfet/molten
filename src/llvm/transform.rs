@@ -603,8 +603,8 @@ impl<'sess> Transformer<'sess> {
         if let Def::Class(classdef) = self.session.get_def(defid).unwrap() {
             if let Some(index) = classdef.get_struct_vtable_index() {
                 exprs.push(LLExpr::StoreRef(r(LLExpr::AccessRef(r(LLExpr::GetValue(id)), vec!(LLRef::Field(index)))), r(LLExpr::GetLocal(classdef.vtable.id))));
-                //exprs.push(LLExpr::GetValue(id));
-                exprs.extend(self.create_closure_invoke(LLExpr::GetValue(classdef.initid), vec!(LLExpr::GetValue(id))));
+                exprs.push(LLExpr::GetValue(id));
+                //exprs.extend(self.create_closure_invoke(LLExpr::GetValue(classdef.initid), vec!(LLExpr::GetValue(id))));
             }
         }
         exprs
@@ -667,12 +667,12 @@ impl<'sess> Transformer<'sess> {
         for node in body {
             match node {
                 AST::Function(id, _, ident, args, _, body, abi) => {
-                    ident.as_ref().map(|ref ident| if ident.as_str() == "__init__" { has_init = true; });
+                    //ident.as_ref().map(|ref ident| if ident.as_str() == "__init__" { has_init = true; });
                     // TODO i switched to using scope here instead of tscope because it was causing problems with references inside closures
                     exprs.extend(self.transform_func_def(scope.clone(), *abi, *id, ident.as_ref().map(|ident| &ident.name), args, body));
                 },
                 AST::Declare(id, _, ident, ttype) => {
-                    if ident.as_str() == "__init__" { has_init = true; }
+                    //if ident.as_str() == "__init__" { has_init = true; }
                     exprs.extend(self.transform_func_decl(scope.clone(), ttype.get_abi().unwrap(), *id, &ident.name, ttype));
                 },
                 AST::Definition(_, _, _, ident, _, value) => {
@@ -684,6 +684,7 @@ impl<'sess> Transformer<'sess> {
             }
         }
 
+        /*
         if !has_init {
             // TODO this can go to refinery if you add another intermediate rep
             let initid = classdef.initid;
@@ -698,6 +699,7 @@ impl<'sess> Transformer<'sess> {
             typecheck::check_types(self.session, scope.clone(), &initcode);
             exprs.extend(self.transform_vec(scope.clone(), &initcode));
         }
+        */
 
         exprs.extend(self.transform_vtable_init(scope.clone(), classdef));
         exprs

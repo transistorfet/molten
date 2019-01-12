@@ -1,9 +1,10 @@
 
 use rand;
 
+use abi::ABI;
 use types::Type;
 use utils::UniqueID;
-use ast::{ NodeID, AST, Ident, ClassSpec, Pattern, Literal };
+use ast::{ NodeID, AST, Ident, ClassSpec, Argument, Pattern, Literal };
 
 pub fn refine(code: Vec<AST>) -> Vec<AST> {
     //vec!(AST::make_func(Pos::empty(), Some(Ident::new(Pos::empty(), format!("init.{}", "test"))), vec!(), None,
@@ -146,9 +147,17 @@ pub fn refine_node(node: AST) -> AST {
             AST::make_block(pos.clone(), refine_vec(block))
         },
 
+        //AST::New(_, _, _) => { node },
+        AST::New(id, pos, classspec) => {
+            AST::make_invoke(pos.clone(),
+                AST::make_resolve(pos.clone(), AST::Identifier(NodeID::generate(), pos.clone(), classspec.ident.clone()), Ident::from_str("__init__")),
+                vec!(AST::New(id, pos.clone(), classspec)))
+        },
+
         AST::Class(id, pos, classspec, parentspec, body) => {
             // Make sure constructors take "self" as the first argument, and return "self" at the end
             let mut has_new = false;
+            let mut has_init = false;
             let mut body: Vec<AST> = body.into_iter().map(|node| {
                 match node {
                     AST::Function(id, pos, ident, args, ret, mut body, abi) => {
@@ -160,12 +169,14 @@ pub fn refine_node(node: AST) -> AST {
                                 panic!("SyntaxError: the \"new\" method on a class must have \"self\" as its first parameter");
                             }
                         }
+                        ident.as_ref().map(|ref ident| if ident.as_str() == "__init__" { has_init = true; });
                         AST::Function(id, pos, ident, args, ret, body, abi)
                     },
                     AST::Declare(id, pos, ident, ttype) => {
                         if ident.as_str() == "new" {
                             has_new = true;
                         }
+                        if ident.as_str() == "__init__" { has_init = true; }
                         AST::Declare(id, pos, ident, ttype)
                     },
                     _ => node
@@ -176,7 +187,31 @@ pub fn refine_node(node: AST) -> AST {
                 //panic!("SyntaxError: you must declare a \"new\" method on a class");
             }
 
-            
+            // Create an __init__ function to initialize the fields of a newly created class object
+            if !has_init {
+                let mut init = vec!();
+                for node in &body {
+                    match node {
+                        AST::Definition(_, _, _, ident, _, value) => {
+                            init.push(AST::make_assign(pos.clone(),
+                                AST::make_access(pos.clone(), AST::make_ident_from_str(pos.clone(), "self"), ident.clone()),
+                                *value.clone()));
+                        },
+                        _ => { },
+                    }
+                }
+
+                let initid = NodeID::generate();
+                let iargs = vec!(Argument::new(pos.clone(), Ident::from_str("self"), None, None));
+                if let Some(parentspec) = parentspec.as_ref() {
+                    init.insert(0, AST::make_invoke(pos.clone(),
+                        AST::make_resolve(pos.clone(), AST::make_ident(pos.clone(), parentspec.ident.clone()), Ident::from_str("__init__")),
+                        vec!(AST::make_ident(pos.clone(), Ident::from_str("self")))));
+                }
+                init.push(AST::make_ident_from_str(pos.clone(), "self"));
+                let mut initcode = AST::Function(initid, pos.clone(), Some(Ident::from_str("__init__")), iargs, None, Box::new(AST::make_block(pos.clone(), init)), ABI::Molten);
+                body.push(initcode);
+            }
 
             AST::Class(id, pos, classspec, parentspec, refine_vec(body))
         },
@@ -220,11 +255,13 @@ pub fn refine_node(node: AST) -> AST {
         //    AST::Import(id, pos, ident, refine_vec(decls))
         //},
 
+        AST::PtrCast(ttype, value) => {
+            AST::PtrCast(ttype, Box::new(refine_node(*value)))
+        },
+
         AST::Literal(_, _) => { node },
         AST::Nil(_) => { node },
-        AST::PtrCast(_, _) => { node },
         AST::Identifier(_, _, _) => { node },
-        AST::New(_, _, _) => { node },
         AST::TypeAlias(_, _, _, _) => { node },
 
         //node @ _ => { node }
