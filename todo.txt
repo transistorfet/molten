@@ -1,13 +1,12 @@
 
+* change box::news
 * you need to add a public/private flag to definitions, for exporting, along with a "private" attribute in IR
 * update the readme
 
 * improve error checks
 * improve type checker
 * fix parse issue with subops
-* implement return value conversion
 * implement try, raise
-* unable to defined a method as / MF or / C ABI
 * either add in the initialization of class variables, possibly limited to constant expressions only, or else raise an error if an initializer is provided
 
 
@@ -65,6 +64,7 @@ TESTS:
 
 
 Changes:
+* unable to define a method as / MF or / C ABI
 * if, sideeffects, and while loops need bool comparison results to work correctly.  You can either force that in type checking or somehow desugar or use the comps style from match
 * you could modify the forloop code to take an iterator in future
 * you really need a better way of doing modules
@@ -92,19 +92,19 @@ Changes:
 * rather than coercising a non pointer type into a pointer, you can box any such types, possibly adding a vtablu of sorts in the process
   possibly containing functions and metadata for copying. You could also make buffer copying functions that take the element size and copy
   the buffer data into the boxed location.
+* implement return value conversion (this doesn't appear to be needed?  Why didn't it work with tuple closures though?)
 
 
 
 
-* implement enums
+* implement exceptions
 * add patterns and matching of patterns
-* implement assignment of tuples and records? or
+* implement enums
+* implement garbage collection
 * add a spread operator for records
 * add an iterator type
-* implement exceptions
-* implement garbage collection
+* implement assignment of tuples and records? or
 * add compiler directives?
-* use customized visitors throughout??
 
 * issue with separator/lf not working when two expressions are on the same line (it should produce a parse error)
 * better support for generics

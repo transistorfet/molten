@@ -17,6 +17,7 @@ use defs::variables::FieldDef;
 #[derive(Clone, Debug, PartialEq)]
 pub struct ClassDef {
     pub id: NodeID,
+    pub initid: NodeID,
     pub primative: Cell<bool>,
     pub classname: String,
     pub classtype: Type,
@@ -32,6 +33,7 @@ impl ClassDef {
     pub fn new(id: NodeID, classname: String, classtype: Type, parenttype: Option<Type>, vars: ScopeRef, vtable: Vtable) -> Self {
         Self {
             id: id,
+            initid: NodeID::generate(),
             primative: Cell::new(false),
             classname: classname,
             classtype: classtype,

@@ -163,7 +163,7 @@ pub fn refine_node(node: AST) -> AST {
                         AST::Function(id, pos, ident, args, ret, body, abi)
                     },
                     AST::Declare(id, pos, ident, ttype) => {
-                        if ident.name == String::from("new") {
+                        if ident.as_str() == "new" {
                             has_new = true;
                         }
                         AST::Declare(id, pos, ident, ttype)
@@ -175,6 +175,9 @@ pub fn refine_node(node: AST) -> AST {
                 //body.insert(0, AST::Function(id, pos.clone(), Some(String::from("new")), vec!((String::from("self"), None, None)), None, Box::new(AST::Identifier(id, pos.clone(), String::from("self"))), UniqueID::generate(), ABI::Molten));
                 //panic!("SyntaxError: you must declare a \"new\" method on a class");
             }
+
+            
+
             AST::Class(id, pos, classspec, parentspec, refine_vec(body))
         },
 
