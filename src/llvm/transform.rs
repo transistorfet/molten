@@ -604,7 +604,6 @@ impl<'sess> Transformer<'sess> {
             if let Some(index) = classdef.get_struct_vtable_index() {
                 exprs.push(LLExpr::StoreRef(r(LLExpr::AccessRef(r(LLExpr::GetValue(id)), vec!(LLRef::Field(index)))), r(LLExpr::GetLocal(classdef.vtable.id))));
                 exprs.push(LLExpr::GetValue(id));
-                //exprs.extend(self.create_closure_invoke(LLExpr::GetValue(classdef.initid), vec!(LLExpr::GetValue(id))));
             }
         }
         exprs
@@ -667,12 +666,10 @@ impl<'sess> Transformer<'sess> {
         for node in body {
             match node {
                 AST::Function(id, _, ident, args, _, body, abi) => {
-                    //ident.as_ref().map(|ref ident| if ident.as_str() == "__init__" { has_init = true; });
                     // TODO i switched to using scope here instead of tscope because it was causing problems with references inside closures
                     exprs.extend(self.transform_func_def(scope.clone(), *abi, *id, ident.as_ref().map(|ident| &ident.name), args, body));
                 },
                 AST::Declare(id, _, ident, ttype) => {
-                    //if ident.as_str() == "__init__" { has_init = true; }
                     exprs.extend(self.transform_func_decl(scope.clone(), ttype.get_abi().unwrap(), *id, &ident.name, ttype));
                 },
                 AST::Definition(_, _, _, ident, _, value) => {
@@ -683,23 +680,6 @@ impl<'sess> Transformer<'sess> {
                 _ => panic!("Not Implemented: {:?}", node),
             }
         }
-
-        /*
-        if !has_init {
-            // TODO this can go to refinery if you add another intermediate rep
-            let initid = classdef.initid;
-            //tscope.define_type(String::from("Self"), Some(classdef.id));
-            let inittype = Type::Function(Box::new(Type::Tuple(vec!(classdef.classtype.clone()))), Box::new(classdef.classtype.clone()), ABI::Molten);
-            let iargs = vec!(Argument::new(Pos::empty(), Ident::from_str("self"), None, None));
-            init.push(AST::make_ident_from_str(Pos::empty(), "self"));
-            let mut initcode = vec!(AST::Function(initid, Pos::empty(), Some(Ident::from_str("__init__")), iargs, Some(classdef.classtype.clone()), Box::new(AST::make_block(Pos::empty(), init)), ABI::Molten));
-
-            debug!("{}\n{:#?}", classdef.classname, initcode);
-            binding::bind_names(self.session, tscope.clone(), &mut initcode);
-            typecheck::check_types(self.session, scope.clone(), &initcode);
-            exprs.extend(self.transform_vec(scope.clone(), &initcode));
-        }
-        */
 
         exprs.extend(self.transform_vtable_init(scope.clone(), classdef));
         exprs
