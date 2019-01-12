@@ -106,7 +106,7 @@ foo(1, 2)
 ### Classes
 ```
 class Foo {
-    let name: String
+    let mut name: String
 
     fn new(self, name) {
         self.name = name
@@ -126,6 +126,21 @@ bar.get("The Cat")              // returns "Mischief The Cat"
 Foo::static(5)
 ```
 
+### Blocks
+A block is a collection of statements which return the result of the last
+expression in the block.  They can be used in place of a single expression.
+They do not create their own local scope, at least at the moment, so variables
+defined inside blocks will appear in the parent scope (usually the function
+the block is in).
+```
+let is_zero = if self.x <= 0 then {
+    self.x = 0
+    true
+} else {
+    false
+}
+```
+
 ### Flow Control
 The return value of an if statement is the result of the expression of the
 clause that is evaluated.  The types of both clauses must match.  The `else`
@@ -143,6 +158,12 @@ match x {
 }
 ```
 
+### And / Or
+The keyword operators `and` and `or` have side-effects and will not execute
+the second expression if the result can be determined from the first
+expression.  The resulting value is the last expression that was executed.
+Operands are not limited to Bool values, although that may change in future.
+
 ### Loops
 ```
 while is_true
@@ -150,21 +171,6 @@ while is_true
 
 for i in [ 1, 2, 3 ]
     println("counting " + i)
-```
-
-### Blocks
-A block is a collection of statements which return the result of the last
-expression in the block.  They can be used in place of a single expression.
-They do not create their own local scope, at least at the moment, so variables
-defined inside blocks will appear in the parent scope (usually the function
-the block is in).
-```
-let is_zero = if self.x <= 0 then {
-    self.x = 0
-    true
-} else {
-    false
-}
 ```
 
 ### Lists
@@ -178,11 +184,38 @@ list2.insert(0, "Hello")
 println(list2[0])
 ```
 
-### And / Or
-The keyword operators `and` and `or` have side-effects and will not execute
-the second expression if the result can be determined from the first
-expression.  The resulting value is the last expression that was executed.
-Operands are not limited to Bool values, although that may change in future.
+### Tuples
+```
+let tup = (1, "String", 4.5)
+println(tup.1)                  // prints "String"
+```
+
+### Records
+Records are like tuples but with named fields.  Created a record uses the
+equals sign ("=") to assign a value to a field.  Specifying a record type
+uses a colon (":") to separate the field name from the type.
+```
+let rec = { i = 1, s = "String", r = 4.5 }
+println(rec.s)
+
+let rec: { i: Int, s: String, r: Real }
+```
+
+### Refs
+A ref is an indirect reference to some data.  It can be passed around as a
+value, and dereferenced to get or set the data inside of it.  References are
+mutable
+```
+let r = ref 42
+println(str(!r))                // prints 42
+!r = 65
+println(str(!r))                // prints 65
+
+fn foo(x: ref Int) { }          // ref types look similar to ref constructors
+
+let r = ref { a = 42, b = "The Answer" }
+println(!r.b)                   // prints "The Answer"
+```
 
 ### Import
 ```
