@@ -211,15 +211,13 @@ Yet To Complete
   above issue of making all functions support throwing exceptions, which
   means a need to declare C/C++ functions that do not allow exceptions.
 
-- Class members can be declared with an optional initial value, but the
-  initial value is ignored.  Instead you must initialize the value in the
-  class constructor.  Ideally I'd like to get it working, but given that
-  the AST cannot be duplicated without side effects, and it needs to work
-  with inherited members too, I haven't gotten it working yet.  The simple
-  solution is to just disallow initial values in class members
-
 - Garbage collection is not yet implemented
 
+
+Previously Uncompleted
+----------------------
+
+- Dynamic Dispatch/vtables works now!
 
 - Closures have been implemented! Most functions and methods are now
   closures, although there is a new ABI type (MF) which is a
@@ -227,7 +225,9 @@ Yet To Complete
   throw exceptions (when they're implemented). It's mostly used by
   builtin functions
 
-- Dynamic Dispatch/vtables works now!
+- Class field initializers are working!  It now adds a new closure to
+  each class called __init__ which is called during "new" to initialize
+  the class members
 
 
 I'd be happy to hear of any additional features ideas or suggestions, if
