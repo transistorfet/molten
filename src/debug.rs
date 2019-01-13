@@ -1,6 +1,5 @@
 
 use ast::AST;
-//use utils::UniqueID;
 use session::Session;
 use scope::{ ScopeRef };
 

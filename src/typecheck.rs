@@ -5,6 +5,7 @@ use session::{ Session, Error };
 use scope::{ Scope, ScopeRef };
 use ast::{ NodeID, ClassSpec, Literal, Pattern, AST };
 use types::{ Type, Check, ABI, expect_type, resolve_type, check_type_params };
+use misc::{ r };
 
 
 pub fn check_types(session: &Session, scope: ScopeRef, code: &Vec<AST>) -> Type {
@@ -71,7 +72,7 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &AST,
             }
 
             let tupleargs = Type::Tuple(argtypes);
-            let nftype = Type::Function(Box::new(tupleargs.clone()), Box::new(rettype), *abi);
+            let nftype = Type::Function(r(tupleargs.clone()), r(rettype), *abi);
 
             if let Ok(Def::Overload(ol)) = session.get_def_from_ref(*id) {
                 if ol.find_local_variants(session, scope.clone(), tupleargs.clone()).0.len() > 0 {
@@ -100,15 +101,15 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &AST,
 
             let ftype = match etype {
                 Type::Function(ref args, _, ref abi) => {
-                    //let ftype = expect_type(session, tscope.clone(), Some(etype.clone()), Some(Type::Function(Box::new(atypes), Box::new(expected.unwrap_or_else(|| tscope.new_typevar())), abi)), Check::Update)?;
-                    let ftype = expect_type(session, tscope.clone(), Some(etype.clone()), Some(Type::Function(Box::new(atypes), Box::new(etype.get_rettype()?.clone()), *abi)), Check::Def)?;
+                    //let ftype = expect_type(session, tscope.clone(), Some(etype.clone()), Some(Type::Function(r(atypes), r(expected.unwrap_or_else(|| tscope.new_typevar())), abi)), Check::Update)?;
+                    let ftype = expect_type(session, tscope.clone(), Some(etype.clone()), Some(Type::Function(r(atypes), r(etype.get_rettype()?.clone()), *abi)), Check::Def)?;
                     // TODO should this actually be another expect, so type resolutions that occur in later args affect earlier args?  Might not be needed unless you add typevar constraints
                     let ftype = resolve_type(session, ftype);        // NOTE This ensures the early arguments are resolved despite typevars not being assigned until later in the signature
 
                     ftype
                 },
                 Type::Variable(_, ref vid) => {
-                    let ftype = Type::Function(Box::new(atypes), Box::new(expected.unwrap_or_else(|| tscope.new_typevar(session))), ABI::Unknown);
+                    let ftype = Type::Function(r(atypes), r(expected.unwrap_or_else(|| tscope.new_typevar(session))), ABI::Unknown);
                     session.update_type(tscope, *vid, ftype.clone())?;
                     ftype
                 },
@@ -212,7 +213,7 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &AST,
 
         AST::Ref(ref id, _, ref expr) => {
             let ttype = check_types_node(session, scope.clone(), expr, None);
-            let rtype = Type::Ref(Box::new(ttype));
+            let rtype = Type::Ref(r(ttype));
             let rtype = expect_type(session, scope.clone(), expected.clone(), Some(rtype), Check::Def)?;
             session.set_type(*id, rtype.clone());
             rtype
@@ -227,7 +228,7 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &AST,
                 },
                 Type::Variable(_, vid) => {
                     let etype = expect_type(session, scope.clone(), expected.clone(), None, Check::Def)?;
-                    session.update_type(scope.clone(), vid, Type::Ref(Box::new(etype.clone())))?;
+                    session.update_type(scope.clone(), vid, Type::Ref(r(etype.clone())))?;
                     session.set_type(*id, etype.clone());
                     etype
                 },

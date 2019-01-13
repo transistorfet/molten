@@ -1,6 +1,17 @@
 
 use std::fmt;
 
+// Boxed References
+
+pub type R<T> = Box<T>;
+
+pub fn r<T>(t: T) -> R<T> {
+    R::new(t)
+}
+
+
+// UniqueID
+
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct UniqueID(pub usize);
 

@@ -4,7 +4,7 @@ use std::io::prelude::*;
 
 use ast::AST;
 use types::Type;
-use utils::UniqueID;
+use misc::UniqueID;
 use config::Options;
 use session::Session;
 use scope::{ Scope, ScopeRef };

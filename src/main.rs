@@ -19,9 +19,9 @@ mod parser;
 
 mod abi;
 mod ast;
+mod misc;
 mod scope;
 mod types;
-mod utils;
 mod config;
 mod session;
 mod refinery;

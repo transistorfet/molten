@@ -17,7 +17,8 @@ use ast::{ NodeID, Pos, Literal, Ident, ClassSpec, Argument, Pattern, AST };
 use defs::functions::{ FuncDef, ClosureDef };
 use defs::classes::{ ClassDefRef, StructDefRef, Define, Vtable };
 
-use llvm::llcode::{ r, LLABI, LLType, LLLit, LLRef, LLExpr, LLGlobal };
+use misc::{ r };
+use llvm::llcode::{ LLABI, LLType, LLLit, LLRef, LLExpr, LLGlobal };
 
 
 
@@ -436,7 +437,7 @@ impl<'sess> Transformer<'sess> {
             Type::Function(mut argtypes, rettype, abi) => {
                 let mut argtypes = argtypes.as_vec();
                 argtypes.push(scope.find_type(self.session, &String::from("String")).unwrap());
-                Type::Function(Box::new(Type::Tuple(argtypes)), rettype, ABI::C)
+                Type::Function(r(Type::Tuple(argtypes)), rettype, ABI::C)
             },
             ttype @ _ => ttype,
         }
@@ -499,7 +500,7 @@ impl<'sess> Transformer<'sess> {
 
         let mut code = vec!();
         let did = NodeID::generate();
-        code.push(AST::Definition(did, Pos::empty(), true, Ident::new(fname.clone()), None, Box::new(AST::make_ref(Pos::empty(), AST::make_record(Pos::empty(), fields)))));
+        code.push(AST::Definition(did, Pos::empty(), true, Ident::new(fname.clone()), None, r(AST::make_ref(Pos::empty(), AST::make_record(Pos::empty(), fields)))));
         // TODO I'm going back on my decision to use a tuple pair to represent the function and context reference because it can't be converted to i8* (the generics type)
         //      Once I have generics that can operate on different sized data instead of only references, I can switch back
         //code.push(AST::Tuple(NodeID::generate(), Pos::empty(), vec!(AST::make_ident_from_str(Pos::empty(), real_fname.as_str()), AST::make_ident(Pos::empty(), Ident::new(cname.clone())))));

@@ -3,7 +3,7 @@ use std::fmt;
 
 use defs::Def;
 use ast::ClassSpec;
-use utils::UniqueID;
+use misc::{ R, r, UniqueID };
 use session::{ Session, Error };
 use scope::{ Scope, ScopeRef };
 
@@ -14,14 +14,14 @@ pub use abi::ABI;
 pub enum Type {
     Object(String, UniqueID, Vec<Type>),
     Variable(String, UniqueID),
-    Function(Box<Type>, Box<Type>, ABI),
+    Function(R<Type>, R<Type>, ABI),
     Tuple(Vec<Type>),
     Record(Vec<(String, Type)>),
-    Ref(Box<Type>),
+    Ref(R<Type>),
 
     // TODO this isn't used atm, I don't think, but we could use it for a constrained type
     Ambiguous(Vec<Type>),
-    //Constrained(Box<&mut AST>),
+    //Constrained(R<&mut AST>),
 }
 
 impl Type {
@@ -148,7 +148,7 @@ impl Type {
             Type::Function(args, ret, abi) => {
                 let args = args.convert(f);
                 let ret = ret.convert(f);
-                Type::Function(Box::new(args), Box::new(ret), abi)
+                Type::Function(r(args), r(ret), abi)
             },
             Type::Variable(name, id) => {
                 Type::Variable(name, id)
@@ -280,7 +280,7 @@ pub fn check_type(session: &Session, scope: ScopeRef, odtype: Option<Type>, octy
                     let oabi = aabi.compare(babi);
                     if oabi.is_some() {
                         let mut argtypes = check_type(session, scope.clone(), Some(*aargs.clone()), Some(*bargs.clone()), mode, update)?;
-                        Ok(Type::Function(Box::new(argtypes), Box::new(check_type(session, scope, Some(*aret.clone()), Some(*bret.clone()), mode, update)?), oabi.unwrap()))
+                        Ok(Type::Function(r(argtypes), r(check_type(session, scope, Some(*aret.clone()), Some(*bret.clone()), mode, update)?), oabi.unwrap()))
                     } else {
                         Err(Error::new(format!("TypeError: type mismatch, expected {} but found {}", dtype, ctype)))
                     }
@@ -321,7 +321,7 @@ pub fn check_type(session: &Session, scope: ScopeRef, odtype: Option<Type>, octy
                 },
                 (Type::Ref(ref atype), Type::Ref(ref btype)) => {
                     let ttype = check_type(session, scope.clone(), Some(*atype.clone()), Some(*btype.clone()), mode, update)?;
-                    Ok(Type::Ref(Box::new(ttype)))
+                    Ok(Type::Ref(r(ttype)))
                 },
                 (_, Type::Ambiguous(_)) |
                 (Type::Ambiguous(_), _) => Err(Error::new(format!("TypeError: overloaded types are not allowed here..."))),
@@ -420,10 +420,10 @@ pub fn resolve_type(session: &Session, ttype: Type) -> Type {
             Type::Record(types)
         },
         Type::Function(ref args, ref ret, ref abi) => {
-            Type::Function(Box::new(resolve_type(session, *args.clone())), Box::new(resolve_type(session, *ret.clone())), *abi)
+            Type::Function(r(resolve_type(session, *args.clone())), r(resolve_type(session, *ret.clone())), *abi)
         },
         Type::Ref(ref ttype) => {
-            Type::Ref(Box::new(resolve_type(session, *ttype.clone())))
+            Type::Ref(r(resolve_type(session, *ttype.clone())))
         },
         Type::Ambiguous(ref variants) => {
             let newvars = variants.iter().map(|variant| resolve_type(session, variant.clone())).collect();

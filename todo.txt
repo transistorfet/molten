@@ -1,18 +1,20 @@
 
 * there's still an issue with the transformed name of methods
 
-* change box::news
+* if you made typechecking an object like transform, and had a context, you could do extended checks of what's allowed in a C function, like exceptions (disallowed in C, but allowed in M and MF)
+* make refinery an object
+* make an HIR
+
+* implement try, raise
 * you need to add a public/private flag to definitions, for exporting, along with a "private" attribute in IR
 * update the readme
 
 * improve error checks
 * improve type checker
 * fix parse issue with subops
-* implement try, raise
 
 
 Typechecking:
-* if you made typechecking an object like transform, and had a context, you could do extended checks of what's allowed in a C function, like exceptions (disallowed in C, but allowed in M and MF)
 * there is a problem with typechecking Option, where in compiles it as an Option<Int> rather than Option<'item>
 * there's still a problem with typevars not resolving fully, where a function that should return a concrete returns a free typevar.... (recursion or forward definition)
 

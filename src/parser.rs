@@ -30,7 +30,7 @@ use std::str::FromStr;
 
 use abi::ABI;
 use types::Type;
-use utils::UniqueID;
+use misc::{ r, UniqueID };
 use ast::{ Pos, Literal, Ident, Argument, ClassSpec, Pattern, AST };
 
 
@@ -356,7 +356,7 @@ named!(newclass(Span) -> AST,
         ) >>
         (AST::PtrCast(
             Type::Object(cs.ident.name.clone(), UniqueID(0), cs.types.clone()),
-            Box::new(AST::make_invoke(Pos::new(pos), AST::make_resolve(Pos::new(pos), AST::make_ident(Pos::new(pos), cs.ident.clone()), Ident::from_str("new")), a))))
+            r(AST::make_invoke(Pos::new(pos), AST::make_resolve(Pos::new(pos), AST::make_ident(Pos::new(pos), cs.ident.clone()), Ident::from_str("new")), a))))
     )
 );
 
@@ -491,7 +491,7 @@ impl AST {
         match op.as_str() {
             "and" | "or" => AST::make_side_effect(pos, op, vec!(r1, r2)),
             _ => 
-            //AST::Infix(pos, op, Box::new(r1), Box::new(r2))
+            //AST::Infix(pos, op, r(r1), r(r2))
             AST::make_invoke(pos.clone(), AST::make_ident(pos, op), vec!(r1, r2))
             //AST::make_invoke(pos, AST::make_access(pos, r1, op), vec!(r2))
         }
@@ -526,7 +526,7 @@ named!(prefix(Span) -> AST,
         pos: position!() >>
         op: prefix_op >>
         a: atomic >>
-        //(AST::Prefix(op, Box::new(a)))
+        //(AST::Prefix(op, r(a)))
         (AST::make_invoke(Pos::new(pos), AST::make_ident(Pos::new(pos), op), vec!(a)))
     )
 );
@@ -661,7 +661,7 @@ named!(type_ref(Span) -> Type,
     do_parse!(
         wscom!(tag_word!("ref")) >>
         s: type_description >>
-        (Type::Ref(Box::new(s)))
+        (Type::Ref(r(s)))
     )
 );
 
@@ -711,7 +711,7 @@ named!(type_function(Span) -> Type,
         wscom!(tag!("->")) >>
         ret: type_description >>
         abi: abi_specifier >>
-        (Type::Function(Box::new(args), Box::new(ret), abi))
+        (Type::Function(r(args), r(ret), abi))
     ))
 );
 

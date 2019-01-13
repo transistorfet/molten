@@ -5,7 +5,7 @@ use types::Type;
 use scope::{ Scope, ScopeRef };
 use session::{ Session, Error };
 use ast::{ ClassSpec, Pattern, AST };
-use utils::UniqueID;
+use misc::UniqueID;
 
 use defs::functions::AnyFunc;
 use defs::classes::{ ClassDef };

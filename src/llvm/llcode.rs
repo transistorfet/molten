@@ -1,12 +1,7 @@
 
-use ast::{ NodeID };
+use ast::NodeID;
+use misc::{ R, r };
 
-
-pub type R<T> = Box<T>;
-
-pub fn r<T>(t: T) -> R<T> {
-    R::new(t)
-}
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum LLABI {

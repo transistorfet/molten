@@ -5,7 +5,7 @@ use std::str;
 use abi::ABI;
 use types::Type;
 use parser::Span;
-use utils::UniqueID;
+use misc::{ R, r, UniqueID };
 
 
 pub type NodeID = UniqueID;
@@ -68,41 +68,41 @@ pub enum Pattern {
 pub enum AST {
     Literal(NodeID, Literal),
     Nil(NodeID),
-    PtrCast(Type, Box<AST>),
-    Ref(NodeID, Pos, Box<AST>),
-    Deref(NodeID, Pos, Box<AST>),
+    PtrCast(Type, R<AST>),
+    Ref(NodeID, Pos, R<AST>),
+    Deref(NodeID, Pos, R<AST>),
 
     Tuple(NodeID, Pos, Vec<AST>),
     Record(NodeID, Pos, Vec<(Ident, AST)>),
     List(NodeID, Pos, Vec<AST>),
 
     Identifier(NodeID, Pos, Ident),
-    Index(NodeID, Pos, Box<AST>, Box<AST>),
-    Resolver(NodeID, Pos, Box<AST>, Ident, NodeID),
-    Accessor(NodeID, Pos, Box<AST>, Ident, NodeID),
+    Index(NodeID, Pos, R<AST>, R<AST>),
+    Resolver(NodeID, Pos, R<AST>, Ident, NodeID),
+    Accessor(NodeID, Pos, R<AST>, Ident, NodeID),
 
     Block(NodeID, Pos, Vec<AST>),
-    Invoke(NodeID, Pos, Box<AST>, Vec<AST>),
-    //Prefix(NodeID, Pos, Ident, Box<AST>),
-    //Infix(NodeID, Pos, Ident, Box<AST>, Box<AST>),
+    Invoke(NodeID, Pos, R<AST>, Vec<AST>),
+    //Prefix(NodeID, Pos, Ident, R<AST>),
+    //Infix(NodeID, Pos, Ident, R<AST>, R<AST>),
 
     SideEffect(NodeID, Pos, Ident, Vec<AST>),
-    If(NodeID, Pos, Box<AST>, Box<AST>, Box<AST>),
-    Raise(NodeID, Pos, Box<AST>),
-    Try(NodeID, Pos, Box<AST>, Vec<(Pattern, AST)>, NodeID),
-    Match(NodeID, Pos, Box<AST>, Vec<(Pattern, AST)>, NodeID),
-    For(NodeID, Pos, Ident, Box<AST>, Box<AST>),
-    While(NodeID, Pos, Box<AST>, Box<AST>),
+    If(NodeID, Pos, R<AST>, R<AST>, R<AST>),
+    Raise(NodeID, Pos, R<AST>),
+    Try(NodeID, Pos, R<AST>, Vec<(Pattern, AST)>, NodeID),
+    Match(NodeID, Pos, R<AST>, Vec<(Pattern, AST)>, NodeID),
+    For(NodeID, Pos, Ident, R<AST>, R<AST>),
+    While(NodeID, Pos, R<AST>, R<AST>),
 
     Declare(NodeID, Pos, Ident, Type),
-    Function(NodeID, Pos, Option<Ident>, Vec<Argument>, Option<Type>, Box<AST>, ABI),
+    Function(NodeID, Pos, Option<Ident>, Vec<Argument>, Option<Type>, R<AST>, ABI),
     New(NodeID, Pos, ClassSpec),
     Class(NodeID, Pos, ClassSpec, Option<ClassSpec>, Vec<AST>),
     TypeAlias(NodeID, Pos, ClassSpec, Type),
 
     Import(NodeID, Pos, Ident, Vec<AST>),
-    Definition(NodeID, Pos, bool, Ident, Option<Type>, Box<AST>),
-    Assignment(NodeID, Pos, Box<AST>, Box<AST>),
+    Definition(NodeID, Pos, bool, Ident, Option<Type>, R<AST>),
+    Assignment(NodeID, Pos, R<AST>, R<AST>),
 }
 
 
@@ -269,11 +269,11 @@ impl AST {
     }
 
     pub fn make_ref(pos: Pos, expr: AST) -> AST {
-        AST::Ref(NodeID::generate(), pos, Box::new(expr))
+        AST::Ref(NodeID::generate(), pos, r(expr))
     }
 
     pub fn make_deref(pos: Pos, expr: AST) -> AST {
-        AST::Deref(NodeID::generate(), pos, Box::new(expr))
+        AST::Deref(NodeID::generate(), pos, r(expr))
     }
 
     pub fn make_lit(literal: Literal) -> AST {
@@ -305,19 +305,19 @@ impl AST {
     }
 
     pub fn make_index(pos: Pos, list: AST, index: AST) -> AST {
-        AST::Index(NodeID::generate(), pos, Box::new(list), Box::new(index))
+        AST::Index(NodeID::generate(), pos, r(list), r(index))
     }
 
     pub fn make_resolve(pos: Pos, object: AST, ident: Ident) -> AST {
-        AST::Resolver(NodeID::generate(), pos, Box::new(object), ident, NodeID::generate())
+        AST::Resolver(NodeID::generate(), pos, r(object), ident, NodeID::generate())
     }
 
     pub fn make_access(pos: Pos, object: AST, ident: Ident) -> AST {
-        AST::Accessor(NodeID::generate(), pos, Box::new(object), ident, NodeID::generate())
+        AST::Accessor(NodeID::generate(), pos, r(object), ident, NodeID::generate())
     }
 
     pub fn make_invoke(pos: Pos, fexpr: AST, args: Vec<AST>) -> AST {
-        AST::Invoke(NodeID::generate(), pos, Box::new(fexpr), args)
+        AST::Invoke(NodeID::generate(), pos, r(fexpr), args)
     }
 
     pub fn make_side_effect(pos: Pos, ident: Ident, args: Vec<AST>) -> AST {
@@ -329,23 +329,23 @@ impl AST {
     }
 
     pub fn make_if(pos: Pos, cond: AST, texpr: AST, fexpr: AST) -> AST {
-        AST::If(NodeID::generate(), pos, Box::new(cond), Box::new(texpr), Box::new(fexpr))
+        AST::If(NodeID::generate(), pos, r(cond), r(texpr), r(fexpr))
     }
 
     pub fn make_raise(pos: Pos, expr: AST) -> AST {
-        AST::Raise(NodeID::generate(), pos, Box::new(expr))
+        AST::Raise(NodeID::generate(), pos, r(expr))
     }
 
     pub fn make_try(pos: Pos, cond: AST, cases: Vec<(Pattern, AST)>) -> AST {
-        AST::Try(NodeID::generate(), pos, Box::new(cond), cases, NodeID::generate())
+        AST::Try(NodeID::generate(), pos, r(cond), cases, NodeID::generate())
     }
 
     pub fn make_match(pos: Pos, cond: AST, cases: Vec<(Pattern, AST)>) -> AST {
-        AST::Match(NodeID::generate(), pos, Box::new(cond), cases, NodeID::generate())
+        AST::Match(NodeID::generate(), pos, r(cond), cases, NodeID::generate())
     }
 
     pub fn make_for(pos: Pos, ident: Ident, list: AST, body: AST) -> AST {
-        AST::For(NodeID::generate(), pos, ident, Box::new(list), Box::new(body))
+        AST::For(NodeID::generate(), pos, ident, r(list), r(body))
     }
 
     pub fn make_decl(pos: Pos, ident: Ident, ttype: Type) -> AST {
@@ -353,7 +353,7 @@ impl AST {
     }
 
     pub fn make_func(pos: Pos, ident: Option<Ident>, args: Vec<Argument>, rtype: Option<Type>, body: AST, abi: ABI) -> AST {
-        AST::Function(NodeID::generate(), pos, ident, args, rtype, Box::new(body), abi)
+        AST::Function(NodeID::generate(), pos, ident, args, rtype, r(body), abi)
     }
 
     pub fn make_new(pos: Pos, classspec: ClassSpec) -> AST {
@@ -369,15 +369,15 @@ impl AST {
     }
 
     pub fn make_def(pos: Pos, mutable: bool, ident: Ident, ttype: Option<Type>, value: AST) -> AST {
-        AST::Definition(NodeID::generate(), pos, mutable, ident, ttype, Box::new(value))
+        AST::Definition(NodeID::generate(), pos, mutable, ident, ttype, r(value))
     }
 
     pub fn make_assign(pos: Pos, left: AST, right: AST) -> AST {
-        AST::Assignment(NodeID::generate(), pos, Box::new(left), Box::new(right))
+        AST::Assignment(NodeID::generate(), pos, r(left), r(right))
     }
 
     pub fn make_while(pos: Pos, cond: AST, body: AST) -> AST {
-        AST::While(NodeID::generate(), pos, Box::new(cond), Box::new(body))
+        AST::While(NodeID::generate(), pos, r(cond), r(body))
     }
 
     pub fn make_type_alias(pos: Pos, classspec: ClassSpec, ttype: Type) -> AST {

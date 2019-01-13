@@ -18,7 +18,7 @@ use self::llvm_sys::transforms::pass_manager_builder::*;
 
 
 use ast::NodeID;
-use utils::UniqueID;
+use misc::UniqueID;
 use config::Options;
 use session::Session;
 

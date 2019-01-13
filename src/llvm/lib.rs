@@ -15,7 +15,7 @@ use ast::{ NodeID };
 use parser::{ parse_type };
 use scope::{ Scope, ScopeRef, ScopeMapRef, Context };
 use binding::{ declare_typevars };
-use utils::UniqueID;
+use misc::UniqueID;
 
 use defs::classes::{ ClassDef, Define };
 use defs::functions::{ AnyFunc, FuncDef };

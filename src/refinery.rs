@@ -3,12 +3,12 @@ use rand;
 
 use abi::ABI;
 use types::Type;
-use utils::UniqueID;
+use misc::{ r, UniqueID };
 use ast::{ NodeID, AST, Ident, ClassSpec, Argument, Pattern, Literal };
 
 pub fn refine(code: Vec<AST>) -> Vec<AST> {
     //vec!(AST::make_func(Pos::empty(), Some(Ident::new(Pos::empty(), format!("init.{}", "test"))), vec!(), None,
-    //    Box::new(AST::make_block(Pos::empty(), refine_vec(code))),
+    //    r(AST::make_block(Pos::empty(), refine_vec(code))),
     //ABI::Molten))
     refine_vec(code)
 }
@@ -31,7 +31,7 @@ pub fn refine_node(node: AST) -> AST {
         },
 
         AST::Definition(id, pos, mutable, ident, ttype, code) => {
-            AST::Definition(id, pos, mutable, ident, ttype, Box::new(refine_node(*code)))
+            AST::Definition(id, pos, mutable, ident, ttype, r(refine_node(*code)))
         },
 
         AST::Declare(id, pos, ident, ttype) => {
@@ -39,14 +39,14 @@ pub fn refine_node(node: AST) -> AST {
         },
 
         AST::Function(id, pos, ident, args, ret, body, abi) => {
-            AST::Function(id, pos, ident, args, ret, Box::new(refine_node(*body)), abi)
+            AST::Function(id, pos, ident, args, ret, r(refine_node(*body)), abi)
         },
 
         AST::Invoke(id, pos, fexpr, mut args) => {
             if let AST::Accessor(_, _, ref expr, _, _) = *fexpr {
                 args.insert(0, *expr.clone());
             }
-            AST::Invoke(id, pos, Box::new(refine_node(*fexpr)), refine_vec(args))
+            AST::Invoke(id, pos, r(refine_node(*fexpr)), refine_vec(args))
         },
 
         AST::SideEffect(id, pos, op, args) => {
@@ -54,25 +54,25 @@ pub fn refine_node(node: AST) -> AST {
         },
 
         AST::If(id, pos, cond, texpr, fexpr) => {
-            AST::If(id, pos, Box::new(refine_node(*cond)), Box::new(refine_node(*texpr)), Box::new(refine_node(*fexpr)))
+            AST::If(id, pos, r(refine_node(*cond)), r(refine_node(*texpr)), r(refine_node(*fexpr)))
         },
 
         AST::Match(id, pos, cond, cases, cid) => {
             let cases = cases.into_iter().map(move |(case, body)| ( refine_pattern(case), refine_node(body) )).collect();
-            AST::Match(id, pos, Box::new(refine_node(*cond)), cases, cid)
+            AST::Match(id, pos, r(refine_node(*cond)), cases, cid)
         },
 
         AST::Try(id, pos, cond, cases, cid) => {
             let cases = cases.into_iter().map(move |(case, body)| ( refine_pattern(case), refine_node(body) )).collect();
-            AST::Try(id, pos, Box::new(refine_node(*cond)), cases, cid)
+            AST::Try(id, pos, r(refine_node(*cond)), cases, cid)
         },
 
         AST::Raise(id, pos, expr) => {
-            AST::Raise(id, pos, Box::new(refine_node(*expr)))
+            AST::Raise(id, pos, r(refine_node(*expr)))
         },
 
         AST::While(id, pos, cond, body) => {
-            AST::While(id, pos, Box::new(refine_node(*cond)), Box::new(refine_node(*body)))
+            AST::While(id, pos, r(refine_node(*cond)), r(refine_node(*body)))
         },
 
         AST::For(id, pos, ident, list, body) => {
@@ -109,13 +109,13 @@ pub fn refine_node(node: AST) -> AST {
             body_block.push(AST::make_assign(pos.clone(), access_iter(), refine_node(invoke(AST::make_ident(pos.clone(), Ident::from_str("+")),
                 vec!(access_iter(), AST::make_lit(Literal::Integer(1)))))));
 
-            block.push(AST::While(id, pos.clone(), Box::new(AST::make_block(pos.clone(), cond_block)), Box::new(AST::make_block(pos.clone(), body_block))));
+            block.push(AST::While(id, pos.clone(), r(AST::make_block(pos.clone(), cond_block)), r(AST::make_block(pos.clone(), body_block))));
             AST::make_block(pos.clone(), block)
-            //AST::For(id, pos, ident, Box::new(refine_node(*cond)), Box::new(refine_node(*body)))
+            //AST::For(id, pos, ident, r(refine_node(*cond)), r(refine_node(*body)))
         },
 
-        AST::Ref(id, pos, expr) => { AST::Ref(id, pos, Box::new(refine_node(*expr))) },
-        AST::Deref(id, pos, expr) => { AST::Deref(id, pos, Box::new(refine_node(*expr))) },
+        AST::Ref(id, pos, expr) => { AST::Ref(id, pos, r(refine_node(*expr))) },
+        AST::Deref(id, pos, expr) => { AST::Deref(id, pos, r(refine_node(*expr))) },
 
         AST::Tuple(id, pos, items) => { AST::Tuple(id, pos, refine_vec(items)) },
 
@@ -164,7 +164,7 @@ pub fn refine_node(node: AST) -> AST {
                         if ident.as_ref().map(|i| i.name.as_str()) == Some("new") {
                             has_new = true;
                             if args.len() > 0 && args[0].ident.as_str() == "self" {
-                                body = Box::new(AST::Block(NodeID::generate(), pos.clone(), vec!(*body, AST::Identifier(NodeID::generate(), pos.clone(), Ident::new(String::from("self"))))));
+                                body = r(AST::Block(NodeID::generate(), pos.clone(), vec!(*body, AST::Identifier(NodeID::generate(), pos.clone(), Ident::new(String::from("self"))))));
                             } else {
                                 panic!("SyntaxError: the \"new\" method on a class must have \"self\" as its first parameter");
                             }
@@ -183,7 +183,7 @@ pub fn refine_node(node: AST) -> AST {
                 }
             }).collect();
             if !has_new {
-                //body.insert(0, AST::Function(id, pos.clone(), Some(String::from("new")), vec!((String::from("self"), None, None)), None, Box::new(AST::Identifier(id, pos.clone(), String::from("self"))), UniqueID::generate(), ABI::Molten));
+                //body.insert(0, AST::Function(id, pos.clone(), Some(String::from("new")), vec!((String::from("self"), None, None)), None, r(AST::Identifier(id, pos.clone(), String::from("self"))), UniqueID::generate(), ABI::Molten));
                 //panic!("SyntaxError: you must declare a \"new\" method on a class");
             }
 
@@ -209,7 +209,7 @@ pub fn refine_node(node: AST) -> AST {
                         vec!(AST::make_ident(pos.clone(), Ident::from_str("self")))));
                 }
                 init.push(AST::make_ident_from_str(pos.clone(), "self"));
-                let mut initcode = AST::Function(initid, pos.clone(), Some(Ident::from_str("__init__")), iargs, None, Box::new(AST::make_block(pos.clone(), init)), ABI::Molten);
+                let mut initcode = AST::Function(initid, pos.clone(), Some(Ident::from_str("__init__")), iargs, None, r(AST::make_block(pos.clone(), init)), ABI::Molten);
                 body.push(initcode);
             }
 
@@ -217,7 +217,7 @@ pub fn refine_node(node: AST) -> AST {
         },
 
         AST::Index(id, pos, base, index) => {
-            refine_node(AST::Invoke(id, pos.clone(), Box::new(AST::Accessor(NodeID::generate(), pos.clone(), base, Ident::new(String::from("[]")), NodeID::generate())), vec!(*index)))
+            refine_node(AST::Invoke(id, pos.clone(), r(AST::Accessor(NodeID::generate(), pos.clone(), base, Ident::new(String::from("[]")), NodeID::generate())), vec!(*index)))
         },
 
         AST::Resolver(id, pos, left, right, oid) => {
@@ -226,11 +226,11 @@ pub fn refine_node(node: AST) -> AST {
                 AST::Identifier(_, _, _) => { },
                 _ => panic!("SyntaxError: left-hand side of scope resolver must be identifier")
             }
-            AST::Resolver(id, pos, Box::new(refine_node(*left)), right, oid)
+            AST::Resolver(id, pos, r(refine_node(*left)), right, oid)
         },
 
         AST::Accessor(id, pos, left, right, oid) => {
-            AST::Accessor(id, pos, Box::new(refine_node(*left)), right, oid)
+            AST::Accessor(id, pos, r(refine_node(*left)), right, oid)
         },
 
         AST::Assignment(id, pos, left, right) => {
@@ -239,10 +239,10 @@ pub fn refine_node(node: AST) -> AST {
                 //AST::Identifier(_, _, _) |
                 AST::Deref(_, _, _) |
                 AST::Accessor(_, _, _, _, _) => {
-                    AST::Assignment(id, pos, Box::new(refine_node(left)), Box::new(refine_node(*right)))
+                    AST::Assignment(id, pos, r(refine_node(left)), r(refine_node(*right)))
                 },
                 AST::Index(iid, ipos, base, index) => {
-                    refine_node(AST::Invoke(id, pos, Box::new(AST::Accessor(iid, ipos.clone(), base, Ident::new(String::from("[]")), NodeID::generate())), vec!(*index, *right)))
+                    refine_node(AST::Invoke(id, pos, r(AST::Accessor(iid, ipos.clone(), base, Ident::new(String::from("[]")), NodeID::generate())), vec!(*index, *right)))
                 },
                 _ => panic!("SyntaxError: assignment to to an invalid element: {:?}", left),
             }
@@ -256,7 +256,7 @@ pub fn refine_node(node: AST) -> AST {
         //},
 
         AST::PtrCast(ttype, value) => {
-            AST::PtrCast(ttype, Box::new(refine_node(*value)))
+            AST::PtrCast(ttype, r(refine_node(*value)))
         },
 
         AST::Literal(_, _) => { node },

@@ -8,7 +8,7 @@ use std::collections::hash_map::Entry;
 use types::Type;
 use ast::{ NodeID };
 use session::{ Session, Error };
-use utils::UniqueID;
+use misc::{ r, UniqueID };
 use defs::Def;
 
 
@@ -322,13 +322,13 @@ impl Scope {
                     }
                 }
             },
-            Type::Function(args, ret, abi) => Type::Function(Box::new(self.map_typevars(session, varmap, *args)), Box::new(self.map_typevars(session, varmap, *ret)), abi),
+            Type::Function(args, ret, abi) => Type::Function(r(self.map_typevars(session, varmap, *args)), r(self.map_typevars(session, varmap, *ret)), abi),
             // TODO why did I do this?  Was it because of a bug or just to reduce typevars, because it caused another bug with constructors
-            //Type::Function(args, ret, abi) => Type::Function(Box::new(self.map_typevars(session, varmap, *args)), ret, abi),
+            //Type::Function(args, ret, abi) => Type::Function(r(self.map_typevars(session, varmap, *args)), ret, abi),
             Type::Tuple(types) => Type::Tuple(self.map_typevars_vec(session, varmap, types)),
             Type::Record(types) => Type::Record(types.into_iter().map(|(n, t)| (n, self.map_typevars(session, varmap, t))).collect()),
             Type::Ambiguous(variants) => Type::Ambiguous(self.map_typevars_vec(session, varmap, variants)),
-            Type::Ref(ttype) => Type::Ref(Box::new(self.map_typevars(session, varmap, *ttype))),
+            Type::Ref(ttype) => Type::Ref(r(self.map_typevars(session, varmap, *ttype))),
             Type::Object(name, id, types) => Type::Object(name.clone(), id, self.map_typevars_vec(session, varmap, types)),
         }
     }
@@ -348,13 +348,13 @@ impl Scope {
                 }
                 Type::Variable(name, id)
             },
-            Type::Function(args, ret, abi) => Type::Function(Box::new(self.unmap_typevars(session, varmap, *args)), Box::new(self.unmap_typevars(session, varmap, *ret)), abi),
+            Type::Function(args, ret, abi) => Type::Function(r(self.unmap_typevars(session, varmap, *args)), r(self.unmap_typevars(session, varmap, *ret)), abi),
             // TODO why did I do this?  Was it because of a bug or just to reduce typevars, because it caused another bug with constructors
-            //Type::Function(args, ret, abi) => Type::Function(Box::new(self.map_typevars(session, varmap, *args)), ret, abi),
+            //Type::Function(args, ret, abi) => Type::Function(r(self.map_typevars(session, varmap, *args)), ret, abi),
             Type::Tuple(types) => Type::Tuple(self.unmap_typevars_vec(session, varmap, types)),
             Type::Record(types) => Type::Record(types.into_iter().map(|(n, t)| (n, self.unmap_typevars(session, varmap, t))).collect()),
             Type::Ambiguous(variants) => Type::Ambiguous(self.unmap_typevars_vec(session, varmap, variants)),
-            Type::Ref(ttype) => Type::Ref(Box::new(self.unmap_typevars(session, varmap, *ttype))),
+            Type::Ref(ttype) => Type::Ref(r(self.unmap_typevars(session, varmap, *ttype))),
             Type::Object(name, id, types) => Type::Object(name.clone(), id, self.unmap_typevars_vec(session, varmap, types)),
         }
     }
