@@ -123,35 +123,46 @@ impl<'sess> Transformer<'sess> {
 
 
     pub fn transform_code(&self, scope: ScopeRef, code: &Vec<AST>) {
-        let mut toplevel = vec!();
+        let run_id = NodeID::generate();
+        let run_ltype = self.convert_to_mfunc_def_type(LLType::Function(vec!(), r(LLType::I64)));
+        self.set_type(run_id, run_ltype.clone());
 
         let exp_id = NodeID::generate();
-        let expoint = self.create_exception_point(&mut toplevel, exp_id);
 
-        let mut body = self.with_exception(exp_id, || {
-            self.transform_vec(scope.clone(), &code)
+        let mut fargs = vec!();
+        self.convert_mfunc_def_args(scope.clone(), exp_id, &mut fargs);
+
+        let mut body = self.with_context(CodeContext::Func(ABI::MoltenFunc, run_id), || {
+            self.with_exception(exp_id, || {
+                self.transform_vec(scope.clone(), &code)
+            })
         });
         body.push(LLExpr::Literal(LLLit::I64(0)));
 
-        let fail = vec!(
-            LLExpr::CallC(r(LLExpr::GetNamed("puts".to_string())), vec!(LLExpr::Literal(LLLit::ConstStr(String::from("Uncaught exception.  Terminating"))))),
-            LLExpr::Literal(LLLit::I64(-1))
-        );
-
-        toplevel.extend(self.create_exception_block(expoint, body, fail));
-
-        let run_id = NodeID::generate();
-        let rftype = LLType::Function(vec!(), r(LLType::I64));
-        self.set_type(run_id, rftype.clone());
-
         let module_run_name = format!("run.{}", self.session.name);
-        self.add_global(LLGlobal::DefCFunc(run_id, module_run_name, rftype, vec!(), toplevel));
+        self.add_global(LLGlobal::DefCFunc(run_id, module_run_name, run_ltype, fargs, body));
+
 
         if !Options::as_ref().is_library {
             let main_id = NodeID::generate();
-            let mftype = LLType::Function(vec!(), r(LLType::I64));
-            let mainbody = self.create_cfunc_invoke(LLExpr::GetValue(run_id), vec!());
-            self.add_global(LLGlobal::DefCFunc(main_id, String::from("main"), mftype, vec!(), mainbody));
+            let main_ltype = LLType::Function(vec!(), r(LLType::I64));
+            let mut main_body = vec!();
+
+            let exp_id = NodeID::generate();
+            let expoint = self.create_exception_point(&mut main_body, exp_id);
+
+            let mut body = self.with_exception(exp_id, || {
+                self.create_mfunc_invoke(LLExpr::GetValue(run_id), vec!())
+            });
+
+            let fail = vec!(
+                LLExpr::CallC(r(LLExpr::GetNamed("puts".to_string())), vec!(LLExpr::Literal(LLLit::ConstStr(String::from("Uncaught exception.  Terminating"))))),
+                LLExpr::Literal(LLLit::I64(-1))
+            );
+
+            main_body.extend(self.create_exception_block(expoint, body, fail));
+
+            self.add_global(LLGlobal::DefCFunc(main_id, String::from("main"), main_ltype, vec!(), main_body));
         }
     }
 

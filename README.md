@@ -64,17 +64,18 @@ println(str(fac(10)))
 
 ### Types
 ```
+()                  // Unit Type
 Nil
 Bool
 Byte
 Int
 Real
 String
-() -> Int           // function type
+(Int, Int) -> Int   // function type
 'a                  // type variable
 List<Int>           // list of integers
-(Int, Real)         // tuple
-{ a: Int, b: Real } // record
+(Int, Real)         // tuple type
+{ a: Int, b: Real } // record type
 ```
 
 ### Declarations
@@ -240,10 +241,6 @@ fn baz(i: Int) / C {
 Yet To Complete
 ---------------
 
-- Exceptions haven't been implemented yet.  This somewhat relates to the
-  above issue of making all functions support throwing exceptions, which
-  means a need to declare C/C++ functions that do not allow exceptions.
-
 - Garbage collection is not yet implemented
 
 
@@ -262,6 +259,7 @@ Previously Uncompleted
   each class called __init__ which is called during "new" to initialize
   the class members
 
+- Exceptions have finally been added using the setjmp/longjmp functions
 
 I'd be happy to hear of any additional features ideas or suggestions, if
 you'd like to leave them under "Issues" on github.

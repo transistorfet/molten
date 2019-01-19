@@ -20,6 +20,7 @@ mod parser;
 mod abi;
 mod ast;
 mod misc;
+//mod hcode;
 mod scope;
 mod types;
 mod config;

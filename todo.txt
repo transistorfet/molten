@@ -1,13 +1,13 @@
 
-* move top level try to inside the main function
+* make run function return a module object?  Should it also memoize itself?
 * make the molten type convert function for mfuncs use the LLType::Exception instead of i8*
-* bug in abi test related to the decl printf
+* add optimizer and output to object file format
 
+* you need to add a public/private flag to definitions, for exporting, along with a "private" attribute in IR
 * if you made typechecking an object like transform, and had a context, you could do extended checks of what's allowed in a C function, like exceptions (disallowed in C, but allowed in M and MF)
 * make refinery an object
 * make an HIR
 
-* you need to add a public/private flag to definitions, for exporting, along with a "private" attribute in IR
 * update the readme
 
 * improve error checks
@@ -44,6 +44,8 @@ Refactoring:
 
 
 BUGS:
+* there's still an issue with the transformed name of methods.  This is because tscope is not passed into class methods during transform.  Causing a test to fail because
+  of a duplicate name when the Option definition in libcore is uncommented
 * issue with separator/lf not working when two expressions are on the same line (it should produce a parse error)
 * if there are brackets after a record literal, it will try to call it as a function: let bar = ref { a = 1, b = 2 } \n (!x).a    parses incorrectly,
   but adding a semi-colon will fix it.  It tries to parse through the line terminator
@@ -53,12 +55,13 @@ BUGS:
 * if you only have one element in a tuple, or in a record, it parses it as a block or expression
 * there was an error where "let ni: newint" with no initializer was causing a type error with "expected class or concrete type", but that was actually because a definition without
   an initializer is the same as "let ni: newint = nil" and nil could not be cast to a Record, which newint is a typealias of a record
-* there's still an issue with the transformed name of methods.  This is because tscope is not passed into class methods during transform
+* minor bug caught by abi test; the printf function had been added in declare_irregulars, but was decl'ed in the test, and it caused a segfault because you call an undefined function "printf.1"
 
 
 
 TESTS:
 * test class init with inherited classes
+* test module system (might need a test opt-out for submodules in a test)
 * test for static method vtable access, dynamic dispatch via that mechanism, and overloading used with resolve
 * error conditions, lack of typing should error, etc
 * test for recursive C functions, recursive MF functions
@@ -92,25 +95,22 @@ Changes:
 * there's no way to genericly compare or print tuples or records
 * can you make a check for nil before unboxing a type... and somehow return an appropriate default value?  I guess that's feasible because only primative types would be
   boxed/unboxed, although records and tuples might be an issue
-* rather than coercising a non pointer type into a pointer, you can box any such types, possibly adding a vtablu of sorts in the process
-  possibly containing functions and metadata for copying. You could also make buffer copying functions that take the element size and copy
-  the buffer data into the boxed location.
+* when you box a type to be converted to typevar, you can possibly add a vtable of sorts in the process, possibly containing functions and metadata for copying. You could also
+  make buffer copying functions that take the element size and copy the buffer data into the boxed location.
 * implement return value conversion (this doesn't appear to be needed?  Why didn't it work with tuple closures though?)
 
+* fill in string and list type functions, and finish hashmap (rename to dict?)
 
 
 
-* implement exceptions
+* add a spread operator for records
 * add patterns and matching of patterns
+* add typeclasses/traits
 * implement enums
 * implement garbage collection
-* add a spread operator for records
 * add an iterator type
 * implement assignment of tuples and records? (or only spread operator)
 * add compiler directives?
-
-* better support for generics
-* fill in string and list type functions, and finish hashmap (rename to dict?)
 
 
 
@@ -137,6 +137,7 @@ Changes:
   make typed functions for all math operations, with the inlinealways attribute, if you decide to make operators methods
 * what if you have a 'context' passed to the node visitors that would allow "if" to know if its' return is used or not, and so whether typechecking must match
 
+* better support for generics
 
 
 EXAMPLE PROGRAM IDEAS:

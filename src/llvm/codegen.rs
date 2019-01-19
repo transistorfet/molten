@@ -86,7 +86,9 @@ impl<'sess> LLVM<'sess> {
             // TODO this buffer size is tricky... I had it set for 8 but got a bunch of segfaults in the testsuite.
             //      The correct value is probably platform specific but I don't know how to find that out.  Oddly enough
             //      it would work for some programs but some would segfault
-            self.set_type(EXCEPTION_ID, LLVMArrayType(self.i64_type(), 10));
+            let jmpbuf = LLVMStructCreateNamed(self.context, cstr("JmpBuf"));
+            LLVMStructSetBody(jmpbuf, vec!(LLVMArrayType(self.i64_type(), 10)).as_mut_ptr(), 1, 0);
+            self.set_type(EXCEPTION_ID, jmpbuf);
         }
     }
 

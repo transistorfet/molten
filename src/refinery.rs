@@ -4,6 +4,7 @@ use rand;
 use abi::ABI;
 use types::Type;
 use misc::{ r, UniqueID };
+//use hcode::{ HExpr };
 use ast::{ NodeID, AST, Ident, ClassSpec, Argument, Pattern, Literal };
 
 pub fn refine(code: Vec<AST>) -> Vec<AST> {

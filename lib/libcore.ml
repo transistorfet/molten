@@ -77,6 +77,40 @@ fn str(num: Real) -> String {
 }
 
 
+class Option<'item> {
+    let mut has = false
+    let mut item: 'item = nil
+
+    fn new(self) { }
+
+    fn Some(item) {
+        let opt = new Option<'item>()
+        opt.has = true
+        opt.item = item
+        opt
+    }
+
+    fn None() {
+        let opt = new Option<'item>()
+        opt.has = true
+        opt.item = nil
+        opt
+    }
+
+    fn unwrap_or(self, item) {
+        if self.has then
+            self.item
+        else
+            item
+    }
+}
+
+class Iterator<'item> {
+    fn next(self) -> Option<'item> {
+        Option::None()
+    }
+}
+
 class List<'item> {
     let mut capacity: Int
     let mut length: Int
@@ -153,6 +187,26 @@ class List<'item> {
     }
 }
 
+class ListIterator<'item> {
+    let mut index = 0
+    let mut list: List<'item> = nil
+
+    fn new(self, list) {
+        self.index = 0
+        self.list = list
+    }
+
+    fn next(self) -> Option<'item> {
+        if self.index < self.list.len() then {
+            let item = self.list[self.index]
+            self.index = self.index + 1
+            Option::Some(item)
+        } else {
+            Option::None()
+        }
+    }
+}
+
 /*
 class HashMapNode<'item> {
     let mut key: String
@@ -192,59 +246,4 @@ class HashMap<'item> {
 }
 */
 
-/*
-class Option<'item> {
-    let mut has = false
-    let mut item: 'item = nil
-
-    fn new(self) { }
-
-    fn some(item) {
-        let opt = new Option<'item>()
-        opt.has = true
-        opt.item = item
-        opt
-    }
-
-    fn none() {
-        let opt = new Option<'item>()
-        opt.has = true
-        opt.item = nil
-        opt
-    }
-
-    fn unwrap_or(self, item) {
-        if self.has then
-            self.item
-        else
-            item
-    }
-}
-
-class Iterator<'item> {
-    fn next(self) -> Option<'item> {
-        Option::none()
-    }
-}
-
-class ListIterator<'item> {
-    let mut index = 0
-    let mut list: List<'item> = nil
-
-    fn new(self, list) {
-        self.index = 0
-        self.list = list
-    }
-
-    fn next(self) -> Option<'item> {
-        if self.index < self.list.len() then {
-            let item = self.list[self.index]
-            self.index = self.index + 1
-            Option::some(item)
-        } else {
-            Option::none()
-        }
-    }
-}
-*/
 
