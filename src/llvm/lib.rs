@@ -178,7 +178,7 @@ unsafe fn declare_irregular_functions(llvm: &LLVM) {
     //declare_function(llvm, "memcpy", &mut [llvm.str_type(), llvm.str_type(), llvm.i64_type()], llvm.str_type(), false);
 
     //declare_function(llvm, "puts", &mut [llvm.str_type()], llvm.i64_type(), false);
-    declare_c_function(llvm, "printf", &mut [llvm.str_type()], llvm.i64_type(), true);
+    //declare_c_function(llvm, "printf", &mut [llvm.str_type()], llvm.i64_type(), true);
     declare_c_function(llvm, "sprintf", &mut [llvm.str_type(), llvm.str_type()], llvm.i64_type(), true);
 
     declare_c_function(llvm, "llvm.pow.f64", &mut [llvm.f64_type(), llvm.f64_type()], llvm.f64_type(), false);
