@@ -9,9 +9,9 @@ use std::io::prelude::*;
 use std::collections::HashMap;
 
 use parser;
-use refinery;
 use types::Type;
 use config::Options;
+use refinery::Refinery;
 use ast::{ NodeID, Pos, AST };
 use defs::{ Def };
 use scope::{ ScopeRef, ScopeMapRef };
@@ -59,7 +59,7 @@ impl Session {
     pub fn parse_string(&self, name: &str, contents: String) -> Vec<AST> {
         self.files.borrow_mut().push((String::from(name), contents));
         let mut code = parser::parse_or_error(name, self.files.borrow().last().unwrap().1.as_bytes());
-        code = refinery::refine(code);
+        code = Refinery::refine(self, code);
         if Options::as_ref().debug {
             println!("\n{:?}\n", code);
         }
