@@ -114,6 +114,49 @@ impl<'sess> LLVM<'sess> {
         file.write_all(self.emit_module().as_bytes()).unwrap();
     }
 
+    pub fn optimize(&self, llvm_opt: u32) {
+        unsafe {
+            let builder = LLVMPassManagerBuilderCreate();
+            // -O optimization level
+            LLVMPassManagerBuilderSetOptLevel(builder, llvm_opt);
+
+            let pass_manager = LLVMCreatePassManager();
+            LLVMPassManagerBuilderPopulateModulePassManager(builder, pass_manager);
+            LLVMPassManagerBuilderDispose(builder);
+
+            LLVMRunPassManager(pass_manager, self.module);
+
+            LLVMDisposePassManager(pass_manager);
+        }
+    }
+
+    pub fn write_object_file(&self, filename: &str) {
+        unsafe {
+            LLVM_InitializeAllTargetInfos();
+            LLVM_InitializeAllTargets();
+            LLVM_InitializeAllTargetMCs();
+            LLVM_InitializeAllAsmParsers();
+            LLVM_InitializeAllAsmPrinters();
+
+            let target_triple = LLVMGetDefaultTargetTriple();
+            LLVMSetTarget(self.module, target_triple);
+
+            let target: *mut LLVMTargetRef = Box::into_raw(Box::new(ptr::null_mut()));
+            let err_msg: *mut *mut i8 = Box::into_raw(Box::new(ptr::null_mut()));
+            if LLVMGetTargetFromTriple(target_triple, target, err_msg) != 0 {
+                let err = CString::from_raw(*err_msg.as_ref().unwrap());
+                eprintln!("Get LLVM target failed");
+                eprintln!("{}", err.to_str().unwrap());
+                panic!();
+            }
+            LLVMDisposeMessage(*err_msg.as_ref().unwrap());
+
+            //LLVMSetDataLayout(self.module, target_machine
+            let target_machine = LLVMCreateTargetMachine(*target.as_ref().unwrap(), target_triple, cstr("generic"), cstr(""), LLVMCodeGenOptLevel::LLVMCodeGenLevelDefault, LLVMRelocMode::LLVMRelocDefault, LLVMCodeModel::LLVMCodeModelDefault);
+            LLVMTargetMachineEmitToFile(target_machine, self.module, cstr(filename), LLVMCodeGenFileType::LLVMObjectFile, err_msg);
+        }
+    }
+
     pub fn set_value(&self, id: UniqueID, value: LLVMValueRef) {
         debug!(">>>>>>>>> SET VALUE: {:?} = {:?} (existing value {:?})", id, value, self.values.borrow().get(&id));
         self.values.borrow_mut().insert(id, value);

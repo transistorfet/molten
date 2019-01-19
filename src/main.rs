@@ -110,6 +110,7 @@ fn compile_file(input: &str, output: Option<&str>) {
     llvm.build_module(&transformer.globals.borrow());
     llvm.print_module();
     llvm.write_module(format!("{}.ll", session.target).as_str());
+    //llvm.write_object_file(format!("{}.o", session.target).as_str());
 }
 
 
