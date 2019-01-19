@@ -213,6 +213,7 @@ fn bind_names_node_or_error(session: &Session, scope: ScopeRef, node: &mut AST) 
         },
 
         AST::Nil(_) |
+        AST::GetValue(_) |
         AST::Literal(_, _) => { }
     }
     Ok(())

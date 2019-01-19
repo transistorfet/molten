@@ -76,6 +76,7 @@ pub enum AST {
     Record(NodeID, Pos, Vec<(Ident, AST)>),
     List(NodeID, Pos, Vec<AST>),
 
+    GetValue(NodeID),
     Identifier(NodeID, Pos, Ident),
     Index(NodeID, Pos, R<AST>, R<AST>),
     Resolver(NodeID, Pos, R<AST>, Ident, NodeID),

@@ -25,14 +25,7 @@ use session::Session;
 use llvm::llcode::{ LLType, LLLit, LLRef, LLCmpType, LLExpr, LLGlobal, LLBlock };
 
 
-
-#[derive(Clone, Debug, PartialEq)]
-pub struct LLValue {
-    value: LLVMValueRef,
-    ltype: LLType,
-}
-
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone)]
 pub struct LLVM<'sess> {
     pub session: &'sess Session,
     pub context: LLVMContextRef,
@@ -46,6 +39,7 @@ pub struct LLVM<'sess> {
 
 
 pub const TYPEVAR_ID: NodeID = UniqueID(2);
+pub const EXCEPTION_ID: NodeID = UniqueID(3);
 
 pub fn cstr(string: &str) -> *mut i8 {
     CString::new(string).unwrap().into_raw()
@@ -85,6 +79,24 @@ impl<'sess> LLVM<'sess> {
         }
     }
 
+    pub fn initialize(&self) {
+        unsafe {
+            self.set_type(TYPEVAR_ID, LLVMPointerType(LLVMStructCreateNamed(self.context, cstr("TypeVar")), 0));
+
+            // TODO this buffer size is tricky... I had it set for 8 but got a bunch of segfaults in the testsuite.
+            //      The correct value is probably platform specific but I don't know how to find that out.  Oddly enough
+            //      it would work for some programs but some would segfault
+            self.set_type(EXCEPTION_ID, LLVMArrayType(self.i64_type(), 10));
+        }
+    }
+
+    pub fn build_module(&self, globals: &Vec<LLGlobal>) {
+        unsafe {
+            self.build_declarations(globals);
+            self.build_definitions(globals);
+        }
+    }
+
     pub fn emit_module(&self) -> String {
         unsafe { CString::from_raw(LLVMPrintModuleToString(self.module)).into_string().unwrap() }
     }
@@ -117,6 +129,7 @@ impl<'sess> LLVM<'sess> {
     pub fn get_type(&self, id: UniqueID) -> Option<LLVMTypeRef> {
         self.types.borrow().get(&id).cloned()
     }
+
 
     pub unsafe fn void_type(&self) -> LLVMTypeRef {
         LLVMVoidTypeInContext(self.context)
@@ -154,6 +167,14 @@ impl<'sess> LLVM<'sess> {
         LLVMPointerType(etype, 0)
     }
 
+    pub unsafe fn exp_type(&self) -> LLVMTypeRef {
+        self.get_type(EXCEPTION_ID).unwrap()
+    }
+
+    pub unsafe fn exp_ref_type(&self) -> LLVMTypeRef {
+        LLVMPointerType(self.get_type(EXCEPTION_ID).unwrap(), 0)
+    }
+
     pub unsafe fn cfunc_type(&self, args: &Vec<LLType>, ret: &LLType) -> LLVMTypeRef {
         let mut argtypes = vec!();
         for ltype in args {
@@ -179,11 +200,11 @@ impl<'sess> LLVM<'sess> {
             LLType::I32 => self.i32_type(),
             LLType::I64 => self.i64_type(),
             LLType::F64 => self.f64_type(),
-            //LLType::Var => self.str_type(),
             LLType::Var => self.get_type(TYPEVAR_ID).unwrap(),
+            LLType::Exception => self.get_type(EXCEPTION_ID).unwrap(),
             LLType::Ptr(etype) => LLVMPointerType(self.build_type(etype), 0),
             LLType::Struct(etypes) => self.struct_type(etypes),
-            LLType::Function(argtypes, rettype, abi) => self.cfunc_type(argtypes, rettype),
+            LLType::Function(argtypes, rettype) => self.cfunc_type(argtypes, rettype),
             LLType::Alias(id) => self.get_type(*id).unwrap(),
         }
     }
@@ -240,6 +261,10 @@ impl<'sess> LLVM<'sess> {
         } else {
             value
         }
+    }
+
+    pub unsafe fn i1_const(&self, num: bool) -> LLVMValueRef {
+        LLVMConstInt(self.i1_type(), if num { 1 } else { 0 }, 0)
     }
 
     pub unsafe fn i32_const(&self, num: i32) -> LLVMValueRef {
@@ -429,6 +454,10 @@ impl<'sess> LLVM<'sess> {
                 value
             },
 
+            LLExpr::GetNamed(name) => {
+                LLVMGetNamedFunction(self.module, cstr(name))
+            },
+
             LLExpr::Cast(ltype, expr) => {
                 let value = self.build_expr(expr);
                 let rtype = self.build_type(ltype);
@@ -514,6 +543,16 @@ impl<'sess> LLVM<'sess> {
                 self.build_store(pointer, value)
             },
 
+            LLExpr::Cmp(cmp, expr1, expr2) => {
+                let val1 = self.build_expr(expr1);
+                let val2 = self.build_expr(expr2);
+                let pred = match cmp {
+                    LLCmpType::Equal => llvm_sys::LLVMIntPredicate::LLVMIntEQ,
+                    LLCmpType::NotEqual => llvm_sys::LLVMIntPredicate::LLVMIntNE,
+                };
+                LLVMBuildICmp(self.builder, pred, val1, val2, cstr(""))
+            },
+
             LLExpr::Phi(conds, blocks) => {
                 let (mut return_vals, mut block_vals) = self.build_basic_blocks("match", conds, blocks);
                 self.build_phi(&mut return_vals, &mut block_vals)
@@ -522,6 +561,7 @@ impl<'sess> LLVM<'sess> {
             LLExpr::Loop(cond, body) => {
                 self.build_loop(cond, body)
             },
+
         }
     }
 
@@ -593,13 +633,6 @@ impl<'sess> LLVM<'sess> {
                 LLGlobal::DefNamedStruct(_, _) |
                 LLGlobal::SetStructBody(_, _) => { /* Nothing Needs To Be Done */ }
             }
-        }
-    }
-
-    pub fn build_module(&self, globals: &Vec<LLGlobal>) {
-        unsafe {
-            self.build_declarations(globals);
-            self.build_definitions(globals);
         }
     }
 }

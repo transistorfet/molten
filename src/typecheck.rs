@@ -8,6 +8,13 @@ use types::{ Type, Check, ABI, expect_type, resolve_type, check_type_params };
 use misc::{ r };
 
 
+#[derive(Clone, Debug, PartialEq)]
+pub struct TypeChecker<'sess> {
+    pub session: &'sess Session,
+    //pub context: RefCell<Vec<CodeContext>>,
+}
+
+
 pub fn check_types(session: &Session, scope: ScopeRef, code: &Vec<AST>) -> Type {
     let ttype = check_types_vec(session, scope, code);
     if session.errors.get() > 0 {
@@ -186,7 +193,8 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &AST,
 
         AST::Raise(_, _, ref expr) => {
             // TODO should you check for a special error/exception type?
-            check_types_node(session, scope, expr, None)
+            check_types_node(session, scope.clone(), expr, None);
+            scope.make_obj(session, String::from("()"), vec!())?
         },
 
         AST::While(_, _, ref cond, ref body) => {
@@ -328,6 +336,7 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &AST,
             scope.make_obj(session, String::from("()"), vec!())?
         },
 
+        AST::GetValue(_) |
         AST::Index(_, _, _, _) => panic!("InternalError: ast element shouldn't appear at this late phase: {:?}", node),
     };
     

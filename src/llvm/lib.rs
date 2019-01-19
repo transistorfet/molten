@@ -96,7 +96,6 @@ pub fn declare_builtins_node<'sess>(session: &Session, scope: ScopeRef, node: &B
 pub fn initialize_builtins<'sess>(llvm: &LLVM<'sess>, transformer: &Transformer, scope: ScopeRef, entries: &Vec<BuiltinDef<'sess>>) {
     unsafe {
         let pscope = scope.get_parent().unwrap();
-        llvm.set_type(TYPEVAR_ID, LLVMPointerType(LLVMStructCreateNamed(llvm.context, cstr("TypeVar")), 0));
         declare_irregular_functions(llvm);
         define_builtins_vec(llvm, transformer, ptr::null_mut(), scope.clone(), entries);
     }
@@ -171,23 +170,26 @@ pub unsafe fn declare_c_function(llvm: &LLVM, name: &str, args: &mut [LLVMTypeRe
 }
 
 unsafe fn declare_irregular_functions(llvm: &LLVM) {
-    let bytestr_type = LLVMPointerType(LLVMInt8Type(), 0);
-    //let cint_type = LLVMInt32TypeInContext(llvm.context);
-    let cint_type = llvm.i64_type();
+    //declare_function(llvm, "malloc", &mut [llvm.i64_type()], llvm.str_type(), false);
+    //declare_function(llvm, "realloc", &mut [llvm.str_type(), llvm.i64_type()], llvm.str_type(), false);
+    //declare_function(llvm, "free", &mut [llvm.str_type()], LLVMVoidType(), false);
 
-    //declare_function(llvm, "malloc", &mut [cint_type], bytestr_type, false);
-    //declare_function(llvm, "realloc", &mut [bytestr_type, cint_type], bytestr_type, false);
-    //declare_function(llvm, "free", &mut [bytestr_type], LLVMVoidType(), false);
+    //declare_function(llvm, "strlen", &mut [llvm.str_type()], llvm.i64_type(), false);
+    //declare_function(llvm, "memcpy", &mut [llvm.str_type(), llvm.str_type(), llvm.i64_type()], llvm.str_type(), false);
 
-    //declare_function(llvm, "strlen", &mut [bytestr_type], cint_type, false);
-    //declare_function(llvm, "memcpy", &mut [bytestr_type, bytestr_type, cint_type], bytestr_type, false);
-
-    //declare_function(llvm, "puts", &mut [bytestr_type], cint_type, false);
-    declare_c_function(llvm, "sprintf", &mut [bytestr_type, bytestr_type], cint_type, true);
+    //declare_function(llvm, "puts", &mut [llvm.str_type()], llvm.i64_type(), false);
+    declare_c_function(llvm, "printf", &mut [llvm.str_type()], llvm.i64_type(), true);
+    declare_c_function(llvm, "sprintf", &mut [llvm.str_type(), llvm.str_type()], llvm.i64_type(), true);
 
     declare_c_function(llvm, "llvm.pow.f64", &mut [llvm.f64_type(), llvm.f64_type()], llvm.f64_type(), false);
 
-    //declare_function(llvm, "__gxx_personality_v0", &mut [bytestr_type, bytestr_type], cint_type, true);
+    declare_c_function(llvm, "setjmp", &mut [llvm.str_type()], llvm.i32_type(), false);
+    declare_c_function(llvm, "longjmp", &mut [llvm.str_type(), llvm.i32_type()], llvm.void_type(), false);
+    //declare_c_function(llvm, "llvm.eh.sjlj.setjmp", &mut [llvm.str_type()], llvm.i32_type(), false);
+    //declare_c_function(llvm, "llvm.eh.sjlj.longjmp", &mut [llvm.str_type()], llvm.void_type(), false);
+    //declare_c_function(llvm, "llvm.stacksave", &mut [], llvm.str_type(), false);
+
+    //declare_function(llvm, "__gxx_personality_v0", &mut [llvm.str_type(), llvm.str_type()], llvm.i64_type(), true);
 }
 
 unsafe fn build_lib_function(llvm: &LLVM, id: NodeID, name: &str, ltype: &LLType, func: PlainFunction) -> LLVMValueRef {
@@ -324,6 +326,10 @@ pub fn get_builtins<'sess>() -> Vec<BuiltinDef<'sess>> {
         BuiltinDef::Func(id(), "==",  "(Bool, Bool) -> Bool / MF",   FuncKind::Function(eq_bool)),
         BuiltinDef::Func(id(), "!=",  "(Bool, Bool) -> Bool / MF",   FuncKind::Function(ne_bool)),
         BuiltinDef::Func(id(), "not", "(Bool) -> Bool / MF",         FuncKind::Function(not_bool)),
+
+        //// Unit Builtins ////
+        BuiltinDef::Func(id(), "==",  "((), ()) -> Bool / MF",   FuncKind::Function(always_true)),
+        BuiltinDef::Func(id(), "!=",  "((), ()) -> Bool / MF",   FuncKind::Function(always_false)),
     )
 }
 
@@ -360,6 +366,9 @@ fn gte_real(llvm: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLV
 fn eq_bool(llvm: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildICmp(llvm.builder, llvm::LLVMIntPredicate::LLVMIntEQ, args[0], args[1], cstr("")) } }
 fn ne_bool(llvm: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildICmp(llvm.builder, llvm::LLVMIntPredicate::LLVMIntNE, args[0], args[1], cstr("")) } }
 fn not_bool(llvm: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildNot(llvm.builder, args[0], cstr("")) } }
+
+fn always_true(llvm: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { llvm.i1_const(true) } }
+fn always_false(llvm: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { llvm.i1_const(false) } }
 
 fn sprintf(llvm: &LLVM, mut args: Vec<LLVMValueRef>) -> LLVMValueRef {
     unsafe {

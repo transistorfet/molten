@@ -259,6 +259,7 @@ pub fn refine_node(node: AST) -> AST {
             AST::PtrCast(ttype, r(refine_node(*value)))
         },
 
+        AST::GetValue(_) => { node },
         AST::Literal(_, _) => { node },
         AST::Nil(_) => { node },
         AST::Identifier(_, _, _) => { node },

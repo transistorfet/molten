@@ -1,11 +1,12 @@
 
-* there's still an issue with the transformed name of methods
+* move top level try to inside the main function
+* make the molten type convert function for mfuncs use the LLType::Exception instead of i8*
+* bug in abi test related to the decl printf
 
 * if you made typechecking an object like transform, and had a context, you could do extended checks of what's allowed in a C function, like exceptions (disallowed in C, but allowed in M and MF)
 * make refinery an object
 * make an HIR
 
-* implement try, raise
 * you need to add a public/private flag to definitions, for exporting, along with a "private" attribute in IR
 * update the readme
 
@@ -15,7 +16,6 @@
 
 
 Typechecking:
-* there is a problem with typechecking Option, where in compiles it as an Option<Int> rather than Option<'item>
 * there's still a problem with typevars not resolving fully, where a function that should return a concrete returns a free typevar.... (recursion or forward definition)
 
 
@@ -44,6 +44,7 @@ Refactoring:
 
 
 BUGS:
+* issue with separator/lf not working when two expressions are on the same line (it should produce a parse error)
 * if there are brackets after a record literal, it will try to call it as a function: let bar = ref { a = 1, b = 2 } \n (!x).a    parses incorrectly,
   but adding a semi-colon will fix it.  It tries to parse through the line terminator
 * recursive c functions don't work because it's typechecked as unknown abi, which is called as a closure
@@ -52,6 +53,7 @@ BUGS:
 * if you only have one element in a tuple, or in a record, it parses it as a block or expression
 * there was an error where "let ni: newint" with no initializer was causing a type error with "expected class or concrete type", but that was actually because a definition without
   an initializer is the same as "let ni: newint = nil" and nil could not be cast to a Record, which newint is a typealias of a record
+* there's still an issue with the transformed name of methods.  This is because tscope is not passed into class methods during transform
 
 
 
@@ -68,29 +70,26 @@ TESTS:
 
 
 Changes:
-* unable to define a method as / MF or / C ABI
-* if, sideeffects, and while loops need bool comparison results to work correctly.  You can either force that in type checking or somehow desugar or use the comps style from match
-* you could modify the forloop code to take an iterator in future
-* you really need a better way of doing modules
-* should vtables be dynamically allocated, or should we add a LLType::ElementOf() type or something to GetElement an aliased type
-* change how you reference an operator function; like op+ or (+)
-* make an "as" for of decl, like decl buffer_resize as resize: () -> ??
-
-
-
-* there's no way to genericly compare or print tuples or records
-
-
 * it might also make it easier/generic to allow compiling to object files?  So no linking, but it would do optimization and object file output
 * how does rust do "use" if there is a circular dependency?
 * put intermediate files somewhere else, at least as controlled by the molten script, so as not to clutter source directories
 
+* the module level scope is now a closed function, so you could return a representation of it as the "module" object
+* you really need a better way of doing modules
+
+* if, sideeffects, and while loops need bool comparison results to work correctly.  You can either force that in type checking or somehow desugar or use the comps style from match
+* unable to define a method as / MF or / C ABI
+* make an "as" for of decl, like decl buffer_resize as resize: () -> ??
+* you could modify the forloop code to take an iterator in future
+* should vtables be dynamically allocated, or should we add a LLType::ElementOf() type or something to GetElement an aliased type
+* change how you reference an operator function; like op+ or (+)
 
 * should compare use a trait/typeclass? that would have to come later
 * strings, buffers, and all the primative types require vtables if they have methods, but there aren't vtables stored inside them.  You could make static vtable exceptions for them
 * make primative types unable to inherit from, because there's no vtable
 * fix lib to allow builtin classes
 
+* there's no way to genericly compare or print tuples or records
 * can you make a check for nil before unboxing a type... and somehow return an appropriate default value?  I guess that's feasible because only primative types would be
   boxed/unboxed, although records and tuples might be an issue
 * rather than coercising a non pointer type into a pointer, you can box any such types, possibly adding a vtablu of sorts in the process
@@ -107,19 +106,15 @@ Changes:
 * implement garbage collection
 * add a spread operator for records
 * add an iterator type
-* implement assignment of tuples and records? or
+* implement assignment of tuples and records? (or only spread operator)
 * add compiler directives?
 
-* issue with separator/lf not working when two expressions are on the same line (it should produce a parse error)
 * better support for generics
 * fill in string and list type functions, and finish hashmap (rename to dict?)
 
 
 
 
-* should you make the top level module functions be closures, instead of using global vars
-* if even the global/module scope was a closure, then you could make a module be equivallent to an implicit function that is called when the module is imported, which could have the name of the
-  module; so a module called main would become the main() function
 
 
 * should you add access modifiers to classes, and maybe functions; public, private, protected

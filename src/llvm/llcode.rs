@@ -3,12 +3,6 @@ use ast::NodeID;
 use misc::{ R, r };
 
 
-#[derive(Copy, Clone, Debug, PartialEq)]
-pub enum LLABI {
-    C,
-    Closure,
-}
-
 #[derive(Clone, Debug, PartialEq)]
 pub enum LLType {
     Void,
@@ -18,23 +12,24 @@ pub enum LLType {
     I64,
     F64,
     Var,
+    Exception,
     Ptr(R<LLType>),
     Struct(Vec<LLType>),
-    Function(Vec<LLType>, R<LLType>, LLABI),
+    Function(Vec<LLType>, R<LLType>),
     Alias(NodeID),
 }
 
 impl LLType {
     pub fn argcount(&self) -> usize {
         match self {
-            LLType::Function(args, _, _) => args.len(),
+            LLType::Function(args, _) => args.len(),
             _ => 0,
         }
     }
 
     pub fn get_rettype(&self) -> LLType {
         match self {
-            LLType::Function(_, ret, _) => *ret.clone(),
+            LLType::Function(_, ret) => *ret.clone(),
             _ => LLType::Void,
         }
     }
@@ -86,6 +81,7 @@ pub enum LLExpr {
     Literal(LLLit),
     GetValue(NodeID),
     SetValue(NodeID, R<LLExpr>),
+    GetNamed(String),
     Cast(LLType, R<LLExpr>),
 
     CallC(R<LLExpr>, Vec<LLExpr>),
@@ -106,6 +102,7 @@ pub enum LLExpr {
     LoadRef(R<LLExpr>),
     StoreRef(R<LLExpr>, R<LLExpr>),
 
+    Cmp(LLCmpType, R<LLExpr>, R<LLExpr>),
     Phi(Vec<LLBlock>, Vec<LLBlock>),
     Loop(LLBlock, LLBlock),
 }

@@ -104,6 +104,7 @@ fn compile_file(input: &str, output: Option<&str>) {
     }
 
     let llvm = llvm::codegen::LLVM::new(&session);
+    llvm.initialize();
     llvm::lib::initialize_builtins(&llvm, &transformer, session.map.get_global(), &builtins);
     llvm.build_module(&transformer.globals.borrow());
     llvm.print_module();
