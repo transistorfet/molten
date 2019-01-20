@@ -717,7 +717,7 @@ impl<'sess> Transformer<'sess> {
         //code.push(AST::Tuple(NodeID::generate(), Pos::empty(), vec!(AST::make_ident_from_str(Pos::empty(), real_fname.as_str()), AST::make_ident(Pos::empty(), Ident::new(cname.clone())))));
 
         binding::bind_names(self.session, scope.clone(), &mut code);
-        typecheck::check_types(self.session, scope.clone(), &code);
+        typecheck::TypeChecker::check(self.session, scope.clone(), &code);
         let mut exprs = self.transform_vec(scope.clone(), &code);
         exprs.push(LLExpr::SetValue(id, r(LLExpr::GetLocal(did))));
         exprs.push(LLExpr::GetValue(id));

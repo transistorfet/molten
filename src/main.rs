@@ -33,6 +33,7 @@ mod export;
 mod llvm;
 
 use config::Options;
+use typecheck::TypeChecker;
 
 fn main() {
     let matches =
@@ -83,7 +84,7 @@ fn compile_file(input: &str, output: Option<&str>) {
 
     let mut code = session.parse_file(input, false);
     binding::bind_names(&session, session.map.get_global(), &mut code);
-    typecheck::check_types(&session, session.map.get_global(), &code);
+    TypeChecker::check(&session, session.map.get_global(), &code);
 
     if Options::as_ref().debug {
         let global = session.map.get_global();
