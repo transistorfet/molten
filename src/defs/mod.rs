@@ -1,5 +1,6 @@
 
 use scope::ScopeRef;
+use ast::Mutability;
 use session::{ Session, Error };
 
 pub mod traits;
@@ -88,9 +89,9 @@ impl Def {
 
     pub fn is_mutable(&self) -> bool {
         match self {
-            Def::Var(def) => def.mutable,
-            Def::Arg(def) => def.mutable,
-            Def::Field(def) => def.mutable,
+            Def::Var(def) if def.mutable == Mutability::Mutable => true,
+            Def::Arg(def) if def.mutable == Mutability::Mutable => true,
+            Def::Field(def) if def.mutable == Mutability::Mutable => true,
             _ => false,
         }
     }

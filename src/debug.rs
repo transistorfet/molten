@@ -23,13 +23,13 @@ pub fn print_types(session: &Session, scope: ScopeRef, code: &Vec<AST>) {
 pub fn print_types_node(session: &Session, scope: ScopeRef, node: &AST) {
     match *node {
         AST::Block(_, _, ref body) => print_types(session, scope, body),
-        AST::Function(ref id, _, _, _, _, ref body, _) => {
+        AST::Function(ref id, _, _, _, _, _, ref body, _) => {
             let fscope = session.map.get(id);
             print_types_scope(session, fscope.clone());
             print_types_node(session, fscope, body);
         },
         AST::Definition(_, _, ref mutable, ref name, ref ttype, ref body) => {
-            println!("\nDefining {}: {:?} {:?}", mutable, name, ttype);
+            println!("\nDefining {:?}: {:?} {:?}", mutable, name, ttype);
             print_types_node(session, scope, body);
         },
         _ => ()

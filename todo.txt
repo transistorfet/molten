@@ -1,11 +1,10 @@
 
+* remove the forced visibility in refinery, when you decide on pub/priv semantics
 * make run function return a module object?  Should it also memoize itself?
-* make the molten type convert function for mfuncs use the LLType::Exception instead of i8*
+* make the molten type convert function for mfuncs use the LLType::Exception instead of i8* (remove molten type convert in transform)
 * issue with linking object file output... .rodata.str1.1 recompile with -fPIC
 
-* you need to add a public/private flag to definitions, for exporting, along with a "private" attribute in IR
 * if you made typechecking an object like transform, and had a context, you could do extended checks of what's allowed in a C function, like exceptions (disallowed in C, but allowed in M and MF)
-* make refinery an object
 * make an HIR
 
 * update the readme

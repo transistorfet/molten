@@ -2,12 +2,12 @@
 use std::fs::File;
 use std::io::prelude::*;
 
-use ast::AST;
 use types::Type;
 use misc::UniqueID;
 use config::Options;
 use session::Session;
 use scope::{ Scope, ScopeRef };
+use ast::{ AST, Mutability, Visibility };
 
 
 pub fn write_exports(session: &Session, scope: ScopeRef, filename: &str, code: &Vec<AST>) {
@@ -29,11 +29,13 @@ pub fn build_index(session: &Session, scope: ScopeRef, code: &Vec<AST>) -> Strin
 
 fn build_index_node(index: &mut String, session: &Session, scope: ScopeRef, node: &AST) {
     match *node {
-        AST::Function(ref id, _, ref ident, _, _, _, _) => {
+        AST::Function(ref id, _, ref vis, ref ident, _, _, _, _) => {
             if let Some(ref ident) = *ident {
-                //let name = get_mangled_name(session, scope.clone(), &ident.name, *id);
-                let ttype = session.get_type(*id).unwrap();
-                index.push_str(format!("decl {} : {}\n", ident.name.clone(), unparse_type(session, scope.clone(), ttype)).as_str());
+                if *vis == Visibility::Public {
+                    //let name = get_mangled_name(session, scope.clone(), &ident.name, *id);
+                    let ttype = session.get_type(*id).unwrap();
+                    index.push_str(format!("decl {} : {}\n", ident.name.clone(), unparse_type(session, scope.clone(), ttype)).as_str());
+                }
             }
         },
 
@@ -58,13 +60,15 @@ fn build_index_node(index: &mut String, session: &Session, scope: ScopeRef, node
                 match *node {
                     AST::Definition(ref id, _, ref mutable, ref ident, _, _) => {
                         let ttype = session.get_type(*id).unwrap();
-                        index.push_str(format!("    let {}{} : {}\n", if *mutable { "mut " } else { "" }, ident.name, unparse_type(session, tscope.clone(), ttype)).as_str());
+                        index.push_str(format!("    let {}{} : {}\n", if let Mutability::Mutable = mutable { "mut " } else { "" }, ident.name, unparse_type(session, tscope.clone(), ttype)).as_str());
                     },
-                    AST::Function(ref id, _, ref ident, _, _, _, _) => {
+                    AST::Function(ref id, _, ref vis, ref ident, _, _, _, _) => {
                         if let Some(ref ident) = *ident {
-                            //let name = get_mangled_name(session, tscope.clone(), &ident.name, *id);
-                            let ttype = session.get_type(*id).unwrap();
-                            index.push_str(format!("    decl {} : {}\n", ident.name.clone(), unparse_type(session, tscope.clone(), ttype)).as_str());
+                            if *vis == Visibility::Public {
+                                //let name = get_mangled_name(session, tscope.clone(), &ident.name, *id);
+                                let ttype = session.get_type(*id).unwrap();
+                                index.push_str(format!("    decl {} : {}\n", ident.name.clone(), unparse_type(session, tscope.clone(), ttype)).as_str());
+                            }
                         }
                     },
                     _ => {  },

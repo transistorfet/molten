@@ -31,7 +31,7 @@ use std::str::FromStr;
 use abi::ABI;
 use types::Type;
 use misc::{ r, UniqueID };
-use ast::{ Pos, Literal, Ident, Argument, ClassSpec, Pattern, AST };
+use ast::{ Pos, Mutability, Visibility, Literal, Ident, Argument, ClassSpec, Pattern, AST };
 
 
 ///// Parsing Macros /////
@@ -175,7 +175,13 @@ named!(definition(Span) -> AST,
             wscom!(tag!("=")),
             expression
         )) >>
-        (AST::make_def(Pos::new(pos), m.is_some(), i.1, i.2, if e.is_some() { e.unwrap() } else { AST::make_nil() }))
+        (AST::make_def(
+            Pos::new(pos),
+            if m.is_some() { Mutability::Mutable } else { Mutability::Immutable },
+            i.1,
+            i.2,
+            if e.is_some() { e.unwrap() } else { AST::make_nil() }
+        ))
     )
 );
 
@@ -363,17 +369,19 @@ named!(newclass(Span) -> AST,
 named!(declare(Span) -> AST,
     do_parse!(
         pos: position!() >>
+        vis: opt!(wscom!(tag_word!("pub"))) >>
         wscom!(tag_word!("decl")) >>
         n: symbol_name >>
         wscom!(tag!(":")) >>
         t: type_description >>
-        (AST::make_decl(Pos::new(pos), n, t))
+        (AST::make_decl(Pos::new(pos), if vis.is_some() { Visibility::Public } else { Visibility::Private }, n, t))
     )
 );
 
 named!(function(Span) -> AST,
     do_parse!(
         pos: position!() >>
+        vis: opt!(wscom!(tag_word!("pub"))) >>
         wscom!(tag_word!("fn")) >>
         //n: opt!(identifier) >>
         l: alt_complete!(
@@ -388,7 +396,7 @@ named!(function(Span) -> AST,
         r: opt!(preceded!(wscom!(tag!("->")), type_description)) >>
         a: abi_specifier >>
         e: alt_complete!(block | preceded!(wscom!(tag!("=>")), expression)) >>
-        (AST::make_func(Pos::new(pos), l.0, l.1, r, e, a))
+        (AST::make_func(Pos::new(pos), if vis.is_some() { Visibility::Public } else { Visibility::Private }, l.0, l.1, r, e, a))
     )
 );
 

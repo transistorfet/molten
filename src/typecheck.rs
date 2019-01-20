@@ -54,7 +54,7 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &AST,
             }
         },
 
-        AST::Function(ref id, _, ref ident, ref args, ref rtype, ref body, ref abi) => {
+        AST::Function(ref id, _, _, ref ident, ref args, ref rtype, ref body, ref abi) => {
             let fscope = session.map.get(id);
 
             let mut argtypes = vec!();
@@ -141,7 +141,7 @@ pub fn check_types_node_or_error(session: &Session, scope: ScopeRef, node: &AST,
             btype
         },
 
-        AST::Declare(ref id, _, ref _ident, ref ttype) => {
+        AST::Declare(ref id, _, _, ref _ident, ref ttype) => {
             session.update_type(scope.clone(), *id, ttype.clone())?;
             ttype.clone()
         },

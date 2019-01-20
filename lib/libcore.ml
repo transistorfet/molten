@@ -23,21 +23,21 @@ class String {
 }
 */
 
-fn ==(str1: String, str2: String) -> Bool / MF {
+pub fn ==(str1: String, str2: String) -> Bool / MF {
     if strcmp(str1, str2) == 0 then
         true
     else
         false
 }
 
-fn !=(str1: String, str2: String) -> Bool / MF {
+pub fn !=(str1: String, str2: String) -> Bool / MF {
     if strcmp(str1, str2) != 0 then
         true
     else
         false
 }
 
-fn +(s1: String, s2: String) -> String / MF {
+pub fn +(s1: String, s2: String) -> String / MF {
     //s1.push(s2)
     let s1length = strlen(s1)
     let s2length = strlen(s2)
@@ -47,30 +47,30 @@ fn +(s1: String, s2: String) -> String / MF {
 }
 
 
-fn str(unit: ()) -> String {
+pub fn str(unit: ()) -> String {
     "()"
 }
 
-fn str(num: Bool) -> String {
+pub fn str(num: Bool) -> String {
     if num then
         "true"
     else
         "false"
 }
 
-fn str(num: Int) -> String {
+pub fn str(num: Int) -> String {
     let buffer: String = malloc(22)
     sprintf(buffer, "%ld", num, ())
     buffer
 }
 
-fn hex(num: Int) -> String {
+pub fn hex(num: Int) -> String {
     let buffer: String = malloc(22)
     sprintf(buffer, "0x%lX", num, ())
     buffer
 }
 
-fn str(num: Real) -> String {
+pub fn str(num: Real) -> String {
     let buffer: String = malloc(22)
     sprintf(buffer, "%f", num, ())
     buffer

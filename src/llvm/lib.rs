@@ -11,8 +11,8 @@ use self::llvm::core::*;
 use abi::ABI;
 use types::Type;
 use session::Session;
-use ast::{ NodeID };
 use parser::{ parse_type };
+use ast::{ NodeID, Mutability, Visibility };
 use scope::{ Scope, ScopeRef, ScopeMapRef, Context };
 use binding::{ declare_typevars };
 use misc::UniqueID;
@@ -74,10 +74,10 @@ pub fn declare_builtins_node<'sess>(session: &Session, scope: ScopeRef, node: &B
             let abi = ftype.as_ref().map(|t| t.get_abi().unwrap()).unwrap_or(ABI::Molten);
             match *func {
                 FuncKind::Function(_) => {
-                    FuncDef::define(session, scope.clone(), *id, &Some(String::from(*name)), ftype.clone()).unwrap();
+                    FuncDef::define(session, scope.clone(), *id, Visibility::Private, &Some(String::from(*name)), ftype.clone()).unwrap();
                 },
                 _ => {
-                    AnyFunc::define(session, scope.clone(), *id, &Some(String::from(*name)), abi, ftype.clone()).unwrap();
+                    AnyFunc::define(session, scope.clone(), *id, Visibility::Private, &Some(String::from(*name)), abi, ftype.clone()).unwrap();
                 },
             };
         },
@@ -143,7 +143,7 @@ pub unsafe fn define_builtins_node<'sess>(llvm: &LLVM<'sess>, transformer: &Tran
 
             let lltype = if structdef.len() > 0 {
                 for (ref field, ref ttype) in structdef {
-                    classdef.structdef.add_field(llvm.session, NodeID::generate(), true, field, ttype.clone(), Define::IfNotExists);
+                    classdef.structdef.add_field(llvm.session, NodeID::generate(), Mutability::Mutable, field, ttype.clone(), Define::IfNotExists);
                 }
                 //build_class_type(llvm, scope.clone(), *id, &cname, classdef.clone())
 

@@ -4,7 +4,7 @@ use abi::ABI;
 use types::Type;
 use scope::{ Scope, ScopeRef };
 use session::{ Session, Error };
-use ast::{ ClassSpec, Pattern, AST };
+use ast::{ Mutability, ClassSpec, Pattern, AST };
 use misc::UniqueID;
 
 use defs::functions::AnyFunc;
@@ -35,7 +35,7 @@ pub fn bind_names_node(session: &Session, scope: ScopeRef, node: &mut AST) {
 
 fn bind_names_node_or_error(session: &Session, scope: ScopeRef, node: &mut AST) -> Result<(), Error> {
     match *node {
-        AST::Function(ref id, _, ref ident, ref mut args, ref mut ret, ref mut body, ref abi) => {
+        AST::Function(ref id, _, ref vis, ref ident, ref mut args, ref mut ret, ref mut body, ref abi) => {
             let fscope = session.map.add(*id, Some(scope.clone()));
             fscope.set_basename(ident.as_ref().map_or(format!("anon{}", id), |ident| ident.name.clone()));
 
@@ -47,11 +47,11 @@ fn bind_names_node_or_error(session: &Session, scope: ScopeRef, node: &mut AST) 
 
 
             // Define the function variable and it's arguments variables
-            AnyFunc::define(session, scope.clone(), *id, &ident.as_ref().map(|ref ident| String::from(ident.as_str())), *abi, None)?;
+            AnyFunc::define(session, scope.clone(), *id, *vis, &ident.as_ref().map(|ref ident| String::from(ident.as_str())), *abi, None)?;
 
             for ref arg in args.iter() {
                 // TODO this is assumed to be always immutable, but maybe shouldn't be
-                ArgDef::define(session, fscope.clone(), arg.id, false, &arg.ident.name, arg.ttype.clone())?;
+                ArgDef::define(session, fscope.clone(), arg.id, Mutability::Immutable, &arg.ident.name, arg.ttype.clone())?;
             }
 
             bind_names_node(session, fscope, body)
@@ -68,10 +68,10 @@ fn bind_names_node_or_error(session: &Session, scope: ScopeRef, node: &mut AST) 
             bind_names_node(session, scope, code);
         },
 
-        AST::Declare(ref id, _, ref ident, ref mut ttype) => {
+        AST::Declare(ref id, _, ref vis, ref ident, ref mut ttype) => {
             declare_typevars(session, scope.clone(), Some(ttype), false)?;
             let abi = ttype.get_abi().unwrap_or(ABI::Molten);
-            AnyFunc::define(session, scope.clone(), *id, &Some(ident.name.clone()), abi, Some(ttype.clone()))?;
+            AnyFunc::define(session, scope.clone(), *id, *vis, &Some(ident.name.clone()), abi, Some(ttype.clone()))?;
         },
 
         AST::Identifier(ref id, _, ref ident) => {
@@ -116,7 +116,7 @@ fn bind_names_node_or_error(session: &Session, scope: ScopeRef, node: &mut AST) 
 
         AST::For(ref id, _, ref ident, ref mut cond, ref mut body) => {
             let lscope = session.map.add(*id, Some(scope.clone()));
-            AnyVar::define(session, lscope.clone(), *id, true, &ident.name, None)?;
+            AnyVar::define(session, lscope.clone(), *id, Mutability::Mutable, &ident.name, None)?;
             bind_names_node(session, lscope.clone(), cond);
             bind_names_node(session, lscope, body);
         },

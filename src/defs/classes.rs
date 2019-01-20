@@ -8,7 +8,7 @@ use types::Type;
 use scope::{ Scope, ScopeRef };
 use session::{ Session, Error };
 use types::{ check_type, Check };
-use ast::{ NodeID, Ident, ClassSpec, AST };
+use ast::{ NodeID, Mutability, Ident, ClassSpec, AST };
 
 use defs::variables::FieldDef;
 
@@ -135,7 +135,7 @@ impl ClassDef {
             if let Some(index) = self.get_struct_vtable_index() {
                 self.structdef.fields.borrow_mut()[index].2 = vtype;
             } else {
-                self.structdef.add_field(session, self.vtable.id, false, "__vtable__", vtype, Define::IfNotExists);
+                self.structdef.add_field(session, self.vtable.id, Mutability::Immutable, "__vtable__", vtype, Define::IfNotExists);
             }
         }
         for ref node in body.iter() {
@@ -227,7 +227,7 @@ impl StructDef {
         *self.fields.borrow_mut() = inherit.fields.borrow().clone();
     }
 
-    pub fn add_field(&self, session: &Session, id: NodeID, mutable: bool, name: &str, ttype: Type, define: Define) {
+    pub fn add_field(&self, session: &Session, id: NodeID, mutable: Mutability, name: &str, ttype: Type, define: Define) {
         let sname = String::from(name);
         if define == Define::IfNotExists && self.vars.get_var_def(&sname).is_none() {
             FieldDef::define(session, self.vars.clone(), id, mutable, &sname, Some(ttype.clone())).unwrap();
@@ -294,12 +294,12 @@ impl Vtable {
     pub fn build_vtable(&self, session: &Session, scope: ScopeRef, body: &Vec<AST>) {
         for ref node in body.iter() {
             match **node {
-                AST::Function(ref id, _, ref ident, ref args, ref rtype, _, ref abi) => {
+                AST::Function(ref id, _, ref vis, ref ident, ref args, ref rtype, _, ref abi) => {
                     if let Some(Ident { ref name, .. }) = ident {
                         self.add_entry(session, scope.clone(), *id, name.as_str(), session.get_type(*id).unwrap());
                     }
                 },
-                AST::Declare(ref id, _, ref ident, _) => {
+                AST::Declare(ref id, _, ref vis, ref ident, _) => {
                     let ttype = session.get_type(*id).unwrap();
                     match ttype {
                         Type::Function(_, _, _) => {

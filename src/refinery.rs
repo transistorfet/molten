@@ -1,4 +1,6 @@
 
+use std::cell::RefCell;
+
 use rand;
 
 use abi::ABI;
@@ -6,18 +8,26 @@ use types::Type;
 use session::Session;
 use misc::{ r, UniqueID };
 //use hcode::{ HExpr };
-use ast::{ NodeID, AST, Ident, ClassSpec, Argument, Pattern, Literal };
+use ast::{ NodeID, AST, Mutability, Visibility, Ident, ClassSpec, Argument, Pattern, Literal };
 
+
+#[derive(Copy, Clone, Debug, PartialEq)]
+enum CodeContext {
+    Func,
+    ClassBody,
+}
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Refinery<'sess> {
     pub session: &'sess Session,
+    context: RefCell<Vec<CodeContext>>,
 }
 
 impl<'sess> Refinery<'sess> {
     pub fn refine(session: &'sess Session, code: Vec<AST>) -> Vec<AST> {
         let refinery = Refinery {
             session: session,
+            context: RefCell::new(vec!()),    
         };
 
         //vec!(AST::make_func(Pos::empty(), Some(Ident::new(Pos::empty(), format!("init.{}", "test"))), vec!(), None,
@@ -25,6 +35,24 @@ impl<'sess> Refinery<'sess> {
         //ABI::Molten))
         refinery.refine_vec(code)
     }
+
+    fn with_context<F, R>(&self, context: CodeContext, f: F) -> R where F: FnOnce() -> R {
+        self.context.borrow_mut().push(context);
+        let ret = f();
+        self.context.borrow_mut().pop();
+        ret
+    }
+
+    fn get_context(&self) -> Option<CodeContext> {
+        self.context.borrow().last().map(|c| *c)
+    }
+
+    // TODO this is a hack to keep the old pub/private visibility as before, until we settle on the behaviour
+    fn top_level(&self) -> bool {
+        let len = self.context.borrow().len();
+        len == 0 || self.get_context() == Some(CodeContext::ClassBody) && len == 1
+    }
+
 
     pub fn refine_vec(&self, code: Vec<AST>) -> Vec<AST> {
         let mut block = vec!();
@@ -47,12 +75,20 @@ impl<'sess> Refinery<'sess> {
                 AST::Definition(id, pos, mutable, ident, ttype, r(self.refine_node(*code)))
             },
 
-            AST::Declare(id, pos, ident, ttype) => {
-                AST::Declare(id, pos, ident, ttype)
+            AST::Declare(id, pos, vis, ident, ttype) => {
+                AST::Declare(id, pos, vis, ident, ttype)
             },
 
-            AST::Function(id, pos, ident, args, ret, body, abi) => {
-                AST::Function(id, pos, ident, args, ret, r(self.refine_node(*body)), abi)
+            AST::Function(id, pos, vis, ident, args, ret, body, abi) => {
+                let vis = if self.top_level() {
+                    Visibility::Public
+                } else {
+                    Visibility::Private
+                };
+
+                self.with_context(CodeContext::Func, || {
+                    AST::Function(id, pos, vis, ident, args, ret, r(self.refine_node(*body)), abi)
+                })
             },
 
             AST::Invoke(id, pos, fexpr, mut args) => {
@@ -103,17 +139,17 @@ impl<'sess> Refinery<'sess> {
                 let invoke = |func, args| AST::make_invoke(pos.clone(), func, args);
 
                 // define the list variable
-                block.push(AST::make_def(pos.clone(), true, Ident::new(listname.clone()), None, self.refine_node(*list)));
+                block.push(AST::make_def(pos.clone(), Mutability::Mutable, Ident::new(listname.clone()), None, self.refine_node(*list)));
 
                 // define the iterator index variable
-                block.push(AST::make_def(pos.clone(), true, Ident::new(iter.clone()), None, AST::make_lit(Literal::Integer(0))));
+                block.push(AST::make_def(pos.clone(), Mutability::Mutable, Ident::new(iter.clone()), None, AST::make_lit(Literal::Integer(0))));
 
                 // compare if iterator index is < length of list
                 cond_block.push(self.refine_node(invoke(AST::make_ident(pos.clone(), Ident::from_str("<")),
                     vec!(access_iter(), invoke(access_list_field("len"), vec!())))));
 
                 // assign the next value to the item variable
-                body_block.push(AST::make_def(pos.clone(), false, ident.clone(), None,
+                body_block.push(AST::make_def(pos.clone(), Mutability::Immutable, ident.clone(), None,
                     self.refine_node(invoke(access_list_field("get"), vec!(access_iter())))));
 
                 body_block.push(self.refine_node(*body));
@@ -144,7 +180,7 @@ impl<'sess> Refinery<'sess> {
                 let typevar = rand::random::<i32>();
 
                 // TODO this makes lists immutable, which might not be what we want
-                block.push(AST::make_def(pos.clone(), false, Ident::new(tmplist.clone()), None,
+                block.push(AST::make_def(pos.clone(), Mutability::Immutable, Ident::new(tmplist.clone()), None,
                     AST::make_invoke(pos.clone(),
                         AST::make_resolve(pos.clone(), AST::make_ident(pos.clone(), Ident::from_str("List")), Ident::from_str("new")),
                         vec!(
@@ -173,7 +209,7 @@ impl<'sess> Refinery<'sess> {
                 let mut has_init = false;
                 let mut body: Vec<AST> = body.into_iter().map(|node| {
                     match node {
-                        AST::Function(id, pos, ident, args, ret, mut body, abi) => {
+                        AST::Function(id, pos, vis, ident, args, ret, mut body, abi) => {
                             if ident.as_ref().map(|i| i.name.as_str()) == Some("new") {
                                 has_new = true;
                                 if args.len() > 0 && args[0].ident.as_str() == "self" {
@@ -183,14 +219,14 @@ impl<'sess> Refinery<'sess> {
                                 }
                             }
                             ident.as_ref().map(|ref ident| if ident.as_str() == "__init__" { has_init = true; });
-                            AST::Function(id, pos, ident, args, ret, body, abi)
+                            AST::Function(id, pos, vis, ident, args, ret, body, abi)
                         },
-                        AST::Declare(id, pos, ident, ttype) => {
+                        AST::Declare(id, pos, vis, ident, ttype) => {
                             if ident.as_str() == "new" {
                                 has_new = true;
                             }
                             if ident.as_str() == "__init__" { has_init = true; }
-                            AST::Declare(id, pos, ident, ttype)
+                            AST::Declare(id, pos, vis, ident, ttype)
                         },
                         _ => node
                     }
@@ -222,11 +258,14 @@ impl<'sess> Refinery<'sess> {
                             vec!(AST::make_ident(pos.clone(), Ident::from_str("self")))));
                     }
                     init.push(AST::make_ident_from_str(pos.clone(), "self"));
-                    let mut initcode = AST::Function(initid, pos.clone(), Some(Ident::from_str("__init__")), iargs, None, r(AST::make_block(pos.clone(), init)), ABI::Molten);
+                    let mut initcode = AST::Function(initid, pos.clone(), Visibility::Public, Some(Ident::from_str("__init__")), iargs, None, r(AST::make_block(pos.clone(), init)), ABI::Molten);
                     body.push(initcode);
                 }
 
-                AST::Class(id, pos, classspec, parentspec, self.refine_vec(body))
+                let body = self.with_context(CodeContext::ClassBody, || {
+                    self.refine_vec(body)
+                });
+                AST::Class(id, pos, classspec, parentspec, body)
             },
 
             AST::Index(id, pos, base, index) => {

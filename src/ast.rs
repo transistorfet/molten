@@ -18,6 +18,17 @@ pub struct Pos {
     pub filenum: u16,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum Visibility {
+    Private,
+    Public,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum Mutability {
+    Immutable,
+    Mutable,
+}
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Literal {
@@ -95,14 +106,14 @@ pub enum AST {
     For(NodeID, Pos, Ident, R<AST>, R<AST>),
     While(NodeID, Pos, R<AST>, R<AST>),
 
-    Declare(NodeID, Pos, Ident, Type),
-    Function(NodeID, Pos, Option<Ident>, Vec<Argument>, Option<Type>, R<AST>, ABI),
+    Declare(NodeID, Pos, Visibility, Ident, Type),
+    Function(NodeID, Pos, Visibility, Option<Ident>, Vec<Argument>, Option<Type>, R<AST>, ABI),
     New(NodeID, Pos, ClassSpec),
     Class(NodeID, Pos, ClassSpec, Option<ClassSpec>, Vec<AST>),
     TypeAlias(NodeID, Pos, ClassSpec, Type),
 
     Import(NodeID, Pos, Ident, Vec<AST>),
-    Definition(NodeID, Pos, bool, Ident, Option<Type>, R<AST>),
+    Definition(NodeID, Pos, Mutability, Ident, Option<Type>, R<AST>),
     Assignment(NodeID, Pos, R<AST>, R<AST>),
 }
 
@@ -222,8 +233,8 @@ impl AST {
             AST::Try(_, ref pos, _, _, _) |
             AST::Match(_, ref pos, _, _, _) |
             AST::For(_, ref pos, _, _, _) |
-            AST::Declare(_, ref pos, _, _) |
-            AST::Function(_, ref pos, _, _, _, _, _) |
+            AST::Declare(_, ref pos, _, _, _) |
+            AST::Function(_, ref pos, _, _, _, _, _, _) |
             AST::New(_, ref pos, _) |
             AST::Class(_, ref pos, _, _, _) |
             AST::Import(_, ref pos, _, _) |
@@ -256,8 +267,8 @@ impl AST {
             AST::Try(ref id, _, _, _, _) |
             AST::Match(ref id, _, _, _, _) |
             AST::For(ref id, _, _, _, _) |
-            AST::Declare(ref id, _, _, _) |
-            AST::Function(ref id, _, _, _, _, _, _) |
+            AST::Declare(ref id, _, _, _, _) |
+            AST::Function(ref id, _, _, _, _, _, _, _) |
             AST::New(ref id, _, _) |
             AST::Class(ref id, _, _, _, _) |
             AST::Import(ref id, _, _, _) |
@@ -349,12 +360,12 @@ impl AST {
         AST::For(NodeID::generate(), pos, ident, r(list), r(body))
     }
 
-    pub fn make_decl(pos: Pos, ident: Ident, ttype: Type) -> AST {
-        AST::Declare(NodeID::generate(), pos, ident, ttype)
+    pub fn make_decl(pos: Pos, vis: Visibility, ident: Ident, ttype: Type) -> AST {
+        AST::Declare(NodeID::generate(), pos, vis, ident, ttype)
     }
 
-    pub fn make_func(pos: Pos, ident: Option<Ident>, args: Vec<Argument>, rtype: Option<Type>, body: AST, abi: ABI) -> AST {
-        AST::Function(NodeID::generate(), pos, ident, args, rtype, r(body), abi)
+    pub fn make_func(pos: Pos, vis: Visibility, ident: Option<Ident>, args: Vec<Argument>, rtype: Option<Type>, body: AST, abi: ABI) -> AST {
+        AST::Function(NodeID::generate(), pos, vis, ident, args, rtype, r(body), abi)
     }
 
     pub fn make_new(pos: Pos, classspec: ClassSpec) -> AST {
@@ -369,7 +380,7 @@ impl AST {
         AST::Import(NodeID::generate(), pos, ident, decls)
     }
 
-    pub fn make_def(pos: Pos, mutable: bool, ident: Ident, ttype: Option<Type>, value: AST) -> AST {
+    pub fn make_def(pos: Pos, mutable: Mutability, ident: Ident, ttype: Option<Type>, value: AST) -> AST {
         AST::Definition(NodeID::generate(), pos, mutable, ident, ttype, r(value))
     }
 

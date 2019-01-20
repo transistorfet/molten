@@ -12,20 +12,19 @@ use types::Type;
 use config::Options;
 use session::Session;
 use scope::{ Scope, ScopeRef };
-use ast::{ NodeID, Pos, Literal, Ident, ClassSpec, Argument, Pattern, AST };
+use ast::{ NodeID, Pos, Mutability, Visibility, Literal, Ident, ClassSpec, Argument, Pattern, AST };
 
 use defs::variables::{ VarDef, ArgDef };
 use defs::functions::{ FuncDef, ClosureDef, ClosureDefRef };
 use defs::classes::{ ClassDefRef, StructDefRef, Define, Vtable };
 
 use misc::{ r };
-use llvm::llcode::{ LLType, LLLit, LLRef, LLCmpType, LLExpr, LLGlobal };
+use llvm::llcode::{ LLType, LLLit, LLRef, LLCmpType, LLLink, LLExpr, LLGlobal };
 
 
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum CodeContext {
-    Try(NodeID),
     Func(ABI, NodeID),
     ClassBody,
 }
@@ -88,7 +87,7 @@ impl<'sess> Transformer<'sess> {
     }
 
     fn get_context(&self) -> Option<CodeContext> {
-        self.context.borrow_mut().last().map(|c| *c)
+        self.context.borrow().last().map(|c| *c)
     }
 
     /*
@@ -118,7 +117,7 @@ impl<'sess> Transformer<'sess> {
     }
 
     fn get_exception(&self) -> Option<NodeID> {
-        self.expoints.borrow_mut().last().map(|e| *e)
+        self.expoints.borrow().last().map(|e| *e)
     }
 
 
@@ -140,7 +139,7 @@ impl<'sess> Transformer<'sess> {
         body.push(LLExpr::Literal(LLLit::I64(0)));
 
         let module_run_name = format!("run.{}", self.session.name);
-        self.add_global(LLGlobal::DefCFunc(run_id, module_run_name, run_ltype, fargs, body));
+        self.add_global(LLGlobal::DefCFunc(run_id, LLLink::Public, module_run_name, run_ltype, fargs, body));
 
 
         if !Options::as_ref().is_library {
@@ -162,7 +161,7 @@ impl<'sess> Transformer<'sess> {
 
             main_body.extend(self.create_exception_block(expoint, body, fail));
 
-            self.add_global(LLGlobal::DefCFunc(main_id, String::from("main"), main_ltype, vec!(), main_body));
+            self.add_global(LLGlobal::DefCFunc(main_id, LLLink::Public, String::from("main"), main_ltype, vec!(), main_body));
         }
     }
 
@@ -210,13 +209,13 @@ impl<'sess> Transformer<'sess> {
             },
 
 
-            AST::Function(id, _, ident, args, _, body, abi) => {
-                self.transform_func_def(scope.clone(), *abi, *id, ident.as_ref().map(|ident| &ident.name), args, body)
+            AST::Function(id, _, vis, ident, args, _, body, abi) => {
+                self.transform_func_def(scope.clone(), *abi, *id, *vis, ident.as_ref().map(|ident| &ident.name), args, body)
             },
 
-            AST::Declare(id, _, ident, ttype) => {
+            AST::Declare(id, _, vis, ident, ttype) => {
                 let abi = self.session.get_type(*id).unwrap().get_abi().unwrap();
-                self.transform_func_decl(scope.clone(), abi, *id, &ident.name, ttype)
+                self.transform_func_decl(scope.clone(), abi, *id, *vis, &ident.name, ttype)
             },
 
             AST::Invoke(id, _, func, args) => {
@@ -415,18 +414,18 @@ impl<'sess> Transformer<'sess> {
         }
     }
 
-    fn transform_func_decl(&self, scope: ScopeRef, abi: ABI, id: NodeID, name: &String, ttype: &Type) -> Vec<LLExpr> {
+    fn transform_func_decl(&self, scope: ScopeRef, abi: ABI, id: NodeID, vis: Visibility, name: &String, ttype: &Type) -> Vec<LLExpr> {
         match abi {
-            ABI::C | ABI::MoltenFunc => self.transform_cfunc_decl(scope.clone(), id, name, ttype),
-            ABI::Molten | ABI::Unknown => self.transform_closure_decl(scope.clone(), id, name, ttype),
+            ABI::C | ABI::MoltenFunc => self.transform_cfunc_decl(scope.clone(), id, vis, name, ttype),
+            ABI::Molten | ABI::Unknown => self.transform_closure_decl(scope.clone(), id, vis, name, ttype),
             _ => panic!("Not Implemented: {:?}", abi),
         }
     }
 
-    pub fn transform_func_def(&self, scope: ScopeRef, abi: ABI, id: NodeID, name: Option<&String>, args: &Vec<Argument>, body: &AST) -> Vec<LLExpr> {
+    pub fn transform_func_def(&self, scope: ScopeRef, abi: ABI, id: NodeID, vis: Visibility, name: Option<&String>, args: &Vec<Argument>, body: &AST) -> Vec<LLExpr> {
         match abi {
-            ABI::C | ABI::MoltenFunc => self.transform_cfunc_def(scope.clone(), id, name, args, body),
-            ABI::Molten | ABI::Unknown => self.transform_closure_def(scope.clone(), id, name, args, body),
+            ABI::C | ABI::MoltenFunc => self.transform_cfunc_def(scope.clone(), id, vis, name, args, body),
+            ABI::Molten | ABI::Unknown => self.transform_closure_def(scope.clone(), id, vis, name, args, body),
             _ => panic!("Not Implemented: {:?}", abi),
         }
     }
@@ -467,6 +466,15 @@ impl<'sess> Transformer<'sess> {
         }
     }
 
+    fn transform_vis(&self, vis: Visibility) -> LLLink {
+        match vis {
+            Visibility::Private => LLLink::Private,
+            Visibility::Public => LLLink::Public,
+        }
+    }
+
+
+
 
 
 
@@ -482,7 +490,7 @@ impl<'sess> Transformer<'sess> {
         LLType::Function(argtypes, r(rettype))
     }
 
-    fn transform_cfunc_decl(&self, scope: ScopeRef, id: NodeID, name: &String, ttype: &Type) -> Vec<LLExpr> {
+    fn transform_cfunc_decl(&self, scope: ScopeRef, id: NodeID, vis: Visibility, name: &String, ttype: &Type) -> Vec<LLExpr> {
         let fname = self.transform_func_name(scope.clone(), Some(name), id);
         let ftype = self.session.get_type(id).unwrap();
         let (argtypes, rettype, abi) = ftype.get_function_types().unwrap();
@@ -495,7 +503,7 @@ impl<'sess> Transformer<'sess> {
         args.iter().map(|arg| (arg.id, arg.ident.name.clone())).collect()
     }
 
-    fn transform_cfunc_def(&self, scope: ScopeRef, id: NodeID, name: Option<&String>, args: &Vec<Argument>, body: &AST) -> Vec<LLExpr> {
+    fn transform_cfunc_def(&self, scope: ScopeRef, id: NodeID, vis: Visibility, name: Option<&String>, args: &Vec<Argument>, body: &AST) -> Vec<LLExpr> {
         let fscope = self.session.map.get(&id);
         let fname = self.transform_func_name(scope.clone(), name, id);
 
@@ -507,7 +515,7 @@ impl<'sess> Transformer<'sess> {
         let fargs = self.transform_cfunc_def_args(args);
 
         self.with_context(CodeContext::Func(ABI::C, id), || {
-            self.add_global(LLGlobal::DefCFunc(id, fname, lftype, fargs, self.transform_node(fscope.clone(), body)));
+            self.add_global(LLGlobal::DefCFunc(id, self.transform_vis(vis), fname, lftype, fargs, self.transform_node(fscope.clone(), body)));
         });
         vec!(LLExpr::GetValue(id))
     }
@@ -562,7 +570,7 @@ impl<'sess> Transformer<'sess> {
         fargs.push((exp_id, String::from("__exception__")));
     }
 
-    fn transform_mfunc_def(&self, scope: ScopeRef, id: NodeID, name: Option<&String>, args: &Vec<Argument>, body: &AST) -> Vec<LLExpr> {
+    fn transform_mfunc_def(&self, scope: ScopeRef, id: NodeID, vis: Visibility, name: Option<&String>, args: &Vec<Argument>, body: &AST) -> Vec<LLExpr> {
         let fscope = self.session.map.get(&id);
         let fname = self.transform_func_name(scope.clone(), name, id);
 
@@ -577,7 +585,7 @@ impl<'sess> Transformer<'sess> {
 
         self.with_context(CodeContext::Func(ABI::MoltenFunc, id), || {
             self.with_exception(exp_id, || {
-                self.add_global(LLGlobal::DefCFunc(id, fname, lftype, fargs, self.transform_node(fscope.clone(), body)));
+                self.add_global(LLGlobal::DefCFunc(id, self.transform_vis(vis), fname, lftype, fargs, self.transform_node(fscope.clone(), body)));
             });
         });
         vec!(LLExpr::GetValue(id))
@@ -648,7 +656,7 @@ impl<'sess> Transformer<'sess> {
         (cfid, cfname, cftype)
     }
 
-    fn transform_closure_decl(&self, scope: ScopeRef, id: NodeID, name: &String, ttype: &Type) -> Vec<LLExpr> {
+    fn transform_closure_decl(&self, scope: ScopeRef, id: NodeID, vis: Visibility, name: &String, ttype: &Type) -> Vec<LLExpr> {
         let fname = self.transform_func_name(scope.clone(), Some(name), id);
 
         let did = NodeID::generate();
@@ -661,7 +669,7 @@ impl<'sess> Transformer<'sess> {
         self.convert_mfunc_def_args(fscope.clone(), exp_id, fargs);
     }
 
-    fn transform_closure_def(&self, scope: ScopeRef, id: NodeID, name: Option<&String>, args: &Vec<Argument>, body: &AST) -> Vec<LLExpr> {
+    fn transform_closure_def(&self, scope: ScopeRef, id: NodeID, vis: Visibility, name: Option<&String>, args: &Vec<Argument>, body: &AST) -> Vec<LLExpr> {
         let fscope = self.session.map.get(&id);
         let fname = self.transform_func_name(scope.clone(), name, id);
         let (cfid, cfname, cftype) = self.transform_closure_raw_func_data(scope.clone(), id, &fname);
@@ -683,13 +691,13 @@ impl<'sess> Transformer<'sess> {
                 self.transform_node(fscope.clone(), body)
             })
         });
-        self.insert_global(index, LLGlobal::DefCFunc(cfid, cfname.clone(), cftype, fargs, body));
+        self.insert_global(index, LLGlobal::DefCFunc(cfid, self.transform_vis(vis), cfname.clone(), cftype, fargs, body));
 
         let structtype = LLType::Ptr(r(self.transform_struct_def(&cl.context_struct)));
         self.insert_global(index, LLGlobal::DefType(cl.context_type_id, format!("__context_{}__", cl.context_type_id), structtype.clone()));
 
 
-        FuncDef::define(self.session, scope.clone(), cfid, &Some(cfname.clone()), Some(ptype)).unwrap();
+        FuncDef::define(self.session, scope.clone(), cfid, cl.vis, &Some(cfname.clone()), Some(ptype)).unwrap();
         let mut fields = vec!();
         cl.context_struct.foreach_field(|defid, field, _| {
             let rid = NodeID::generate();
@@ -703,7 +711,7 @@ impl<'sess> Transformer<'sess> {
 
         let mut code = vec!();
         let did = NodeID::generate();
-        code.push(AST::Definition(did, Pos::empty(), true, Ident::new(fname.clone()), None, r(AST::make_ref(Pos::empty(), AST::make_record(Pos::empty(), fields)))));
+        code.push(AST::Definition(did, Pos::empty(), Mutability::Mutable, Ident::new(fname.clone()), None, r(AST::make_ref(Pos::empty(), AST::make_record(Pos::empty(), fields)))));
         // TODO I'm going back on my decision to use a tuple pair to represent the function and context reference because it can't be converted to i8* (the generics type)
         //      Once I have generics that can operate on different sized data instead of only references, I can switch back
         //code.push(AST::Tuple(NodeID::generate(), Pos::empty(), vec!(AST::make_ident_from_str(Pos::empty(), real_fname.as_str()), AST::make_ident(Pos::empty(), Ident::new(cname.clone())))));
@@ -714,8 +722,7 @@ impl<'sess> Transformer<'sess> {
         exprs.push(LLExpr::SetValue(id, r(LLExpr::GetLocal(did))));
         exprs.push(LLExpr::GetValue(id));
 
-        // TODO this is a hack to export functions that are in the global scope
-        if scope.get_parent().map(|s| s.is_primative()).unwrap_or(false) {
+        if vis == Visibility::Public {
             let gid = NodeID::generate();
             self.add_global(LLGlobal::DefGlobal(gid, fname.clone(), structtype));
             exprs.push(LLExpr::SetGlobal(gid, r(LLExpr::GetLocal(did))));
@@ -871,12 +878,12 @@ impl<'sess> Transformer<'sess> {
         let mut has_init = false;
         for node in body {
             match node {
-                AST::Function(id, _, ident, args, _, body, abi) => {
+                AST::Function(id, _, vis, ident, args, _, body, abi) => {
                     // TODO i switched to using scope here instead of tscope because it was causing problems with references inside closures
-                    exprs.extend(self.transform_func_def(scope.clone(), *abi, *id, ident.as_ref().map(|ident| &ident.name), args, body));
+                    exprs.extend(self.transform_func_def(scope.clone(), *abi, *id, *vis, ident.as_ref().map(|ident| &ident.name), args, body));
                 },
-                AST::Declare(id, _, ident, ttype) => {
-                    exprs.extend(self.transform_func_decl(scope.clone(), ttype.get_abi().unwrap(), *id, &ident.name, ttype));
+                AST::Declare(id, _, vis, ident, ttype) => {
+                    exprs.extend(self.transform_func_decl(scope.clone(), ttype.get_abi().unwrap(), *id, *vis, &ident.name, ttype));
                 },
                 AST::Definition(_, _, _, ident, _, value) => {
                     init.push(AST::make_assign(Pos::empty(),

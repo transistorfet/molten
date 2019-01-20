@@ -68,10 +68,17 @@ pub enum LLRef {
     //Ident(NodeID),
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum LLCmpType {
     Equal,
     NotEqual,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum LLLink {
+    Private,
+    Public,
+    Once,
 }
 
 pub type LLBlock = Vec<LLExpr>;
@@ -112,7 +119,7 @@ pub enum LLGlobal {
     DefType(NodeID, String, LLType),
 
     DefGlobal(NodeID, String, LLType),
-    DefCFunc(NodeID, String, LLType, Vec<(NodeID, String)>, Vec<LLExpr>),
+    DefCFunc(NodeID, LLLink, String, LLType, Vec<(NodeID, String)>, Vec<LLExpr>),
     DeclCFunc(NodeID, String, LLType),
 
     DefNamedStruct(NodeID, String),

@@ -4,9 +4,9 @@ use std::cell::RefCell;
 
 use types::*;
 use defs::Def;
-use ast::{ NodeID };
 use scope::{ Scope, ScopeRef };
 use session::{ Session, Error };
+use ast::{ NodeID, Mutability, Visibility };
 
 use defs::classes::{ Define, StructDef, StructDefRef };
 
@@ -15,17 +15,17 @@ pub struct AnyFunc();
 
 impl AnyFunc {
     #[must_use]
-    pub fn define(session: &Session, scope: ScopeRef, id: NodeID, name: &Option<String>, abi: ABI, ttype: Option<Type>) -> Result<Def, Error> {
+    pub fn define(session: &Session, scope: ScopeRef, id: NodeID, vis: Visibility, name: &Option<String>, abi: ABI, ttype: Option<Type>) -> Result<Def, Error> {
         match abi {
-            ABI::C => CFuncDef::define(session, scope.clone(), id, name, ttype),
-            ABI::MoltenFunc => FuncDef::define(session, scope.clone(), id, name, ttype),
+            ABI::C => CFuncDef::define(session, scope.clone(), id, vis, name, ttype),
+            ABI::MoltenFunc => FuncDef::define(session, scope.clone(), id, vis, name, ttype),
             ABI::Molten => {
                 if scope.is_redirect() && name.is_some() {
                     // TODO do you need a separate or selectable somehow method def for MoltenFunc types
-                    MethodDef::define(session, scope.clone(), id, name, ttype)
+                    MethodDef::define(session, scope.clone(), id, vis, name, ttype)
                 } else {
-                    //FuncDef::define(session, scope.clone(), id, name, ttype)
-                    ClosureDef::define(session, scope.clone(), id, name, ttype)
+                    //FuncDef::define(session, scope.clone(), id, vis, name, ttype)
+                    ClosureDef::define(session, scope.clone(), id, vis, name, ttype)
                 }
             },
             _ => return Err(Error::new(format!("DefError: unsupported ABI {:?}", abi))),
@@ -36,16 +36,18 @@ impl AnyFunc {
 #[derive(Clone, Debug, PartialEq)]
 pub struct FuncDef {
     pub id: NodeID,
+    pub vis: Visibility,
 }
 
 pub type FuncDefRef = Rc<FuncDef>;
 
 impl FuncDef {
     #[must_use]
-    pub fn define(session: &Session, scope: ScopeRef, id: NodeID, name: &Option<String>, ttype: Option<Type>) -> Result<Def, Error> {
+    pub fn define(session: &Session, scope: ScopeRef, id: NodeID, vis: Visibility, name: &Option<String>, ttype: Option<Type>) -> Result<Def, Error> {
 
         let def = Def::Func(Rc::new(FuncDef {
             id: id,
+            vis: vis,
         }));
 
         FuncDef::set_func_def(session, scope.clone(), id, name, def.clone(), ttype)?;
@@ -190,6 +192,7 @@ impl OverloadDef {
 #[derive(Clone, Debug, PartialEq)]
 pub struct ClosureDef {
     pub id: NodeID,
+    pub vis: Visibility,
     pub context_arg_id: NodeID,
     pub context_type_id: NodeID,
     pub context_struct: StructDefRef,
@@ -199,12 +202,13 @@ pub type ClosureDefRef = Rc<ClosureDef>;
 
 impl ClosureDef {
     #[must_use]
-    pub fn define(session: &Session, scope: ScopeRef, id: NodeID, name: &Option<String>, ttype: Option<Type>) -> Result<Def, Error> {
+    pub fn define(session: &Session, scope: ScopeRef, id: NodeID, vis: Visibility, name: &Option<String>, ttype: Option<Type>) -> Result<Def, Error> {
         let ctid = NodeID::generate();
         let structdef = StructDef::new_ref(Scope::new_ref(Some(scope.clone())));
 
         let def = Def::Closure(Rc::new(ClosureDef {
             id: id,
+            vis: vis,
             context_arg_id: NodeID::generate(),
             context_type_id: ctid,
             context_struct: structdef,
@@ -215,7 +219,7 @@ impl ClosureDef {
     }
 
     pub fn add_field(&self, session: &Session, id: NodeID, name: &str, ttype: Type, define: Define) {
-        self.context_struct.add_field(session, id, true, name, ttype, define);
+        self.context_struct.add_field(session, id, Mutability::Mutable, name, ttype, define);
     }
 
     pub fn find_or_add_field(&self, session: &Session, id: NodeID, name: &str, ttype: Type) -> usize {
@@ -234,6 +238,7 @@ impl ClosureDef {
 #[derive(Clone, Debug, PartialEq)]
 pub struct MethodDef {
     pub id: NodeID,
+    pub vis: Visibility,
     pub closure: ClosureDefRef,
 }
 
@@ -241,14 +246,15 @@ pub type MethodDefRef = Rc<MethodDef>;
 
 impl MethodDef {
     #[must_use]
-    pub fn define(session: &Session, scope: ScopeRef, id: NodeID, name: &Option<String>, ttype: Option<Type>) -> Result<Def, Error> {
-        let closure = match ClosureDef::define(session, scope, id, name, ttype) {
+    pub fn define(session: &Session, scope: ScopeRef, id: NodeID, vis: Visibility, name: &Option<String>, ttype: Option<Type>) -> Result<Def, Error> {
+        let closure = match ClosureDef::define(session, scope, id, vis, name, ttype) {
             Ok(Def::Closure(cl)) => cl,
             result @ _ => return result,
         };
 
         let def = Def::Method(Rc::new(MethodDef {
             id: id,
+            vis: vis,
             closure: closure,
         }));
 
@@ -262,6 +268,7 @@ impl MethodDef {
 #[derive(Clone, Debug, PartialEq)]
 pub struct CFuncDef {
     pub id: NodeID,
+    pub vis: Visibility,
     //pub ftype: Type,
 }
 
@@ -269,7 +276,7 @@ pub type CFuncDefRef = Rc<CFuncDef>;
 
 impl CFuncDef {
     #[must_use]
-    pub fn define(session: &Session, scope: ScopeRef, id: NodeID, name: &Option<String>, ttype: Option<Type>) -> Result<Def, Error> {
+    pub fn define(session: &Session, scope: ScopeRef, id: NodeID, vis: Visibility, name: &Option<String>, ttype: Option<Type>) -> Result<Def, Error> {
         if scope.is_redirect() {
             return Err(Error::new(format!("DefError: cannot declare a C ABI function within a class body")));
         }
@@ -281,7 +288,7 @@ impl CFuncDef {
 
         let def = Def::CFunc(Rc::new(CFuncDef {
             id: id,
-
+            vis: vis,
         }));
 
         scope.define(name.clone(), Some(id))?;

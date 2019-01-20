@@ -22,7 +22,7 @@ use misc::UniqueID;
 use config::Options;
 use session::Session;
 
-use llvm::llcode::{ LLType, LLLit, LLRef, LLCmpType, LLExpr, LLGlobal, LLBlock };
+use llvm::llcode::{ LLType, LLLit, LLRef, LLCmpType, LLLink, LLExpr, LLGlobal, LLBlock };
 
 
 #[derive(Clone)]
@@ -328,6 +328,15 @@ impl<'sess> LLVM<'sess> {
         LLVMConstNull(ltype)
     }
 
+    pub unsafe fn build_linkage(&self, val: LLVMValueRef, link: LLLink) {
+        let linktype = match link {
+            LLLink::Private => LLVMLinkage::LLVMInternalLinkage,
+            LLLink::Public => LLVMLinkage::LLVMExternalLinkage,
+            LLLink::Once => LLVMLinkage::LLVMLinkOnceAnyLinkage,
+        };
+        LLVMSetLinkage(val, linktype);
+    }
+
     pub unsafe fn build_literal(&self, lit: &LLLit) -> LLVMValueRef {
         match lit {
             LLLit::I1(num) => LLVMConstInt(self.i1_type(), *num as u64, 0),
@@ -628,7 +637,7 @@ impl<'sess> LLVM<'sess> {
                 },
 
                 LLGlobal::DeclCFunc(id, name, ltype) |
-                LLGlobal::DefCFunc(id, name, ltype, _, _) => {
+                LLGlobal::DefCFunc(id, _, name, ltype, _, _) => {
                     let ftype = self.build_type(ltype);
                     let function = LLVMAddFunction(self.module, cstring(&name), ftype);
                     self.set_value(*id, function);
@@ -667,8 +676,9 @@ impl<'sess> LLVM<'sess> {
     pub unsafe fn build_definitions(&self, globals: &Vec<LLGlobal>) {
         for global in globals {
             match &global {
-                LLGlobal::DefCFunc(id, name, _, args, body) => {
+                LLGlobal::DefCFunc(id, link, name, _, args, body) => {
                     let function = self.get_value(*id).unwrap();
+                    self.build_linkage(function, *link);
                     self.build_cfunc_def(function, args, body);
                 },
 
