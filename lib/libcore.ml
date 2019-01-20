@@ -185,6 +185,11 @@ class List<'item> {
             self.insert(index + 1, cur)
         }
     }
+
+    // TODO can't forward reference ListIterator
+    //fn iter() {
+    //    new ListIterator<'item>(self)
+    //}
 }
 
 class ListIterator<'item> {

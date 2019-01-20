@@ -396,7 +396,7 @@ impl<'sess> LLVM<'sess> {
     }
 
     pub unsafe fn build_store(&self, pointer: LLVMValueRef, value: LLVMValueRef) -> LLVMValueRef {
-        LLVMBuildStore(self.builder, value, pointer);
+        LLVMBuildStore(self.builder, self.cast_typevars(LLVMGetElementType(LLVMTypeOf(pointer)), value), pointer);
         value
     }
 
