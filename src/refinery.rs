@@ -13,7 +13,7 @@ use ast::{ NodeID, AST, Mutability, Visibility, Ident, ClassSpec, Argument, Patt
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 enum CodeContext {
-    Func,
+    Func(ABI),
     ClassBody,
 }
 
@@ -86,7 +86,7 @@ impl<'sess> Refinery<'sess> {
                     Visibility::Private
                 };
 
-                self.with_context(CodeContext::Func, || {
+                self.with_context(CodeContext::Func(abi), || {
                     AST::Function(id, pos, vis, ident, args, ret, r(self.refine_node(*body)), abi)
                 })
             },
@@ -117,6 +117,12 @@ impl<'sess> Refinery<'sess> {
             },
 
             AST::Raise(id, pos, expr) => {
+                match self.get_context() {
+                    Some(CodeContext::ClassBody) |
+                    Some(CodeContext::Func(ABI::C)) =>
+                        panic!("SyntaxError: raise keyword cannot appear in this context"),
+                    _ => { },
+                }
                 AST::Raise(id, pos, r(self.refine_node(*expr)))
             },
 

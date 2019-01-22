@@ -92,9 +92,19 @@ class Option<'item> {
 
     fn None() {
         let opt = new Option<'item>()
-        opt.has = true
+        opt.has = false
         opt.item = nil
         opt
+    }
+
+    fn unwrap(self) -> 'item {
+        if not self.has then {
+            raise "Panic: unwrap on none"
+            // TODO this is here because raise returns unit instead of being marked as 'no return' somehow
+            self.item
+        }
+        else
+            self.item
     }
 
     fn unwrap_or(self, item) {
@@ -102,6 +112,14 @@ class Option<'item> {
             self.item
         else
             item
+    }
+
+    fn is_some(self) {
+        self.has
+    }
+
+    fn is_none(self) {
+        not self.has
     }
 }
 
@@ -190,6 +208,8 @@ class List<'item> {
     //fn iter() {
     //    new ListIterator<'item>(self)
     //}
+
+    // TODO add map, filter, reduce? Or should they go on the iterator parent class?
 }
 
 class ListIterator<'item> {

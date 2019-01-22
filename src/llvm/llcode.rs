@@ -81,6 +81,13 @@ pub enum LLLink {
     Once,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum LLCC {
+    CCC,
+    FastCC,
+}
+
+
 pub type LLBlock = Vec<LLExpr>;
 
 #[derive(Clone, Debug, PartialEq)]
@@ -119,8 +126,8 @@ pub enum LLGlobal {
     DefType(NodeID, String, LLType),
 
     DefGlobal(NodeID, String, LLType),
-    DefCFunc(NodeID, LLLink, String, LLType, Vec<(NodeID, String)>, Vec<LLExpr>),
-    DeclCFunc(NodeID, String, LLType),
+    DefCFunc(NodeID, LLLink, String, LLType, Vec<(NodeID, String)>, Vec<LLExpr>, LLCC),
+    DeclCFunc(NodeID, String, LLType, LLCC),
 
     DefNamedStruct(NodeID, String),
     SetStructBody(NodeID, Vec<LLType>),

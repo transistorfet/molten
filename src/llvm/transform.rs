@@ -19,7 +19,7 @@ use defs::functions::{ FuncDef, ClosureDef, ClosureDefRef };
 use defs::classes::{ ClassDefRef, StructDefRef, Define, Vtable };
 
 use misc::{ r };
-use llvm::llcode::{ LLType, LLLit, LLRef, LLCmpType, LLLink, LLExpr, LLGlobal };
+use llvm::llcode::{ LLType, LLLit, LLRef, LLCmpType, LLLink, LLCC, LLExpr, LLGlobal };
 
 
 
@@ -139,7 +139,7 @@ impl<'sess> Transformer<'sess> {
         body.push(LLExpr::Literal(LLLit::I64(0)));
 
         let module_run_name = format!("run.{}", self.session.name);
-        self.add_global(LLGlobal::DefCFunc(run_id, LLLink::Public, module_run_name, run_ltype, fargs, body));
+        self.add_global(LLGlobal::DefCFunc(run_id, LLLink::Public, module_run_name, run_ltype, fargs, body, LLCC::FastCC));
 
 
         if !Options::as_ref().is_library {
@@ -161,7 +161,7 @@ impl<'sess> Transformer<'sess> {
 
             main_body.extend(self.create_exception_block(expoint, body, fail));
 
-            self.add_global(LLGlobal::DefCFunc(main_id, LLLink::Public, String::from("main"), main_ltype, vec!(), main_body));
+            self.add_global(LLGlobal::DefCFunc(main_id, LLLink::Public, String::from("main"), main_ltype, vec!(), main_body, LLCC::CCC));
         }
     }
 
@@ -350,7 +350,7 @@ impl<'sess> Transformer<'sess> {
         let rid = NodeID::generate();
         let module_run_name = format!("run.{}", name);
         let rftype = LLType::Function(vec!(), r(LLType::I64));
-        self.add_global(LLGlobal::DeclCFunc(rid, module_run_name, rftype));
+        self.add_global(LLGlobal::DeclCFunc(rid, module_run_name, rftype, LLCC::FastCC));
         exprs.extend(self.create_cfunc_invoke(LLExpr::GetValue(rid), vec!()));
         exprs.extend(self.transform_vec(scope.clone(), decls));
         exprs
@@ -495,7 +495,7 @@ impl<'sess> Transformer<'sess> {
         let ftype = self.session.get_type(id).unwrap();
         let (argtypes, rettype, abi) = ftype.get_function_types().unwrap();
         let lftype = self.transform_cfunc_def_type(&argtypes.as_vec(), rettype);
-        self.add_global(LLGlobal::DeclCFunc(id, fname, lftype));
+        self.add_global(LLGlobal::DeclCFunc(id, fname, lftype, LLCC::CCC));
         vec!(LLExpr::GetValue(id))
     }
 
@@ -515,7 +515,7 @@ impl<'sess> Transformer<'sess> {
         let fargs = self.transform_cfunc_def_args(args);
 
         self.with_context(CodeContext::Func(ABI::C, id), || {
-            self.add_global(LLGlobal::DefCFunc(id, self.transform_vis(vis), fname, lftype, fargs, self.transform_node(fscope.clone(), body)));
+            self.add_global(LLGlobal::DefCFunc(id, self.transform_vis(vis), fname, lftype, fargs, self.transform_node(fscope.clone(), body), LLCC::CCC));
         });
         vec!(LLExpr::GetValue(id))
     }
@@ -585,7 +585,7 @@ impl<'sess> Transformer<'sess> {
 
         self.with_context(CodeContext::Func(ABI::MoltenFunc, id), || {
             self.with_exception(exp_id, || {
-                self.add_global(LLGlobal::DefCFunc(id, self.transform_vis(vis), fname, lftype, fargs, self.transform_node(fscope.clone(), body)));
+                self.add_global(LLGlobal::DefCFunc(id, self.transform_vis(vis), fname, lftype, fargs, self.transform_node(fscope.clone(), body), LLCC::FastCC));
             });
         });
         vec!(LLExpr::GetValue(id))
@@ -604,7 +604,8 @@ impl<'sess> Transformer<'sess> {
 
     fn create_mfunc_invoke(&self, func: LLExpr, mut fargs: Vec<LLExpr>) -> Vec<LLExpr> {
         fargs.push(LLExpr::GetValue(self.get_exception().unwrap()));
-        self.create_cfunc_invoke(func, fargs)
+        vec!(LLExpr::CallC(r(func), fargs))
+        //self.create_cfunc_invoke(func, fargs)
     }
 
 
@@ -691,7 +692,7 @@ impl<'sess> Transformer<'sess> {
                 self.transform_node(fscope.clone(), body)
             })
         });
-        self.insert_global(index, LLGlobal::DefCFunc(cfid, self.transform_vis(vis), cfname.clone(), cftype, fargs, body));
+        self.insert_global(index, LLGlobal::DefCFunc(cfid, self.transform_vis(vis), cfname.clone(), cftype, fargs, body, LLCC::FastCC));
 
         let structtype = LLType::Ptr(r(self.transform_struct_def(&cl.context_struct)));
         self.insert_global(index, LLGlobal::DefType(cl.context_type_id, format!("__context_{}__", cl.context_type_id), structtype.clone()));

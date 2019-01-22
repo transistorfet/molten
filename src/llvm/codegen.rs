@@ -7,6 +7,8 @@ use std::collections::HashMap;
 use std::fs::File;
 use std::io::prelude::*;
 
+use std::os::raw::c_uint;
+
 
 extern crate llvm_sys;
 use self::llvm_sys::*;
@@ -22,7 +24,7 @@ use misc::UniqueID;
 use config::Options;
 use session::Session;
 
-use llvm::llcode::{ LLType, LLLit, LLRef, LLCmpType, LLLink, LLExpr, LLGlobal, LLBlock };
+use llvm::llcode::{ LLType, LLLit, LLRef, LLCmpType, LLLink, LLCC, LLExpr, LLGlobal, LLBlock };
 
 
 #[derive(Clone)]
@@ -337,6 +339,13 @@ impl<'sess> LLVM<'sess> {
         LLVMSetLinkage(val, linktype);
     }
 
+    pub unsafe fn get_callconv(&self, cc: LLCC) -> LLVMCallConv {
+        match cc {
+            LLCC::CCC => LLVMCallConv::LLVMCCallConv,
+            LLCC::FastCC => LLVMCallConv::LLVMFastCallConv,
+        }
+    }
+
     pub unsafe fn build_literal(&self, lit: &LLLit) -> LLVMValueRef {
         match lit {
             LLLit::I1(num) => LLVMConstInt(self.i1_type(), *num as u64, 0),
@@ -522,7 +531,9 @@ impl<'sess> LLVM<'sess> {
             LLExpr::CallC(fexpr, args) => {
                 let function = self.build_expr(fexpr);
                 let mut argvals = self.build_args(args, LLVMTypeOf(function));
-                LLVMBuildCall(self.builder, function, argvals.as_mut_ptr(), argvals.len() as u32, cstr(""))
+                let call = LLVMBuildCall(self.builder, function, argvals.as_mut_ptr(), argvals.len() as u32, cstr(""));
+                LLVMSetInstructionCallConv(call, LLVMGetFunctionCallConv(function));
+                call
             },
 
 
@@ -636,10 +647,11 @@ impl<'sess> LLVM<'sess> {
                     self.set_value(*id, global);
                 },
 
-                LLGlobal::DeclCFunc(id, name, ltype) |
-                LLGlobal::DefCFunc(id, _, name, ltype, _, _) => {
+                LLGlobal::DeclCFunc(id, name, ltype, cc) |
+                LLGlobal::DefCFunc(id, _, name, ltype, _, _, cc) => {
                     let ftype = self.build_type(ltype);
                     let function = LLVMAddFunction(self.module, cstring(&name), ftype);
+                    LLVMSetFunctionCallConv(function, self.get_callconv(*cc) as c_uint);
                     self.set_value(*id, function);
                 },
 
@@ -676,7 +688,7 @@ impl<'sess> LLVM<'sess> {
     pub unsafe fn build_definitions(&self, globals: &Vec<LLGlobal>) {
         for global in globals {
             match &global {
-                LLGlobal::DefCFunc(id, link, name, _, args, body) => {
+                LLGlobal::DefCFunc(id, link, name, _, args, body, _) => {
                     let function = self.get_value(*id).unwrap();
                     self.build_linkage(function, *link);
                     self.build_cfunc_def(function, args, body);
@@ -684,7 +696,7 @@ impl<'sess> LLVM<'sess> {
 
                 LLGlobal::DefType(_, _, _) |
                 LLGlobal::DefGlobal(_, _, _) |
-                LLGlobal::DeclCFunc(_, _, _) |
+                LLGlobal::DeclCFunc(_, _, _, _) |
                 LLGlobal::DefNamedStruct(_, _) |
                 LLGlobal::SetStructBody(_, _) => { /* Nothing Needs To Be Done */ }
             }
