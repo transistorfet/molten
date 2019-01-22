@@ -90,7 +90,7 @@ def compile_and_link(target, deps, flags="", force=False):
 def compile(filename, flags="", force=False):
     target = os.path.splitext(filename)[0] + ".ll"
     if force or not os.path.exists(target) or os.path.getmtime(filename) > os.path.getmtime(target):
-        runordie(COMPILE + " -c " + flags + " " + filename)
+        runordie(COMPILE + " -S " + flags + " " + filename)
     return target
 
 

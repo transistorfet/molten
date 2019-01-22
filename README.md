@@ -45,7 +45,14 @@ output using `lli-7`
 The `*.ll` files contain IR code for a single file.  The `*.dec` files contain
 declarations for use when importing from another file.  The `*.bc` files
 contain LLVM Bitcode, which can be executed using `lli-7` or compiled using
-`llc-7`
+`llc-7`.
+
+```
+llc-7 -filetype=obj lib/libcore.ll
+llc-7 -filetype=obj example/fac.ll
+gcc -lm -no-pie example/fac.o lib/libcore.o
+```
+Note: the `-no-pie` flag may be required when linking or you may get an error 
 
 
 Example

@@ -3,7 +3,7 @@ use std::str;
 
 extern crate rand;
 extern crate clap;
-use clap::{ App, Arg };
+use clap::{ App, Arg, ArgMatches };
 
 #[macro_use]
 extern crate nom;
@@ -32,8 +32,8 @@ mod defs;
 mod export;
 mod llvm;
 
-use config::Options;
 use typecheck::TypeChecker;
+use config::{ Options, EmitAs };
 
 fn main() {
     let matches =
@@ -51,26 +51,47 @@ fn main() {
                 .help("Sets the output file"))
             .arg(Arg::with_name("compile")
                 .short("c")
-                .help("Compiles rather than executing"))
+                .conflicts_with("assemble")
+                .help("Compiles to an object file"))
+            .arg(Arg::with_name("assemble")
+                .short("S")
+                .conflicts_with("compile")
+                .help("Compiles to an assembly file"))
             .arg(Arg::with_name("library")
                 .short("l")
+                .help("Compiles as a library, without a main function"))
+            .arg(Arg::with_name("opt")
+                .short("O")
+                .takes_value(true)
                 .help("Compiles as a library, without a main function"))
             .arg(Arg::with_name("debug")
                 .short("d")
                 .help("Enables debug logging"))
             .get_matches();
 
-    Options::init();
-    Options::as_ref().debug = matches.occurrences_of("debug") > 0;
-    Options::as_ref().is_library = matches.occurrences_of("library") > 0;
+    build_options(&matches);
 
     let input = matches.value_of("INPUT").unwrap();
     let output = matches.value_of("output");
-    if matches.occurrences_of("compile") > 0 {
+    if matches.occurrences_of("compile") > 0 || matches.occurrences_of("assemble") > 0 {
         compile_file(input, output);
     } else {
         println!("Use the -c flag to compile");
     }
+}
+
+fn build_options(matches: &ArgMatches) {
+    Options::init();
+    Options::as_ref().debug = matches.occurrences_of("debug") > 0;
+    Options::as_ref().is_library = matches.occurrences_of("library") > 0;
+
+    Options::as_ref().format = if matches.occurrences_of("assemble") > 0 {
+        EmitAs::LLIR
+    } else {
+        EmitAs::Obj
+    };
+
+    Options::as_ref().optlevel = matches.value_of("opt").map(|s| s.parse::<u32>().unwrap()).unwrap_or(0);
 }
 
 fn compile_file(input: &str, output: Option<&str>) {
@@ -109,9 +130,13 @@ fn compile_file(input: &str, output: Option<&str>) {
     llvm.initialize();
     llvm::lib::initialize_builtins(&llvm, &transformer, session.map.get_global(), &builtins);
     llvm.build_module(&transformer.globals.borrow());
+    llvm.optimize(Options::as_ref().optlevel);
     llvm.print_module();
-    llvm.write_module(format!("{}.ll", session.target).as_str());
-    //llvm.write_object_file(format!("{}.o", session.target).as_str());
+
+    match Options::as_ref().format { 
+        EmitAs::LLIR => llvm.write_module(format!("{}.ll", session.target).as_str()),
+        EmitAs::Obj => llvm.write_object_file(format!("{}.o", session.target).as_str()),
+    }
 }
 
 

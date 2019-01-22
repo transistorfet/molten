@@ -1,17 +1,17 @@
 
-* in expoints list, we need to account for function that don't have an expoint arg, like C functions... There needs to be a NoTry state pushed to the list
 * there is an issue with raise, in that it is considered to return unit () instead of somehow being marked as not returning...  Getting type errors in Option def
 * it's kinda tricky to use a while loop without a break keyword.  Also Rust can break a value out... that would be super useful and make while loops exprs
 * remove the forced visibility in refinery, when you decide on pub/priv semantics
 * make run function return a module object?  Should it also memoize itself?
 * make the molten type convert function for mfuncs use the LLType::Exception instead of i8* (remove molten type convert in transform)
-* issue with linking object file output... .rodata.str1.1 recompile with -fPIC
 
 * make an HIR
 * improve error checks
 * improve type checker
 * fix parse issue with subops
 * update the readme
+
+* in expoints list, we need to account for function that don't have an expoint arg, like C functions... There needs to be a NoTry state pushed to the list (maybe not, it checks ahead of time)
 
 
 Typechecking:
@@ -31,26 +31,24 @@ Error Messages:
 
 
 Refactoring:
+* should you process imports in refinery instead of binding
 * modify resolve to return a result rather than unwrapping
 * improve storing of file info in the Pos structs (maybe rename to Span?)
 * change parser to take session argument or something so it can record the file info, and maybe do other advanced things
-* should you add session to refinery and process imports there
-* make refinery use an object direct traversal, which can store context, which could be used to error when a mut outside a class is used, rather than putting the check in assignment
-* make binding and typechecking use an object, which could help break them down a bit into smaller functions
 * there must be a way to fix the 'scope exceptions' (Scope::target) that we're doing to make class bodies work... pass in an argument to all scoped functions?  or use scopemap and scope ids?
 * add the .set_id() functions to simpliy ast builders
 
 
 
 BUGS:
+* there is still a bug with the Phi statement, in that it will return null if you don't cover all cases. there is no check for coverage
+* recursive c functions don't work because it's typechecked as unknown abi, which is called as a closure
 * there's still an issue with the transformed name of methods.  This is because tscope is not passed into class methods during transform.  Causing a test to fail because
   of a duplicate name when the Option definition in libcore is uncommented
 * issue with separator/lf not working when two expressions are on the same line (it should produce a parse error)
 * if there are brackets after a record literal, it will try to call it as a function: let bar = ref { a = 1, b = 2 } \n (!x).a    parses incorrectly,
   but adding a semi-colon will fix it.  It tries to parse through the line terminator
-* recursive c functions don't work because it's typechecked as unknown abi, which is called as a closure
 * issue with calling function references store in structs or tuples... it converts them to methods incorrectly
-* there is still a bug with the Phi statement, in that it will return null if you don't cover all cases. there is no check for coverage
 * if you only have one element in a tuple, or in a record, it parses it as a block or expression
 * there was an error where "let ni: newint" with no initializer was causing a type error with "expected class or concrete type", but that was actually because a definition without
   an initializer is the same as "let ni: newint = nil" and nil could not be cast to a Record, which newint is a typealias of a record

@@ -1,10 +1,17 @@
 
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum EmitAs {
+    LLIR,
+    Obj,
+}
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Options<'a> {
     pub debug: bool,
     pub is_library: bool,
     pub libpath: Vec<&'a str>,
+    pub format: EmitAs,
+    pub optlevel: u32,
 }
 
 
@@ -17,7 +24,13 @@ static mut _OPTIONS: Option<Options<'static>> = None;
 impl Options<'static> {
     pub fn init() {
         unsafe {
-            _OPTIONS = Some(Options { debug: false, is_library: false, libpath: vec!(".", "lib") });
+            _OPTIONS = Some(Options {
+                debug: false,
+                is_library: false,
+                libpath: vec!(".", "lib"),
+                format: EmitAs::LLIR,
+                optlevel: 0
+            });
         }
     }
 
