@@ -1,9 +1,7 @@
 
-* change panic errors in refinery to session errors
+* in expoints list, we need to account for function that don't have an expoint arg, like C functions... There needs to be a NoTry state pushed to the list
 * there is an issue with raise, in that it is considered to return unit () instead of somehow being marked as not returning...  Getting type errors in Option def
 * it's kinda tricky to use a while loop without a break keyword.  Also Rust can break a value out... that would be super useful and make while loops exprs
-* in expoints list, we need to account for function that don't have an expoint arg, like C functions... There needs to be a NoTry state pushed to the list
-* add calling convention, so molten functions can use fastcc instead of ccc
 * remove the forced visibility in refinery, when you decide on pub/priv semantics
 * make run function return a module object?  Should it also memoize itself?
 * make the molten type convert function for mfuncs use the LLType::Exception instead of i8* (remove molten type convert in transform)
@@ -21,7 +19,6 @@ Typechecking:
 
 
 Error Messages:
-* check that raise is not used inside a C function, and calling a function that can raise should be surrounded by a try?
 * there are poor error messages when deleting the "=" from a "let something = fn x => ..." both inside and outside classes.... shouldn't be doing this (actually, because of
   let without init, and the lf issue... lf fix would solve this)
 * you can put a restriction on type aliases such that a type can only use type vars defined in the declaration
