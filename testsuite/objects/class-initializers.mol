@@ -1,4 +1,5 @@
 
+//! 8
 //! It Closure Worked
 //! 8
 
@@ -18,6 +19,9 @@ fn test() {
 
         fn new(self) { }
     }
+
+    let parent = new Parent()
+    println(str(parent.bar))
 
     let child = new Child()
     println(child.foo)

@@ -57,13 +57,9 @@ BUGS:
 
 
 TESTS:
-* test that raise inside a C function causes a syntax error
-* test class init with inherited classes
 * test module system (might need a test opt-out for submodules in a test)
 * test for static method vtable access, dynamic dispatch via that mechanism, and overloading used with resolve
 * error conditions, lack of typing should error, etc
-* test for recursive C functions, recursive MF functions
-* parse error with let bar = ref { a = 1, b = 2 } \n (!x).a
 * test that non-closures accessing values outside their scope produces meaningful errors
 * test that you don't allow overloading of overlapping function types, and different function types (??)
 
@@ -149,5 +145,9 @@ COMPLETED TESTS (for reference):
 * test for references, records, tuples, used in local vars, func args, return values, etc
 * test for directly calling functions in records or tuples, which shouldn't add the object argument
 * test for records that have different member orders are still equal
+* test that raise inside a C function causes a syntax error
+* test class init with inherited classes
+* test for recursive C functions, recursive MF functions
+* parse error with let bar = ref { a = 1, b = 2 } \n (!x).a
 
 

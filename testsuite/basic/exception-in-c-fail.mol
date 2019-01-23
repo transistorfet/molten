@@ -1,0 +1,7 @@
+
+//!should_fail
+
+fn ctest() / C {
+    raise "Error"
+}
+

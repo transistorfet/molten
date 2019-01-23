@@ -2,9 +2,12 @@ Cargo.lock
 .*.sw?
 /target/
 **/*.rs.bk
+
 *.ll
 *.bc
 *.dec
+*.o
+a.out
 
 session.vim
 .local.vimrc
