@@ -114,7 +114,7 @@ fn compile_file(input: &str, output: Option<&str>) {
         debug::print_types_scope(&session, global);
     }
 
-    session.resolve_types();
+    //session.resolve_types();
 
     export::write_exports(&session, session.map.get_global(), format!("{}.dec", session.target).as_str(), &code);
 

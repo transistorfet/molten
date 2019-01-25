@@ -87,6 +87,8 @@ pub fn unparse_type(session: &Session, scope: ScopeRef, ttype: Type) -> String {
             name.clone() + &params
         },
         Type::Variable(mut name, id) => {
+            /*
+            // TODO this doesn't work because if a name isnt' found, then all tyyevars with that id are made independent
             let var = scope.find_type(session, &name);
             if var.is_none() || var.unwrap().get_id().unwrap_or(UniqueID(0)) != id {
                 let gscope = Scope::global(scope.clone());
@@ -95,8 +97,9 @@ pub fn unparse_type(session: &Session, scope: ScopeRef, ttype: Type) -> String {
                 gscope.define_type(name.clone(), Some(id)).unwrap();
                 session.set_type(id, Type::Variable(name.clone(), id));
             }
-            //format!("'v{}", id)
-            format!("'{}", name)
+            */
+            format!("'v{}", id)
+            //format!("'{}", name)
         },
         Type::Tuple(types) => {
             let tuple: Vec<String> = types.iter().map(|t| unparse_type(session, scope.clone(), t.clone())).collect();

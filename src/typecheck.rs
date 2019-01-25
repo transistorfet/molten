@@ -191,7 +191,6 @@ impl<'sess> TypeChecker<'sess> {
                         let (fid, ftype) = self.session_find_variant_id(scope.clone(), defid, &Type::Tuple(vec!(ctype.clone(), ctype.clone())))?;
                         self.session.set_ref(*compid, fid);
                         self.session.set_type(*compid, ftype);
-                        //self.session.set_type(*compid, ctype);
                     }
                 }
                 rtype.unwrap()
@@ -390,7 +389,7 @@ impl<'sess> TypeChecker<'sess> {
                         self.session.set_type(defid, items[index].clone());
                         Ok(Some((*id, defid)))
                     },
-                    _ => panic!("")
+                    _ => Err(Error::new(format!("TypeError: attempting to access within a non-accessible value: {:?}", ltype)))
                 }
             },
             _ => { Ok(None) },
@@ -407,6 +406,8 @@ impl<'sess> TypeChecker<'sess> {
         let (fid, ftype) = self.session_find_variant_id(scope.clone(), defid, argtypes)?;
         self.session.set_ref(refid, fid);
         self.session.set_ref(invid, fid);
+
+        debug!("CHECK: {:?} {:?}", ftype, fexpr);
         Ok(ftype)
     }
 

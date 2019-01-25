@@ -83,7 +83,7 @@ class Option<'item> {
 
     fn new(self) { }
 
-    fn Some(item) {
+    fn Some(item: 'item) {
         let opt = new Option<'item>()
         opt.has = true
         opt.item = item
@@ -127,6 +127,8 @@ class Iterator<'item> {
     fn next(self) -> Option<'item> {
         Option::None()
     }
+
+    fn reset(self) => ()
 }
 
 class List<'item> {
@@ -229,6 +231,10 @@ class ListIterator<'item> {
         } else {
             Option::None()
         }
+    }
+
+    fn reset(self) {
+        self.index = 0;
     }
 }
 

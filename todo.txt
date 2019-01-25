@@ -16,6 +16,8 @@
 
 Typechecking:
 * there's still a problem with typevars not resolving fully, where a function that should return a concrete returns a free typevar.... (recursion or forward definition)
+* in bindings for functions, maybe we want those to declare typevars as always new? since it's a definition?  But this would be a problem for methods which share class typevars
+* Session::resolve_types causing over resolution of types, and commenting it out fixes the type issues in libcore, but what breaks now, without it?
 
 
 Error Messages:

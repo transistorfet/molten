@@ -403,6 +403,7 @@ pub fn resolve_type(session: &Session, ttype: Type) -> Type {
         Type::Variable(_, ref id) => {
             match session.get_type(*id) {
                 Some(vtype) => {
+                    debug!("~~~~~~ {:?} -> {:?}", id, vtype);
                     match vtype {
                         Type::Variable(_, ref eid) if eid == id => vtype.clone(),
                         _ => resolve_type(session, vtype),
