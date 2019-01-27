@@ -1,4 +1,6 @@
 
+* pattern matching at least for variable assignment, otherwise you can't get an exception return value
+
 * there is an issue with raise, in that it is considered to return unit () instead of somehow being marked as not returning...  Getting type errors in Option def
 * it's kinda tricky to use a while loop without a break keyword.  Also Rust can break a value out... that would be super useful and make while loops exprs
 * remove the forced visibility in refinery, when you decide on pub/priv semantics

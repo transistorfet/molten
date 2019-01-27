@@ -180,9 +180,9 @@ impl<'sess> TypeChecker<'sess> {
             AST::Match(ref id, _, ref cond, ref cases, ref compid) => {
                 let mut ctype = self.check_node(scope.clone(), cond, None);
                 let mut rtype = None;
-                for &(ref case, ref expr) in cases {
-                    ctype = expect_type(self.session, scope.clone(), Some(ctype.clone()), Some(self.check_pattern(scope.clone(), case, Some(ctype.clone()))?), Check::List)?;
-                    rtype = Some(expect_type(self.session, scope.clone(), rtype.clone(), Some(self.check_node(scope.clone(), expr, rtype.clone())), Check::List)?);
+                for ref case in cases {
+                    ctype = expect_type(self.session, scope.clone(), Some(ctype.clone()), Some(self.check_pattern(scope.clone(), &case.pat, Some(ctype.clone()))?), Check::List)?;
+                    rtype = Some(expect_type(self.session, scope.clone(), rtype.clone(), Some(self.check_node(scope.clone(), &case.body, rtype.clone())), Check::List)?);
                 }
 
                 match scope.get_var_def(&String::from("==")) {
@@ -353,6 +353,7 @@ impl<'sess> TypeChecker<'sess> {
         match pat {
             Pattern::Underscore => Ok(expected.unwrap_or_else(|| scope.new_typevar(self.session))),
             Pattern::Literal(node) => self.check_node_or_error(scope.clone(), node, expected),
+            Pattern::Identifier(id, ident) => { panic!("Not Implemented: {:?}", pat) },
         }
     }
 

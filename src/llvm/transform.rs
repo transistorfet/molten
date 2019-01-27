@@ -12,7 +12,7 @@ use types::Type;
 use config::Options;
 use session::Session;
 use scope::{ Scope, ScopeRef };
-use ast::{ NodeID, Pos, Mutability, Visibility, Literal, Ident, ClassSpec, Argument, Pattern, AST };
+use ast::{ NodeID, Pos, Mutability, Visibility, Literal, Ident, ClassSpec, Argument, MatchCase, Pattern, AST };
 
 use defs::variables::{ VarDef, ArgDef };
 use defs::functions::{ FuncDef, ClosureDef, ClosureDefRef };
@@ -356,7 +356,7 @@ impl<'sess> Transformer<'sess> {
         exprs
     }
 
-    fn transform_try(&self, scope: ScopeRef, id: NodeID, code: &AST, cases: &Vec<(Pattern, AST)>, compid: NodeID) -> Vec<LLExpr> {
+    fn transform_try(&self, scope: ScopeRef, id: NodeID, code: &AST, cases: &Vec<MatchCase>, compid: NodeID) -> Vec<LLExpr> {
         let mut exprs = vec!();
 
         let exp_id = NodeID::generate();
@@ -989,7 +989,7 @@ impl<'sess> Transformer<'sess> {
         vec!(LLExpr::Phi(conds, blocks))
     }
 
-    fn transform_match(&self, scope: ScopeRef, cond: &AST, cases: &Vec<(Pattern, AST)>, compid: NodeID) -> Vec<LLExpr> {
+    fn transform_match(&self, scope: ScopeRef, cond: &AST, cases: &Vec<MatchCase>, compid: NodeID) -> Vec<LLExpr> {
         let mut exprs = vec!();
         let mut conds = vec!();
         let mut blocks = vec!();
@@ -1003,15 +1003,16 @@ impl<'sess> Transformer<'sess> {
         exprs.push(LLExpr::SetValue(cid, r(funcresult)));
 
         let ftype = self.session.get_type(compid).unwrap();
-        for (pat, block) in cases {
-            conds.push(match pat {
+        for case in cases {
+            conds.push(match &case.pat {
                 Pattern::Underscore => vec!(LLExpr::Literal(LLLit::I1(true))),
                 Pattern::Literal(lit) => {
                     let result = self.transform_as_result(&mut exprs, scope.clone(), lit).unwrap();
                     self.create_func_invoke(ftype.get_abi().unwrap(), LLExpr::GetValue(cid), vec!(LLExpr::GetValue(condid), result))
                 },
+                Pattern::Identifier(id, ident) => { panic!("Not Implemented: {:?}", case.pat) },
             });
-            blocks.push(self.transform_node(scope.clone(), block));
+            blocks.push(self.transform_node(scope.clone(), &case.body));
         }
 
         exprs.push(LLExpr::Phi(conds, blocks));

@@ -31,7 +31,7 @@ use std::str::FromStr;
 use abi::ABI;
 use types::Type;
 use misc::{ r, UniqueID };
-use ast::{ Pos, Mutability, Visibility, Literal, Ident, Argument, ClassSpec, Pattern, AST };
+use ast::{ Pos, NodeID, Mutability, Visibility, Literal, Ident, Argument, ClassSpec, MatchCase, Pattern, AST };
 
 
 ///// Parsing Macros /////
@@ -319,7 +319,7 @@ named!(matchcase(Span) -> AST,
     )
 );
 
-named!(caselist(Span) -> Vec<(Pattern, AST)>,
+named!(caselist(Span) -> Vec<MatchCase>,
     //separated_list_complete!(wscom!(tag!(",")), do_parse!(
     many1!(do_parse!(
         //wscom!(tag!("|")) >>
@@ -327,14 +327,15 @@ named!(caselist(Span) -> Vec<(Pattern, AST)>,
         wscom!(tag!("=>")) >>
         e: expression >>
         //wscom!(tag!(",")) >>
-        (c, e)
+        (MatchCase::new(c, e))
     ))
 );
 
 named!(pattern(Span) -> Pattern,
     alt_complete!(
         value!(Pattern::Underscore, tag!("_")) |
-        map!(literal, |l| Pattern::Literal(l))
+        map!(literal, |l| Pattern::Literal(l)) |
+        map!(identifier, |i| Pattern::Identifier(NodeID::generate(), i))
     )
 );
 

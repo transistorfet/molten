@@ -77,6 +77,19 @@ pub fn str(num: Real) -> String {
 }
 
 
+class Exception {
+    let mut msg = ""
+
+    fn new(self, msg) {
+        self.msg = msg
+    }
+
+    fn print(self) {
+        println(self.msg)
+    }
+}
+
+
 class Option<'item> {
     let mut has = false
     let mut item: 'item = nil

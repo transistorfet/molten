@@ -99,9 +99,9 @@ fn bind_names_node_or_error(session: &Session, scope: ScopeRef, node: &mut AST) 
         AST::Match(_, _, ref mut cond, ref mut cases, _) => {
             bind_names_node(session, scope.clone(), cond);
             // TODO check to make sure AST::Underscore only occurs as the last case, if at all
-            for &mut (ref mut case, ref mut body) in cases {
-                bind_names_pattern(session, scope.clone(), case);
-                bind_names_node(session, scope.clone(), body);
+            for ref mut case in cases {
+                bind_names_pattern(session, scope.clone(), &mut case.pat);
+                bind_names_node(session, scope.clone(), &mut case.body);
             }
         },
 
@@ -219,6 +219,16 @@ fn bind_names_node_or_error(session: &Session, scope: ScopeRef, node: &mut AST) 
     Ok(())
 }
 
+pub fn bind_names_pattern(session: &Session, scope: ScopeRef, pat: &mut Pattern) {
+    match pat {
+        Pattern::Identifier(id, ident) => {
+            // TODO scoping is going to be a big problem here
+        },
+        _ => { }
+    }
+}
+
+
 #[must_use]
 pub fn declare_typevars(session: &Session, scope: ScopeRef, ttype: Option<&mut Type>, always_new: bool) -> Result<(), Error> {
     match ttype {
@@ -277,10 +287,6 @@ pub fn declare_typevars(session: &Session, scope: ScopeRef, ttype: Option<&mut T
         None => { },
     }
     Ok(())
-}
-
-pub fn bind_names_pattern(session: &Session, scope: ScopeRef, pat: &mut Pattern) {
-    // TODO nothing to do yet
 }
 
 

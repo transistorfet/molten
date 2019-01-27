@@ -8,7 +8,7 @@ use types::Type;
 //use hcode::{ HExpr };
 use misc::{ r, UniqueID };
 use session::{ Session, Error };
-use ast::{ NodeID, AST, Mutability, Visibility, Ident, ClassSpec, Argument, Pattern, Literal };
+use ast::{ NodeID, AST, Mutability, Visibility, Ident, ClassSpec, Argument, MatchCase, Pattern, Literal };
 
 
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -341,12 +341,12 @@ impl<'sess> Refinery<'sess> {
         })
     }
 
-    pub fn refine_cases(&self, cases: Vec<(Pattern, AST)>) -> Result<Vec<(Pattern, AST)>, Error> {
+    pub fn refine_cases(&self, cases: Vec<MatchCase>) -> Result<Vec<MatchCase>, Error> {
         let mut refined = vec!();
-        for (case, body) in cases {
-            let pattern = self.refine_pattern(case)?;
-            let code = self.refine_node(body)?;
-            refined.push((pattern, code));
+        for case in cases {
+            let pat = self.refine_pattern(case.pat)?;
+            let body = self.refine_node(case.body)?;
+            refined.push(MatchCase::new(pat, body));
         }
         Ok(refined)
     }

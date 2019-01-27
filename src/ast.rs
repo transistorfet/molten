@@ -69,9 +69,17 @@ pub struct Field {
 }
 
 #[derive(Clone, Debug, PartialEq)]
+pub struct MatchCase {
+    pub id: NodeID,
+    pub pat: Pattern,
+    pub body: AST,
+}
+
+#[derive(Clone, Debug, PartialEq)]
 pub enum Pattern {
     Underscore,
     Literal(AST),
+    Identifier(NodeID, Ident),
 }
 
 
@@ -101,8 +109,8 @@ pub enum AST {
     SideEffect(NodeID, Pos, Ident, Vec<AST>),
     If(NodeID, Pos, R<AST>, R<AST>, R<AST>),
     Raise(NodeID, Pos, R<AST>),
-    Try(NodeID, Pos, R<AST>, Vec<(Pattern, AST)>, NodeID),
-    Match(NodeID, Pos, R<AST>, Vec<(Pattern, AST)>, NodeID),
+    Try(NodeID, Pos, R<AST>, Vec<MatchCase>, NodeID),
+    Match(NodeID, Pos, R<AST>, Vec<MatchCase>, NodeID),
     For(NodeID, Pos, Ident, R<AST>, R<AST>),
     While(NodeID, Pos, R<AST>, R<AST>),
 
@@ -212,6 +220,17 @@ impl Field {
         }
     }
 }
+
+impl MatchCase {
+    pub fn new(pat: Pattern, body: AST) -> Self {
+        Self {
+            id: NodeID::generate(),
+            pat: pat,
+            body: body,
+        }
+    }
+}
+
 
 impl AST {
     pub fn get_pos(&self) -> Pos {
@@ -348,11 +367,11 @@ impl AST {
         AST::Raise(NodeID::generate(), pos, r(expr))
     }
 
-    pub fn make_try(pos: Pos, cond: AST, cases: Vec<(Pattern, AST)>) -> AST {
+    pub fn make_try(pos: Pos, cond: AST, cases: Vec<MatchCase>) -> AST {
         AST::Try(NodeID::generate(), pos, r(cond), cases, NodeID::generate())
     }
 
-    pub fn make_match(pos: Pos, cond: AST, cases: Vec<(Pattern, AST)>) -> AST {
+    pub fn make_match(pos: Pos, cond: AST, cases: Vec<MatchCase>) -> AST {
         AST::Match(NodeID::generate(), pos, r(cond), cases, NodeID::generate())
     }
 
