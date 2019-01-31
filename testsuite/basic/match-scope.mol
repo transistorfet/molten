@@ -1,0 +1,18 @@
+
+//! This Is Block Scope
+//! Function Scope
+
+let text = "Global Scope"
+
+fn test() {
+    let text = "Function Scope"
+    match 1 {
+        1 => {
+            let a = "This Is Block Scope"
+            println(a)
+            println(text)
+        }
+    }
+}
+test()
+

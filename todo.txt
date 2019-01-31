@@ -1,10 +1,11 @@
 
-* type checking fails for reducedtest with the resolver disabled, but libcore has problems with it enabled...
-* there was no test that caught the failure with reducedtest.  It was a problem with type conversion for Option2
 * pattern matching at least for variable assignment, otherwise you can't get an exception return value
 * make "with" block of try require parens, at least so they match, and maybe change it to catch? I don't know,  I should have a more consistent means of determining syntax
-
 * there is an issue with raise, in that it is considered to return unit () instead of somehow being marked as not returning...  Getting type errors in Option def
+
+* type checking fails for reducedtest with the session type resolver disabled (in main.rs), but libcore has problems with it enabled...
+* there was no test that caught the failure with reducedtest.  It was a problem with type conversion for Option2
+
 * it's kinda tricky to use a while loop without a break keyword.  Also Rust can break a value out... that would be super useful and make while loops exprs
 * remove the forced visibility in refinery, when you decide on pub/priv semantics
 * make run function return a module object?  Should it also memoize itself?
@@ -16,7 +17,6 @@
 * fix parse issue with subops
 * update the readme
 
-* in expoints list, we need to account for function that don't have an expoint arg, like C functions... There needs to be a NoTry state pushed to the list (maybe not, it checks ahead of time)
 
 
 Typechecking:
