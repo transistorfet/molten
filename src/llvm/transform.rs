@@ -998,21 +998,14 @@ impl<'sess> Transformer<'sess> {
         let condval = self.transform_as_result(&mut exprs, scope.clone(), cond).unwrap();
         exprs.push(LLExpr::SetValue(condid, r(condval)));
 
-        let cid = NodeID::generate();
+        let compfuncid = NodeID::generate();
         let funcresult = self.transform_as_result(&mut exprs, scope.clone(), &AST::Identifier(compid, Pos::empty(), Ident::from_str("=="))).unwrap();
-        exprs.push(LLExpr::SetValue(cid, r(funcresult)));
+        exprs.push(LLExpr::SetValue(compfuncid, r(funcresult)));
 
         let ftype = self.session.get_type(compid).unwrap();
         for case in cases {
             let lscope = self.session.map.get(&case.id);
-            conds.push(match &case.pat {
-                Pattern::Wild => vec!(LLExpr::Literal(LLLit::I1(true))),
-                Pattern::Literal(lit) => {
-                    let result = self.transform_as_result(&mut exprs, lscope.clone(), lit).unwrap();
-                    self.create_func_invoke(ftype.get_abi().unwrap(), LLExpr::GetValue(cid), vec!(LLExpr::GetValue(condid), result))
-                },
-                Pattern::Binding(id, ident) => { panic!("Not Implemented: {:?}", case.pat) },
-            });
+            conds.push(self.transform_pattern(lscope.clone(), &case.pat, condid, compfuncid, ftype.get_abi().unwrap()));
             blocks.push(self.transform_node(lscope.clone(), &case.body));
         }
 
@@ -1020,8 +1013,23 @@ impl<'sess> Transformer<'sess> {
         exprs
     }
 
-    fn transform_pattern(&self, scope: ScopeRef, pat: Pattern) -> Vec<LLExpr> {
-        panic!("Not Implemented");
+    // TODO can we do this without passing in case_id and cond_id?  What would we need?  We would need to link them to the pattern elements during the earlier stages
+    fn transform_pattern(&self, scope: ScopeRef, pat: &Pattern, valueid: NodeID, compid: NodeID, compabi: ABI) -> Vec<LLExpr> {
+        //panic!("Not Implemented");
+        let mut exprs = vec!();
+
+        match pat {
+            Pattern::Wild => exprs.push(LLExpr::Literal(LLLit::I1(true))),
+            Pattern::Literal(lit) => {
+                let result = self.transform_as_result(&mut exprs, scope.clone(), lit).unwrap();
+                exprs.extend(self.create_func_invoke(compabi, LLExpr::GetValue(compid), vec!(LLExpr::GetValue(valueid), result)));
+            },
+            Pattern::Binding(id, ident) => {
+                exprs.extend(self.transform_def_local(scope.clone(), *id, &ident.name, &AST::GetValue(valueid)));
+                exprs.push(LLExpr::Literal(LLLit::I1(true)));
+            },
+        }
+        exprs
     }
 
     /*

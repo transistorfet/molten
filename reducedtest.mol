@@ -121,7 +121,7 @@ runloop()
 try {
     raise "Test"
     ()
-} with _ => println("HEY")
+} with e => println("EXCEPTION! " + e)
 
 //let mem = bufalloc(10)
 //bufset(mem, 0, thing)
@@ -201,8 +201,9 @@ fn ctest() / C {
 fn test4() {
 let clo = "Awww poops"
     match 1 {
-        1 => {
+        e => {
             let a = "This Is Scope"
+            println("e was " + str(e))
             println(a)
             println(clo)
         }
