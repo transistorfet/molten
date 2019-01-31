@@ -11,7 +11,7 @@ use defs::Def;
 use types::Type;
 use config::Options;
 use session::Session;
-use scope::{ Scope, ScopeRef };
+use scope::{ Scope, ScopeRef, Context };
 use ast::{ NodeID, Pos, Mutability, Visibility, Literal, Ident, ClassSpec, Argument, MatchCase, Pattern, AST };
 
 use defs::variables::{ VarDef, ArgDef };
@@ -769,7 +769,7 @@ impl<'sess> Transformer<'sess> {
 
     fn transform_reference(&self, scope: ScopeRef, defid: NodeID, name: &String) -> Vec<LLExpr> {
         if
-            !scope.contains_local(name)
+            !scope.contains_context(name)
             && !Scope::global(scope.clone()).contains(name)
             && !self.session.get_def(defid).unwrap().is_globally_accessible()
         {
@@ -881,10 +881,10 @@ impl<'sess> Transformer<'sess> {
             match node {
                 AST::Function(id, _, vis, ident, args, _, body, abi) => {
                     // TODO i switched to using scope here instead of tscope because it was causing problems with references inside closures
-                    exprs.extend(self.transform_func_def(scope.clone(), *abi, *id, *vis, ident.as_ref().map(|ident| &ident.name), args, body));
+                    exprs.extend(self.transform_func_def(tscope.clone(), *abi, *id, *vis, ident.as_ref().map(|ident| &ident.name), args, body));
                 },
                 AST::Declare(id, _, vis, ident, ttype) => {
-                    exprs.extend(self.transform_func_decl(scope.clone(), ttype.get_abi().unwrap(), *id, *vis, &ident.name, ttype));
+                    exprs.extend(self.transform_func_decl(tscope.clone(), ttype.get_abi().unwrap(), *id, *vis, &ident.name, ttype));
                 },
                 AST::Definition(_, _, _, ident, _, value) => {
                     init.push(AST::make_assign(Pos::empty(),
@@ -1004,15 +1004,16 @@ impl<'sess> Transformer<'sess> {
 
         let ftype = self.session.get_type(compid).unwrap();
         for case in cases {
+            let lscope = self.session.map.get(&case.id);
             conds.push(match &case.pat {
-                Pattern::Underscore => vec!(LLExpr::Literal(LLLit::I1(true))),
+                Pattern::Wild => vec!(LLExpr::Literal(LLLit::I1(true))),
                 Pattern::Literal(lit) => {
-                    let result = self.transform_as_result(&mut exprs, scope.clone(), lit).unwrap();
+                    let result = self.transform_as_result(&mut exprs, lscope.clone(), lit).unwrap();
                     self.create_func_invoke(ftype.get_abi().unwrap(), LLExpr::GetValue(cid), vec!(LLExpr::GetValue(condid), result))
                 },
-                Pattern::Identifier(id, ident) => { panic!("Not Implemented: {:?}", case.pat) },
+                Pattern::Binding(id, ident) => { panic!("Not Implemented: {:?}", case.pat) },
             });
-            blocks.push(self.transform_node(scope.clone(), &case.body));
+            blocks.push(self.transform_node(lscope.clone(), &case.body));
         }
 
         exprs.push(LLExpr::Phi(conds, blocks));

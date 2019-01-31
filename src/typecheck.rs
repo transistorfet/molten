@@ -178,11 +178,19 @@ impl<'sess> TypeChecker<'sess> {
 
             AST::Try(ref id, _, ref cond, ref cases, ref compid) |
             AST::Match(ref id, _, ref cond, ref cases, ref compid) => {
-                let mut ctype = self.check_node(scope.clone(), cond, None);
+                let mut ctype = match node {
+                    AST::Match(_, _, _, _, _) => self.check_node(scope.clone(), cond, None),
+                    AST::Try(_, _, _, _, _) => {
+                        self.check_node(scope.clone(), cond, None);
+                        scope.new_typevar(self.session)
+                    },
+                    _ => panic!(""),
+                };
                 let mut rtype = None;
                 for ref case in cases {
-                    ctype = expect_type(self.session, scope.clone(), Some(ctype.clone()), Some(self.check_pattern(scope.clone(), &case.pat, Some(ctype.clone()))?), Check::List)?;
-                    rtype = Some(expect_type(self.session, scope.clone(), rtype.clone(), Some(self.check_node(scope.clone(), &case.body, rtype.clone())), Check::List)?);
+                    let lscope = self.session.map.get(&case.id);
+                    ctype = expect_type(self.session, lscope.clone(), Some(ctype.clone()), Some(self.check_pattern(lscope.clone(), &case.pat, Some(ctype.clone()))?), Check::List)?;
+                    rtype = Some(expect_type(self.session, lscope.clone(), rtype.clone(), Some(self.check_node(lscope.clone(), &case.body, rtype.clone())), Check::List)?);
                 }
 
                 match scope.get_var_def(&String::from("==")) {
@@ -351,9 +359,13 @@ impl<'sess> TypeChecker<'sess> {
 
     pub fn check_pattern(&self, scope: ScopeRef, pat: &Pattern, expected: Option<Type>) -> Result<Type, Error> {
         match pat {
-            Pattern::Underscore => Ok(expected.unwrap_or_else(|| scope.new_typevar(self.session))),
+            Pattern::Wild => Ok(expected.unwrap_or_else(|| scope.new_typevar(self.session))),
             Pattern::Literal(node) => self.check_node_or_error(scope.clone(), node, expected),
-            Pattern::Identifier(id, ident) => { panic!("Not Implemented: {:?}", pat) },
+            Pattern::Binding(id, ident) => {
+                let btype = expected.unwrap_or_else(|| scope.new_typevar(self.session));
+                self.session.update_type(scope.clone(), *id, btype.clone())?;
+                Ok(btype)
+            },
         }
     }
 

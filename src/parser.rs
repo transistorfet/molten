@@ -333,9 +333,9 @@ named!(caselist(Span) -> Vec<MatchCase>,
 
 named!(pattern(Span) -> Pattern,
     alt_complete!(
-        value!(Pattern::Underscore, tag!("_")) |
+        value!(Pattern::Wild, tag!("_")) |
         map!(literal, |l| Pattern::Literal(l)) |
-        map!(identifier, |i| Pattern::Identifier(NodeID::generate(), i))
+        map!(identifier, |i| Pattern::Binding(NodeID::generate(), i))
     )
 );
 

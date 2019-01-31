@@ -2,8 +2,8 @@
 
 use abi::ABI;
 use types::Type;
-use scope::{ Scope, ScopeRef };
 use session::{ Session, Error };
+use scope::{ Scope, ScopeRef, Context };
 use ast::{ Mutability, ClassSpec, Pattern, AST };
 use misc::UniqueID;
 
@@ -33,6 +33,7 @@ pub fn bind_names_node(session: &Session, scope: ScopeRef, node: &mut AST) {
     }
 }
 
+#[must_use]
 fn bind_names_node_or_error(session: &Session, scope: ScopeRef, node: &mut AST) -> Result<(), Error> {
     match *node {
         AST::Function(ref id, _, ref vis, ref ident, ref mut args, ref mut ret, ref mut body, ref abi) => {
@@ -98,10 +99,12 @@ fn bind_names_node_or_error(session: &Session, scope: ScopeRef, node: &mut AST) 
         AST::Try(_, _, ref mut cond, ref mut cases, _) |
         AST::Match(_, _, ref mut cond, ref mut cases, _) => {
             bind_names_node(session, scope.clone(), cond);
-            // TODO check to make sure AST::Underscore only occurs as the last case, if at all
+            // TODO check to make sure Pattern::Wild only occurs as the last case, if at all
             for ref mut case in cases {
-                bind_names_pattern(session, scope.clone(), &mut case.pat);
-                bind_names_node(session, scope.clone(), &mut case.body);
+                let lscope = session.map.add(case.id, Some(scope.clone()));
+                lscope.set_context(Context::Block);
+                bind_names_pattern(session, lscope.clone(), &mut case.pat)?;
+                bind_names_node(session, lscope.clone(), &mut case.body);
             }
         },
 
@@ -219,13 +222,15 @@ fn bind_names_node_or_error(session: &Session, scope: ScopeRef, node: &mut AST) 
     Ok(())
 }
 
-pub fn bind_names_pattern(session: &Session, scope: ScopeRef, pat: &mut Pattern) {
+#[must_use]
+pub fn bind_names_pattern(session: &Session, scope: ScopeRef, pat: &mut Pattern) -> Result<(), Error> {
     match pat {
-        Pattern::Identifier(id, ident) => {
-            // TODO scoping is going to be a big problem here
+        Pattern::Binding(id, ident) => {
+            ArgDef::define(session, scope.clone(), *id, Mutability::Immutable, &ident.name, None)?;
         },
         _ => { }
     }
+    Ok(())
 }
 
 

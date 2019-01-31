@@ -17,7 +17,8 @@ pub enum Context {
     Primative,
     Global,
     Local,
-    Redirect,
+    Object,
+    Block,
 }
 
 
@@ -62,7 +63,7 @@ impl Scope {
     }
 
     pub fn set_redirect(&self, value: bool) {
-        self.context.set(if value { Context::Redirect } else { Context::Local });
+        self.context.set(if value { Context::Object } else { Context::Local });
     }
 
     pub fn is_primative(&self) -> bool {
@@ -78,7 +79,7 @@ impl Scope {
     }
 
     pub fn is_redirect(&self) -> bool {
-        self.context.get() == Context::Redirect
+        self.context.get() == Context::Object
     }
 
     //pub fn set_parent(&mut self, parent: ScopeRef) {
@@ -91,7 +92,7 @@ impl Scope {
 
     pub fn target(session: &Session, scope: ScopeRef) -> ScopeRef {
         match scope.context.get() {
-            Context::Redirect => scope.find_type_def(session, &scope.basename.borrow()).unwrap().get_vars().unwrap(),
+            Context::Object => scope.find_type_def(session, &scope.basename.borrow()).unwrap().get_vars().unwrap(),
             _ => scope,
         }
     }
@@ -153,6 +154,18 @@ impl Scope {
 
     pub fn contains_local(&self, name: &String) -> bool {
         self.names.borrow().contains_key(name)
+    }
+
+    pub fn contains_context(&self, name: &String) -> bool {
+        if let Some(sym) = self.names.borrow().get(name) {
+            true
+        } else {
+            match (self.context.get(), &self.parent) {
+                (Context::Block, Some(ref parent)) |
+                (Context::Object, Some(ref parent)) => parent.contains_context(name),
+                _ => false
+            }
+        }
     }
 
     // TODO remove this; it's only used by forloops atm, and there should be a way to refactor forloops

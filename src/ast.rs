@@ -77,9 +77,9 @@ pub struct MatchCase {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Pattern {
-    Underscore,
+    Wild,
     Literal(AST),
-    Identifier(NodeID, Ident),
+    Binding(NodeID, Ident),
 }
 
 

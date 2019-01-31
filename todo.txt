@@ -1,5 +1,8 @@
 
+* type checking fails for reducedtest with the resolver disabled, but libcore has problems with it enabled...
+* there was no test that caught the failure with reducedtest.  It was a problem with type conversion for Option2
 * pattern matching at least for variable assignment, otherwise you can't get an exception return value
+* make "with" block of try require parens, at least so they match, and maybe change it to catch? I don't know,  I should have a more consistent means of determining syntax
 
 * there is an issue with raise, in that it is considered to return unit () instead of somehow being marked as not returning...  Getting type errors in Option def
 * it's kinda tricky to use a while loop without a break keyword.  Also Rust can break a value out... that would be super useful and make while loops exprs
@@ -47,8 +50,6 @@ Refactoring:
 BUGS:
 * there is still a bug with the Phi statement, in that it will return null if you don't cover all cases. there is no check for coverage
 * recursive c functions don't work because it's typechecked as unknown abi, which is called as a closure
-* there's still an issue with the transformed name of methods.  This is because tscope is not passed into class methods during transform.  Causing a test to fail because
-  of a duplicate name when the Option definition in libcore is uncommented
 * issue with separator/lf not working when two expressions are on the same line (it should produce a parse error)
 * if there are brackets after a record literal, it will try to call it as a function: let bar = ref { a = 1, b = 2 } \n (!x).a    parses incorrectly,
   but adding a semi-colon will fix it.  It tries to parse through the line terminator

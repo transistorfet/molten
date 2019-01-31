@@ -1,4 +1,4 @@
-Wed Jan 23 11:55:48 PST 2019
+Wed Jan 30 15:59:33 PST 2019
 [01/58] basic/abi-across-exprs.mol......................................success
 [02/58] basic/block-assign.mol..........................................success
 [03/58] basic/block-invoke.mol..........................................success
