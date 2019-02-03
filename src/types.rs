@@ -13,11 +13,13 @@ pub use abi::ABI;
 #[derive(Clone, Debug, PartialEq)]
 pub enum Type {
     Object(String, UniqueID, Vec<Type>),
-    Variable(String, UniqueID),
-    Function(R<Type>, R<Type>, ABI),
     Tuple(Vec<Type>),
     Record(Vec<(String, Type)>),
     Ref(R<Type>),
+    Function(R<Type>, R<Type>, ABI),
+
+    Variable(String, UniqueID),
+    //Existential(UniqueID),
 
     // TODO this isn't used atm, I don't think, but we could use it for a constrained type
     Ambiguous(Vec<Type>),

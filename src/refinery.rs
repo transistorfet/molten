@@ -114,14 +114,14 @@ impl<'sess> Refinery<'sess> {
                 AST::If(id, pos, r(self.refine_node(*cond)?), r(self.refine_node(*texpr)?), r(self.refine_node(*fexpr)?))
             },
 
-            AST::Match(id, pos, cond, cases, cid) => {
+            AST::Match(id, pos, cond, cases) => {
                 let cases = self.refine_cases(cases)?;
-                AST::Match(id, pos, r(self.refine_node(*cond)?), cases, cid)
+                AST::Match(id, pos, r(self.refine_node(*cond)?), cases)
             },
 
-            AST::Try(id, pos, cond, cases, cid) => {
+            AST::Try(id, pos, cond, cases) => {
                 let cases = self.refine_cases(cases)?;
-                AST::Try(id, pos, r(self.refine_node(*cond)?), cases, cid)
+                AST::Try(id, pos, r(self.refine_node(*cond)?), cases)
             },
 
             AST::Raise(id, pos, expr) => {

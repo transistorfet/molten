@@ -96,8 +96,8 @@ fn bind_names_node_or_error(session: &Session, scope: ScopeRef, node: &mut AST) 
             bind_names_node(session, scope, fexpr);
         },
 
-        AST::Try(_, _, ref mut cond, ref mut cases, _) |
-        AST::Match(_, _, ref mut cond, ref mut cases, _) => {
+        AST::Try(_, _, ref mut cond, ref mut cases) |
+        AST::Match(_, _, ref mut cond, ref mut cases) => {
             bind_names_node(session, scope.clone(), cond);
             // TODO check to make sure Pattern::Wild only occurs as the last case, if at all
             for ref mut case in cases {

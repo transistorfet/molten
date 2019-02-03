@@ -1,5 +1,5 @@
 
-* pattern matching at least for variable assignment, otherwise you can't get an exception return value
+* return value after an exception is not the longjmp value??  At least binding that value is not workng
 * make "with" block of try require parens, at least so they match, and maybe change it to catch? I don't know,  I should have a more consistent means of determining syntax
 * there is an issue with raise, in that it is considered to return unit () instead of somehow being marked as not returning...  Getting type errors in Option def
 

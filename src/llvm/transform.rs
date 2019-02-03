@@ -200,8 +200,8 @@ impl<'sess> Transformer<'sess> {
                 self.transform_import(scope.clone(), *id, &ident.name, decls)
             },
 
-            AST::Try(id, _, code, cases, compid) => {
-                self.transform_try(scope.clone(), *id, code, cases, *compid)
+            AST::Try(id, _, code, cases) => {
+                self.transform_try(scope.clone(), *id, code, cases)
             },
 
             AST::Raise(id, _, valexpr) => {
@@ -295,8 +295,8 @@ impl<'sess> Transformer<'sess> {
                 self.transform_if_expr(scope.clone(), cond, texpr, fexpr)
             },
 
-            AST::Match(_, _, cond, cases, compid) => {
-                self.transform_match(scope.clone(), cond, cases, *compid)
+            AST::Match(_, _, cond, cases) => {
+                self.transform_match(scope.clone(), cond, cases)
             },
 
             AST::SideEffect(_, _, ident, args) => {
@@ -356,7 +356,7 @@ impl<'sess> Transformer<'sess> {
         exprs
     }
 
-    fn transform_try(&self, scope: ScopeRef, id: NodeID, code: &AST, cases: &Vec<MatchCase>, compid: NodeID) -> Vec<LLExpr> {
+    fn transform_try(&self, scope: ScopeRef, id: NodeID, code: &AST, cases: &Vec<MatchCase>) -> Vec<LLExpr> {
         let mut exprs = vec!();
 
         let exp_id = NodeID::generate();
@@ -368,7 +368,7 @@ impl<'sess> Transformer<'sess> {
             self.transform_node(scope.clone(), code)
         });
 
-        let matchblock = self.transform_match(scope.clone(), &AST::GetValue(expoint_id), cases, compid);
+        let matchblock = self.transform_match(scope.clone(), &AST::GetValue(expoint_id), cases);
         exprs.extend(self.create_exception_block(LLExpr::GetValue(expoint_id), tryblock, matchblock));
         exprs
     }
@@ -989,7 +989,7 @@ impl<'sess> Transformer<'sess> {
         vec!(LLExpr::Phi(conds, blocks))
     }
 
-    fn transform_match(&self, scope: ScopeRef, cond: &AST, cases: &Vec<MatchCase>, compid: NodeID) -> Vec<LLExpr> {
+    fn transform_match(&self, scope: ScopeRef, cond: &AST, cases: &Vec<MatchCase>) -> Vec<LLExpr> {
         let mut exprs = vec!();
         let mut conds = vec!();
         let mut blocks = vec!();
@@ -998,14 +998,9 @@ impl<'sess> Transformer<'sess> {
         let condval = self.transform_as_result(&mut exprs, scope.clone(), cond).unwrap();
         exprs.push(LLExpr::SetValue(condid, r(condval)));
 
-        let compfuncid = NodeID::generate();
-        let funcresult = self.transform_as_result(&mut exprs, scope.clone(), &AST::Identifier(compid, Pos::empty(), Ident::from_str("=="))).unwrap();
-        exprs.push(LLExpr::SetValue(compfuncid, r(funcresult)));
-
-        let ftype = self.session.get_type(compid).unwrap();
         for case in cases {
             let lscope = self.session.map.get(&case.id);
-            conds.push(self.transform_pattern(lscope.clone(), &case.pat, condid, compfuncid, ftype.get_abi().unwrap()));
+            conds.push(self.transform_pattern(lscope.clone(), &case.pat, condid));
             blocks.push(self.transform_node(lscope.clone(), &case.body));
         }
 
@@ -1013,16 +1008,16 @@ impl<'sess> Transformer<'sess> {
         exprs
     }
 
-    // TODO can we do this without passing in case_id and cond_id?  What would we need?  We would need to link them to the pattern elements during the earlier stages
-    fn transform_pattern(&self, scope: ScopeRef, pat: &Pattern, valueid: NodeID, compid: NodeID, compabi: ABI) -> Vec<LLExpr> {
-        //panic!("Not Implemented");
+    fn transform_pattern(&self, scope: ScopeRef, pat: &Pattern, valueid: NodeID) -> Vec<LLExpr> {
         let mut exprs = vec!();
 
         match pat {
             Pattern::Wild => exprs.push(LLExpr::Literal(LLLit::I1(true))),
-            Pattern::Literal(lit) => {
+            Pattern::Literal(id, lit) => {
+                let compfunc = self.transform_as_result(&mut exprs, scope.clone(), &AST::Identifier(*id, Pos::empty(), Ident::from_str("=="))).unwrap();
+                let compabi = self.session.get_type(*id).unwrap().get_abi().unwrap();
                 let result = self.transform_as_result(&mut exprs, scope.clone(), lit).unwrap();
-                exprs.extend(self.create_func_invoke(compabi, LLExpr::GetValue(compid), vec!(LLExpr::GetValue(valueid), result)));
+                exprs.extend(self.create_func_invoke(compabi, compfunc, vec!(LLExpr::GetValue(valueid), result)));
             },
             Pattern::Binding(id, ident) => {
                 exprs.extend(self.transform_def_local(scope.clone(), *id, &ident.name, &AST::GetValue(valueid)));

@@ -78,7 +78,7 @@ pub struct MatchCase {
 #[derive(Clone, Debug, PartialEq)]
 pub enum Pattern {
     Wild,
-    Literal(AST),
+    Literal(NodeID, AST),
     Binding(NodeID, Ident),
 }
 
@@ -109,8 +109,8 @@ pub enum AST {
     SideEffect(NodeID, Pos, Ident, Vec<AST>),
     If(NodeID, Pos, R<AST>, R<AST>, R<AST>),
     Raise(NodeID, Pos, R<AST>),
-    Try(NodeID, Pos, R<AST>, Vec<MatchCase>, NodeID),
-    Match(NodeID, Pos, R<AST>, Vec<MatchCase>, NodeID),
+    Try(NodeID, Pos, R<AST>, Vec<MatchCase>),
+    Match(NodeID, Pos, R<AST>, Vec<MatchCase>),
     For(NodeID, Pos, Ident, R<AST>, R<AST>),
     While(NodeID, Pos, R<AST>, R<AST>),
 
@@ -249,8 +249,8 @@ impl AST {
             AST::Block(_, ref pos, _) |
             AST::If(_, ref pos, _, _, _) |
             AST::Raise(_, ref pos, _) |
-            AST::Try(_, ref pos, _, _, _) |
-            AST::Match(_, ref pos, _, _, _) |
+            AST::Try(_, ref pos, _, _) |
+            AST::Match(_, ref pos, _, _) |
             AST::For(_, ref pos, _, _, _) |
             AST::Declare(_, ref pos, _, _, _) |
             AST::Function(_, ref pos, _, _, _, _, _, _) |
@@ -283,8 +283,8 @@ impl AST {
             AST::Block(ref id, _, _) |
             AST::If(ref id, _, _, _, _) |
             AST::Raise(ref id, _, _) |
-            AST::Try(ref id, _, _, _, _) |
-            AST::Match(ref id, _, _, _, _) |
+            AST::Try(ref id, _, _, _) |
+            AST::Match(ref id, _, _, _) |
             AST::For(ref id, _, _, _, _) |
             AST::Declare(ref id, _, _, _, _) |
             AST::Function(ref id, _, _, _, _, _, _, _) |
@@ -368,11 +368,11 @@ impl AST {
     }
 
     pub fn make_try(pos: Pos, cond: AST, cases: Vec<MatchCase>) -> AST {
-        AST::Try(NodeID::generate(), pos, r(cond), cases, NodeID::generate())
+        AST::Try(NodeID::generate(), pos, r(cond), cases)
     }
 
     pub fn make_match(pos: Pos, cond: AST, cases: Vec<MatchCase>) -> AST {
-        AST::Match(NodeID::generate(), pos, r(cond), cases, NodeID::generate())
+        AST::Match(NodeID::generate(), pos, r(cond), cases)
     }
 
     pub fn make_for(pos: Pos, ident: Ident, list: AST, body: AST) -> AST {

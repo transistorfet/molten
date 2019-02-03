@@ -176,11 +176,11 @@ impl<'sess> TypeChecker<'sess> {
                 expect_type(self.session, scope, Some(ttype), Some(ftype), Check::List)?
             },
 
-            AST::Try(ref id, _, ref cond, ref cases, ref compid) |
-            AST::Match(ref id, _, ref cond, ref cases, ref compid) => {
+            AST::Try(ref id, _, ref cond, ref cases) |
+            AST::Match(ref id, _, ref cond, ref cases) => {
                 let mut ctype = match node {
-                    AST::Match(_, _, _, _, _) => self.check_node(scope.clone(), cond, None),
-                    AST::Try(_, _, _, _, _) => {
+                    AST::Match(_, _, _, _) => self.check_node(scope.clone(), cond, None),
+                    AST::Try(_, _, _, _) => {
                         self.check_node(scope.clone(), cond, None);
                         scope.new_typevar(self.session)
                     },
@@ -193,14 +193,6 @@ impl<'sess> TypeChecker<'sess> {
                     rtype = Some(expect_type(self.session, lscope.clone(), rtype.clone(), Some(self.check_node(lscope.clone(), &case.body, rtype.clone())), Check::List)?);
                 }
 
-                match scope.get_var_def(&String::from("==")) {
-                    None => return Err(Error::new(format!("NameError: no \"==\" function defined for type {:?}", ctype))),
-                    Some(defid) => {
-                        let (fid, ftype) = self.session_find_variant_id(scope.clone(), defid, &Type::Tuple(vec!(ctype.clone(), ctype.clone())))?;
-                        self.session.set_ref(*compid, fid);
-                        self.session.set_type(*compid, ftype);
-                    }
-                }
                 rtype.unwrap()
             },
 
@@ -360,13 +352,30 @@ impl<'sess> TypeChecker<'sess> {
     pub fn check_pattern(&self, scope: ScopeRef, pat: &Pattern, expected: Option<Type>) -> Result<Type, Error> {
         match pat {
             Pattern::Wild => Ok(expected.unwrap_or_else(|| scope.new_typevar(self.session))),
-            Pattern::Literal(node) => self.check_node_or_error(scope.clone(), node, expected),
+            Pattern::Literal(id, node) => {
+                let ltype = self.check_node_or_error(scope.clone(), node, expected)?;
+                self.link_comparison_func(scope.clone(), *id, &ltype)?;
+                Ok(ltype)
+            },
             Pattern::Binding(id, ident) => {
                 let btype = expected.unwrap_or_else(|| scope.new_typevar(self.session));
                 self.session.update_type(scope.clone(), *id, btype.clone())?;
                 Ok(btype)
             },
         }
+    }
+
+    #[must_use]
+    pub fn link_comparison_func(&self, scope: ScopeRef, refid: NodeID, ctype: &Type) -> Result<(), Error> {
+        match scope.get_var_def(&String::from("==")) {
+            None => return Err(Error::new(format!("NameError: no \"==\" function defined for type {:?}", ctype))),
+            Some(defid) => {
+                let (fid, ftype) = self.session_find_variant_id(scope.clone(), defid, &Type::Tuple(vec!(ctype.clone(), ctype.clone())))?;
+                self.session.set_ref(refid, fid);
+                self.session.set_type(refid, ftype);
+            }
+        }
+        Ok(())
     }
 
 
