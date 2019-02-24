@@ -89,7 +89,12 @@ impl<'sess> LLVM<'sess> {
             //      The correct value is probably platform specific but I don't know how to find that out.  Oddly enough
             //      it would work for some programs but some would segfault
             let jmpbuf = LLVMStructCreateNamed(self.context, cstr("JmpBuf"));
+
+            // TODO either just store the data or also allocate space for a return value in the expoint
             LLVMStructSetBody(jmpbuf, vec!(LLVMArrayType(self.i64_type(), 10)).as_mut_ptr(), 1, 0);
+            //let mut body = vec!(LLVMArrayType(self.i64_type(), 10), self.get_type(TYPEVAR_ID).unwrap());
+            //LLVMStructSetBody(jmpbuf, body.as_mut_ptr(), body.len() as u32, 0);
+
             self.set_type(EXCEPTION_ID, jmpbuf);
         }
     }

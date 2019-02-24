@@ -10,7 +10,7 @@ use misc::UniqueID;
 use defs::functions::AnyFunc;
 use defs::classes::{ ClassDef };
 use defs::types::{ TypeAliasDef };
-use defs::variables::{ AnyVar, ArgDef };
+use defs::variables::{ AnyVar, VarDef, ArgDef };
 
 
 pub fn bind_names(session: &Session, scope: ScopeRef, code: &mut Vec<AST>) {
@@ -226,7 +226,7 @@ fn bind_names_node_or_error(session: &Session, scope: ScopeRef, node: &mut AST) 
 pub fn bind_names_pattern(session: &Session, scope: ScopeRef, pat: &mut Pattern) -> Result<(), Error> {
     match pat {
         Pattern::Binding(id, ident) => {
-            ArgDef::define(session, scope.clone(), *id, Mutability::Immutable, &ident.name, None)?;
+            VarDef::define(session, scope.clone(), *id, Mutability::Immutable, &ident.name, None)?;
         },
         _ => { }
     }

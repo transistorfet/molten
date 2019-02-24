@@ -199,11 +199,11 @@ fn ctest() / C {
 }
 
 fn test4() {
-let clo = "Awww poops"
-    match 1 {
+    let clo = "Awww poops"
+    match "thing" {
         e => {
             let a = "This Is Scope"
-            println("e was " + str(e))
+            println("e was " + e)
             println(a)
             println(clo)
         }
