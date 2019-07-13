@@ -27,7 +27,7 @@ impl<'sess> Refinery<'sess> {
     pub fn refine(session: &'sess Session, code: Vec<AST>) -> Vec<AST> {
         let refinery = Refinery {
             session: session,
-            context: RefCell::new(vec!()),    
+            context: RefCell::new(vec!()),
         };
 
         //vec!(AST::make_func(Pos::empty(), Some(Ident::new(Pos::empty(), format!("init.{}", "test"))), vec!(), None,

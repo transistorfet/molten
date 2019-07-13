@@ -162,7 +162,7 @@ else
 match x {
     1 => "It's one"
     5 => "It's five"
-    _ => "It's not five"
+    _ => "It's not one or five"
 }
 ```
 
@@ -199,7 +199,7 @@ println(tup.1)                  // prints "String"
 ```
 
 ### Records
-Records are like tuples but with named fields.  Created a record uses the
+Records are like tuples but with named fields.  Record literals use the
 equals sign ("=") to assign a value to a field.  Specifying a record type
 uses a colon (":") to separate the field name from the type.
 ```
@@ -211,8 +211,8 @@ let rec: { i: Int, s: String, r: Real }
 
 ### Refs
 A ref is an indirect reference to some data.  It can be passed around as a
-value, and dereferenced to get or set the data inside of it.  References are
-mutable
+value, and dereferenced to get or set the data inside of it.  The interal value
+of a reference is mutable
 ```
 let r = ref 42
 println(str(!r))                // prints 42
@@ -249,6 +249,10 @@ Yet To Complete
 ---------------
 
 - Garbage collection is not yet implemented
+
+- Improved pattern matching
+
+- Enum types, with pattern matching of variants
 
 
 Previously Uncompleted

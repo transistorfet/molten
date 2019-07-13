@@ -2,7 +2,7 @@
 import lib.libcore
 
 class Input {
-    let stopflag: Bool
+    let mut stopflag: Bool
 
     fn new(self) {
         self.stopflag = false

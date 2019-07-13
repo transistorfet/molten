@@ -133,7 +133,7 @@ fn compile_file(input: &str, output: Option<&str>) {
     llvm.optimize(Options::as_ref().optlevel);
     llvm.print_module();
 
-    match Options::as_ref().format { 
+    match Options::as_ref().format {
         EmitAs::LLIR => llvm.write_module(format!("{}.ll", session.target).as_str()),
         EmitAs::Obj => llvm.write_object_file(format!("{}.o", session.target).as_str()),
     }

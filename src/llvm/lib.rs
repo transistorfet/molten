@@ -52,7 +52,7 @@ pub fn make_global<'sess>(session: &Session, builtins: &Vec<BuiltinDef<'sess>>) 
     // TODO disabling this allows the identifier closure convertor to convert references to variables inside the main function
     //global.set_context(Context::Global);
 }
- 
+
 pub fn declare_builtins_vec<'sess>(session: &Session, scope: ScopeRef, entries: &Vec<BuiltinDef<'sess>>) {
     for node in entries {
         declare_builtins_node(session, scope.clone(), node);

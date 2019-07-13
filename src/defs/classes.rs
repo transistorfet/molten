@@ -2,7 +2,7 @@
 use std::rc::Rc;
 use std::cell::Cell;
 use std::cell::RefCell;
- 
+
 use defs::Def;
 use types::Type;
 use scope::{ Scope, ScopeRef };

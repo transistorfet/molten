@@ -33,8 +33,8 @@
         //fac2(3)
         testy(3)
 
-	let test2 = fn x => x()
-	let test3 = fn x => x() + 1
+        let test2 = fn x => x()
+        let test3 = fn x => x() + 1
         println(str(test3(fn => 3)))
 
         /*
@@ -155,7 +155,7 @@
             1 => a
             2 => a * 4
             _ => a * 16
-	}
+        }
         println(str(r))
 
         // TODO this doesn't work without brackets around the if statement
@@ -179,7 +179,7 @@
         }
 
         let d = if a > 1 then {
-            a;   
+            a;
         } else {
             a * -1;
         }
@@ -227,7 +227,7 @@
         //        recoverload(x - 1.0)
         //}
 
-	println("thing" + "stuff\n")
+        println("thing" + "stuff\n")
         println("STUFF".push(" things"))
         println(strnum(12))
         println(strnum(1.214))
@@ -250,9 +250,9 @@
 
         let alloc = malloc(30)
 
-	let buffer = new Buffer<Int>(5)
+        let buffer = new Buffer<Int>(5)
         buffer[0] = 124
-	println(str(buffer[0]))
+        println(str(buffer[0]))
 
         let list3 = new List<Int>()
         list3.push(4)

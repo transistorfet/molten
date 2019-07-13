@@ -48,4 +48,3 @@ pub fn print_types_scope(session: &Session, scope: ScopeRef) {
     }
 }
 
- 

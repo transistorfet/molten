@@ -19,7 +19,7 @@ impl<'sess> TypeChecker<'sess> {
     pub fn check(session: &'sess Session, scope: ScopeRef, code: &Vec<AST>) -> Type {
         let typechecker = TypeChecker {
             session: session,
-            //context: RefCell::new(vec!()),    
+            //context: RefCell::new(vec!()),
         };
 
         let ttype = typechecker.check_vec(scope, code);
@@ -344,7 +344,7 @@ impl<'sess> TypeChecker<'sess> {
             AST::GetValue(_) |
             AST::Index(_, _, _, _) => panic!("InternalError: ast element shouldn't appear at this late phase: {:?}", node),
         };
-        
+
         debug!("CHECK: {:?} {:?}", rtype, node);
         Ok(rtype)
     }
