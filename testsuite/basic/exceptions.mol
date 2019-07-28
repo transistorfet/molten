@@ -1,6 +1,7 @@
 
 //! 123
 //! Error
+//! EXCEPTION! Test
 
 import lib.libcore
 
@@ -13,4 +14,10 @@ fn test() {
 
 try test() with
     _ => println("Error")
+
+try {
+    raise "Test"
+    ()
+} with
+    e => println("EXCEPTION! " + e)
 

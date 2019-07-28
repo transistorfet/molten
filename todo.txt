@@ -1,4 +1,8 @@
 
+* rewrite resolve_type to return an error and take an optional 'fail on unresolved' argument
+* the unmapping function doesn't seem to do anything at the moment.  Mapping back causes object-typevar-params test to fail (possibly related to subclass checking?)  We could
+  possibly remove most of the unmapping code, or otherwise fix the failed testcase some other way
+
 * make "with" block of try require parens, at least so they match, and maybe change it to catch? I don't know,  I should have a more consistent means of determining syntax
 * there is an issue with raise, in that it is considered to return unit () instead of somehow being marked as not returning...  Getting type errors in Option def
 

@@ -132,6 +132,7 @@ debug!("SET REF: {:?} -> {:?}", id, defid);
 
 
     pub fn set_type(&self, id: NodeID, ttype: Type) {
+        debug!("SET TYPE: {:?} <= {:?} (previously {:?})", id, ttype, self.types.borrow().get(&id));
         self.types.borrow_mut().insert(id, ttype);
     }
 
@@ -144,10 +145,13 @@ debug!("SET REF: {:?} -> {:?}", id, defid);
         use types;
 
         let etype = self.get_type(id);
-        let ntype = if etype.is_some() {
-            types::check_type(self, scope.clone(), etype, Some(ttype.clone()), types::Check::Def, false)?
-        } else {
-            ttype
+        let ntype = match etype {
+            // NOTE don't update a variable with itself or it will cause infinite recursion due to the update call in check_type
+            Some(Type::Variable(_, eid, _)) if eid == id => ttype,
+            etype @ Some(_) => {
+                types::check_type(self, scope.clone(), etype, Some(ttype.clone()), types::Check::Def, true)?
+            },
+            None => ttype,
         };
         self.set_type(id, ntype);
         Ok(())
@@ -159,7 +163,7 @@ debug!("SET REF: {:?} -> {:?}", id, defid);
         let keys: Vec<NodeID> = self.types.borrow().keys().map(|k| *k).collect();
         for key in keys {
             let ttype = self.get_type(key).unwrap();
-            let ntype = types::resolve_type(self, ttype.clone());
+            let ntype = types::resolve_type_or_fail(self, ttype.clone());
             debug!("$$$$$$$: {:?} {:?} {:?}", key, ttype, ntype);
             self.set_type(key, ntype);
         }

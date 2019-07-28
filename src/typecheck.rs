@@ -43,7 +43,7 @@ impl<'sess> TypeChecker<'sess> {
             Err(err) => {
                 self.session.print_error(err.add_pos(&node.get_pos()));
                 //Type::Object(String::from("()"), vec!())
-                scope.new_typevar(self.session)
+                scope.new_typevar(self.session, false)
             }
         }
     }
@@ -69,7 +69,6 @@ impl<'sess> TypeChecker<'sess> {
                     let mut atype = expect_type(self.session, fscope.clone(), arg.ttype.clone(), vtype, Check::Def)?;
                     if &arg.ident.name[..] == "self" {
                         let mut stype = fscope.find_type(self.session, &String::from("Self")).unwrap();
-                        stype = fscope.map_all_typevars(self.session, stype);
                         atype = expect_type(self.session, fscope.clone(), Some(atype), Some(stype), Check::Def)?;
                     }
                     self.session.update_type(fscope.clone(), arg.id, atype.clone())?;
@@ -93,7 +92,7 @@ impl<'sess> TypeChecker<'sess> {
                     }
                 }
 
-                // TODO build closure context from body (all references)
+                debug!("FINISHED FUNCTION: {:?} -> {:?}", self.session.get_type(*id), nftype);
                 self.session.update_type(scope.clone(), *id, nftype.clone())?;
                 nftype
             },
@@ -107,22 +106,23 @@ impl<'sess> TypeChecker<'sess> {
 
                 let tscope = Scope::new_ref(Some(scope.clone()));
                 let dtype = self.session_find_variant(tscope.clone(), *id, fexpr.as_ref(), &atypes)?;
+                debug!("INVOKE TYPE: {:?} has type {:?}", id, dtype);
                 let etype = match dtype {
-                    Type::Variable(_, _) => dtype.clone(),
+                    Type::Variable(_, _, _) => dtype.clone(),
                     _ => tscope.map_all_typevars(self.session, dtype.clone()),
                 };
 
                 let ftype = match etype {
                     Type::Function(ref args, _, ref abi) => {
-                        //let ftype = expect_type(self.session, tscope.clone(), Some(etype.clone()), Some(Type::Function(r(atypes), r(expected.unwrap_or_else(|| tscope.new_typevar())), abi)), Check::Update)?;
+                        //let ftype = expect_type(self.session, tscope.clone(), Some(etype.clone()), Some(Type::Function(r(atypes), r(expected.unwrap_or_else(|| tscope.new_typevar(self.session, false))), abi)), Check::Update)?;
                         let ftype = expect_type(self.session, tscope.clone(), Some(etype.clone()), Some(Type::Function(r(atypes), r(etype.get_rettype()?.clone()), *abi)), Check::Def)?;
                         // TODO should this actually be another expect, so type resolutions that occur in later args affect earlier args?  Might not be needed unless you add typevar constraints
                         let ftype = resolve_type(self.session, ftype);        // NOTE This ensures the early arguments are resolved despite typevars not being assigned until later in the signature
 
                         ftype
                     },
-                    Type::Variable(_, ref vid) => {
-                        let ftype = Type::Function(r(atypes), r(expected.unwrap_or_else(|| tscope.new_typevar(self.session))), ABI::Unknown);
+                    Type::Variable(_, ref vid, _) => {
+                        let ftype = Type::Function(r(atypes), r(expected.unwrap_or_else(|| tscope.new_typevar(self.session, false))), ABI::Unknown);
                         self.session.update_type(tscope, *vid, ftype.clone())?;
                         ftype
                     },
@@ -182,7 +182,8 @@ impl<'sess> TypeChecker<'sess> {
                     AST::Match(_, _, _, _) => self.check_node(scope.clone(), cond, None),
                     AST::Try(_, _, _, _) => {
                         self.check_node(scope.clone(), cond, None);
-                        scope.new_typevar(self.session)
+                        // TODO this is problematic.  If the value that's raised is not used, this var will be unresolved.  We aren't really checking the raised type anywhere though
+                        scope.new_typevar(self.session, false)
                     },
                     _ => panic!(""),
                 };
@@ -211,7 +212,7 @@ impl<'sess> TypeChecker<'sess> {
 
             AST::For(ref id, _, ref ident, ref list, ref body) => {
                 let lscope = self.session.map.get(id);
-                let itype = lscope.get_variable_type(self.session, &ident.name).unwrap_or_else(|| expected.unwrap_or_else(|| scope.new_typevar(self.session)));
+                let itype = lscope.get_variable_type(self.session, &ident.name).unwrap_or_else(|| expected.unwrap_or_else(|| scope.new_typevar(self.session, false)));
                 let etype = Some(scope.make_obj(self.session, String::from("List"), vec!(itype))?);
                 let ltype = expect_type(self.session, lscope.clone(), etype.clone(), Some(self.check_node(lscope.clone(), list, etype.clone())), Check::Def)?;
                 self.session.update_type(lscope.clone(), *id, ltype.get_params()?[0].clone())?;
@@ -219,7 +220,7 @@ impl<'sess> TypeChecker<'sess> {
             },
 
             AST::Nil(ref id) => {
-                let ttype = expected.unwrap_or_else(|| scope.new_typevar(self.session));
+                let ttype = expected.unwrap_or_else(|| scope.new_typevar(self.session, false));
                 self.session.set_type(*id, ttype.clone());
                 ttype
             },
@@ -239,7 +240,7 @@ impl<'sess> TypeChecker<'sess> {
                         self.session.set_type(*id, etype.clone());
                         etype
                     },
-                    Type::Variable(_, vid) => {
+                    Type::Variable(_, vid, _) => {
                         let etype = expect_type(self.session, scope.clone(), expected.clone(), None, Check::Def)?;
                         self.session.update_type(scope.clone(), vid, Type::Ref(r(etype.clone())))?;
                         self.session.set_type(*id, etype.clone());
@@ -283,7 +284,7 @@ impl<'sess> TypeChecker<'sess> {
                 for ref expr in items {
                     ltype = Some(expect_type(self.session, scope.clone(), ltype.clone(), Some(self.check_node(scope.clone(), expr, ltype.clone())), Check::List)?);
                 }
-                let ltype = ltype.unwrap_or_else(|| expected.unwrap_or_else(|| scope.new_typevar(self.session)));
+                let ltype = ltype.unwrap_or_else(|| expected.unwrap_or_else(|| scope.new_typevar(self.session, false)));
                 scope.make_obj(self.session, String::from("List"), vec!(ltype))?
             },
 
@@ -303,7 +304,7 @@ impl<'sess> TypeChecker<'sess> {
                 let dtype = self.session.get_type_from_ref(*id)?;
                 let tscope = Scope::new_ref(Some(scope.clone()));
                 let mtype = tscope.map_all_typevars(self.session, dtype.clone());
-                check_type_params(self.session, scope.clone(), &mtype.get_params()?, types, Check::Def, false)?;
+                check_type_params(self.session, scope.clone(), &mtype.get_params()?, types, Check::Def, true)?;
                 scope.make_obj(self.session, ident.name.clone(), types.clone())?
             },
 
@@ -317,7 +318,7 @@ impl<'sess> TypeChecker<'sess> {
             AST::Accessor(_, _, _, _, _) => {
                 let (refid, defid) = self.get_access_ids(scope.clone(), node)?.unwrap();
                 self.session.set_ref(refid, defid);
-                self.session.get_type(defid).unwrap_or_else(|| expected.unwrap_or_else(|| scope.new_typevar(self.session)))
+                self.get_type_or_new_typevar(scope, defid, expected)
             },
 
             AST::Assignment(ref id, _, ref left, ref right) => {
@@ -351,14 +352,14 @@ impl<'sess> TypeChecker<'sess> {
 
     pub fn check_pattern(&self, scope: ScopeRef, pat: &Pattern, expected: Option<Type>) -> Result<Type, Error> {
         match pat {
-            Pattern::Wild => Ok(expected.unwrap_or_else(|| scope.new_typevar(self.session))),
+            Pattern::Wild => Ok(expected.unwrap_or_else(|| scope.new_typevar(self.session, false))),
             Pattern::Literal(id, node) => {
                 let ltype = self.check_node_or_error(scope.clone(), node, expected)?;
                 self.link_comparison_func(scope.clone(), *id, &ltype)?;
                 Ok(ltype)
             },
             Pattern::Binding(id, ident) => {
-                let btype = expected.unwrap_or_else(|| scope.new_typevar(self.session));
+                let btype = expected.unwrap_or_else(|| scope.new_typevar(self.session, false));
                 self.session.update_type(scope.clone(), *id, btype.clone())?;
                 Ok(btype)
             },
@@ -429,14 +430,25 @@ impl<'sess> TypeChecker<'sess> {
         self.session.set_ref(refid, fid);
         self.session.set_ref(invid, fid);
 
-        debug!("CHECK: {:?} {:?}", ftype, fexpr);
+        debug!("CHECK VARIANT: {:?} {:?}", ftype, fexpr);
         Ok(ftype)
     }
 
     pub fn session_find_variant_id(&self, scope: ScopeRef, defid: NodeID, argtypes: &Type) -> Result<(NodeID, Type), Error> {
         match self.session.get_def(defid) {
             Ok(Def::Overload(ref ol)) => ol.find_variant(self.session, scope.clone(), argtypes.clone()),
-            _ => Ok((defid, self.session.get_type(defid).unwrap_or_else(|| scope.new_typevar(self.session))))
+            _ => Ok((defid, self.get_type_or_new_typevar(scope, defid, None)))
+        }
+    }
+
+    pub fn get_type_or_new_typevar(&self, scope: ScopeRef, defid: NodeID, expected: Option<Type>) -> Type {
+        match self.session.get_type(defid) {
+            Some(ttype) => ttype,
+            None => {
+                let ttype = expected.unwrap_or_else(|| scope.new_typevar(self.session, false));
+                self.session.set_type(defid, ttype.clone());
+                ttype
+            }
         }
     }
 }

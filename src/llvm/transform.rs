@@ -1091,9 +1091,9 @@ impl<'sess> Transformer<'sess> {
             Type::Tuple(items) => LLType::Struct(items.iter().map(|item| self.transform_value_type(&item)).collect()),
             Type::Record(items) => LLType::Struct(items.iter().map(|item| self.transform_value_type(&item.1)).collect()),
             // TODO how will you do generics
-            //Type::Variable(name, id) => { panic!("") },
-            //Type::Variable(name, id) => LLType::Ptr(r(LLType::I8)),
-            Type::Variable(name, id) => LLType::Var,
+            //Type::Variable(name, id, _) => { panic!("") },
+            //Type::Variable(name, id, _) => LLType::Ptr(r(LLType::I8)),
+            Type::Variable(_, _, _) => LLType::Var,
             Type::Function(args, ret, abi) => {
                 match abi {
                     ABI::C | ABI::MoltenFunc => LLType::Ptr(r(self.transform_cfunc_def_type(&args.as_vec(), &*ret))),

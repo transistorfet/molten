@@ -267,7 +267,7 @@ pub fn get_builtins<'sess>() -> Vec<BuiltinDef<'sess>> {
         BuiltinDef::Func(id(), "sizeof",    "('ptr) -> Int",                    FuncKind::Function(sizeof_value)),
 
 
-        BuiltinDef::Class(id(), "Buffer", vec!(Type::Variable(String::from("item"), UniqueID(0))), vec!(), vec!()),
+        BuiltinDef::Class(id(), "Buffer", vec!(Type::Variable(String::from("item"), UniqueID(0), true)), vec!(), vec!()),
 
         BuiltinDef::Func(id(), "getindex",  "(String, Int) -> Int / C",                     FuncKind::Function(string_get)),
         BuiltinDef::Func(id(), "bufalloc",  "(Int) -> Buffer<'item> / C",                   FuncKind::Function(buffer_alloc)),
@@ -277,7 +277,7 @@ pub fn get_builtins<'sess>() -> Vec<BuiltinDef<'sess>> {
 
 
         /*
-        BuiltinDef::Class(id(), "Buffer", vec!(Type::Variable(String::from("item"), UniqueID(0))), vec!(), vec!(
+        BuiltinDef::Class(id(), "Buffer", vec!(Type::Variable(String::from("item"), UniqueID(0), true)), vec!(), vec!(
             BuiltinDef::Func(id(), "__alloc__",  "() -> Buffer<'item>",                      FuncKind::Method(buffer_allocator)),
             BuiltinDef::Func(id(), "new",        "(Buffer<'item>, Int) -> Buffer<'item>",    FuncKind::Method(buffer_constructor)),
             BuiltinDef::Func(id(), "resize",     "(Buffer<'item>, Int) -> Buffer<'item>",    FuncKind::Method(buffer_resize)),

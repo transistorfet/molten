@@ -3,6 +3,8 @@
 
 //!dec decl f : (Int) -> Nil
 
+// TODO this test could be fixed by delaying the overloaded function resolution (for str) until later
+
 import lib.libcore
 
 fn f(x) {

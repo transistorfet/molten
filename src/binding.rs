@@ -18,6 +18,7 @@ pub fn bind_names(session: &Session, scope: ScopeRef, code: &mut Vec<AST>) {
     if session.errors.get() > 0 {
         panic!("Exiting due to previous errors");
     }
+    debug!("POST-BINDING: {:?}", code);
 }
 
 pub fn bind_names_vec(session: &Session, scope: ScopeRef, code: &mut Vec<AST>) {
@@ -267,18 +268,21 @@ pub fn declare_typevars(session: &Session, scope: ScopeRef, ttype: Option<&mut T
                 declare_typevars(session, scope.clone(), Some(args.as_mut()), always_new)?;
                 declare_typevars(session, scope, Some(ret.as_mut()), always_new)?;
             },
-            &mut Type::Variable(ref name, ref mut id) => {
+            &mut Type::Variable(ref name, ref mut id, existential) => {
+                debug!("DECLARING TYPEVAR: {:?} {:?}", name, id);
                 let vtype = match always_new {
                     true => scope.find_type_local(session, name),
                     false => scope.find_type(session, name),
                 };
                 match vtype {
-                    Some(Type::Variable(_, ref eid)) => {
+                    Some(Type::Variable(_, ref eid, _)) => {
+                        debug!("FOUND VAR {:?}", eid);
                         *id = *eid
                     },
                     _ => {
                         *id = UniqueID::generate();
-                        let ttype = Type::Variable(name.clone(), *id);
+                        debug!("SETTING {:?} TO {:?}", name, id);
+                        let ttype = Type::Variable(name.clone(), *id, existential);
                         scope.define_type(name.clone(), Some(*id))?;
                         session.set_type(*id, ttype);
                     }

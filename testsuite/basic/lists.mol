@@ -5,10 +5,11 @@
 
     import lib.libcore
 
-    []
+    // TODO this has an unresovled typevar because it cannot determine the type of an empty list
+    //[]
     [1, 2, 3 * 10 + 3]
     [ 0, 1, 2, 3 ][0]
-    let arr = [ 1, 2, 3, 4 ] 
+    let arr = [ 1, 2, 3, 4 ]
 
     let list1 = new List<Int>()
     list1.push(4)

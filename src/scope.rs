@@ -316,19 +316,25 @@ impl Scope {
 
     pub fn map_typevars(&self, session: &Session, varmap: &mut HashMap<UniqueID, Type>, ttype: Type) -> Type {
         match ttype {
-            Type::Variable(name, id) => {
+            Type::Variable(name, id, existential) => {
                 match varmap.get(&id).map(|x| x.clone()) {
                     Some(ptype) => ptype,
                     None => {
                         let etype = self.find_type(session, &name);
                         debug!("EXISTING TYPEVAR for {:?}: {:?} vs {:?}", name, etype, id);
                         match etype {
-                            Some(Type::Variable(_, ref eid)) if *eid == id => etype.clone().unwrap(),
-                            None | Some(Type::Variable(_, _)) => {
-                                let v = self.new_typevar(session);
-                                varmap.insert(id, v.clone());
-                                debug!("MAPPED from {:?} to {:?}", Type::Variable(name.clone(), id), v);
-                                v
+                            Some(Type::Variable(_, ref eid, _)) if *eid == id && !existential => etype.clone().unwrap(),
+                            None | Some(Type::Variable(_, _, _)) => {
+                                let orgtype = Type::Variable(name.clone(), id, existential);
+                                if existential {
+                                    let maptype = self.new_typevar(session, false);
+                                    varmap.insert(id, maptype.clone());
+                                    debug!("MAPPED from {:?} to {:?}", orgtype, maptype);
+                                    maptype
+                                } else {
+                                    debug!("NOT MAPPED: {:?}", orgtype);
+                                    orgtype.clone()
+                                }
                             },
                             _ => etype.clone().unwrap(),
                         }
@@ -352,14 +358,24 @@ impl Scope {
 
     pub fn unmap_typevars(&self, session: &Session, varmap: &mut HashMap<UniqueID, Type>, ttype: Type) -> Type {
         match ttype {
-            Type::Variable(name, id) => {
+            Type::Variable(name, id, existential) => {
                 for (oid, mtype) in varmap.iter() {
                     match *mtype {
-                        Type::Variable(ref mname, ref mid) if *mid == id => { return Type::Variable(mname.clone(), *oid); },
+                        Type::Variable(ref mname, ref mid, ref mexistential) if *mid == id => {
+                            debug!("UNMAPPING {:?} to {:?}", mtype, oid);
+                            if *mid == *oid {
+                                return mtype.clone();
+                            } else {
+                                //let otype = Type::Variable(mname.clone(), *oid, true);
+                                // TODO this is almost certainly wrong, but it stops the infinite loop
+                                //session.set_type(*oid, mtype.clone());
+                                //return otype;
+                            }
+                        },
                         _ => { },
                     };
                 }
-                Type::Variable(name, id)
+                Type::Variable(name, id, existential)
             },
             Type::Function(args, ret, abi) => Type::Function(r(self.unmap_typevars(session, varmap, *args)), r(self.unmap_typevars(session, varmap, *ret)), abi),
             // TODO why did I do this?  Was it because of a bug or just to reduce typevars, because it caused another bug with constructors
@@ -376,10 +392,11 @@ impl Scope {
         types.into_iter().map(|vtype| self.unmap_typevars(session, varmap, vtype)).collect()
     }
 
-    pub fn new_typevar(&self, session: &Session) -> Type {
+    pub fn new_typevar(&self, session: &Session, existential: bool) -> Type {
         let id = UniqueID::generate();
+        //if id == UniqueID(903) { panic!("") }
         let name = self.new_typevar_name();
-        let ttype = Type::Variable(name.clone(), id);
+        let ttype = Type::Variable(name.clone(), id, existential);
 
         //self.define_type(name, ttype.clone()).unwrap();
         session.set_type(id, ttype.clone());
