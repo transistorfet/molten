@@ -1,24 +1,25 @@
 
-* the unmapping function doesn't seem to do anything at the moment.  Mapping back causes object-typevar-params test to fail (possibly related to subclass checking?)  We could
-  possibly remove most of the unmapping code, or otherwise fix the failed testcase some other way
-
+* add spread op
 * make "with" block of try require parens, at least so they match, and maybe change it to catch? I don't know,  I should have a more consistent means of determining syntax
 * there is an issue with raise, in that it is considered to return unit () instead of somehow being marked as not returning...  Getting type errors in Option def
 
-* type checking fails for reducedtest with the session type resolver disabled (in main.rs), but libcore has problems with it enabled...
-* there was no test that caught the failure with reducedtest.  It was a problem with type conversion for Option2
+* add enums
+* add type annotations to pattern matching
 
+* the unmapping function doesn't seem to do anything at the moment.  Mapping back causes object-typevar-params test to fail (possibly related to subclass checking?)  We could
+  possibly remove most of the unmapping code, or otherwise fix the failed testcase some other way
+
+* fix modules system
 * remove the forced visibility in refinery, when you decide on pub/priv semantics
 * make run function return a module object?  Should it also memoize itself?
 * make the molten type convert function for mfuncs use the LLType::Exception instead of i8* (remove molten type convert in transform)
 
+* implement typeclasses
 
-* improve type checker (impl bidirectional)
-* add enums
-* add spread op
-* fix modules system
+* put intermediate files somewhere else, at least as controlled by the molten script, so as not to clutter source directories
+
+
 * improve error checks
-* fix parse issue with subops
 * make loops use phi, and add break
 * make an HIR
 * update the readme
@@ -40,11 +41,10 @@ Error Messages:
 
 Refactoring:
 * should you process imports in refinery instead of binding
-* modify resolve to return a result rather than unwrapping
 * improve storing of file info in the Pos structs (maybe rename to Span?)
 * change parser to take session argument or something so it can record the file info, and maybe do other advanced things
 * there must be a way to fix the 'scope exceptions' (Scope::target) that we're doing to make class bodies work... pass in an argument to all scoped functions?  or use scopemap and scope ids?
-* add the .set_id() functions to simpliy ast builders
+* add the .set_id() functions to simplify ast builders
 
 
 
@@ -52,8 +52,6 @@ BUGS:
 * there is still a bug with the Phi statement, in that it will return null if you don't cover all cases. there is no check for coverage
 * recursive c functions don't work because it's typechecked as unknown abi, which is called as a closure
 * issue with separator/lf not working when two expressions are on the same line (it should produce a parse error)
-* if there are brackets after a record literal, it will try to call it as a function: let bar = ref { a = 1, b = 2 } \n (!x).a    parses incorrectly,
-  but adding a semi-colon will fix it.  It tries to parse through the line terminator
 * issue with calling function references store in structs or tuples... it converts them to methods incorrectly
 * if you only have one element in a tuple, or in a record, it parses it as a block or expression
 * there was an error where "let ni: newint" with no initializer was causing a type error with "expected class or concrete type", but that was actually because a definition without
@@ -78,9 +76,7 @@ Changes:
 * change how you reference an operator function; like op+ or (+)
 
 * you really need a better way of doing modules
-* it might also make it easier/generic to allow compiling to object files?  So no linking, but it would do optimization and object file output
 * how does rust do "use" if there is a circular dependency?
-* put intermediate files somewhere else, at least as controlled by the molten script, so as not to clutter source directories
 * the module level scope is now a closed function, so you could return a representation of it as the "module" object
 
 * if, sideeffects, and while loops need bool comparison results to work correctly.  You can either force that in type checking or somehow desugar or use the comps style from match
@@ -102,16 +98,16 @@ Changes:
 * implement return value conversion (this doesn't appear to be needed?  Why didn't it work with tuple closures though?)
 
 * fill in string and list type functions, and finish hashmap (rename to dict?)
+* improve type checker (impl bidirectional)
 
 
 
-* implement enums
+* add enums
 * add a spread operator for records
 * add patterns and matching of patterns
 * add typeclasses/traits
 * implement garbage collection
 * add an iterator type
-* implement assignment of tuples and records? (or only spread operator)
 * add compiler directives?
 
 
@@ -131,6 +127,7 @@ Changes:
 * should local variables be allowed to be mutable...
 * should you require an override keyword when masking definitions in lower scopes? like class definitions
 * should you add macros and expandable forms (like lisp)
+* should you implement assignment of tuples and records? (in addition to the spread operator)
 
 * is it even possible to add a special "constrained" type, which has &AST that must type check correctly in order to match (checks done in check_type)
 * you might need to integrate type restrictions which have to get resolved later; like 'a where 'a is object with add(Int) method; not sure how you could be so specific without complexity

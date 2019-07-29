@@ -880,9 +880,9 @@ named!(tuple(Span) -> AST,
     do_parse!(
         pos: position!() >>
         l: delimited!(
-            wscom!(tag!("(")),
-            separated_list_complete!(wscom!(tag!(",")), expression),
-            wscom!(tag!(")"))
+            tag!("("),
+            wscom!(separated_list_complete!(wscom!(tag!(",")), expression)),
+            tag!(")")
         ) >>
         (AST::make_tuple(Pos::new(pos), l))
     )
@@ -892,14 +892,14 @@ named!(record(Span) -> AST,
     do_parse!(
         pos: position!() >>
         l: delimited!(
-            wscom!(tag!("{")),
-            separated_list_complete!(wscom!(tag!(",")), do_parse!(
+            tag!("{"),
+            wscom!(separated_list_complete!(wscom!(tag!(",")), do_parse!(
                 i: identifier >>
                 wscom!(tag!("=")) >>
                 e: expression >>
                 ((i, e))
-            )),
-            wscom!(tag!("}"))
+            ))),
+            tag!("}")
         ) >>
         (AST::make_record(Pos::new(pos), l))
     )
