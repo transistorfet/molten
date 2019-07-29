@@ -193,6 +193,12 @@ fn rectestc(x) / C {
 rectestc(4)
 */
 
+fn pctest(i) {
+    str(5 : Int)
+}
+
+let pc = (pctest(5) : String)
+
 
 fn ctest() / C {
     //raise "Error"

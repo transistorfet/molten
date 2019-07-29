@@ -250,6 +250,7 @@ named!(expression(Span) -> AST,
         declare |
         function |
         reference |
+        annotation |
         infix
     )
 );
@@ -410,6 +411,15 @@ named!(reference(Span) -> AST,
     )
 );
 
+named!(annotation(Span) -> AST,
+    do_parse!(
+        e: wscom!(atomic) >>
+        wscom!(tag!(":")) >>
+        t: type_description >>
+        (AST::PtrCast(t, r(e)))
+    )
+);
+
 named!(argument_list(Span) -> Vec<Argument>,
     separated_list_complete!(tag!(","),
         do_parse!(
@@ -499,7 +509,7 @@ impl AST {
     fn make_op(pos: Pos, op: Ident, r1: AST, r2: AST) -> AST {
         match op.as_str() {
             "and" | "or" => AST::make_side_effect(pos, op, vec!(r1, r2)),
-            _ => 
+            _ =>
             //AST::Infix(pos, op, r(r1), r(r2))
             AST::make_invoke(pos.clone(), AST::make_ident(pos, op), vec!(r1, r2))
             //AST::make_invoke(pos, AST::make_access(pos, r1, op), vec!(r2))

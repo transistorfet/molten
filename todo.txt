@@ -1,5 +1,4 @@
 
-* rewrite resolve_type to return an error and take an optional 'fail on unresolved' argument
 * the unmapping function doesn't seem to do anything at the moment.  Mapping back causes object-typevar-params test to fail (possibly related to subclass checking?)  We could
   possibly remove most of the unmapping code, or otherwise fix the failed testcase some other way
 
@@ -25,11 +24,6 @@
 * update the readme
 
 
-
-Typechecking:
-* there's still a problem with typevars not resolving fully, where a function that should return a concrete returns a free typevar.... (recursion or forward definition)
-* in bindings for functions, maybe we want those to declare typevars as always new? since it's a definition?  But this would be a problem for methods which share class typevars
-* Session::resolve_types causing over resolution of types, and commenting it out fixes the type issues in libcore, but what breaks now, without it?
 
 
 Error Messages:
@@ -79,6 +73,8 @@ TESTS:
 
 
 Changes:
+* the infer-arg-as-typevar test fails because str() cannot be resolved to a concrete variant by the time it's typechecked (no backwards affect allowed)
+
 * change how you reference an operator function; like op+ or (+)
 
 * you really need a better way of doing modules
@@ -110,7 +106,6 @@ Changes:
 
 
 * implement enums
-* add type annotations ( value : type )
 * add a spread operator for records
 * add patterns and matching of patterns
 * add typeclasses/traits

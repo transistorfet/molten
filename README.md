@@ -1,4 +1,4 @@
- 
+
 Molten
 ======
 
@@ -52,7 +52,7 @@ llc-7 -filetype=obj lib/libcore.ll
 llc-7 -filetype=obj example/fac.ll
 gcc -lm -no-pie example/fac.o lib/libcore.o
 ```
-Note: the `-no-pie` flag may be required when linking or you may get an error 
+Note: the `-no-pie` flag may be required when linking or you may get an error
 
 
 Example
@@ -61,9 +61,9 @@ Example
 ```
 fn fac(x) {
     if x < 1 then
-	1
+        1
     else
-	x * fac(x - 1)
+        x * fac(x - 1)
 }
 
 println(str(fac(10)))
@@ -223,6 +223,14 @@ fn foo(x: ref Int) { }          // ref types look similar to ref constructors
 
 let r = ref { a = 42, b = "The Answer" }
 println(!r.b)                   // prints "The Answer"
+```
+
+### Annotations
+A value can be type annotated using a colon followed by the type.
+```
+5 : Int
+str(i : Int)
+(func() : String)
 ```
 
 ### Import
