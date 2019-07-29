@@ -225,14 +225,14 @@ pub fn check_type(session: &Session, scope: ScopeRef, odtype: Option<Type>, octy
     if odtype.is_none() {
         // TODO should the else case just be Nil...
         match octype {
-            Some(ctype) => Ok(resolve_type(session, ctype)),
+            Some(ctype) => Ok(resolve_type(session, ctype, false)?),
             None => Ok(scope.new_typevar(session, false)),
         }
     } else if octype.is_none() {
         Ok(odtype.unwrap())
     } else {
-        let dtype = resolve_type(session, odtype.unwrap());
-        let ctype = resolve_type(session, octype.unwrap());
+        let dtype = resolve_type(session, odtype.unwrap(), false)?;
+        let ctype = resolve_type(session, octype.unwrap(), false)?;
 
         debug!("CHECK TYPE {:?} {:?} {:?}", dtype, ctype, update);
         if let Type::Variable(ref _dname, ref did, dex) = dtype {
@@ -240,18 +240,18 @@ pub fn check_type(session: &Session, scope: ScopeRef, odtype: Option<Type>, octy
             if let Type::Variable(ref cname, ref cid, cex) = ctype {
                 if scope.contains_type(cname) {
                     if update && !dex { session.set_type(*did, ctype.clone()); }
-                    Ok(resolve_type(session, ctype.clone()))
+                    Ok(resolve_type(session, ctype.clone(), false)?)
                 } else {
                     if update && !cex { session.set_type(*cid, dtype.clone()); }
-                    Ok(resolve_type(session, dtype.clone()))
+                    Ok(resolve_type(session, dtype.clone(), false)?)
                 }
             } else {
                 if update && !dex { session.update_type(scope.clone(), *did, ctype.clone())?; }
-                Ok(resolve_type(session, ctype.clone()))
+                Ok(resolve_type(session, ctype.clone(), false)?)
             }
         } else if let Type::Variable(_, ref cid, cex) = ctype {
             if update && !cex { session.update_type(scope.clone(), *cid, dtype.clone())?; }
-            Ok(resolve_type(session, dtype.clone()))
+            Ok(resolve_type(session, dtype.clone(), false)?)
         } else {
             match (dtype.clone(), ctype.clone()) {
                 (Type::Function(ref aargs, ref aret, ref aabi), Type::Function(ref bargs, ref bret, ref babi)) => {
@@ -333,7 +333,7 @@ fn is_subclass_of(session: &Session, scope: ScopeRef, adef: (&String, UniqueID, 
             } else {
                 vec!()
             };
-            let rtype = resolve_type(session, tscope.unmap_typevars(session, &mut names, Type::Object(adef.0, adef.1, ptypes)));
+            let rtype = resolve_type(session, tscope.unmap_typevars(session, &mut names, Type::Object(adef.0, adef.1, ptypes)), false)?;
             debug!("DONE SUBCLASS: {:?}", rtype);
             return Ok(rtype);
         }
@@ -343,7 +343,7 @@ fn is_subclass_of(session: &Session, scope: ScopeRef, adef: (&String, UniqueID, 
             return Err(Error::new(format!("TypeError: type mismatch, expected {} but found {}", Type::Object(adef.0.clone(), adef.1, adef.2), Type::Object(bdef.0.clone(), bdef.1, bdef.2.clone()))));
         }
         let parent = tscope.map_typevars(session, &mut names, classdef.parenttype.clone().unwrap());
-        match resolve_type(session, parent) {
+        match resolve_type(session, parent, false)? {
             Type::Object(name, id, params) => adef = (name, id, params),
             ttype @ _ => return Err(Error::new(format!("TypeError: expected Object but found {}", ttype))),
         }
@@ -362,18 +362,18 @@ pub fn check_type_params(session: &Session, scope: ScopeRef, dtypes: &Vec<Type>,
     }
 }
 
-pub fn resolve_type(session: &Session, ttype: Type) -> Type {
+pub fn resolve_type(session: &Session, ttype: Type, require_resolve: bool) -> Result<Type, Error> {
     match ttype {
         Type::Object(ref name, ref id, ref types) => {
-            let params = types.iter().map(|ptype| resolve_type(session, ptype.clone())).collect();
+            let params = types.iter().map(|ptype| resolve_type(session, ptype.clone(), require_resolve)).collect::<Result<Vec<Type>, Error>>()?;
 
             match session.get_def(*id) {
                 Ok(Def::TypeAlias(alias)) => {
-                    alias.resolve(session, params).unwrap()
+                    Ok(alias.resolve(session, params).unwrap())
                 },
                 _ => match session.get_type(*id) {
                     // TODO we are purposely returning the original type here so as not to over-resolve types... but we should probably still fully resolve for checking purposes
-                    Some(_) => Type::Object(name.clone(), *id, params),
+                    Some(_) => Ok(Type::Object(name.clone(), *id, params)),
                     None => panic!("TypeError: undefined type {:?}", name),
                 },
             }
@@ -383,86 +383,39 @@ pub fn resolve_type(session: &Session, ttype: Type) -> Type {
                 Some(vtype) => {
                     debug!("~~~~~~ {:?} -> {:?}", id, vtype);
                     match vtype {
-                        Type::Variable(_, ref eid, _) if eid == id => vtype.clone(),
-                        _ => resolve_type(session, vtype),
-                    }
-                },
-                None => panic!("TypeError: undefined type variable {}", ttype),
-            }
-        },
-        Type::Tuple(ref types) => {
-            let types = types.iter().map(|ttype| resolve_type(session, ttype.clone())).collect();
-            Type::Tuple(types)
-        },
-        Type::Record(ref types) => {
-            let types = types.iter().map(|(name, ttype)| (name.clone(), resolve_type(session, ttype.clone()))).collect();
-            Type::Record(types)
-        },
-        Type::Function(ref args, ref ret, ref abi) => {
-            Type::Function(r(resolve_type(session, *args.clone())), r(resolve_type(session, *ret.clone())), *abi)
-        },
-        Type::Ref(ref ttype) => {
-            Type::Ref(r(resolve_type(session, *ttype.clone())))
-        },
-        Type::Ambiguous(ref variants) => {
-            let newvars = variants.iter().map(|variant| resolve_type(session, variant.clone())).collect();
-            Type::Ambiguous(newvars)
-        },
-    }
-}
-
-
-pub fn resolve_type_or_fail(session: &Session, ttype: Type) -> Type {
-    match ttype {
-        Type::Object(ref name, ref id, ref types) => {
-            let params = types.iter().map(|ptype| resolve_type_or_fail(session, ptype.clone())).collect();
-
-            match session.get_def(*id) {
-                Ok(Def::TypeAlias(alias)) => {
-                    alias.resolve(session, params).unwrap()
-                },
-                _ => match session.get_type(*id) {
-                    // TODO we are purposely returning the original type here so as not to over-resolve types... but we should probably still fully resolve for checking purposes
-                    Some(_) => Type::Object(name.clone(), *id, params),
-                    None => panic!("TypeError: undefined type {:?}", name),
-                },
-            }
-        },
-        Type::Variable(_, ref id, _) => {
-            match session.get_type(*id) {
-                Some(vtype) => {
-                    debug!("~~~~~~ {:?} -> {:?}", id, vtype);
-                    match vtype {
-                        Type::Variable(_, ref eid, eex) if eid == id => {
-                            if eex {
-                                vtype.clone()
+                        Type::Variable(_, ref eid, ref eex) if eid == id => {
+                            if !require_resolve || *eex {
+                                Ok(vtype.clone())
                             } else {
                                 panic!("TypeError: unification variable unresolved: {}", vtype);
                             }
                         },
-                        _ => resolve_type_or_fail(session, vtype),
+                        _ => resolve_type(session, vtype, require_resolve),
                     }
                 },
                 None => panic!("TypeError: undefined type variable {}", ttype),
             }
         },
         Type::Tuple(ref types) => {
-            let types = types.iter().map(|ttype| resolve_type_or_fail(session, ttype.clone())).collect();
-            Type::Tuple(types)
+            let types = types.iter().map(|ttype| resolve_type(session, ttype.clone(), require_resolve)).collect::<Result<Vec<Type>, Error>>()?;
+            Ok(Type::Tuple(types))
         },
         Type::Record(ref types) => {
-            let types = types.iter().map(|(name, ttype)| (name.clone(), resolve_type_or_fail(session, ttype.clone()))).collect();
-            Type::Record(types)
+            let types = types.iter().map(|(name, ttype)| {
+                let ttype = resolve_type(session, ttype.clone(), require_resolve)?;
+                Ok((name.clone(), ttype))
+            }).collect::<Result<Vec<(String, Type)>, Error>>()?;
+            Ok(Type::Record(types))
         },
         Type::Function(ref args, ref ret, ref abi) => {
-            Type::Function(r(resolve_type_or_fail(session, *args.clone())), r(resolve_type_or_fail(session, *ret.clone())), *abi)
+            Ok(Type::Function(r(resolve_type(session, *args.clone(), require_resolve)?), r(resolve_type(session, *ret.clone(), require_resolve)?), *abi))
         },
         Type::Ref(ref ttype) => {
-            Type::Ref(r(resolve_type_or_fail(session, *ttype.clone())))
+            Ok(Type::Ref(r(resolve_type(session, *ttype.clone(), require_resolve)?)))
         },
         Type::Ambiguous(ref variants) => {
-            let newvars = variants.iter().map(|variant| resolve_type_or_fail(session, variant.clone())).collect();
-            Type::Ambiguous(newvars)
+            let newvars = variants.iter().map(|variant| resolve_type(session, variant.clone(), require_resolve)).collect::<Result<Vec<Type>, Error>>()?;
+            Ok(Type::Ambiguous(newvars))
         },
     }
 }

@@ -79,7 +79,7 @@ impl<'sess> TypeChecker<'sess> {
 
                 // Resolve type variables that can be
                 for i in 0 .. argtypes.len() {
-                    argtypes[i] = resolve_type(self.session, argtypes[i].clone());
+                    argtypes[i] = resolve_type(self.session, argtypes[i].clone(), false)?;
                     self.session.update_type(fscope.clone(), args[i].id, argtypes[i].clone())?;
                 }
 
@@ -117,7 +117,7 @@ impl<'sess> TypeChecker<'sess> {
                         //let ftype = expect_type(self.session, tscope.clone(), Some(etype.clone()), Some(Type::Function(r(atypes), r(expected.unwrap_or_else(|| tscope.new_typevar(self.session, false))), abi)), Check::Update)?;
                         let ftype = expect_type(self.session, tscope.clone(), Some(etype.clone()), Some(Type::Function(r(atypes), r(etype.get_rettype()?.clone()), *abi)), Check::Def)?;
                         // TODO should this actually be another expect, so type resolutions that occur in later args affect earlier args?  Might not be needed unless you add typevar constraints
-                        let ftype = resolve_type(self.session, ftype);        // NOTE This ensures the early arguments are resolved despite typevars not being assigned until later in the signature
+                        let ftype = resolve_type(self.session, ftype, false)?;        // NOTE This ensures the early arguments are resolved despite typevars not being assigned until later in the signature
 
                         ftype
                     },
@@ -392,7 +392,7 @@ impl<'sess> TypeChecker<'sess> {
                 Ok(Some((*id, vars.get_var_def(&field.name).ok_or(Error::new(format!("VarError: definition not set for {:?}", field.name)))?)))
             },
             AST::Accessor(ref id, _, ref left, ref field, ref oid) => {
-                let ltype = resolve_type(self.session, self.check_node(scope.clone(), left, None));
+                let ltype = resolve_type(self.session, self.check_node(scope.clone(), left, None), false)?;
                 self.session.set_type(*oid, ltype.clone());
 
                 match ltype {
