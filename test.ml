@@ -228,7 +228,8 @@
         //}
 
         println("thing" + "stuff\n")
-        println("STUFF".push(" things"))
+        // TODO string methods are no longer implemented because strings don't have vtables
+        //println("STUFF".push(" things"))
         println(strnum(12))
         println(strnum(1.214))
 
@@ -250,9 +251,10 @@
 
         let alloc = malloc(30)
 
-        let buffer = new Buffer<Int>(5)
-        buffer[0] = 124
-        println(str(buffer[0]))
+        // TODO buffer is no longer a class
+        //let buffer = new Buffer<Int>(5)
+        //buffer[0] = 124
+        //println(str(buffer[0]))
 
         let list3 = new List<Int>()
         list3.push(4)
@@ -263,7 +265,8 @@
         let list: List<'thing> = [ 1, 2, 3 ]
         list[1] = 5
         println(str(list[1]))
-        println(str("Thing"[2]))
+        // TODO strings have no methods now
+        //println(str("Thing"[2]))
         // TODO this isn't compiling correctly (expected Stuff found TestClass, seems odd)
         //let list2 = [ new TestClass(), new Stuff(), new TestClass() ]
 

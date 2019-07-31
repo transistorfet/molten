@@ -25,6 +25,7 @@ def main():
     parser.add_argument('-v', '--verbose', action='store_true', help='Print extended info on why a test fails')
     parser.add_argument('-n', '--no-color', action='store_true', help='Remove color codes from output')
     parser.add_argument('-F', '--failed-only', action='store_true', help='Show only the failed tests')
+    parser.add_argument('-s', '--show-output', action='store_true', help='Show the output of the compiler')
     args = parser.parse_args()
 
     if args.no_color:
@@ -34,7 +35,7 @@ def main():
     if args.directory == "clean":
         os.system("./molten cleanall {directory}".format(directory=testdir))
     elif os.path.isfile(args.directory):
-        test = Test(args.directory, verbose=args.verbose)
+        test = Test(args.directory, args)
         test.run_test(args.force)
     else:
         os.system("date")
@@ -56,7 +57,7 @@ def run_all(args):
     passed = 0
     for i, (path, short) in enumerate(testfiles):
         total += 1
-        test = Test(path, verbose=args.verbose, failed_only=args.failed_only)
+        test = Test(path, args)
         if not args.failed_only:
             print("[{:02.0f}/{:02.0f}] ".format(i + 1, len(testfiles)), end="")
         if test.run_test(args.force, short=short):
@@ -72,9 +73,10 @@ def find_rootdir():
 
 
 class Test (object):
-    def __init__(self, path, verbose=False, failed_only=False):
-        self.failed_only = failed_only
-        self.verbose = verbose
+    def __init__(self, path, args):
+        self.verbose = args.verbose
+        self.failed_only = args.failed_only
+        self.show_output = args.show_output
         self.path = path
         self.expected_ret = True
         self.expected_out = []
@@ -150,6 +152,11 @@ class Test (object):
         else:
             self.print_name(short)
             print(RED + "FAIL" + CLEAR)
+            if self.show_output:
+                print("StdOut:\n")
+                print(stdout.decode('utf-8'))
+                print("StdError:\n")
+                print(stderr.decode('utf-8'))
             #if retcode == 0:
             #    print("Output:", " " * (64 - len("Output:")), "Expected:")
             #    if self.expected_out:

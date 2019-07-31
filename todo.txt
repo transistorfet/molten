@@ -19,10 +19,25 @@
 * put intermediate files somewhere else, at least as controlled by the molten script, so as not to clutter source directories
 
 
+- add pipe operator
 * improve error checks
 * make loops use phi, and add break
 * make an HIR
 * update the readme
+
+
+
+BUGS:
+* there is a bug, demod in extends-list.mol, which is actually unrelated... a class with immutable variables causes an MutableError because of what I think is the __init__ function
+
+* there is still a bug with the Phi statement, in that it will return null if you don't cover all cases. there is no check for coverage
+* recursive c functions don't work because it's typechecked as unknown abi, which is called as a closure
+* issue with separator/lf not working when two expressions are on the same line (it should produce a parse error)
+* issue with calling function references store in structs or tuples... it converts them to methods incorrectly
+* if you only have one element in a tuple, or in a record, it parses it as a block or expression
+* there was an error where "let ni: newint" with no initializer was causing a type error with "expected class or concrete type", but that was actually because a definition without
+  an initializer is the same as "let ni: newint = nil" and nil could not be cast to a Record, which newint is a typealias of a record
+* minor bug caught by abi test; the printf function had been added in declare_irregulars, but was decl'ed in the test, and it caused a segfault because you call an undefined function "printf.1"
 
 
 
@@ -47,16 +62,6 @@ Refactoring:
 * add the .set_id() functions to simplify ast builders
 
 
-
-BUGS:
-* there is still a bug with the Phi statement, in that it will return null if you don't cover all cases. there is no check for coverage
-* recursive c functions don't work because it's typechecked as unknown abi, which is called as a closure
-* issue with separator/lf not working when two expressions are on the same line (it should produce a parse error)
-* issue with calling function references store in structs or tuples... it converts them to methods incorrectly
-* if you only have one element in a tuple, or in a record, it parses it as a block or expression
-* there was an error where "let ni: newint" with no initializer was causing a type error with "expected class or concrete type", but that was actually because a definition without
-  an initializer is the same as "let ni: newint = nil" and nil could not be cast to a Record, which newint is a typealias of a record
-* minor bug caught by abi test; the printf function had been added in declare_irregulars, but was decl'ed in the test, and it caused a segfault because you call an undefined function "printf.1"
 
 
 

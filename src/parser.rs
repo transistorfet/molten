@@ -314,14 +314,15 @@ named!(matchcase(Span) -> AST,
         wscom!(tag_word!("match")) >>
         c: expression >>
         //wscom!(tag_word!("with")) >>
-        //l: caselist >>
-        l: delimited!(wscom!(tag!("{")), caselist, wscom!(tag!("}"))) >>
+        wscom!(tag!("{")) >>
+        l: caselist >>
+        wscom!(tag!("}")) >>
         (AST::make_match(Pos::new(pos), c, l))
     )
 );
 
 named!(caselist(Span) -> Vec<MatchCase>,
-    //separated_list_complete!(wscom!(tag!(",")), do_parse!(
+    //separated_list_complete!(wscom!(tag!("|")), do_parse!(
     many1!(do_parse!(
         //wscom!(tag!("|")) >>
         c: pattern >>

@@ -167,7 +167,10 @@ fn bind_names_node_or_error(session: &Session, scope: ScopeRef, node: &mut AST) 
             }
 
             let classtype = Type::Object(classspec.ident.name.clone(), *id, classspec.types.clone());
-            let parenttype = parentspec.clone().map(|p| scope.make_obj(session, p.ident.name.clone(), p.types).unwrap());
+            let parenttype = match parentspec {
+                Some(p) => Some(scope.make_obj(session, p.ident.name.clone(), p.types.clone())?),
+                None => None
+            };
             //let classtype = Type::from_spec(classspec.clone());
             //let parenttype = parentspec.clone().map(|p| Type::from_spec(p));
 

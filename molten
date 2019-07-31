@@ -49,10 +49,13 @@ def main():
     cmd.set_defaults(command=command_cleanall)
 
     args = parser.parse_args()
-    if 'command' in args:
-        args.command(args)
-    else:
+    if 'command' not in args:
         parser.print_help()
+    else:
+        try:
+            args.command(args)
+        except Exception as e:
+            sys.stderr.write("Command failed: " + str(e))
 
 
 def command_build(args):

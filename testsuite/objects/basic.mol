@@ -5,6 +5,7 @@ import lib.libcore
 
 class Object {
     let mut a: Int
+    let b = 123
 
     fn new(self) { }
 
