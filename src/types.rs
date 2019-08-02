@@ -403,7 +403,7 @@ pub fn resolve_type(session: &Session, ttype: Type, require_resolve: bool) -> Re
                 _ => match session.get_type(*id) {
                     // TODO we are purposely returning the original type here so as not to over-resolve types... but we should probably still fully resolve for checking purposes
                     Some(_) => Ok(Type::Object(name.clone(), *id, params)),
-                    None => panic!("TypeError: undefined type {:?}", name),
+                    None => Err(Error::new(format!("TypeError: undefined type {:?}", name))),
                 },
             }
         },
@@ -416,13 +416,13 @@ pub fn resolve_type(session: &Session, ttype: Type, require_resolve: bool) -> Re
                             if !require_resolve || *eex {
                                 Ok(vtype.clone())
                             } else {
-                                panic!("TypeError: unification variable unresolved: {}", vtype);
+                                Err(Error::new(format!("TypeError: unification variable unresolved: {}", vtype)))
                             }
                         },
                         _ => resolve_type(session, vtype, require_resolve),
                     }
                 },
-                None => panic!("TypeError: undefined type variable {}", ttype),
+                None => Err(Error::new(format!("TypeError: undefined type variable {}", ttype))),
             }
         },
         Type::Tuple(ref types) => {

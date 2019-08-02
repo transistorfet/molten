@@ -163,9 +163,13 @@ debug!("SET REF: {:?} -> {:?}", id, defid);
         let keys: Vec<NodeID> = self.types.borrow().keys().map(|k| *k).collect();
         for key in keys {
             let ttype = self.get_type(key).unwrap();
-            let ntype = types::resolve_type(self, ttype.clone(), true).unwrap();
-            debug!("$$$$$$$: {:?} {:?} {:?}", key, ttype, ntype);
-            self.set_type(key, ntype);
+            match types::resolve_type(self, ttype.clone(), true) {
+                Ok(ntype) => {
+                    debug!("$$$$$$$: {:?} {:?} {:?}", key, ttype, ntype);
+                    self.set_type(key, ntype);
+                },
+                Err(err) => self.print_error(err),
+            }
         }
     }
 }
