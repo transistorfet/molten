@@ -191,6 +191,15 @@ impl<'sess> Refinery<'sess> {
                 AST::Record(id, pos, refined)
             },
 
+            AST::RecordUpdate(id, pos, record, mut items) => {
+                items.sort_unstable_by(|a, b| a.0.name.cmp(&b.0.name));
+                let mut refined = vec!();
+                for (i, e) in items {
+                    refined.push((i, self.refine_node(e)?));
+                }
+                AST::RecordUpdate(id, pos, record, refined)
+            },
+
             //AST::List(id, pos, items, ttype) => { AST::List(id, pos, self.refine_vec(items), ttype) },
             AST::List(_, pos, items) => {
                 let mut block = vec!();

@@ -1,5 +1,4 @@
 
-* add spread op
 * make "with" block of try require parens, at least so they match, and maybe change it to catch? I don't know,  I should have a more consistent means of determining syntax
 * there is an issue with raise, in that it is considered to return unit () instead of somehow being marked as not returning...  Getting type errors in Option def
 
@@ -19,7 +18,7 @@
 * put intermediate files somewhere else, at least as controlled by the molten script, so as not to clutter source directories
 
 
-- add pipe operator
+* add pipe operator
 * improve error checks
 * make loops use phi, and add break
 * make an HIR
@@ -108,7 +107,6 @@ Changes:
 
 
 * add enums
-* add a spread operator for records
 * add patterns and matching of patterns
 * add typeclasses/traits
 * implement garbage collection
@@ -132,7 +130,7 @@ Changes:
 * should local variables be allowed to be mutable...
 * should you require an override keyword when masking definitions in lower scopes? like class definitions
 * should you add macros and expandable forms (like lisp)
-* should you implement assignment of tuples and records? (in addition to the spread operator)
+* should you implement assignment of tuples and records? (in addition to the record update syntax)
 
 * is it even possible to add a special "constrained" type, which has &AST that must type check correctly in order to match (checks done in check_type)
 * you might need to integrate type restrictions which have to get resolved later; like 'a where 'a is object with add(Int) method; not sure how you could be so specific without complexity

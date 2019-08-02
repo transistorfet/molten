@@ -1,0 +1,22 @@
+
+//! 5 Hey 3.450000 \(\)
+//! 1 Ho 3.450000 \(\)
+
+import lib.libcore
+
+let rec1 = { a = 5, b = "Hey", c = 3.45, d = () }
+println(str(rec1.a) + " " + rec1.b + " " + str(rec1.c) + " " + str(rec1.d))
+
+let rec2 = { rec1 with b = "Ho", a = 1 }
+println(str(rec2.a) + " " + rec2.b + " " + str(rec2.c) + " " + str(rec2.d))
+
+fn test() => 4
+
+fn ret() {
+    {
+        rec2 with
+        d = ()
+        c = 1.2
+    }
+}
+

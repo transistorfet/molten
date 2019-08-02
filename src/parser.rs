@@ -16,7 +16,8 @@ use nom::{
     Needed,
     IResult,
     Context,
-    ErrorKind
+    ErrorKind,
+    error_to_list
 };
 use nom::types::CompleteByteSlice;
 
@@ -237,6 +238,10 @@ named!(typealias(Span) -> AST,
 
 
 
+named!(expression_list(Span) -> Vec<AST>,
+    separated_list_complete!(tag!(","), expression)
+);
+
 named!(expression(Span) -> AST,
     alt_complete!(
         //underscore |
@@ -398,7 +403,7 @@ named!(function(Span) -> AST,
         ) >>
         r: opt!(preceded!(wscom!(tag!("->")), type_description)) >>
         a: abi_specifier >>
-        e: alt_complete!(block | preceded!(wscom!(tag!("=>")), expression)) >>
+        e: alt_complete!(preceded!(wscom!(tag!("=>")), expression) | block) >>
         (AST::make_func(Pos::new(pos), if vis.is_some() { Visibility::Public } else { Visibility::Private }, l.0, l.1, r, e, a))
     )
 );
@@ -589,6 +594,7 @@ impl AST {
 named!(subatomic(Span) -> AST,
     alt_complete!(
         delimited!(tag!("("), wscom!(expression), tag!(")")) |
+        record_update |
         block |
         dereference |
         literal |
@@ -596,8 +602,18 @@ named!(subatomic(Span) -> AST,
     )
 );
 
-named!(expression_list(Span) -> Vec<AST>,
-    separated_list_complete!(tag!(","), expression)
+named!(record_update(Span) -> AST,
+    delimited!(
+        tag!("{"),
+        do_parse!(
+            pos: position!() >>
+            i: wscom!(identifier_node) >>
+            wscom!(tag_word!("with")) >>
+            l: record_field_assignments >>
+            (AST::make_record_update(Pos::new(pos), i, l))
+        ),
+        tag!("}")
+    )
 );
 
 named!(dereference(Span) -> AST,
@@ -751,27 +767,6 @@ named!(abi_specifier(Span) -> ABI,
 );
 
 
-named!(not_reserved(Span) -> (),
-    // TODO you need to figure out the add_error thing to raise a specific error
-    //return_error!(ErrorKind::Custom(128), alt!(
-    not!(alt!(
-        tag_word!("do") |
-        tag_word!("end") |
-        tag_word!("while") |
-        tag_word!("class") |
-        tag_word!("import") |
-        tag_word!("let") |
-        tag_word!("type") |
-        tag_word!("match") |
-        tag_word!("if") | tag_word!("then") | tag_word!("else") |
-        tag_word!("try") | tag_word!("with") | tag_word!("raise") |
-        tag_word!("for") | tag_word!("in") |
-        tag_word!("fn") | tag_word!("decl")
-    ))
-);
-
-
-
 named!(literal(Span) -> AST,
     alt_complete!(
         unit |
@@ -894,16 +889,20 @@ named!(record(Span) -> AST,
         pos: position!() >>
         l: delimited!(
             tag!("{"),
-            wscom!(separated_list_complete!(wscom!(tag!(",")), do_parse!(
-                i: identifier >>
-                wscom!(tag!("=")) >>
-                e: expression >>
-                ((i, e))
-            ))),
+            record_field_assignments,
             tag!("}")
         ) >>
         (AST::make_record(Pos::new(pos), l))
     )
+);
+
+named!(record_field_assignments(Span) -> Vec<(Ident, AST)>,
+    wscom!(separated_list_complete!(wscom!(tag!(",")), do_parse!(
+        i: identifier >>
+        wscom!(tag!("=")) >>
+        e: expression >>
+        ((i, e))
+    )))
 );
 
 named!(list(Span) -> AST,
@@ -917,6 +916,28 @@ named!(list(Span) -> AST,
         (AST::make_list(Pos::new(pos), l))
     )
 );
+
+
+named!(not_reserved(Span) -> (),
+    // TODO you need to figure out the add_error thing to raise a specific error
+    //return_error!(ErrorKind::Custom(128), alt!(
+    not!(alt!(
+        tag_word!("do") |
+        tag_word!("end") |
+        tag_word!("while") |
+        tag_word!("class") |
+        tag_word!("import") |
+        tag_word!("let") |
+        tag_word!("type") |
+        tag_word!("match") |
+        tag_word!("with") |
+        tag_word!("if") | tag_word!("then") | tag_word!("else") |
+        tag_word!("try") | tag_word!("with") | tag_word!("raise") |
+        tag_word!("for") | tag_word!("in") |
+        tag_word!("fn") | tag_word!("decl")
+    ))
+);
+
 
 
 
@@ -1008,11 +1029,30 @@ pub fn print_error(name: &str, span: Span, err: nom::Err<Span, u32>) {
         nom::Err::Incomplete(_) => println!("ParseError: incomplete input..."),
         nom::Err::Error(Context::Code(span, code)) |
         nom::Err::Failure(Context::Code(span, code)) => {
-            let snippet = span_to_string(span);
-            let index = snippet.find('\n').unwrap_or(snippet.len());
-            println!("\x1B[1;31m{}:{}:{}: ParseError ({:?}) near {:?}\x1B[0m", name, span.line, span.get_utf8_column(), code, snippet.get(..index).unwrap());
+            println!("\x1B[1;31m{}:{}:{}: ParseError ({:?}) near {:?}\x1B[0m", name, span.line, span.get_utf8_column(), code, format_snippet(&span));
+        },
+        nom::Err::Error(list @ Context::List(_)) |
+        nom::Err::Failure(list @ Context::List(_)) => {
+            let errors = error_to_list(&list);
+            let (span, _) = &errors[errors.len() - 1];
+            println!("\x1B[1;31m{}:{}:{}: ParseError ({}) near {:?}\x1B[0m", name, span.line, span.get_utf8_column(), format_codes(&errors), format_snippet(&span));
         },
     }
 }
 
+pub fn format_snippet<'a>(span: &'a Span) -> String {
+    let snippet = str::from_utf8(&span.fragment).unwrap();
+    let index = snippet.find('\n').unwrap_or(snippet.len());
+    String::from(snippet.get(..index).unwrap())
+}
 
+pub fn format_codes(codes: &Vec<(Span, ErrorKind)>) -> String {
+    codes.iter().fold(String::new(), |acc, (_, code)| {
+        let string = format!("{:?}", code);
+        if &acc == "" {
+            string
+        } else {
+            acc + " " + &string
+        }
+    })
+}

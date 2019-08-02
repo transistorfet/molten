@@ -257,6 +257,10 @@ impl<'sess> Transformer<'sess> {
                 self.transform_tuple_lit(scope.clone(), *id, &items)
             },
 
+            AST::RecordUpdate(id, _, record, items) => {
+                self.transform_record_update(scope.clone(), *id, &record, &items)
+            },
+
 
             AST::New(id, _, _) => {
                 self.transform_new_object(scope.clone(), *id)
@@ -334,6 +338,24 @@ impl<'sess> Transformer<'sess> {
         }
         let ltype = self.transform_value_type(&self.session.get_type(id).unwrap());
         exprs.push(LLExpr::DefStruct(id, ltype, litems));
+        exprs
+    }
+
+    fn transform_record_update(&self, scope: ScopeRef, id: NodeID, record: &AST, items: &Vec<(Ident, AST)>) -> Vec<LLExpr> {
+        let mut exprs = vec!();
+        let mut litems = vec!();
+
+        let ttype = &self.session.get_type(id).unwrap();
+        let valexpr = self.transform_as_result(&mut exprs, scope.clone(), record).unwrap();
+
+        for (ref name, ref itype) in ttype.get_record_types().unwrap() {
+            let item = match items.iter().find(|(ident, _)| &ident.name == name) {
+                Some((_, expr)) => self.transform_as_result(&mut exprs, scope.clone(), expr).unwrap(),
+                None => LLExpr::GetItem(r(valexpr.clone()), litems.len()),
+            };
+            litems.push(item);
+        }
+        exprs.push(LLExpr::DefStruct(id, self.transform_value_type(ttype), litems));
         exprs
     }
 

@@ -216,3 +216,8 @@ fn test4() {
     }
 }
 test4()
+
+
+let up = { s with a = 3 }
+println(str(up.a) + " " +str(up.b))
+

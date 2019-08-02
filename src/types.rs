@@ -56,6 +56,35 @@ impl Type {
     }
 
 
+    pub fn is_record(&self) -> bool {
+        match *self {
+            Type::Record(_) => true,
+            _ => false
+        }
+    }
+
+    pub fn get_record_types(&self) -> Result<&Vec<(String, Type)>, Error> {
+        match self {
+            &Type::Record(ref items) => Ok(items),
+            _ => Err(Error::new(format!("TypeError: expected record type, found {:?}", self))),
+        }
+    }
+
+    pub fn get_record_field(&self, name: &str) -> Result<&Type, Error> {
+        match self {
+            &Type::Record(ref items) => {
+                for (ref ident, ref ttype) in items {
+                    if ident.as_str() == name {
+                        return Ok(ttype);
+                    }
+                }
+                Err(Error::new(format!("TypeError: no field named {:?} exists in record of type {:?}", name, self)))
+            },
+            _ => Err(Error::new(format!("TypeError: expected record type, found {:?}", self))),
+        }
+    }
+
+
     pub fn is_function(&self) -> bool {
         match *self {
             Type::Function(_, _, _) => true,

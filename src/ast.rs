@@ -91,9 +91,10 @@ pub enum AST {
     Ref(NodeID, Pos, R<AST>),
     Deref(NodeID, Pos, R<AST>),
 
+    List(NodeID, Pos, Vec<AST>),
     Tuple(NodeID, Pos, Vec<AST>),
     Record(NodeID, Pos, Vec<(Ident, AST)>),
-    List(NodeID, Pos, Vec<AST>),
+    RecordUpdate(NodeID, Pos, R<AST>, Vec<(Ident, AST)>),
 
     GetValue(NodeID),
     Identifier(NodeID, Pos, Ident),
@@ -237,9 +238,10 @@ impl AST {
         match *self {
             AST::Ref(_, ref pos, _) |
             AST::Deref(_, ref pos, _) |
+            AST::List(_, ref pos, _) |
             AST::Tuple(_, ref pos, _) |
             AST::Record(_, ref pos, _) |
-            AST::List(_, ref pos, _) |
+            AST::RecordUpdate(_, ref pos, _, _) |
             AST::Identifier(_, ref pos, _) |
             AST::Index(_, ref pos, _, _) |
             AST::Resolver(_, ref pos, _, _, _) |
@@ -271,9 +273,10 @@ impl AST {
             AST::Nil(ref id) |
             AST::Ref(ref id, _, _) |
             AST::Deref(ref id, _, _) |
+            AST::List(ref id, _, _) |
             AST::Tuple(ref id, _, _) |
             AST::Record(ref id, _, _) |
-            AST::List(ref id, _, _) |
+            AST::RecordUpdate(ref id, _, _, _) |
             AST::Identifier(ref id, _, _) |
             AST::Index(ref id, _, _, _) |
             AST::Resolver(ref id, _, _, _, _) |
@@ -315,6 +318,10 @@ impl AST {
         AST::Nil(NodeID::generate())
     }
 
+    pub fn make_list(pos: Pos, items: Vec<AST>) -> AST {
+        AST::List(NodeID::generate(), pos, items)
+    }
+
     pub fn make_tuple(pos: Pos, items: Vec<AST>) -> AST {
         AST::Tuple(NodeID::generate(), pos, items)
     }
@@ -323,8 +330,8 @@ impl AST {
         AST::Record(NodeID::generate(), pos, items)
     }
 
-    pub fn make_list(pos: Pos, items: Vec<AST>) -> AST {
-        AST::List(NodeID::generate(), pos, items)
+    pub fn make_record_update(pos: Pos, record: AST, items: Vec<(Ident, AST)>) -> AST {
+        AST::RecordUpdate(NodeID::generate(), pos, r(record), items)
     }
 
     pub fn make_ident(pos: Pos, ident: Ident) -> AST {

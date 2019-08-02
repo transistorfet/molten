@@ -138,6 +138,13 @@ fn bind_names_node_or_error(session: &Session, scope: ScopeRef, node: &mut AST) 
             }
         },
 
+        AST::RecordUpdate(_, _, ref mut record, ref mut items) => {
+            bind_names_node(session, scope.clone(), record);
+            for &mut (_, ref mut expr) in items {
+                bind_names_node(session, scope.clone(), expr);
+            }
+        },
+
         AST::Index(_, _, ref mut base, ref mut index) => {
             bind_names_node(session, scope.clone(), base);
             bind_names_node(session, scope, index);

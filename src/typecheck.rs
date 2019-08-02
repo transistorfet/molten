@@ -279,6 +279,18 @@ impl<'sess> TypeChecker<'sess> {
                 Type::Record(types)
             },
 
+            AST::RecordUpdate(ref id, _, ref record, ref items) => {
+                let rtype = self.check_node(scope.clone(), record, None);
+
+                for (ref ident, ref expr) in items {
+                    let ftype = rtype.get_record_field(ident.name.as_str())?;
+                    let itype = self.check_node(scope.clone(), expr, None);
+                    expect_type(self.session, scope.clone(), Some(ftype.clone()), Some(itype), Check::Def)?;
+                }
+                self.session.set_type(*id, rtype.clone());
+                rtype
+            },
+
             AST::List(_, _, ref items) => {
                 let mut ltype = None;
                 for ref expr in items {
