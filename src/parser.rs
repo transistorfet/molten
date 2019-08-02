@@ -37,6 +37,13 @@ use ast::{ Pos, NodeID, Mutability, Visibility, Literal, Ident, Argument, ClassS
 
 ///// Parsing Macros /////
 
+const ERR_IN_FUNC: u32 = 40;
+const ERR_IN_MATCH: u32 = 41;
+const ERR_IN_WHILE: u32 = 42;
+const ERR_IN_FOR: u32 = 43;
+const ERR_IN_CLASS: u32 = 44;
+const ERR_IN_LIST: u32 = 45;
+
 pub type Span<'a> = LocatedSpan<CompleteByteSlice<'a>>;
 
 #[inline]
@@ -202,7 +209,7 @@ named!(whileloop(Span) -> AST,
         wscom!(tag_word!("while")) >>
         c: expression >>
         opt!(multispace_comment) >>
-        e: expression >>
+        e: return_error!(ErrorKind::Custom(ERR_IN_WHILE), expression) >>
         (AST::make_while(Pos::new(pos), c, e))
     )
 );
@@ -220,7 +227,7 @@ named!(class(Span) -> AST,
                 declare |
                 function
                 )) >>
-        wscom!(tag!("}")) >>
+        return_error!(ErrorKind::Custom(ERR_IN_CLASS), wscom!(tag!("}"))) >>
         (AST::make_class(Pos::new(pos), i, p, s))
         )
     );
@@ -321,7 +328,9 @@ named!(matchcase(Span) -> AST,
         //wscom!(tag_word!("with")) >>
         wscom!(tag!("{")) >>
         l: caselist >>
-        wscom!(tag!("}")) >>
+        return_error!(ErrorKind::Custom(ERR_IN_MATCH),
+            wscom!(tag!("}"))
+        ) >>
         (AST::make_match(Pos::new(pos), c, l))
     )
 );
@@ -354,7 +363,7 @@ named!(forloop(Span) -> AST,
         wscom!(tag_word!("in")) >>
         l: expression >>
         opt!(multispace_comment) >>
-        e: expression >>
+        e: return_error!(ErrorKind::Custom(ERR_IN_FOR), expression) >>
         (AST::make_for(Pos::new(pos), i, l, e))
     )
 );
@@ -403,7 +412,10 @@ named!(function(Span) -> AST,
         ) >>
         r: opt!(preceded!(wscom!(tag!("->")), type_description)) >>
         a: abi_specifier >>
-        e: alt_complete!(preceded!(wscom!(tag!("=>")), expression) | block) >>
+        e: alt_complete!(
+            preceded!(wscom!(tag!("=>")), return_error!(ErrorKind::Custom(ERR_IN_FUNC), expression)) |
+            return_error!(ErrorKind::Custom(ERR_IN_FUNC), block)
+        ) >>
         (AST::make_func(Pos::new(pos), if vis.is_some() { Visibility::Public } else { Visibility::Private }, l.0, l.1, r, e, a))
     )
 );
@@ -612,7 +624,7 @@ named!(record_update(Span) -> AST,
             l: record_field_assignments >>
             (AST::make_record_update(Pos::new(pos), i, l))
         ),
-        tag!("}")
+        return_error!(ErrorKind::Custom(ERR_IN_LIST), tag!("}"))
     )
 );
 
@@ -890,7 +902,7 @@ named!(record(Span) -> AST,
         l: delimited!(
             tag!("{"),
             record_field_assignments,
-            tag!("}")
+            return_error!(ErrorKind::Custom(ERR_IN_LIST), tag!("}"))
         ) >>
         (AST::make_record(Pos::new(pos), l))
     )

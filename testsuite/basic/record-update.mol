@@ -15,7 +15,7 @@ fn test() => 4
 fn ret() {
     {
         rec2 with
-        d = ()
+        d = (),
         c = 1.2
     }
 }
