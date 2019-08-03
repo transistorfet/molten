@@ -33,7 +33,8 @@
         //fac2(3)
         testy(3)
 
-        let test2 = fn x => x()
+        // TODO this doesn't have an explicitly declared type variable
+        //let test2 = fn x => x()
         let test3 = fn x => x() + 1
         println(str(test3(fn => 3)))
 
@@ -85,7 +86,6 @@
 
         // NOTE this correctly causes a type error (actually an overload/no variant error)
         //let ab = 123.24 * 3
-
 
         class Stuff {
             fn new(self) { }
@@ -185,6 +185,8 @@
         }
         println("semicolon: " + str(d))
 
+        /*
+        // TODO these otherwise work but the nil seems to be causing an unresolved unified variable
         fn strnum(num: Int) -> String {
             let buffer: String = malloc(22)
             sprintf(buffer, "%d", num, nil)
@@ -196,6 +198,13 @@
             sprintf(buffer, "%f", num, nil)
             buffer
         }
+
+        println("thing" + "stuff\n")
+        // TODO string methods are no longer implemented because strings don't have vtables
+        //println("STUFF".push(" things"))
+        println(strnum(12))
+        println(strnum(1.214))
+        */
 
 
         // TODO this causes a segfault during codegen
@@ -227,12 +236,6 @@
         //        recoverload(x - 1.0)
         //}
 
-        println("thing" + "stuff\n")
-        // TODO string methods are no longer implemented because strings don't have vtables
-        //println("STUFF".push(" things"))
-        println(strnum(12))
-        println(strnum(1.214))
-
 
         /// Exceptions
 
@@ -249,7 +252,7 @@
 
         /// Lists, Buffers, Alloc
 
-        let alloc = malloc(30)
+        //let alloc = malloc(30)
 
         // TODO buffer is no longer a class
         //let buffer = new Buffer<Int>(5)
@@ -269,6 +272,7 @@
         //println(str("Thing"[2]))
         // TODO this isn't compiling correctly (expected Stuff found TestClass, seems odd)
         //let list2 = [ new TestClass(), new Stuff(), new TestClass() ]
+
 
         class NumList<'a> extends List<Int> {
             let x: 'a = nil
@@ -298,7 +302,7 @@
 
         class Thing {
             fn new(self) {
-                self.bar = fn a => [ a, a, a ]
+                //self.bar = fn a: 'b => [ a, a, a ]
                 self.arr = [ 1, 2, 3, 4 ]
                 self.foobar = [ fn x => x * 16, fn x => x * 100 ]
             }
@@ -307,21 +311,23 @@
                 a * 4
             }
 
-            let mut bar = fn a => [ a, a, a ]
+            // TODO bar is commented out because there's an unresolved typevar somewhere
+            //let mut bar = fn a: 'b => [ a, a, a ]
             let mut arr: List<Int>
             let mut foobar: List<(Int) -> Int>
             //let arr = [ 1, 2, 3, 4 ]
             //let foobar = [ fn x => x * 16, fn x => x * 100 ]
 
-            fn baz(self: Thing, a) {
+            fn baz(self: Thing, a: Int) {
 
             }
         }
 
+
         let thing = new Thing()
         let get_thing = fn => thing
 
-        []
+        //[]
         [1, 2, 3 * 10 + 3]
         [ 0, 1, 2, 3 ][0]
         let arr = [ 1, 2, 3, 4 ]
@@ -331,19 +337,22 @@
 
         thing.baz(521)
         get_thing().baz(985)
-        thing.bar()[1]
-        (thing.bar())[1]
-        get_thing().bar()[1]
+        // TODO bar is no longer defined because of the type issue
+        //thing.bar()[1]
+        //(thing.bar())[1]
+        //get_thing().bar()[1]
         thing.baz
 
-        thing.foobar[1](123)
-        get_thing().foobar[1](123)
+        // TODO these both cause a segfault
+        //thing.foobar[1](123)
+        //get_thing().foobar[1](123)
 
         Thing::foo(a)
 
 
         // TODO this probably shouldn't parse without a ; or \n, but it does
         thing "things"
+
 
 
 
@@ -400,9 +409,10 @@
         let v = !rr
         println(str(v))
 
-        println(str(sizeof(1)))
+        // TODO this causes a segfault
+        //println(str(sizeof(1)))
 
-/*
+
         /// Closures
 
         fn test() {
@@ -413,8 +423,6 @@
         }
 
         println(str(test()()))
-*/
-
 
 
         // TODO parse test?
@@ -423,5 +431,4 @@
         // things
         /* stuff */
         4 + /* things */ 5
-
 

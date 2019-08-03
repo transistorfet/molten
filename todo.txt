@@ -41,6 +41,7 @@ BUGS:
 
 
 Error Messages:
+* there is no context info for the ununified variables, which makes it hard to find the issue
 * there are poor error messages when deleting the "=" from a "let something = fn x => ..." both inside and outside classes.... shouldn't be doing this (actually, because of
   let without init, and the lf issue... lf fix would solve this)
 * you can put a restriction on type aliases such that a type can only use type vars defined in the declaration
