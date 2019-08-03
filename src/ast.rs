@@ -86,6 +86,7 @@ pub enum Pattern {
     Wild,
     Literal(NodeID, AST),
     Binding(NodeID, Ident),
+    Annotation(NodeID, Type, R<Pattern>),
 }
 
 

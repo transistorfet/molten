@@ -917,6 +917,7 @@ impl<'sess> Transformer<'sess> {
                 AST::Declare(id, _, vis, ident, ttype) => {
                     exprs.extend(self.transform_func_decl(tscope.clone(), ttype.get_abi().unwrap(), *id, *vis, &ident.name, ttype));
                 },
+                AST::Definition(_, _, _, _, _, _) => { },
                 _ => panic!("Not Implemented: {:?}", node),
             }
         }
@@ -1048,6 +1049,9 @@ impl<'sess> Transformer<'sess> {
             Pattern::Binding(id, ident) => {
                 exprs.extend(self.transform_def_local(scope.clone(), *id, &ident.name, &AST::GetValue(valueid)));
                 exprs.push(LLExpr::Literal(LLLit::I1(true)));
+            },
+            Pattern::Annotation(id, ttype, pat) => {
+                exprs.extend(self.transform_pattern(scope.clone(), pat, valueid))
             },
         }
         exprs

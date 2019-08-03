@@ -1,6 +1,7 @@
 
 //! One
 //! Not One
+//! 1
 
 
 import lib.libcore
@@ -14,6 +15,11 @@ match a {
 
 match a + 1 {
     1 => { println("One") }
+    _ => { println("Not One") }
+}
+
+match a {
+    e : Int => { println(str(e)) }
     _ => { println("Not One") }
 }
 

@@ -403,7 +403,7 @@ pub fn resolve_type(session: &Session, ttype: Type, require_resolve: bool) -> Re
                 _ => match session.get_type(*id) {
                     // TODO we are purposely returning the original type here so as not to over-resolve types... but we should probably still fully resolve for checking purposes
                     Some(_) => Ok(Type::Object(name.clone(), *id, params)),
-                    None => Err(Error::new(format!("TypeError: undefined type {:?}", name))),
+                    None => Err(Error::new(format!("TypeError: undefined type {:?}", name))).unwrap(),
                 },
             }
         },

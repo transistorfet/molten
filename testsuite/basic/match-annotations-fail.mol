@@ -1,0 +1,14 @@
+
+//!should_fail
+//!err .*TypeError: type mismatch, expected Int but found String
+//!err .*
+
+import lib.libcore
+
+let a = 1
+
+match a {
+    e : String => { println(str(e)) }
+    _ => { println("Not One") }
+}
+

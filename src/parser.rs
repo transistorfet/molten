@@ -348,6 +348,17 @@ named!(caselist(Span) -> Vec<MatchCase>,
 );
 
 named!(pattern(Span) -> Pattern,
+    do_parse!(
+        p: pattern_atomic >>
+        a: opt!(preceded!(wscom!(tag!(":")), type_description)) >>
+        (match a {
+            Some(ty) => Pattern::Annotation(NodeID::generate(), ty, r(p)),
+            None => p,
+        })
+    )
+);
+
+named!(pattern_atomic(Span) -> Pattern,
     alt_complete!(
         value!(Pattern::Wild, tag!("_")) |
         map!(literal, |l| Pattern::Literal(NodeID::generate(), l)) |

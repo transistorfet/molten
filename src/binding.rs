@@ -239,6 +239,10 @@ pub fn bind_names_pattern(session: &Session, scope: ScopeRef, pat: &mut Pattern)
         Pattern::Binding(id, ident) => {
             VarDef::define(session, scope.clone(), *id, Mutability::Immutable, &ident.name, None)?;
         },
+        Pattern::Annotation(_, ttype, pat) => {
+            declare_typevars(session, scope.clone(), Some(ttype), false)?;
+            bind_names_pattern(session, scope, pat)?
+        }
         _ => { }
     }
     Ok(())
