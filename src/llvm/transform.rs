@@ -290,7 +290,7 @@ impl<'sess> Transformer<'sess> {
                 self.transform_resolve(scope.clone(), *id, path, &field.name, otype)
             },
 
-            AST::Assignment(id, _, left, right) => {
+            AST::Assignment(id, _, left, right, _) => {
                 self.transform_assignment(scope.clone(), *id, left, right)
             },
 
@@ -908,8 +908,6 @@ impl<'sess> Transformer<'sess> {
 
         self.transform_class_type_data(scope.clone(), classdef.clone(), body);
 
-        let mut init = vec!();
-        let mut has_init = false;
         for node in body {
             match node {
                 AST::Function(id, _, vis, ident, args, _, body, abi) => {
@@ -918,11 +916,6 @@ impl<'sess> Transformer<'sess> {
                 },
                 AST::Declare(id, _, vis, ident, ttype) => {
                     exprs.extend(self.transform_func_decl(tscope.clone(), ttype.get_abi().unwrap(), *id, *vis, &ident.name, ttype));
-                },
-                AST::Definition(_, _, _, ident, _, value) => {
-                    init.push(AST::make_assign(Pos::empty(),
-                        AST::make_access(Pos::empty(), AST::make_ident_from_str(Pos::empty(), "self"), ident.clone()),
-                        *value.clone()));
                 },
                 _ => panic!("Not Implemented: {:?}", node),
             }

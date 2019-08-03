@@ -32,7 +32,7 @@ use std::str::FromStr;
 use abi::ABI;
 use types::Type;
 use misc::{ r, UniqueID };
-use ast::{ Pos, NodeID, Mutability, Visibility, Literal, Ident, Argument, ClassSpec, MatchCase, Pattern, AST };
+use ast::{ Pos, NodeID, Mutability, Visibility, AssignType, Literal, Ident, Argument, ClassSpec, MatchCase, Pattern, AST };
 
 
 ///// Parsing Macros /////
@@ -199,7 +199,7 @@ named!(assignment(Span) -> AST,
         o: subatomic_operation >>
         wscom!(tag!("=")) >>
         e: expression >>
-        (AST::make_assign(Pos::new(pos), o, e))
+        (AST::make_assign(Pos::new(pos), o, e, AssignType::Update))
     )
 );
 

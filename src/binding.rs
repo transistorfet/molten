@@ -215,7 +215,7 @@ fn bind_names_node_or_error(session: &Session, scope: ScopeRef, node: &mut AST) 
             bind_names_node(session, scope, left);
         },
 
-        AST::Assignment(_, _, ref mut left, ref mut right) => {
+        AST::Assignment(_, _, ref mut left, ref mut right, _) => {
             bind_names_node(session, scope.clone(), left);
             bind_names_node(session, scope, right);
         },

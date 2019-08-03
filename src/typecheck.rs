@@ -3,7 +3,7 @@
 use defs::Def;
 use session::{ Session, Error };
 use scope::{ Scope, ScopeRef };
-use ast::{ NodeID, ClassSpec, Literal, Pattern, AST };
+use ast::{ NodeID, AssignType, ClassSpec, Literal, Pattern, AST };
 use types::{ Type, Check, ABI, expect_type, resolve_type, check_type_params };
 use misc::{ r };
 
@@ -333,11 +333,11 @@ impl<'sess> TypeChecker<'sess> {
                 self.get_type_or_new_typevar(scope, defid, expected)
             },
 
-            AST::Assignment(ref id, _, ref left, ref right) => {
+            AST::Assignment(ref id, _, ref left, ref right, ref ty) => {
                 // TODO this is duplicated in check_types_node(left)... can we avoid that
                 match self.get_access_ids(scope.clone(), left)? {
                     Some((refid, defid)) => {
-                        if !self.session.get_def(defid).map(|d| d.is_mutable()).unwrap_or(false) {
+                        if *ty == AssignType::Update && !self.session.get_def(defid).map(|d| d.is_mutable()).unwrap_or(false) {
                             return Err(Error::new(format!("MutableError: attempting to assign to an immutable variable")));
                         }
                     },

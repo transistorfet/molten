@@ -76,7 +76,7 @@ println(str(s.a))
 let clo = "It Closure Worked"
 
 class Stuff {
-    let mut what = 8
+    let what = 8
 
     fn new(self) { }
 

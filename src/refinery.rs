@@ -8,7 +8,7 @@ use types::Type;
 //use hcode::{ HExpr };
 use misc::{ r, UniqueID };
 use session::{ Session, Error };
-use ast::{ NodeID, AST, Mutability, Visibility, Ident, ClassSpec, Argument, MatchCase, Pattern, Literal };
+use ast::{ NodeID, AST, Mutability, Visibility, AssignType, Ident, ClassSpec, Argument, MatchCase, Pattern, Literal };
 
 
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -170,7 +170,7 @@ impl<'sess> Refinery<'sess> {
 
                 // increment the iterator index variable
                 body_block.push(AST::make_assign(pos.clone(), access_iter(), self.refine_node(invoke(AST::make_ident(pos.clone(), Ident::from_str("+")),
-                    vec!(access_iter(), AST::make_lit(Literal::Integer(1)))))?));
+                    vec!(access_iter(), AST::make_lit(Literal::Integer(1)))))?, AssignType::Update));
 
                 block.push(AST::While(id, pos.clone(), r(AST::make_block(pos.clone(), cond_block)), r(AST::make_block(pos.clone(), body_block))));
                 AST::make_block(pos.clone(), block)
@@ -273,7 +273,8 @@ impl<'sess> Refinery<'sess> {
                             AST::Definition(_, _, _, ident, _, value) => {
                                 init.push(AST::make_assign(pos.clone(),
                                     AST::make_access(pos.clone(), AST::make_ident_from_str(pos.clone(), "self"), ident.clone()),
-                                    *value.clone()));
+                                    *value.clone(),
+                                    AssignType::Initialize));
                             },
                             _ => { },
                         }
@@ -314,13 +315,13 @@ impl<'sess> Refinery<'sess> {
                 AST::Accessor(id, pos, r(self.refine_node(*left)?), right, oid)
             },
 
-            AST::Assignment(id, pos, left, right) => {
+            AST::Assignment(id, pos, left, right, ty) => {
                 let left = *left;
                 match left {
                     //AST::Identifier(_, _, _) |
                     AST::Deref(_, _, _) |
                     AST::Accessor(_, _, _, _, _) => {
-                        AST::Assignment(id, pos, r(self.refine_node(left)?), r(self.refine_node(*right)?))
+                        AST::Assignment(id, pos, r(self.refine_node(left)?), r(self.refine_node(*right)?), ty)
                     },
                     AST::Index(iid, ipos, base, index) => {
                         self.refine_node(AST::Invoke(id, pos, r(AST::Accessor(iid, ipos.clone(), base, Ident::new(String::from("[]")), NodeID::generate())), vec!(*index, *right)))?

@@ -30,6 +30,12 @@ pub enum Mutability {
     Mutable,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum AssignType {
+    Initialize,
+    Update,
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub enum Literal {
     Unit,
@@ -123,7 +129,7 @@ pub enum AST {
 
     Import(NodeID, Pos, Ident, Vec<AST>),
     Definition(NodeID, Pos, Mutability, Ident, Option<Type>, R<AST>),
-    Assignment(NodeID, Pos, R<AST>, R<AST>),
+    Assignment(NodeID, Pos, R<AST>, R<AST>, AssignType),
 }
 
 
@@ -260,7 +266,7 @@ impl AST {
             AST::Class(_, ref pos, _, _, _) |
             AST::Import(_, ref pos, _, _) |
             AST::Definition(_, ref pos, _, _, _, _) |
-            AST::Assignment(_, ref pos, _, _) |
+            AST::Assignment(_, ref pos, _, _, _) |
             AST::While(_, ref pos, _, _) |
             AST::TypeAlias(_, ref pos, _, _) => { pos.clone() }
             _ => Pos::empty(),
@@ -295,7 +301,7 @@ impl AST {
             AST::Class(ref id, _, _, _, _) |
             AST::Import(ref id, _, _, _) |
             AST::Definition(ref id, _, _, _, _, _) |
-            AST::Assignment(ref id, _, _, _) |
+            AST::Assignment(ref id, _, _, _, _) |
             AST::While(ref id, _, _, _) |
             AST::TypeAlias(ref id, _, _, _) => { *id }
             _ => UniqueID(0),
@@ -410,8 +416,8 @@ impl AST {
         AST::Definition(NodeID::generate(), pos, mutable, ident, ttype, r(value))
     }
 
-    pub fn make_assign(pos: Pos, left: AST, right: AST) -> AST {
-        AST::Assignment(NodeID::generate(), pos, r(left), r(right))
+    pub fn make_assign(pos: Pos, left: AST, right: AST, ty: AssignType) -> AST {
+        AST::Assignment(NodeID::generate(), pos, r(left), r(right), ty)
     }
 
     pub fn make_while(pos: Pos, cond: AST, body: AST) -> AST {

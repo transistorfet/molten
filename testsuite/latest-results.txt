@@ -1,4 +1,4 @@
-Fri Aug  2 11:27:38 PDT 2019
+Fri Aug  2 23:28:09 PDT 2019
 [01/61] basic/abi-across-exprs.mol......................................success
 [02/61] basic/block-assign.mol..........................................success
 [03/61] basic/block-invoke.mol..........................................success
@@ -42,12 +42,12 @@ Fri Aug  2 11:27:38 PDT 2019
 [41/61] binding/method-fail.mol.........................................success
 [42/61] binding/overload-c-fail.mol.....................................success
 [43/61] binding/overload.mol............................................success
-[44/61] objects/basic.mol...............................................FAIL
+[44/61] objects/basic.mol...............................................success
 [45/61] objects/class-initializers.mol..................................success
 [46/61] objects/constructors.mol........................................success
-[47/61] objects/extends-list.mol........................................FAIL
+[47/61] objects/extends-list.mol........................................success
 [48/61] objects/funcptr-member.mol......................................success
-[49/61] objects/funcptr-uninitialized-issue.mol.........................FAIL
+[49/61] objects/funcptr-uninitialized-issue.mol.........................success
 [50/61] objects/inheritence-super.mol...................................success
 [51/61] objects/inheritence-third.mol...................................success
 [52/61] objects/inheritence-vtable.mol..................................success
@@ -60,4 +60,4 @@ Fri Aug  2 11:27:38 PDT 2019
 [59/61] typecheck/infer-forward-method.mol..............................success
 [60/61] typecheck/method-overload-mismatch.mol..........................FAIL
 [61/61] typecheck/object-typevar-params.mol.............................success
-52 tests passed, 9 tests failed, 61 total
+55 tests passed, 6 tests failed, 61 total
