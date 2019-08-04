@@ -11,11 +11,10 @@ use defs::Def;
 use types::Type;
 use config::Options;
 use session::Session;
-use scope::{ Scope, ScopeRef, Context };
-use ast::{ NodeID, Pos, Mutability, Visibility, Literal, Ident, ClassSpec, Argument, MatchCase, Pattern, AST };
+use scope::{ Scope, ScopeRef };
+use ast::{ NodeID, Pos, Mutability, Visibility, Literal, Ident, Argument, MatchCase, Pattern, AST };
 
-use defs::variables::{ VarDef, ArgDef };
-use defs::functions::{ FuncDef, ClosureDef, ClosureDefRef };
+use defs::functions::{ FuncDef, ClosureDefRef };
 use defs::classes::{ ClassDefRef, StructDefRef, Define, Vtable };
 
 use misc::{ r };
@@ -150,7 +149,7 @@ impl<'sess> Transformer<'sess> {
             let exp_id = NodeID::generate();
             let expoint = self.create_exception_point(&mut main_body, exp_id);
 
-            let mut body = self.with_exception(exp_id, || {
+            let body = self.with_exception(exp_id, || {
                 self.create_mfunc_invoke(LLExpr::GetValue(run_id), vec!())
             });
 
@@ -196,12 +195,12 @@ impl<'sess> Transformer<'sess> {
 
             AST::Block(_, _, code) => self.transform_vec(scope.clone(), code),
 
-            AST::Import(id, _, ident, decls) => {
-                self.transform_import(scope.clone(), *id, &ident.name, decls)
+            AST::Import(_, _, ident, decls) => {
+                self.transform_import(scope.clone(), &ident.name, decls)
             },
 
-            AST::Try(id, _, code, cases) => {
-                self.transform_try(scope.clone(), *id, code, cases)
+            AST::Try(_, _, code, cases) => {
+                self.transform_try(scope.clone(), code, cases)
             },
 
             AST::Raise(id, _, valexpr) => {
@@ -223,7 +222,7 @@ impl<'sess> Transformer<'sess> {
                 self.transform_func_invoke(scope.clone(), abi, *id, func, args)
             },
 
-            AST::Definition(id, _, mutable, ident, _, value) => {
+            AST::Definition(id, _, _, ident, _, value) => {
                 self.transform_def_local(scope.clone(), *id, &ident.name, value)
             },
 
@@ -241,7 +240,7 @@ impl<'sess> Transformer<'sess> {
                 self.transform_alloc_ref(scope.clone(), *id, value)
             },
 
-            AST::Deref(id, _, value) => {
+            AST::Deref(_, _, value) => {
                 self.transform_deref_ref(scope.clone(), value)
             },
 
@@ -263,7 +262,7 @@ impl<'sess> Transformer<'sess> {
 
 
             AST::New(id, _, _) => {
-                self.transform_new_object(scope.clone(), *id)
+                self.transform_new_object(*id)
             },
 
             AST::Class(id, _, _, _, body) => {
@@ -287,7 +286,7 @@ impl<'sess> Transformer<'sess> {
 
             AST::Resolver(id, _, path, field, oid) => {
                 let otype = self.session.get_type_from_ref(*oid).unwrap();
-                self.transform_resolve(scope.clone(), *id, path, &field.name, otype)
+                self.transform_resolve(*id, path, &field.name, otype)
             },
 
             AST::Assignment(id, _, left, right, _) => {
@@ -348,7 +347,7 @@ impl<'sess> Transformer<'sess> {
         let ttype = &self.session.get_type(id).unwrap();
         let valexpr = self.transform_as_result(&mut exprs, scope.clone(), record).unwrap();
 
-        for (ref name, ref itype) in ttype.get_record_types().unwrap() {
+        for (ref name, _) in ttype.get_record_types().unwrap() {
             let item = match items.iter().find(|(ident, _)| &ident.name == name) {
                 Some((_, expr)) => self.transform_as_result(&mut exprs, scope.clone(), expr).unwrap(),
                 None => LLExpr::GetItem(r(valexpr.clone()), litems.len()),
@@ -367,7 +366,7 @@ impl<'sess> Transformer<'sess> {
         exprs
     }
 
-    fn transform_import(&self, scope: ScopeRef, id: NodeID, name: &String, decls: &Vec<AST>) -> Vec<LLExpr> {
+    fn transform_import(&self, scope: ScopeRef, name: &String, decls: &Vec<AST>) -> Vec<LLExpr> {
         let mut exprs = vec!();
         let rid = NodeID::generate();
         let module_run_name = format!("run.{}", name);
@@ -378,7 +377,7 @@ impl<'sess> Transformer<'sess> {
         exprs
     }
 
-    fn transform_try(&self, scope: ScopeRef, id: NodeID, code: &AST, cases: &Vec<MatchCase>) -> Vec<LLExpr> {
+    fn transform_try(&self, scope: ScopeRef, code: &AST, cases: &Vec<MatchCase>) -> Vec<LLExpr> {
         let mut exprs = vec!();
 
         let exp_id = NodeID::generate();
@@ -471,7 +470,7 @@ impl<'sess> Transformer<'sess> {
         }
     }
 
-    fn create_func_invoke(&self, abi: ABI, func: LLExpr, mut fargs: Vec<LLExpr>) -> Vec<LLExpr> {
+    fn create_func_invoke(&self, abi: ABI, func: LLExpr, fargs: Vec<LLExpr>) -> Vec<LLExpr> {
         match abi {
             ABI::C | ABI::MoltenFunc => self.create_cfunc_invoke(func, fargs),
             ABI::Molten | ABI::Unknown => self.create_closure_invoke(func, fargs),
@@ -481,7 +480,7 @@ impl<'sess> Transformer<'sess> {
 
     fn transform_func_as_result(&self, exprs: &mut Vec<LLExpr>, scope: ScopeRef, func: &AST, fargs: &mut Vec<LLExpr>) -> LLExpr {
         match func {
-            AST::Accessor(id, _, obj, ident, oid) => {
+            AST::Accessor(id, _, _, ident, oid) => {
                 let otype = self.session.get_type(*oid).unwrap();
                 match otype {
                     Type::Object(_, _, _) => {
@@ -526,7 +525,7 @@ impl<'sess> Transformer<'sess> {
     fn transform_cfunc_decl(&self, scope: ScopeRef, id: NodeID, vis: Visibility, name: &String, ttype: &Type) -> Vec<LLExpr> {
         let fname = self.transform_func_name(scope.clone(), Some(name), id);
         let ftype = self.session.get_type(id).unwrap();
-        let (argtypes, rettype, abi) = ftype.get_function_types().unwrap();
+        let (argtypes, rettype, _) = ftype.get_function_types().unwrap();
         let lftype = self.transform_cfunc_def_type(&argtypes.as_vec(), rettype);
         self.add_global(LLGlobal::DeclCFunc(id, fname, lftype, LLCC::CCC));
         vec!(LLExpr::GetValue(id))
@@ -541,7 +540,7 @@ impl<'sess> Transformer<'sess> {
         let fname = self.transform_func_name(scope.clone(), name, id);
 
         let ftype = self.session.get_type(id).unwrap();
-        let (argtypes, rettype, abi) = ftype.get_function_types().unwrap();
+        let (argtypes, rettype, _) = ftype.get_function_types().unwrap();
         let lftype = self.transform_cfunc_def_type(&argtypes.as_vec(), rettype);
         self.set_type(id, lftype.clone());
 
@@ -564,7 +563,7 @@ impl<'sess> Transformer<'sess> {
         exprs
     }
 
-    fn create_cfunc_invoke(&self, func: LLExpr, mut fargs: Vec<LLExpr>) -> Vec<LLExpr> {
+    fn create_cfunc_invoke(&self, func: LLExpr, fargs: Vec<LLExpr>) -> Vec<LLExpr> {
         vec!(LLExpr::CallC(r(func), fargs))
     }
 
@@ -590,7 +589,7 @@ impl<'sess> Transformer<'sess> {
 
     fn convert_mfunc_molten_type(&self, scope: ScopeRef, ttype: Type) -> Type {
         match ttype {
-            Type::Function(mut argtypes, rettype, abi) => {
+            Type::Function(argtypes, rettype, _) => {
                 let mut argtypes = argtypes.as_vec();
                 argtypes.push(scope.find_type(self.session, &String::from("String")).unwrap());
                 Type::Function(r(Type::Tuple(argtypes)), rettype, ABI::C)
@@ -608,7 +607,7 @@ impl<'sess> Transformer<'sess> {
         let fname = self.transform_func_name(scope.clone(), name, id);
 
         let ftype = self.session.get_type(id).unwrap();
-        let (argtypes, rettype, abi) = ftype.get_function_types().unwrap();
+        let (argtypes, rettype, _) = ftype.get_function_types().unwrap();
         let lftype = self.transform_mfunc_def_type(&argtypes.as_vec(), rettype);
         self.set_type(id, lftype.clone());
 
@@ -671,7 +670,7 @@ impl<'sess> Transformer<'sess> {
 
     fn convert_closure_molten_type(&self, scope: ScopeRef, ttype: Type) -> Type {
         match ttype {
-            Type::Function(mut argtypes, rettype, abi) => {
+            Type::Function(mut argtypes, rettype, _) => {
                 let mut argtypes = argtypes.as_vec();
                 argtypes.push(scope.find_type(self.session, &String::from("String")).unwrap());
                 self.convert_mfunc_molten_type(scope.clone(), Type::Function(r(Type::Tuple(argtypes)), rettype, ABI::C))
@@ -682,7 +681,7 @@ impl<'sess> Transformer<'sess> {
 
     fn transform_closure_raw_func_data(&self, scope: ScopeRef, id: NodeID, fname: &String) -> (NodeID, String, LLType) {
         let ftype = self.session.get_type(id).unwrap();
-        let (argtypes, rettype, abi) = ftype.get_function_types().unwrap();
+        let (argtypes, rettype, _) = ftype.get_function_types().unwrap();
         let cftype = self.transform_closure_def_type(&argtypes.as_vec(), rettype);
         let cfid = NodeID::generate();
         let cfname = format!("{}_func", fname);
@@ -841,7 +840,7 @@ impl<'sess> Transformer<'sess> {
         exprs
     }
 
-    fn transform_new_object(&self, scope: ScopeRef, id: NodeID) -> Vec<LLExpr> {
+    fn transform_new_object(&self, id: NodeID) -> Vec<LLExpr> {
         let mut exprs = vec!();
         let defid = self.session.get_ref(id).unwrap();
         let ltype = self.transform_value_type(&self.session.get_type(defid).unwrap());
@@ -874,13 +873,13 @@ impl<'sess> Transformer<'sess> {
 
     fn transform_vtable_def(&self, vtable: &Vtable) -> LLType {
         let mut items = vec!();
-        vtable.foreach_entry(|id, name, ttype| {
+        vtable.foreach_entry(|_, _, ttype| {
             items.push(self.transform_value_type(ttype));
         });
         LLType::Struct(items)
     }
 
-    fn transform_vtable_init(&self, scope: ScopeRef, classdef: ClassDefRef) -> Vec<LLExpr> {
+    fn transform_vtable_init(&self, classdef: ClassDefRef) -> Vec<LLExpr> {
         if !classdef.has_vtable() {
             return vec!();
         }
@@ -891,7 +890,7 @@ impl<'sess> Transformer<'sess> {
         self.add_global(LLGlobal::DefGlobal(classdef.vtable.id, format!("__{}_vtable", tscope.get_basename()), self.get_type(classdef.vtable.id).unwrap()));
         // TODO should vtables be dynamically allocated, or should we add a LLType::ElementOf() type or something to GetElement an aliased type
         exprs.push(LLExpr::SetGlobal(classdef.vtable.id, r(LLExpr::AllocRef(NodeID::generate(), self.get_type(classdef.vtable.id).unwrap(), None))));
-        classdef.vtable.foreach_enumerated(|i, id, name, ttype| {
+        classdef.vtable.foreach_enumerated(|i, id, _, ttype| {
             let ltype = self.transform_value_type(ttype);
             let field = LLExpr::AccessRef(r(LLExpr::GetGlobal(classdef.vtable.id)), vec!(LLRef::Field(i)));
             exprs.push(LLExpr::StoreRef(r(field), r(LLExpr::Cast(ltype, r(LLExpr::GetValue(id))))));
@@ -922,7 +921,7 @@ impl<'sess> Transformer<'sess> {
             }
         }
 
-        exprs.extend(self.transform_vtable_init(scope.clone(), classdef));
+        exprs.extend(self.transform_vtable_init(classdef));
         exprs
     }
 
@@ -940,14 +939,14 @@ impl<'sess> Transformer<'sess> {
             Type::Object(_, objid, _) => {
                 let objdef = self.session.get_def(objid).unwrap();
                 match self.session.get_def(defid) {
-                    Ok(Def::Method(meth)) => {
+                    Ok(Def::Method(_)) => {
                         let classdef = objdef.as_class().unwrap();
                         let vindex = classdef.get_struct_vtable_index().unwrap();
                         let index = classdef.vtable.get_index_by_id(defid).unwrap();
                         let vtable = LLExpr::LoadRef(r(LLExpr::AccessRef(r(objval), vec!(LLRef::Field(vindex)))));
                         exprs.push(LLExpr::LoadRef(r(LLExpr::AccessRef(r(vtable), vec!(LLRef::Field(index))))));
                     },
-                    Ok(Def::Field(field)) => {
+                    Ok(Def::Field(_)) => {
                         let (index, _) = objdef.as_struct().unwrap().find_field_by_id(defid).unwrap();
                         exprs.push(LLExpr::LoadRef(r(LLExpr::AccessRef(r(objval), vec!(LLRef::Field(index))))));
                     },
@@ -961,7 +960,7 @@ impl<'sess> Transformer<'sess> {
                 let index = items.iter().position(|(name, _)| name == field).unwrap();
                 exprs.push(LLExpr::GetItem(r(objval), index));
             },
-            Type::Tuple(items) => {
+            Type::Tuple(_) => {
                 let index = field.parse::<usize>().unwrap();
                 exprs.push(LLExpr::GetItem(r(objval), index));
             },
@@ -970,7 +969,7 @@ impl<'sess> Transformer<'sess> {
         exprs
     }
 
-    fn transform_resolve(&self, scope: ScopeRef, id: NodeID, path: &AST, field: &String, otype: Type) -> Vec<LLExpr> {
+    fn transform_resolve(&self, id: NodeID, path: &AST, field: &String, otype: Type) -> Vec<LLExpr> {
         let defid = self.session.get_ref(id).unwrap();
         let classdef = self.session.get_def(otype.get_id().unwrap()).unwrap().as_class().unwrap();
         let index = classdef.vtable.get_index_by_id(defid).unwrap();
@@ -982,7 +981,7 @@ impl<'sess> Transformer<'sess> {
 
         let value = self.transform_as_result(&mut exprs, scope.clone(), right).unwrap();
         match left {
-            AST::Accessor(aid, _, obj, field, oid) => {
+            AST::Accessor(aid, _, obj, _, oid) => {
                 let objval = self.transform_as_result(&mut exprs, scope.clone(), obj).unwrap();
                 let fieldid = self.session.get_ref(*aid).unwrap();
                 let objdef = self.session.get_def(self.session.get_type(*oid).unwrap().get_id().unwrap()).unwrap();
@@ -993,7 +992,7 @@ impl<'sess> Transformer<'sess> {
                 let defid = self.session.get_ref(*aid).unwrap();
                 exprs.push(LLExpr::StoreRef(r(LLExpr::GetValue(defid)), r(value)));
             },
-            AST::Deref(aid, _, node) => {
+            AST::Deref(_, _, node) => {
                 let result = self.transform_as_result(&mut exprs, scope.clone(), node).unwrap();
                 exprs.push(LLExpr::StoreRef(r(result), r(value)));
             },
@@ -1050,8 +1049,10 @@ impl<'sess> Transformer<'sess> {
                 exprs.extend(self.transform_def_local(scope.clone(), *id, &ident.name, &AST::GetValue(valueid)));
                 exprs.push(LLExpr::Literal(LLLit::I1(true)));
             },
-            Pattern::Annotation(id, ttype, pat) => {
-                exprs.extend(self.transform_pattern(scope.clone(), pat, valueid))
+            Pattern::Annotation(_, ttype, pat) => {
+                exprs.extend(self.transform_pattern(scope.clone(), pat, valueid));
+                let last = exprs.pop().unwrap();
+                exprs.push(LLExpr::Cast(self.transform_value_type(ttype), r(last)));
             },
         }
         exprs
@@ -1093,7 +1094,7 @@ impl<'sess> Transformer<'sess> {
 
     pub fn transform_value_type(&self, ttype: &Type) -> LLType {
         match &ttype {
-            Type::Object(name, id, params) => match name.as_str() {
+            Type::Object(name, id, _) => match name.as_str() {
                 // TODO void is not entirely correct, and it was causing issues with return values
                 //"()" => LLType::Void,
                 "()" => LLType::I32,
@@ -1126,7 +1127,7 @@ impl<'sess> Transformer<'sess> {
 
     fn transform_struct_def(&self, structdef: &StructDefRef) -> LLType {
         let mut items = vec!();
-        structdef.foreach_field(|id, name, ttype| {
+        structdef.foreach_field(|_, _, ttype| {
             items.push(self.transform_value_type(ttype));
         });
         LLType::Struct(items)

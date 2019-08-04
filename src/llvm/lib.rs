@@ -85,7 +85,7 @@ pub fn declare_builtins_node<'sess>(session: &Session, scope: ScopeRef, node: &B
             let tscope = ClassDef::create_class_scope(session, scope.clone(), *id);
             let mut ttype = Type::Object(String::from(*name), *id, params.clone());
             declare_typevars(session, tscope.clone(), Some(&mut ttype), true).unwrap();
-            let classdef = ClassDef::define(session, scope.clone(), *id, ttype, None).unwrap();
+            ClassDef::define(session, scope.clone(), *id, ttype, None).unwrap();
 
             declare_builtins_vec(session, tscope.clone(), entries);
         },
@@ -95,7 +95,6 @@ pub fn declare_builtins_node<'sess>(session: &Session, scope: ScopeRef, node: &B
 
 pub fn initialize_builtins<'sess>(llvm: &LLVM<'sess>, transformer: &Transformer, scope: ScopeRef, entries: &Vec<BuiltinDef<'sess>>) {
     unsafe {
-        let pscope = scope.get_parent().unwrap();
         declare_irregular_functions(llvm);
         define_builtins_vec(llvm, transformer, ptr::null_mut(), scope.clone(), entries);
     }
@@ -112,7 +111,7 @@ pub unsafe fn define_builtins_node<'sess>(llvm: &LLVM<'sess>, transformer: &Tran
         BuiltinDef::Func(ref id, ref sname, ref types, ref func) => {
             let ftype = parse_type(types).unwrap();
             let (argtypes, rettype, abi) = ftype.get_function_types().unwrap();
-            let mut name = abi.mangle_name(sname, argtypes, 2);
+            let name = abi.mangle_name(sname, argtypes, 2);
             let ltype = transformer.transform_func_def_type(abi, &argtypes.as_vec(), rettype);
             match *func {
                 FuncKind::External => {
@@ -120,11 +119,11 @@ pub unsafe fn define_builtins_node<'sess>(llvm: &LLVM<'sess>, transformer: &Tran
                     llvm.set_value(*id, func);
                 },
                 FuncKind::Method(func) => {
-                    let function = build_lib_method(llvm, *id, name.as_str(), objtype, &ltype, func);
+                    let function = build_lib_method(llvm, name.as_str(), objtype, &ltype, func);
                     llvm.set_value(*id, function);
                 },
                 FuncKind::Function(func) => {
-                    let function = build_lib_function(llvm, *id, name.as_str(), &ltype, func);
+                    let function = build_lib_function(llvm, name.as_str(), &ltype, func);
                     llvm.set_value(*id, function);
                 },
                 FuncKind::FromNamed => {
@@ -192,7 +191,7 @@ unsafe fn declare_irregular_functions(llvm: &LLVM) {
     //declare_function(llvm, "__gxx_personality_v0", &mut [llvm.str_type(), llvm.str_type()], llvm.i64_type(), true);
 }
 
-unsafe fn build_lib_function(llvm: &LLVM, id: NodeID, name: &str, ltype: &LLType, func: PlainFunction) -> LLVMValueRef {
+unsafe fn build_lib_function(llvm: &LLVM, name: &str, ltype: &LLType, func: PlainFunction) -> LLVMValueRef {
     let function = LLVMAddFunction(llvm.module, cstr(name), llvm.build_type(&ltype));
     LLVMSetLinkage(function, llvm::LLVMLinkage::LLVMLinkOnceODRLinkage);
 
@@ -211,7 +210,7 @@ unsafe fn build_lib_function(llvm: &LLVM, id: NodeID, name: &str, ltype: &LLType
     function
 }
 
-unsafe fn build_lib_method(llvm: &LLVM, id: NodeID, name: &str, objtype: LLVMTypeRef, ltype: &LLType, func: ObjectFunction) -> LLVMValueRef {
+unsafe fn build_lib_method(llvm: &LLVM, name: &str, objtype: LLVMTypeRef, ltype: &LLType, func: ObjectFunction) -> LLVMValueRef {
     let function = LLVMAddFunction(llvm.module, cstr(name), llvm.build_type(&ltype));
     LLVMSetLinkage(function, llvm::LLVMLinkage::LLVMLinkOnceODRLinkage);
 
@@ -367,8 +366,8 @@ fn eq_bool(llvm: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVM
 fn ne_bool(llvm: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildICmp(llvm.builder, llvm::LLVMIntPredicate::LLVMIntNE, args[0], args[1], cstr("")) } }
 fn not_bool(llvm: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildNot(llvm.builder, args[0], cstr("")) } }
 
-fn always_true(llvm: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { llvm.i1_const(true) } }
-fn always_false(llvm: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { llvm.i1_const(false) } }
+fn always_true(llvm: &LLVM, _args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { llvm.i1_const(true) } }
+fn always_false(llvm: &LLVM, _args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { llvm.i1_const(false) } }
 
 fn sprintf(llvm: &LLVM, mut args: Vec<LLVMValueRef>) -> LLVMValueRef {
     unsafe {

@@ -3,7 +3,7 @@
 use abi::ABI;
 use types::Type;
 use session::{ Session, Error };
-use scope::{ Scope, ScopeRef, Context };
+use scope::{ ScopeRef, Context };
 use ast::{ Mutability, ClassSpec, Pattern, AST };
 use misc::UniqueID;
 
@@ -118,18 +118,10 @@ fn bind_names_node_or_error(session: &Session, scope: ScopeRef, node: &mut AST) 
             bind_names_node(session, scope, body);
         },
 
-        AST::For(ref id, _, ref ident, ref mut cond, ref mut body) => {
-            let lscope = session.map.add(*id, Some(scope.clone()));
-            AnyVar::define(session, lscope.clone(), *id, Mutability::Mutable, &ident.name, None)?;
-            bind_names_node(session, lscope.clone(), cond);
-            bind_names_node(session, lscope, body);
-        },
-
         AST::Ref(_, _, ref mut code) |
         AST::Deref(_, _, ref mut code) => { bind_names_node(session, scope, code.as_mut()); },
 
         AST::Tuple(_, _, ref mut code) |
-        AST::List(_, _, ref mut code) |
         AST::Block(_, _, ref mut code) => { bind_names_vec(session, scope, code); },
 
         AST::Record(_, _, ref mut items) => {
@@ -143,11 +135,6 @@ fn bind_names_node_or_error(session: &Session, scope: ScopeRef, node: &mut AST) 
             for &mut (_, ref mut expr) in items {
                 bind_names_node(session, scope.clone(), expr);
             }
-        },
-
-        AST::Index(_, _, ref mut base, ref mut index) => {
-            bind_names_node(session, scope.clone(), base);
-            bind_names_node(session, scope, index);
         },
 
 
@@ -181,7 +168,7 @@ fn bind_names_node_or_error(session: &Session, scope: ScopeRef, node: &mut AST) 
             //let classtype = Type::from_spec(classspec.clone());
             //let parenttype = parentspec.clone().map(|p| Type::from_spec(p));
 
-            let classdef = ClassDef::define(session, scope, *id, classtype, parenttype)?;
+            ClassDef::define(session, scope, *id, classtype, parenttype)?;
             let tscope = session.map.get(id);
 
             bind_names_vec(session, tscope, body);
@@ -197,7 +184,7 @@ fn bind_names_node_or_error(session: &Session, scope: ScopeRef, node: &mut AST) 
             //session.set_type(*id, ttype.clone());
         },
 
-        AST::Resolver(ref id, _, ref mut left, _, ref oid) => {
+        AST::Resolver(_, _, ref mut left, _, ref oid) => {
             // TODO should this always work on a type reference, or should classes be added as values as well as types?
             //bind_names_node(session, scope, left);
             match **left {
@@ -220,13 +207,17 @@ fn bind_names_node_or_error(session: &Session, scope: ScopeRef, node: &mut AST) 
             bind_names_node(session, scope, right);
         },
 
-        AST::Import(_, _, ref ident, ref mut decls) => {
+        AST::Import(_, _, _, ref mut decls) => {
             bind_names_vec(session, scope, decls);
         },
 
         AST::Nil(_) |
         AST::GetValue(_) |
         AST::Literal(_, _) => { }
+
+        AST::List(_, _, _) |
+        AST::For(_, _, _, _, _) |
+        AST::Index(_, _, _, _) => { panic!("InternalError: ast element shouldn't appear at this late phase: {:?}", node) }
     }
     Ok(())
 }

@@ -88,6 +88,7 @@ impl<'sess> Refinery<'sess> {
             },
 
             AST::Function(id, pos, vis, ident, args, ret, body, abi) => {
+                // TODO visibility is forced here so I don't have to add 'pub' keywords yet
                 let vis = if self.top_level() {
                     Visibility::Public
                 } else {
@@ -147,7 +148,6 @@ impl<'sess> Refinery<'sess> {
                 let listname = format!("{}", NodeID::generate());
 
                 let access_iter = || AST::make_ident(pos.clone(), Ident::new(iter.clone()));
-                let access_item = || AST::make_ident(pos.clone(), ident.clone());
                 let access_list = || AST::make_ident(pos.clone(), Ident::new(listname.clone()));
                 let access_list_field = |field| AST::make_access(pos.clone(), access_list(), Ident::from_str(field));
                 let invoke = |func, args| AST::make_invoke(pos.clone(), func, args);
@@ -174,7 +174,6 @@ impl<'sess> Refinery<'sess> {
 
                 block.push(AST::While(id, pos.clone(), r(AST::make_block(pos.clone(), cond_block)), r(AST::make_block(pos.clone(), body_block))));
                 AST::make_block(pos.clone(), block)
-                //AST::For(id, pos, ident, r(self.refine_node(*cond)?), r(self.refine_node(*body)?))
             },
 
             AST::Ref(id, pos, expr) => { AST::Ref(id, pos, r(self.refine_node(*expr)?)) },
@@ -200,7 +199,6 @@ impl<'sess> Refinery<'sess> {
                 AST::RecordUpdate(id, pos, record, refined)
             },
 
-            //AST::List(id, pos, items, ttype) => { AST::List(id, pos, self.refine_vec(items), ttype) },
             AST::List(_, pos, items) => {
                 let mut block = vec!();
                 let tmplist = format!("{}", UniqueID::generate());
@@ -223,7 +221,6 @@ impl<'sess> Refinery<'sess> {
                 AST::make_block(pos.clone(), self.refine_vec(block))
             },
 
-            //AST::New(_, _, _) => { node },
             AST::New(id, pos, classspec) => {
                 AST::make_invoke(pos.clone(),
                     AST::make_resolve(pos.clone(), AST::Identifier(NodeID::generate(), pos.clone(), classspec.ident.clone()), Ident::from_str("__init__")),
@@ -288,7 +285,7 @@ impl<'sess> Refinery<'sess> {
                             vec!(AST::make_ident(pos.clone(), Ident::from_str("self")))));
                     }
                     init.push(AST::make_ident_from_str(pos.clone(), "self"));
-                    let mut initcode = AST::Function(initid, pos.clone(), Visibility::Public, Some(Ident::from_str("__init__")), iargs, None, r(AST::make_block(pos.clone(), init)), ABI::Molten);
+                    let initcode = AST::Function(initid, pos.clone(), Visibility::Public, Some(Ident::from_str("__init__")), iargs, None, r(AST::make_block(pos.clone(), init)), ABI::Molten);
                     newbody.push(initcode);
                 }
 

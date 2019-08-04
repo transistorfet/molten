@@ -1,6 +1,6 @@
 
 use ast::NodeID;
-use misc::{ R, r };
+use misc::{ R };
 
 
 #[derive(Clone, Debug, PartialEq)]

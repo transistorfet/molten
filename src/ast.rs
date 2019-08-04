@@ -67,14 +67,6 @@ pub struct ClassSpec {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct Field {
-    pub id: NodeID,
-    pub pos: Pos,
-    pub ident: Ident,
-    pub ttype: Option<Type>
-}
-
-#[derive(Clone, Debug, PartialEq)]
 pub struct MatchCase {
     pub id: NodeID,
     pub pat: Pattern,
@@ -215,17 +207,6 @@ impl ClassSpec {
 
     pub fn from_str(name: &str) -> Self {
         Self::new(Pos::empty(), Ident::from_str(name), vec!())
-    }
-}
-
-impl Field {
-    pub fn new(pos: Pos, ident: Ident, ttype: Option<Type>) -> Self {
-        Self {
-            id: NodeID::generate(),
-            pos: pos,
-            ident: ident,
-            ttype: ttype
-        }
     }
 }
 

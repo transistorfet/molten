@@ -46,11 +46,6 @@ const ERR_IN_LIST: u32 = 45;
 
 pub type Span<'a> = LocatedSpan<CompleteByteSlice<'a>>;
 
-#[inline]
-pub fn span_to_string(s: Span) -> String {
-    String::from(str::from_utf8(&s.fragment).unwrap())
-}
-
 //named!(sp, eat_separator!(&b" \t"[..]));
 
 #[macro_export]
@@ -116,7 +111,7 @@ pub fn parse_or_error(name: &str, text: &[u8]) -> Vec<AST> {
     match parse(span) {
         Ok((rem, _)) if rem.fragment != CompleteByteSlice(&[]) => panic!("InternalError: unparsed input remaining: {:?}", rem),
         Ok((_, code)) => code,
-        Err(err) => { print_error(name, span, err); panic!("") },
+        Err(err) => { print_error(name, err); panic!("") },
     }
 }
 
@@ -136,7 +131,7 @@ named!(statement_list(Span) -> Vec<AST>,
             term = t;
             (list, term)
         }),
-        |(mut list, mut term)| {
+        |(mut list, term)| {
             if let Some(term) = term {
                 list.push(term);
             }
@@ -725,7 +720,7 @@ named!(type_ref(Span) -> Type,
 );
 
 named!(type_unit(Span) -> Type,
-    map!(tag!("()"), |s| Type::Object(String::from("()"), UniqueID(0), vec!()))
+    map!(tag!("()"), |_| Type::Object(String::from("()"), UniqueID(0), vec!()))
 );
 
 
@@ -1047,7 +1042,7 @@ pub fn is_not_colon(ch: u8) -> bool {
 
 
 
-pub fn print_error(name: &str, span: Span, err: nom::Err<Span, u32>) {
+pub fn print_error(name: &str, err: nom::Err<Span, u32>) {
     match err {
         nom::Err::Incomplete(_) => println!("ParseError: incomplete input..."),
         nom::Err::Error(Context::Code(span, code)) |

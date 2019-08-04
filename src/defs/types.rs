@@ -5,7 +5,7 @@ use defs::Def;
 use types::Type;
 use scope::{ Scope, ScopeRef };
 use session::{ Session, Error };
-use ast::{ NodeID, ClassSpec };
+use ast::{ NodeID };
 
 
 #[derive(Clone, Debug, PartialEq)]
@@ -51,7 +51,7 @@ impl TypeAliasDef {
         let mut map = Scope::map_new();
         for (def, param) in defparams.iter().zip(params) {
             match def {
-                Type::Variable(_, ref id, _) => { map.insert(def.get_id()?, param); },
+                Type::Variable(_, ref id, _) => { map.insert(*id, param); },
                 _ => return Err(Error::new(format!("UnsupportedError: currently only typevars are supported as type parameters in type aliases"))),
             }
         }

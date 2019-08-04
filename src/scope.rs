@@ -157,7 +157,7 @@ impl Scope {
     }
 
     pub fn contains_context(&self, name: &String) -> bool {
-        if let Some(sym) = self.names.borrow().get(name) {
+        if let Some(_) = self.names.borrow().get(name) {
             true
         } else {
             match (self.context.get(), &self.parent) {
@@ -165,14 +165,6 @@ impl Scope {
                 (Context::Object, Some(ref parent)) => parent.contains_context(name),
                 _ => false
             }
-        }
-    }
-
-    // TODO remove this; it's only used by forloops atm, and there should be a way to refactor forloops
-    pub fn get_variable_type(&self, session: &Session, name: &String) -> Option<Type> {
-        match self.get_var_def(name) {
-            Some(defid) => session.get_type(defid),
-            None => None,
         }
     }
 
@@ -282,7 +274,7 @@ impl Scope {
 
     pub fn make_obj(&self, session: &Session, name: String, params: Vec<Type>) -> Result<Type, Error> {
         match self.find_type(session, &name) {
-            Some(Type::Object(ename, id, eparams)) => {
+            Some(Type::Object(_, id, eparams)) => {
                 if eparams.len() != params.len() {
                     return Err(Error::new(format!("TypeError: type parameters don't match.  Expected {:?} but found {:?}", eparams, params)));
                 }
@@ -361,7 +353,7 @@ impl Scope {
             Type::Variable(name, id, existential) => {
                 for (oid, mtype) in varmap.iter() {
                     match *mtype {
-                        Type::Variable(ref mname, ref mid, ref mexistential) if *mid == id => {
+                        Type::Variable(_, ref mid, _) if *mid == id => {
                             debug!("UNMAPPING {:?} to {:?}", mtype, oid);
                             if *mid == *oid {
                                 return mtype.clone();
@@ -405,7 +397,7 @@ impl Scope {
     }
 
     pub fn new_typevar_name(&self) -> String {
-        for mut ch1 in b'`' .. b'z' {
+        for ch1 in b'`' .. b'z' {
             let name = if ch1 == b'`' { String::from("") } else { (ch1 as char).to_string() };
             for ch2 in b'a' .. b'z' + 1 {
                 let name = name.clone() + &(ch2 as char).to_string();

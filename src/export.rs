@@ -6,7 +6,7 @@ use types::Type;
 use misc::UniqueID;
 use config::Options;
 use session::Session;
-use scope::{ Scope, ScopeRef };
+use scope::{ ScopeRef };
 use ast::{ AST, Mutability, Visibility };
 
 
@@ -86,7 +86,7 @@ pub fn unparse_type(session: &Session, scope: ScopeRef, ttype: Type) -> String {
             let params = if types.len() > 0 { format!("<{}>", types.iter().map(|p| unparse_type(session, scope.clone(), p.clone())).collect::<Vec<String>>().join(", ")) } else { String::from("") };
             name.clone() + &params
         },
-        Type::Variable(mut name, id, existential) => {
+        Type::Variable(mut name, id, _) => {
             /*
             // TODO this doesn't work because if a name isnt' found, then all tyyevars with that id are made independent
             let var = scope.find_type(session, &name);

@@ -3,7 +3,7 @@ use scope::ScopeRef;
 use ast::Mutability;
 use session::{ Session, Error };
 
-pub mod traits;
+//pub mod traits;
 pub mod types;
 pub mod classes;
 pub mod variables;

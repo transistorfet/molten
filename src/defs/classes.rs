@@ -8,7 +8,7 @@ use types::Type;
 use scope::{ Scope, ScopeRef };
 use session::{ Session, Error };
 use types::{ check_type, Check };
-use ast::{ NodeID, Mutability, Ident, ClassSpec, AST };
+use ast::{ NodeID, Mutability, Ident, AST };
 
 use defs::variables::FieldDef;
 
@@ -140,7 +140,7 @@ impl ClassDef {
         }
         for ref node in body.iter() {
             match **node {
-                AST::Definition(ref id, _, ref mutable, ref ident, _, ref value) => {
+                AST::Definition(ref id, _, ref mutable, ref ident, _, _) => {
                     self.structdef.add_field(session, *id, *mutable, ident.name.as_str(), session.get_type(*id).unwrap(), Define::IfNotExists);
                 },
                 _ => { }
@@ -294,12 +294,12 @@ impl Vtable {
     pub fn build_vtable(&self, session: &Session, scope: ScopeRef, body: &Vec<AST>) {
         for ref node in body.iter() {
             match **node {
-                AST::Function(ref id, _, ref vis, ref ident, ref args, ref rtype, _, ref abi) => {
+                AST::Function(ref id, _, _, ref ident, _, _, _, _) => {
                     if let Some(Ident { ref name, .. }) = ident {
                         self.add_entry(session, scope.clone(), *id, name.as_str(), session.get_type(*id).unwrap());
                     }
                 },
-                AST::Declare(ref id, _, ref vis, ref ident, _) => {
+                AST::Declare(ref id, _, _, ref ident, _) => {
                     let ttype = session.get_type(*id).unwrap();
                     match ttype {
                         Type::Function(_, _, _) => {

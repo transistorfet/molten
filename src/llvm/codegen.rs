@@ -457,7 +457,7 @@ impl<'sess> LLVM<'sess> {
         let mut block_vals = vec!();
         let mut return_vals = vec!();
 
-        for block in blocks {
+        for _ in blocks {
             cond_vals.push(LLVMAppendBasicBlockInContext(self.context, *self.curfunc.borrow(), cstring(&format!("{}_cond", label))));
             block_vals.push(LLVMAppendBasicBlockInContext(self.context, *self.curfunc.borrow(), cstring(&format!("{}_block", label))));
         }
@@ -638,7 +638,7 @@ impl<'sess> LLVM<'sess> {
     pub unsafe fn build_declarations(&self, globals: &Vec<LLGlobal>) {
         for global in globals {
             match &global {
-                LLGlobal::DefType(id, name, ltype) => {
+                LLGlobal::DefType(id, _, ltype) => {
                     // TODO this might need more later, particularly for objects
                     self.set_type(*id, self.build_type(ltype));
                 },
@@ -693,7 +693,7 @@ impl<'sess> LLVM<'sess> {
     pub unsafe fn build_definitions(&self, globals: &Vec<LLGlobal>) {
         for global in globals {
             match &global {
-                LLGlobal::DefCFunc(id, link, name, _, args, body, _) => {
+                LLGlobal::DefCFunc(id, link, _, _, args, body, _) => {
                     let function = self.get_value(*id).unwrap();
                     self.build_linkage(function, *link);
                     self.build_cfunc_def(function, args, body);

@@ -238,7 +238,6 @@ impl fmt::Display for Type {
 pub enum Check {
     Def,
     List,
-    Update,
 }
 
 pub fn expect_type(session: &Session, scope: ScopeRef, odtype: Option<Type>, octype: Option<Type>, mode: Check) -> Result<Type, Error> {
@@ -286,7 +285,7 @@ pub fn check_type(session: &Session, scope: ScopeRef, odtype: Option<Type>, octy
                 (Type::Function(ref aargs, ref aret, ref aabi), Type::Function(ref bargs, ref bret, ref babi)) => {
                     let oabi = aabi.compare(babi);
                     if oabi.is_some() {
-                        let mut argtypes = check_type(session, scope.clone(), Some(*aargs.clone()), Some(*bargs.clone()), mode, update)?;
+                        let argtypes = check_type(session, scope.clone(), Some(*aargs.clone()), Some(*bargs.clone()), mode, update)?;
                         Ok(Type::Function(r(argtypes), r(check_type(session, scope, Some(*aret.clone()), Some(*bret.clone()), mode, update)?), oabi.unwrap()))
                     } else {
                         Err(Error::new(format!("TypeError: type mismatch, expected {} but found {}", dtype, ctype)))

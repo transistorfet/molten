@@ -1,6 +1,5 @@
 
 use std::rc::Rc;
-use std::cell::RefCell;
 
 use defs::Def;
 use types::Type;
@@ -41,11 +40,11 @@ impl VarDef {
 
         }));
 
-        VarDef::set_var_def(session, scope.clone(), id, mutable, name, def.clone(), ttype)?;
+        VarDef::set_var_def(session, scope.clone(), id, name, def.clone(), ttype)?;
         Ok(def)
     }
 
-    pub fn set_var_def(session: &Session, scope: ScopeRef, id: NodeID, mutable: Mutability, name: &String, def: Def, ttype: Option<Type>) -> Result<(), Error> {
+    pub fn set_var_def(session: &Session, scope: ScopeRef, id: NodeID, name: &String, def: Def, ttype: Option<Type>) -> Result<(), Error> {
         let dscope = Scope::target(session, scope.clone());
 
         dscope.define(name.clone(), Some(id))?;
@@ -74,7 +73,7 @@ impl ArgDef {
 
         }));
 
-        VarDef::set_var_def(session, scope.clone(), id, mutable, name, def.clone(), ttype)?;
+        VarDef::set_var_def(session, scope.clone(), id, name, def.clone(), ttype)?;
         Ok(def)
     }
 }
@@ -97,7 +96,7 @@ impl FieldDef {
 
         }));
 
-        VarDef::set_var_def(session, scope.clone(), id, mutable, name, def.clone(), ttype)?;
+        VarDef::set_var_def(session, scope.clone(), id, name, def.clone(), ttype)?;
         Ok(def)
     }
 }
