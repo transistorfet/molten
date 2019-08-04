@@ -330,12 +330,11 @@ impl<'sess> Refinery<'sess> {
                 }
             },
 
-            AST::Import(_, _, _, _) => { node },
-            //AST::Import(id, pos, ident, _) => {
-            //    let path = ident.replace(".", "/") + ".dec";
-            //    let decls = session.parse_file(path.as_str());
-            //    AST::Import(id, pos, ident, self.refine_vec(decls))
-            //},
+            AST::Import(id, pos, ident, _) => {
+                let path = ident.name.replace(".", "/") + ".dec";
+                let decls = self.session.parse_file(path.as_str(), true);
+                AST::Import(id, pos, ident, self.refine_vec(decls))
+            },
 
             AST::PtrCast(ttype, value) => {
                 AST::PtrCast(ttype, r(self.refine_node(*value)?))

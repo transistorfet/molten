@@ -5,6 +5,7 @@
 * the unmapping function doesn't seem to do anything at the moment.  Mapping back causes object-typevar-params test to fail (possibly related to subclass checking?)  We could
   possibly remove most of the unmapping code, or otherwise fix the failed testcase some other way
 
+* make definitions always require an initializer
 * make an HIR
 * add type annotations to pattern matching
 * add enums
@@ -54,7 +55,6 @@ Error Messages:
 
 
 Refactoring:
-* should you process imports in refinery instead of binding
 * improve storing of file info in the Pos structs (maybe rename to Span?)
 * change parser to take session argument or something so it can record the file info, and maybe do other advanced things
 * there must be a way to fix the 'scope exceptions' (Scope::target) that we're doing to make class bodies work... pass in an argument to all scoped functions?  or use scopemap and scope ids?

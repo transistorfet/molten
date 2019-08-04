@@ -221,8 +221,6 @@ fn bind_names_node_or_error(session: &Session, scope: ScopeRef, node: &mut AST) 
         },
 
         AST::Import(_, _, ref ident, ref mut decls) => {
-            let path = ident.name.replace(".", "/") + ".dec";
-            *decls = session.parse_file(path.as_str(), true);
             bind_names_vec(session, scope, decls);
         },
 
