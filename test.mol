@@ -2,8 +2,8 @@
         import lib.libcore
 
         let msg = "Hey"
-        // TODO this is actually a closure, which isn't implemented yet
-        //let stringstuff = fn x: String => msg
+        let stringstuff = fn x: String => msg
+        println(stringstuff("nothing"))
         println(msg)
         println(str(10))
 
@@ -84,9 +84,6 @@
         println("0x00 | 0x20: " + str(0x00 | 0x20))
         println("Com: " + hex(~0x5555555555555555))
 
-        // NOTE this correctly causes a type error (actually an overload/no variant error)
-        //let ab = 123.24 * 3
-
         class Stuff {
             fn new(self) { }
 
@@ -135,7 +132,7 @@
 
         let thingy = new TestClass()
         thingy.a = 1337
-        ////thingy.add(124)     // this method is not initialized
+        thingy.add(124)
         println(str(thingy.a))
         thingy.virtfun()
 
@@ -164,7 +161,6 @@
         match x == true {
             true => x
             false => x == true
-            //false => !x   // TODO this causes a parse error
             _ => false
         }
 
@@ -185,17 +181,15 @@
         }
         println("semicolon: " + str(d))
 
-        /*
-        // TODO these otherwise work but the nil seems to be causing an unresolved unified variable
         fn strnum(num: Int) -> String {
             let buffer: String = malloc(22)
-            sprintf(buffer, "%d", num, nil)
+            sprintf(buffer, "%d", num, nil: String)     // TODO the type annotation of nil is required or else the typevar isn't resolved
             buffer
         }
 
         fn strnum(num: Real) -> String {
             let buffer: String = malloc(22)
-            sprintf(buffer, "%f", num, nil)
+            sprintf(buffer, "%f", num, nil: String)     // TODO the type annotation of nil is required or else the typevar isn't resolved
             buffer
         }
 
@@ -204,7 +198,6 @@
         //println("STUFF".push(" things"))
         println(strnum(12))
         println(strnum(1.214))
-        */
 
 
         // TODO this causes a segfault during codegen
@@ -327,7 +320,9 @@
         let thing = new Thing()
         let get_thing = fn => thing
 
+        // TODO this has an unresolved type var
         //[]
+        [] : List<String>
         [1, 2, 3 * 10 + 3]
         [ 0, 1, 2, 3 ][0]
         let arr = [ 1, 2, 3, 4 ]
@@ -424,6 +419,11 @@
 
         println(str(test()()))
 
+
+        /// Intentional Failures
+
+        // NOTE this correctly causes a type error (actually an overload/no variant error)
+        //let ab = 123.24 * 3
 
         // TODO parse test?
         //thing.stuff() * ~foo().bar

@@ -7,22 +7,18 @@
 
 * make definitions always require an initializer
 * make an HIR
-* add type annotations to pattern matching
 * add enums
+* add typeclasses
 
 * fix modules system
 * remove the forced visibility in refinery, when you decide on pub/priv semantics
 * make run function return a module object?  Should it also memoize itself?
 * make the molten type convert function for mfuncs use the LLType::Exception instead of i8* (remove molten type convert in transform)
-* add an import as thing
-
-* implement typeclasses
-
 * put intermediate files somewhere else, at least as controlled by the molten script, so as not to clutter source directories
+* add an import as thing
 
 
 * add pipe operator
-* improve error checks
 * make loops use phi, and add break
 * update the readme
 
@@ -37,6 +33,7 @@ BUGS:
 * there was an error where "let ni: newint" with no initializer was causing a type error with "expected class or concrete type", but that was actually because a definition without
   an initializer is the same as "let ni: newint = nil" and nil could not be cast to a Record, which newint is a typealias of a record
 * minor bug caught by abi test; the printf function had been added in declare_irregulars, but was decl'ed in the test, and it caused a segfault because you call an undefined function "printf.1"
+* not really a bug, but empty lists cannot be typechecked to concrete types unless it's explicitly provided ("[]" on its own)
 
 
 
@@ -102,12 +99,12 @@ Changes:
 * implement return value conversion (this doesn't appear to be needed?  Why didn't it work with tuple closures though?)
 
 * fill in string and list type functions, and finish hashmap (rename to dict?)
-* improve type checker (impl bidirectional)
+* do you need to implement the proper bidirectional typechecker algorithm
 
 
 
 * add enums
-* add patterns and matching of patterns
+* add proper pattern matching for definitions/matchcases/etc
 * add typeclasses/traits
 * implement garbage collection
 * add an iterator type
