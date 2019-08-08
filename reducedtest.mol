@@ -242,6 +242,7 @@ enum Value =
 | Integer(Int)
 | String(String)
 | Pair(String, String)
+| Tree(ref Value)
 
 let val = Value::String("Hey")
 

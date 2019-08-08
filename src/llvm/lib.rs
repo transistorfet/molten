@@ -14,7 +14,7 @@ use session::Session;
 use parser::{ parse_type };
 use ast::{ NodeID, Mutability, Visibility };
 use scope::{ Scope, ScopeRef, ScopeMapRef, Context };
-use binding::{ declare_typevars };
+use binding::{ bind_type_names };
 use misc::UniqueID;
 
 use defs::classes::{ ClassDef, Define };
@@ -69,7 +69,7 @@ pub fn declare_builtins_node<'sess>(session: &Session, scope: ScopeRef, node: &B
             };
 
             let mut ftype = parse_type(ftype);
-            declare_typevars(session, tscope.clone(), ftype.as_mut(), true).unwrap();
+            bind_type_names(session, tscope.clone(), ftype.as_mut(), true).unwrap();
             debug!("BUILTIN TYPE: {:?}", ftype);
             let abi = ftype.as_ref().map(|t| t.get_abi().unwrap()).unwrap_or(ABI::Molten);
             match *func {
@@ -84,7 +84,7 @@ pub fn declare_builtins_node<'sess>(session: &Session, scope: ScopeRef, node: &B
         BuiltinDef::Class(ref id, ref name, ref params, _, ref entries) => {
             let tscope = ClassDef::create_class_scope(session, scope.clone(), *id);
             let mut ttype = Type::Object(String::from(*name), *id, params.clone());
-            declare_typevars(session, tscope.clone(), Some(&mut ttype), true).unwrap();
+            bind_type_names(session, tscope.clone(), Some(&mut ttype), true).unwrap();
             ClassDef::define(session, scope.clone(), *id, ttype, None).unwrap();
 
             declare_builtins_vec(session, tscope.clone(), entries);

@@ -44,9 +44,9 @@ fn bind_names_node_or_error(session: &Session, scope: ScopeRef, node: &mut AST) 
 
             // Check for typevars in the type params
             for ref mut arg in &mut args.iter_mut() {
-                declare_typevars(session, fscope.clone(), arg.ttype.as_mut(), false)?;
+                bind_type_names(session, fscope.clone(), arg.ttype.as_mut(), false)?;
             }
-            declare_typevars(session, fscope.clone(), ret.as_mut(), false)?;
+            bind_type_names(session, fscope.clone(), ret.as_mut(), false)?;
 
 
             // Define the function variable and it's arguments variables
@@ -66,13 +66,13 @@ fn bind_names_node_or_error(session: &Session, scope: ScopeRef, node: &mut AST) 
         },
 
         AST::Definition(ref id, _, ref mutable, ref ident, ref mut ttype, ref mut code) => {
-            declare_typevars(session, scope.clone(), ttype.as_mut(), false)?;
+            bind_type_names(session, scope.clone(), ttype.as_mut(), false)?;
             AnyVar::define(session, scope.clone(), *id, *mutable, &ident.name, ttype.clone())?;
             bind_names_node(session, scope, code);
         },
 
         AST::Declare(ref id, _, ref vis, ref ident, ref mut ttype) => {
-            declare_typevars(session, scope.clone(), Some(ttype), false)?;
+            bind_type_names(session, scope.clone(), Some(ttype), false)?;
             let abi = ttype.get_abi().unwrap_or(ABI::Molten);
             AnyFunc::define(session, scope.clone(), *id, *vis, &Some(ident.name.clone()), abi, Some(ttype.clone()))?;
         },
@@ -140,12 +140,12 @@ fn bind_names_node_or_error(session: &Session, scope: ScopeRef, node: &mut AST) 
 
 
         AST::PtrCast(ref mut ttype, ref mut code) => {
-            declare_typevars(session, scope.clone(), Some(ttype), false)?;
+            bind_type_names(session, scope.clone(), Some(ttype), false)?;
             bind_names_node(session, scope, code)
         },
 
         AST::New(ref id, _, ref mut classspec) => {
-            classspec.types.iter_mut().map(|ref mut ttype| declare_typevars(session, scope.clone(), Some(ttype), false).unwrap()).count();
+            classspec.types.iter_mut().map(|ref mut ttype| bind_type_names(session, scope.clone(), Some(ttype), false).unwrap()).count();
             match scope.get_type_def(&classspec.ident.name) {
                 Some(defid) => session.set_ref(*id, defid),
                 None => return Err(Error::new(format!("NameError: undefined identifier {:?}", classspec.ident.name)))
@@ -177,7 +177,7 @@ fn bind_names_node_or_error(session: &Session, scope: ScopeRef, node: &mut AST) 
 
         AST::TypeAlias(ref id, _, ref mut classspec, ref mut ttype) => {
             declare_classspec_typevars(session, scope.clone(), classspec, true)?;
-            declare_typevars(session, scope.clone(), Some(ttype), false)?;
+            bind_type_names(session, scope.clone(), Some(ttype), false)?;
 
             let deftype = Type::Object(classspec.ident.name.clone(), *id, classspec.types.clone());
             TypeAliasDef::define(session, scope.clone(), *id, deftype, ttype.clone())?;
@@ -187,12 +187,13 @@ fn bind_names_node_or_error(session: &Session, scope: ScopeRef, node: &mut AST) 
 
         AST::TypeEnum(ref id, _, ref mut classspec, ref mut variants) => {
             declare_classspec_typevars(session, scope.clone(), classspec, true)?;
-            for variant in variants.iter_mut() {
-                declare_typevars(session, scope.clone(), variant.ttype.as_mut(), false)?;
-            }
-
             let deftype = Type::Object(classspec.ident.name.clone(), *id, classspec.types.clone());
-            EnumDef::define(session, scope.clone(), *id, deftype, variants.clone())?;
+            let enumdef = EnumDef::define(session, scope.clone(), *id, deftype)?;
+
+            for variant in variants.iter_mut() {
+                bind_type_names(session, scope.clone(), variant.ttype.as_mut(), false)?;
+                enumdef.add_variant(session, scope.clone(), variant.clone())?;
+            }
         },
 
         AST::Resolver(_, _, ref mut left, _, ref oid) => {
@@ -240,7 +241,7 @@ pub fn bind_names_pattern(session: &Session, scope: ScopeRef, pat: &mut Pattern)
             VarDef::define(session, scope.clone(), *id, Mutability::Immutable, &ident.name, None)?;
         },
         Pattern::Annotation(_, ttype, pat) => {
-            declare_typevars(session, scope.clone(), Some(ttype), false)?;
+            bind_type_names(session, scope.clone(), Some(ttype), false)?;
             bind_names_pattern(session, scope, pat)?
         },
         Pattern::Resolve(id, left, ident, oid) => {
@@ -267,7 +268,7 @@ pub fn bind_names_pattern(session: &Session, scope: ScopeRef, pat: &mut Pattern)
 
 
 #[must_use]
-pub fn declare_typevars(session: &Session, scope: ScopeRef, ttype: Option<&mut Type>, always_new: bool) -> Result<(), Error> {
+pub fn bind_type_names(session: &Session, scope: ScopeRef, ttype: Option<&mut Type>, always_new: bool) -> Result<(), Error> {
     match ttype {
         Some(ttype) => match ttype {
             &mut Type::Object(ref name, ref mut id, ref mut types) => {
@@ -281,23 +282,23 @@ pub fn declare_typevars(session: &Session, scope: ScopeRef, ttype: Option<&mut T
                 }
 
                 for ttype in types.iter_mut() {
-                    declare_typevars(session, scope.clone(), Some(ttype), always_new)?;
+                    bind_type_names(session, scope.clone(), Some(ttype), always_new)?;
                 }
             },
             &mut Type::Tuple(ref mut types) => {
                 for ttype in types.iter_mut() {
-                    declare_typevars(session, scope.clone(), Some(ttype), always_new)?;
+                    bind_type_names(session, scope.clone(), Some(ttype), always_new)?;
                 }
             },
             &mut Type::Record(ref mut types) => {
                 types.sort_unstable_by(|a, b| a.0.cmp(&b.0));
                 for (_, ttype) in types.iter_mut() {
-                    declare_typevars(session, scope.clone(), Some(ttype), always_new)?;
+                    bind_type_names(session, scope.clone(), Some(ttype), always_new)?;
                 }
             },
             &mut Type::Function(ref mut args, ref mut ret, _) => {
-                declare_typevars(session, scope.clone(), Some(args.as_mut()), always_new)?;
-                declare_typevars(session, scope, Some(ret.as_mut()), always_new)?;
+                bind_type_names(session, scope.clone(), Some(args.as_mut()), always_new)?;
+                bind_type_names(session, scope, Some(ret.as_mut()), always_new)?;
             },
             &mut Type::Variable(ref name, ref mut id, existential) => {
                 debug!("DECLARING TYPEVAR: {:?} {:?}", name, id);
@@ -320,7 +321,7 @@ pub fn declare_typevars(session: &Session, scope: ScopeRef, ttype: Option<&mut T
                 }
             },
             &mut Type::Ref(ref mut ttype) => {
-                declare_typevars(session, scope.clone(), Some(ttype), always_new)?;
+                bind_type_names(session, scope.clone(), Some(ttype), always_new)?;
             },
             &mut Type::Ambiguous(_) => { },
         },
@@ -333,12 +334,12 @@ pub fn declare_typevars(session: &Session, scope: ScopeRef, ttype: Option<&mut T
 #[must_use]
 pub fn declare_classspec_typevars(session: &Session, scope: ScopeRef, classspec: &mut ClassSpec, always_new: bool) -> Result<(), Error> {
     let &mut ClassSpec { ref mut types, .. } = classspec;
-    types.iter_mut().map(|ref mut ttype| declare_typevars(session, scope.clone(), Some(ttype), always_new)).count();
+    types.iter_mut().map(|ref mut ttype| bind_type_names(session, scope.clone(), Some(ttype), always_new)).count();
     Ok(())
 }
 
 /*
-pub fn declare_typevars(session: &Session, scope: ScopeRef, ttype: Type, always_new: bool) -> Type {
+pub fn bind_type_names(session: &Session, scope: ScopeRef, ttype: Type, always_new: bool) -> Type {
     convert(|ttype| {
         match ttype {
             Type::Variable(name, id) => {
