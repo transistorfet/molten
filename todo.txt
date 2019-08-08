@@ -1,4 +1,12 @@
 
+* find the true size of the enum when creating the overall struct to hold it
+* should you add some means of accessing variant values without pattern matching?
+* allow nested enums
+
+* handle option case
+* add accessor for constructing a variant
+* add pattern matching of enums
+
 * make "with" block of try require parens, at least so they match, and maybe change it to catch? I don't know,  I should have a more consistent means of determining syntax
 * there is an issue with raise, in that it is considered to return unit () instead of somehow being marked as not returning...  Getting type errors in Option def
 
@@ -7,7 +15,6 @@
 
 * make definitions always require an initializer
 * make an HIR
-* add enums
 * add typeclasses
 
 * fix modules system
@@ -103,7 +110,6 @@ Changes:
 
 
 
-* add enums
 * add proper pattern matching for definitions/matchcases/etc
 * add typeclasses/traits
 * implement garbage collection

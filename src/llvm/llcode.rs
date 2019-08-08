@@ -15,6 +15,7 @@ pub enum LLType {
     Exception,
     Ptr(R<LLType>),
     Struct(Vec<LLType>),
+    Array(R<LLType>, usize),
     Function(Vec<LLType>, R<LLType>),
     Alias(NodeID),
 }
@@ -129,8 +130,8 @@ pub enum LLGlobal {
     DefCFunc(NodeID, LLLink, String, LLType, Vec<(NodeID, String)>, Vec<LLExpr>, LLCC),
     DeclCFunc(NodeID, String, LLType, LLCC),
 
-    DefNamedStruct(NodeID, String),
-    SetStructBody(NodeID, Vec<LLType>),
+    DefNamedStruct(NodeID, String, bool),
+    SetStructBody(NodeID, Vec<LLType>, bool),
 }
 
 

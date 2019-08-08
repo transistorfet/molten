@@ -32,7 +32,7 @@ use std::str::FromStr;
 use abi::ABI;
 use types::Type;
 use misc::{ r, UniqueID };
-use ast::{ Pos, NodeID, Mutability, Visibility, AssignType, Literal, Ident, Argument, ClassSpec, MatchCase, Pattern, AST };
+use ast::{ Pos, NodeID, Mutability, Visibility, AssignType, Literal, Ident, Argument, ClassSpec, MatchCase, Pattern, EnumVariant, AST };
 
 
 ///// Parsing Macros /////
@@ -150,6 +150,7 @@ named!(statement(Span) -> (AST, Option<AST>),
             whileloop |
             class |
             typealias |
+            typeenum |
             expression
             // TODO should class be here too?
         )) >>
@@ -235,6 +236,27 @@ named!(typealias(Span) -> AST,
         wscom!(tag!("=")) >>
         ts: type_description >>
         (AST::make_type_alias(Pos::new(pos), c, ts))
+    )
+);
+
+named!(typeenum(Span) -> AST,
+    do_parse!(
+        pos: position!() >>
+        wscom!(tag_word!("enum")) >>
+        c: class_spec >>
+        wscom!(tag!("=")) >>
+        wscom!(opt!(tag!("|"))) >>
+        ev: separated_list_complete!(wscom!(tag!("|")), enum_variant) >>
+        (AST::make_type_enum(Pos::new(pos), c, ev))
+    )
+);
+
+named!(enum_variant(Span) -> EnumVariant,
+    do_parse!(
+        pos: position!() >>
+        i: identifier >>
+        t: opt!(delimited!(tag!("("), separated_list_complete!(wscom!(tag!(",")), type_description), tag!(")"))) >>
+        (EnumVariant::new(Pos::new(pos), i, t.map(|t| Type::Tuple(t))))
     )
 );
 
@@ -340,25 +362,6 @@ named!(caselist(Span) -> Vec<MatchCase>,
         //wscom!(tag!(",")) >>
         (MatchCase::new(c, e))
     ))
-);
-
-named!(pattern(Span) -> Pattern,
-    do_parse!(
-        p: pattern_atomic >>
-        a: opt!(preceded!(wscom!(tag!(":")), type_description)) >>
-        (match a {
-            Some(ty) => Pattern::Annotation(NodeID::generate(), ty, r(p)),
-            None => p,
-        })
-    )
-);
-
-named!(pattern_atomic(Span) -> Pattern,
-    alt_complete!(
-        value!(Pattern::Wild, tag!("_")) |
-        map!(literal, |l| Pattern::Literal(NodeID::generate(), l)) |
-        map!(identifier, |i| Pattern::Binding(NodeID::generate(), i))
-    )
 );
 
 named!(forloop(Span) -> AST,
@@ -954,6 +957,57 @@ named!(not_reserved(Span) -> (),
         tag_word!("for") | tag_word!("in") |
         tag_word!("fn") | tag_word!("decl")
     ))
+);
+
+named!(pattern(Span) -> Pattern,
+    do_parse!(
+        p: pattern_atomic >>
+        a: opt!(preceded!(wscom!(tag!(":")), type_description)) >>
+        (match a {
+            Some(ty) => Pattern::Annotation(NodeID::generate(), ty, r(p)),
+            None => p,
+        })
+    )
+);
+
+named!(pattern_atomic(Span) -> Pattern,
+    alt_complete!(
+        value!(Pattern::Wild, tag!("_")) |
+        pattern_literal |
+        pattern_enum_variant |
+        pattern_binding
+    )
+);
+
+named!(pattern_literal(Span) -> Pattern,
+    map!(literal, |l| Pattern::Literal(NodeID::generate(), l))
+);
+
+named!(pattern_binding(Span) -> Pattern,
+    map!(identifier, |i| Pattern::Binding(NodeID::generate(), i))
+);
+
+named!(pattern_enum_variant(Span) -> Pattern,
+    do_parse!(
+        p: pattern_resolve >>
+        o: opt!(delimited!(
+            tag!("("),
+            separated_list_complete!(wscom!(tag!(",")), alt_complete!(pattern_literal | pattern_binding)),
+            tag!(")")
+        )) >>
+        (match o {
+            None => p,
+            Some(l) => Pattern::EnumArgs(NodeID::generate(), r(p), l)
+        })
+    )
+);
+
+named!(pattern_resolve(Span) -> Pattern,
+    do_parse!(
+        left: identifier >>
+        operations: many1!(preceded!(tag!("::"), identifier)) >>
+        (operations.into_iter().fold(Pattern::Identifier(NodeID::generate(), left), |acc, i| Pattern::Resolve(NodeID::generate(), r(acc), i, NodeID::generate())))
+    )
 );
 
 

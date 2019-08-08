@@ -4,14 +4,16 @@ use ast::Mutability;
 use session::{ Session, Error };
 
 //pub mod traits;
+pub mod enums;
 pub mod types;
 pub mod classes;
 pub mod variables;
 pub mod functions;
 
+use defs::enums::{ EnumDefRef };
 use defs::types::{ TypeAliasDefRef };
-use defs::variables::{ VarDefRef, ArgDefRef, FieldDefRef };
 use defs::classes::{ ClassDefRef, StructDefRef };
+use defs::variables::{ VarDefRef, ArgDefRef, FieldDefRef };
 use defs::functions::{ FuncDefRef, OverloadDefRef, ClosureDefRef, MethodDefRef, CFuncDefRef };
 
 
@@ -23,6 +25,7 @@ pub enum Def {
     Field(FieldDefRef),
     Class(ClassDefRef),
     Struct(StructDefRef),
+    Enum(EnumDefRef),
     Func(FuncDefRef),
     Overload(OverloadDefRef),
     Closure(ClosureDefRef),
@@ -47,11 +50,19 @@ impl Def {
         }
     }
 
+    pub fn as_enum(&self) -> Result<EnumDefRef, Error> {
+        match *self {
+            Def::Enum(ref enumdef) => Ok(enumdef.clone()),
+            _ => Err(Error::new(format!("DefError: expected enum def but found {:#?}", self))),
+        }
+    }
+
     pub fn get_vars(&self) -> Result<ScopeRef, Error> {
         match *self {
             Def::Class(ref class) => Ok(class.structdef.vars.clone()),
             Def::Struct(ref structdef) => Ok(structdef.vars.clone()),
-            _ => Err(Error::new(format!("DefError: expected class or struct def but found {:#?}", self))),
+            Def::Enum(ref enumdef) => Ok(enumdef.vars.clone()),
+            _ => Err(Error::new(format!("DefError: expected class, struct, or enum but found {:#?}", self))),
         }
     }
 

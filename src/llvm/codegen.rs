@@ -244,6 +244,10 @@ impl<'sess> LLVM<'sess> {
         LLVMStructType(rtypes.as_mut_ptr(), rtypes.len() as u32, false as i32)
     }
 
+    pub unsafe fn array_type(&self, itype: &LLType, size: usize) -> LLVMTypeRef {
+        LLVMArrayType(self.build_type(itype), size as u32)
+    }
+
     pub unsafe fn build_type(&self, ltype: &LLType) -> LLVMTypeRef {
         match ltype {
             LLType::Void => self.void_type(),
@@ -256,6 +260,7 @@ impl<'sess> LLVM<'sess> {
             LLType::Exception => self.get_type(EXCEPTION_ID).unwrap(),
             LLType::Ptr(etype) => LLVMPointerType(self.build_type(etype), 0),
             LLType::Struct(etypes) => self.struct_type(etypes),
+            LLType::Array(etype, size) => self.array_type(etype, *size),
             LLType::Function(argtypes, rettype) => self.cfunc_type(argtypes, rettype),
             LLType::Alias(id) => self.get_type(*id).unwrap(),
         }
@@ -283,6 +288,12 @@ impl<'sess> LLVM<'sess> {
                 (_, LLVMTypeKind::LLVMPointerTypeKind) => {
                     let boxed = self.build_boxed(LLVMPointerType(LLVMTypeOf(value), 0), value);
                     LLVMBuildPointerCast(self.builder, boxed, rtype, cstr(""))
+                },
+
+                (LLVMTypeKind::LLVMStructTypeKind, LLVMTypeKind::LLVMStructTypeKind) => {
+                    let pointer = LLVMBuildAlloca(self.builder, LLVMTypeOf(value), cstr(""));
+                    LLVMBuildStore(self.builder, value, pointer);
+                    LLVMBuildLoad(self.builder, LLVMBuildBitCast(self.builder, pointer, LLVMPointerType(rtype, 0), cstr("ptr")), cstr(""))
                 },
 
                 (LLVMTypeKind::LLVMIntegerTypeKind, LLVMTypeKind::LLVMDoubleTypeKind) =>
@@ -661,12 +672,14 @@ impl<'sess> LLVM<'sess> {
                 },
 
 
-                LLGlobal::DefNamedStruct(id, name) => {
-                    self.set_type(*id, LLVMPointerType(LLVMStructCreateNamed(self.context, cstr(name.as_str())), 0));
+                LLGlobal::DefNamedStruct(id, name, use_ptr) => {
+                    let s = LLVMStructCreateNamed(self.context, cstr(name.as_str()));
+                    self.set_type(*id, if *use_ptr { LLVMPointerType(s, 0) } else { s });
                 },
 
-                LLGlobal::SetStructBody(id, items) => {
-                    let rtype = LLVMGetElementType(self.get_type(*id).unwrap());
+                LLGlobal::SetStructBody(id, items, use_ptr) => {
+                    let ptype = self.get_type(*id).unwrap();
+                    let rtype = if *use_ptr { LLVMGetElementType(ptype) } else { ptype };
                     let mut items: Vec<LLVMTypeRef> = items.iter().map(|item| self.build_type(item)).collect();
                     LLVMStructSetBody(rtype, items.as_mut_ptr(), items.len() as u32, false as i32);
                 },
@@ -702,8 +715,8 @@ impl<'sess> LLVM<'sess> {
                 LLGlobal::DefType(_, _, _) |
                 LLGlobal::DefGlobal(_, _, _) |
                 LLGlobal::DeclCFunc(_, _, _, _) |
-                LLGlobal::DefNamedStruct(_, _) |
-                LLGlobal::SetStructBody(_, _) => { /* Nothing Needs To Be Done */ }
+                LLGlobal::DefNamedStruct(_, _, _) |
+                LLGlobal::SetStructBody(_, _, _) => { /* Nothing Needs To Be Done */ }
             }
         }
     }

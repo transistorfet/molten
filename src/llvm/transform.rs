@@ -12,7 +12,7 @@ use types::Type;
 use config::Options;
 use session::Session;
 use scope::{ Scope, ScopeRef };
-use ast::{ NodeID, Pos, Mutability, Visibility, Literal, Ident, Argument, MatchCase, Pattern, AST };
+use ast::{ NodeID, Pos, Mutability, Visibility, Literal, Ident, Argument, ClassSpec, MatchCase, Pattern, EnumVariant, AST };
 
 use defs::functions::{ FuncDef, ClosureDefRef };
 use defs::classes::{ ClassDefRef, StructDefRef, Define, Vtable };
@@ -260,6 +260,10 @@ impl<'sess> Transformer<'sess> {
                 self.transform_record_update(scope.clone(), *id, &record, &items)
             },
 
+            AST::TypeEnum(id, _, classspec, variants) => {
+                self.transform_enum_def(scope.clone(), *id, &classspec, &variants)
+            },
+
 
             AST::New(id, _, _) => {
                 self.transform_new_object(*id)
@@ -356,6 +360,61 @@ impl<'sess> Transformer<'sess> {
         }
         exprs.push(LLExpr::DefStruct(id, self.transform_value_type(ttype), litems));
         exprs
+    }
+
+    fn transform_enum_def(&self, scope: ScopeRef, id: NodeID, classspec: &ClassSpec, variants: &Vec<EnumVariant>) -> Vec<LLExpr> {
+        let mut exprs = vec!();
+        let selector = LLType::I8;
+
+        //let types: Vec<Option<LLType>> = variants.iter().map(|variant| variant.ttype.as_ref().map(|v| self.transform_value_type(v))).collect();
+        // TODO this is still broken
+        self.create_enum_struct(id, classspec.ident.name.clone(), selector.clone(), Some(LLType::Array(r(LLType::I8), 40)));
+
+        for (i, variant) in variants.iter().enumerate() {
+            let name = format!("{}_{}", classspec.ident.name, variant.ident.name);
+            self.transform_enum_variant(variant.id, i as i8, name, selector.clone(), variant.ttype.clone())
+        }
+
+        exprs
+    }
+
+    fn transform_enum_variant(&self, id: NodeID, variant: i8, name: String, selector: LLType, ttype: Option<Type>) {
+        let struct_id = NodeID::generate();
+        self.create_enum_struct(struct_id, name.clone(), selector, ttype.clone().map(|t| self.transform_value_type(&t)));
+        self.set_type(id, LLType::Alias(struct_id));
+
+        if ttype.is_some() {
+            let ftype = self.session.get_type(id).unwrap();
+            let (argtypes, rettype, _) = ftype.get_function_types().unwrap();
+            let lftype = self.transform_cfunc_def_type(&argtypes.as_vec(), rettype);
+
+            let mut params = vec!();
+            let mut tuple_items = vec!();
+            for (i, arg) in argtypes.as_vec().iter().enumerate() {
+                let arg_id = NodeID::generate();
+                tuple_items.push(LLExpr::GetValue(arg_id));
+                params.push((arg_id, format!("value{}", i)));
+            }
+
+            let tuple_id = NodeID::generate();
+            let body = vec!(LLExpr::DefStruct(NodeID::generate(), self.get_type(struct_id).unwrap(), vec!(
+                LLExpr::Literal(LLLit::I8(variant as i8)),
+                LLExpr::DefStruct(NodeID::generate(), self.transform_value_type(argtypes), tuple_items)
+            )));
+            self.add_global(LLGlobal::DefCFunc(id, LLLink::Once, name, lftype, params, body, LLCC::CCC));
+        }
+    }
+
+    fn create_enum_struct(&self, id: NodeID, name: String, selector: LLType, ltype: Option<LLType>) {
+        let mut body = vec!(selector);
+        match ltype {
+            Some(ltype) => body.push(ltype),
+            None => { },
+        }
+
+        self.set_type(id, LLType::Alias(id));
+        self.add_global(LLGlobal::DefNamedStruct(id, name.clone(), false));
+        self.add_global(LLGlobal::SetStructBody(id, body, false));
     }
 
     fn transform_def_local(&self, scope: ScopeRef, id: NodeID, name: &String, value: &AST) -> Vec<LLExpr> {
@@ -859,16 +918,16 @@ impl<'sess> Transformer<'sess> {
         classdef.build_vtable(self.session, scope.clone(), body);
         classdef.build_structdef(self.session, scope.clone(), body);
 
-        self.add_global(LLGlobal::DefNamedStruct(classdef.id, classdef.classname.clone()));
+        self.add_global(LLGlobal::DefNamedStruct(classdef.id, classdef.classname.clone(), true));
         self.set_type(classdef.id, LLType::Alias(classdef.id));
-        self.add_global(LLGlobal::DefNamedStruct(classdef.vtable.id, format!("{}_vtable", classdef.classname.clone())));
+        self.add_global(LLGlobal::DefNamedStruct(classdef.vtable.id, format!("{}_vtable", classdef.classname.clone()), true));
         self.set_type(classdef.vtable.id, LLType::Alias(classdef.vtable.id));
 
         let stype = self.transform_struct_def(&classdef.structdef);
-        self.add_global(LLGlobal::SetStructBody(classdef.id, stype.get_items()));
+        self.add_global(LLGlobal::SetStructBody(classdef.id, stype.get_items(), true));
 
         let vtype = self.transform_vtable_def(&classdef.vtable);
-        self.add_global(LLGlobal::SetStructBody(classdef.vtable.id, vtype.get_items()));
+        self.add_global(LLGlobal::SetStructBody(classdef.vtable.id, vtype.get_items(), true));
     }
 
     fn transform_vtable_def(&self, vtable: &Vtable) -> LLType {
@@ -971,9 +1030,22 @@ impl<'sess> Transformer<'sess> {
 
     fn transform_resolve(&self, id: NodeID, path: &AST, field: &String, otype: Type) -> Vec<LLExpr> {
         let defid = self.session.get_ref(id).unwrap();
-        let classdef = self.session.get_def(otype.get_id().unwrap()).unwrap().as_class().unwrap();
-        let index = classdef.vtable.get_index_by_id(defid).unwrap();
-        vec!(LLExpr::LoadRef(r(LLExpr::AccessRef(r(LLExpr::GetGlobal(classdef.vtable.id)), vec!(LLRef::Field(index))))))
+        match self.session.get_def(otype.get_id().unwrap()).unwrap() {
+            Def::Class(classdef) => {
+                let index = classdef.vtable.get_index_by_id(defid).unwrap();
+                vec!(LLExpr::LoadRef(r(LLExpr::AccessRef(r(LLExpr::GetGlobal(classdef.vtable.id)), vec!(LLRef::Field(index))))))
+            },
+            Def::Enum(enumdef) => {
+                match enumdef.get_variant_type_by_id(defid) {
+                    Some(_) => vec!(LLExpr::GetValue(defid)),
+                    None => {
+                        let variant = enumdef.get_variant_by_id(defid).unwrap();
+                        vec!(LLExpr::DefStruct(id, self.get_type(defid).unwrap(), vec!(LLExpr::Literal(LLLit::I8(variant as i8)))))
+                    },
+                }
+            },
+            def @ _ => panic!("DefError: expected class or enum but found {:?}", def),
+        }
     }
 
     fn transform_assignment(&self, scope: ScopeRef, id: NodeID, left: &AST, right: &AST) -> Vec<LLExpr> {
@@ -1054,6 +1126,25 @@ impl<'sess> Transformer<'sess> {
                 let last = exprs.pop().unwrap();
                 exprs.push(LLExpr::Cast(self.transform_value_type(ttype), r(last)));
             },
+            Pattern::Resolve(id, left, field, oid) => {
+                let defid = self.session.get_ref(*id).unwrap();
+                let enumdef = self.session.get_def_from_ref(*oid).unwrap().as_enum().unwrap();
+                let variant = enumdef.get_variant_by_id(defid).unwrap();
+                exprs.push(LLExpr::Cmp(LLCmpType::Equal, r(LLExpr::GetItem(r(LLExpr::GetValue(valueid)), 0)), r(LLExpr::Literal(LLLit::I8(variant as i8)))));
+            },
+            Pattern::EnumArgs(id, left, args) => {
+                let variant_id = self.session.get_ref(*id).unwrap();
+                let item_id = NodeID::generate();
+                exprs.push(LLExpr::SetValue(item_id, r(LLExpr::GetItem(r(LLExpr::Cast(self.get_type(variant_id).unwrap(), r(LLExpr::GetValue(valueid)))), 1))));
+                for (i, arg) in args.iter().enumerate() {
+                    let arg_id = NodeID::generate();
+                    exprs.push(LLExpr::SetValue(arg_id, r(LLExpr::GetItem(r(LLExpr::GetValue(item_id)), i))));
+                    exprs.extend(self.transform_pattern(scope.clone(), &arg, arg_id));
+                }
+                //let result = exprs.pop();
+                exprs.extend(self.transform_pattern(scope.clone(), left, valueid));
+            },
+            _ => panic!("Not Implemented: {:?}", pat),
         }
         exprs
     }

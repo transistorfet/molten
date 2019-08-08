@@ -140,7 +140,7 @@ impl Type {
         match self {
             &Type::Object(_, ref id, _) => Ok(*id),
             &Type::Variable(_, ref id, _) => Ok(*id),
-            _ => Err(Error::new(format!("TypeError: expected variable type, found {:?}", self))),
+            _ => Err(Error::new(format!("TypeError: expected object or variable type, found {:?}", self))),
         }
     }
 

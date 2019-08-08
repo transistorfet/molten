@@ -225,6 +225,26 @@ let r = ref { a = 42, b = "The Answer" }
 println(!r.b)                   // prints "The Answer"
 ```
 
+### Enums (Tagged Unions)
+An enum can either have no arguments, or a tuple of arguments.  Constructing an
+enum variant requires using the Resolve (::) notation.  Pattern matching is
+currently the only way to get values out of a variant.  The current implementation
+needs work and does not currently support nested variant types
+```
+enum Value =
+| None
+| Integer(Int)
+| String(String)
+| Pair(String, String)
+
+let val = Value::String("Hey")
+
+match val {
+    Value::String(s) => println(s)
+    _ => ()
+}
+```
+
 ### Annotations
 A value can be type annotated using a colon followed by the type.
 ```
@@ -260,8 +280,6 @@ Yet To Complete
 
 - Improved pattern matching
 
-- Enum types, with pattern matching of variants
-
 
 Previously Uncompleted
 ----------------------
@@ -279,6 +297,11 @@ Previously Uncompleted
   the class members
 
 - Exceptions have finally been added using the setjmp/longjmp functions
+
+- Enums have been added but with a lot of limitations.  It's not possible
+  to use an enum inside itself (eg. to make a tree data structure).  It
+  also doesn't properly calculate the enum size, because that will require
+  having the target architecture info.
 
 I'd be happy to hear of any additional features ideas or suggestions, if
 you'd like to leave them under "Issues" on github.

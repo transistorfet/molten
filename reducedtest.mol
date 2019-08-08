@@ -221,3 +221,31 @@ test4()
 let up = { s with a = 3 }
 println(str(up.a) + " " +str(up.b))
 
+enum TestThing =
+| Variant1
+| Variant2(Int)
+| Variant3(String, String)
+
+//let tt = TestThing::Variant1
+//let tt = TestThing::Variant2(987)
+let tt = TestThing::Variant3("Hey", "Ho")
+
+match tt {
+    TestThing::Variant1 => println("It's Variant 1")
+    TestThing::Variant2(n) => println("It's soo Variant 2 with " + str(n))
+    TestThing::Variant3(s1, s2) => println("It's totally Variant 3 with " + s1 + " and " + s2)
+    _ => println("I don't know")
+}
+
+enum Value =
+| None
+| Integer(Int)
+| String(String)
+| Pair(String, String)
+
+let val = Value::String("Hey")
+
+match val {
+    Value::String(s) => println(s)
+    _ => ()
+}

@@ -7,9 +7,10 @@ use scope::{ ScopeRef, Context };
 use ast::{ Mutability, ClassSpec, Pattern, AST };
 use misc::UniqueID;
 
+use defs::enums::EnumDef;
+use defs::classes::ClassDef;
 use defs::functions::AnyFunc;
-use defs::classes::{ ClassDef };
-use defs::types::{ TypeAliasDef };
+use defs::types::TypeAliasDef;
 use defs::variables::{ AnyVar, VarDef, ArgDef };
 
 
@@ -184,6 +185,16 @@ fn bind_names_node_or_error(session: &Session, scope: ScopeRef, node: &mut AST) 
             //session.set_type(*id, ttype.clone());
         },
 
+        AST::TypeEnum(ref id, _, ref mut classspec, ref mut variants) => {
+            declare_classspec_typevars(session, scope.clone(), classspec, true)?;
+            for variant in variants.iter_mut() {
+                declare_typevars(session, scope.clone(), variant.ttype.as_mut(), false)?;
+            }
+
+            let deftype = Type::Object(classspec.ident.name.clone(), *id, classspec.types.clone());
+            EnumDef::define(session, scope.clone(), *id, deftype, variants.clone())?;
+        },
+
         AST::Resolver(_, _, ref mut left, _, ref oid) => {
             // TODO should this always work on a type reference, or should classes be added as values as well as types?
             //bind_names_node(session, scope, left);
@@ -231,7 +242,24 @@ pub fn bind_names_pattern(session: &Session, scope: ScopeRef, pat: &mut Pattern)
         Pattern::Annotation(_, ttype, pat) => {
             declare_typevars(session, scope.clone(), Some(ttype), false)?;
             bind_names_pattern(session, scope, pat)?
-        }
+        },
+        Pattern::Resolve(id, left, ident, oid) => {
+            match **left {
+                Pattern::Identifier(_, ref ident) => {
+                    match scope.get_type_def(&ident.name) {
+                        Some(defid) => session.set_ref(*oid, defid),
+                        None => return Err(Error::new(format!("NameError: undefined type {:?}", ident.name)))
+                    }
+                },
+                _ => { return Err(Error::new(format!("SyntaxError: left-hand side of scope resolver must be identifier"))); }
+            }
+        },
+        Pattern::EnumArgs(id, left, args) => {
+            bind_names_pattern(session, scope.clone(), left);
+            for arg in args {
+                bind_names_pattern(session, scope.clone(), arg);
+            }
+        },
         _ => { }
     }
     Ok(())

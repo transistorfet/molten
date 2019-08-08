@@ -79,6 +79,17 @@ pub enum Pattern {
     Literal(NodeID, AST),
     Binding(NodeID, Ident),
     Annotation(NodeID, Type, R<Pattern>),
+    Identifier(NodeID, Ident),
+    Resolve(NodeID, R<Pattern>, Ident, NodeID),
+    EnumArgs(NodeID, R<Pattern>, Vec<Pattern>),
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct EnumVariant {
+    pub id: NodeID,
+    pub pos: Pos,
+    pub ident: Ident,
+    pub ttype: Option<Type>,
 }
 
 
@@ -119,6 +130,7 @@ pub enum AST {
     New(NodeID, Pos, ClassSpec),
     Class(NodeID, Pos, ClassSpec, Option<ClassSpec>, Vec<AST>),
     TypeAlias(NodeID, Pos, ClassSpec, Type),
+    TypeEnum(NodeID, Pos, ClassSpec, Vec<EnumVariant>),
 
     Import(NodeID, Pos, Ident, Vec<AST>),
     Definition(NodeID, Pos, Mutability, Ident, Option<Type>, R<AST>),
@@ -220,6 +232,31 @@ impl MatchCase {
     }
 }
 
+impl Pattern {
+    pub fn get_id(&self) -> NodeID {
+        match *self {
+            Pattern::Literal(id, _) |
+            Pattern::Binding(id, _) |
+            Pattern::Annotation(id, _, _) |
+            Pattern::Identifier(id, _) |
+            Pattern::Resolve(id, _, _, _) |
+            Pattern::EnumArgs(id, _, _) => id,
+            _ => UniqueID(0),
+        }
+    }
+}
+
+impl EnumVariant {
+    pub fn new(pos: Pos, ident: Ident, ttype: Option<Type>) -> Self {
+        Self {
+            id: NodeID::generate(),
+            pos: pos,
+            ident: ident,
+            ttype: ttype,
+        }
+    }
+}
+
 
 impl AST {
     pub fn get_pos(&self) -> Pos {
@@ -250,7 +287,8 @@ impl AST {
             AST::Definition(_, ref pos, _, _, _, _) |
             AST::Assignment(_, ref pos, _, _, _) |
             AST::While(_, ref pos, _, _) |
-            AST::TypeAlias(_, ref pos, _, _) => { pos.clone() }
+            AST::TypeAlias(_, ref pos, _, _) |
+            AST::TypeEnum(_, ref pos, _, _) => { pos.clone() }
             _ => Pos::empty(),
         }
     }
@@ -285,6 +323,7 @@ impl AST {
             AST::Definition(ref id, _, _, _, _, _) |
             AST::Assignment(ref id, _, _, _, _) |
             AST::While(ref id, _, _, _) |
+            AST::TypeEnum(ref id, _, _, _) |
             AST::TypeAlias(ref id, _, _, _) => { *id }
             _ => UniqueID(0),
         }
@@ -408,6 +447,10 @@ impl AST {
 
     pub fn make_type_alias(pos: Pos, classspec: ClassSpec, ttype: Type) -> AST {
         AST::TypeAlias(NodeID::generate(), pos, classspec, ttype)
+    }
+
+    pub fn make_type_enum(pos: Pos, classspec: ClassSpec, variants: Vec<EnumVariant>) -> AST {
+        AST::TypeEnum(NodeID::generate(), pos, classspec, variants)
     }
 
     /*

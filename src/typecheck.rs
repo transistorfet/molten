@@ -282,6 +282,7 @@ impl<'sess> TypeChecker<'sess> {
                 rtype
             },
 
+            AST::TypeEnum(_, _, _, _) |
             AST::TypeAlias(_, _, _, _) => {
                 scope.make_obj(self.session, String::from("()"), vec!())?
             },
@@ -363,6 +364,40 @@ impl<'sess> TypeChecker<'sess> {
                 let etype = self.check_pattern(scope.clone(), pat, Some(ttype.clone()))?;
                 expect_type(self.session, scope, Some(ttype.clone()), Some(etype), Check::Def)
             },
+            Pattern::Resolve(ref id, ref left, ref field, ref oid) => {
+                let ltype = self.session.get_type_from_ref(*oid).unwrap();
+
+                let vars = self.session.get_def(ltype.get_id()?)?.get_vars()?;
+                let defid = vars.get_var_def(&field.name).ok_or(Error::new(format!("VarError: definition not set for {:?}", field.name)))?;
+                self.session.set_ref(*id, defid);
+                let ttype = self.session.get_type(defid).ok_or(Error::new(format!("TypeError: no type set for id {:?}", defid)))?;
+                expect_type(self.session, scope, Some(ttype), expected, Check::Def)
+            },
+            Pattern::EnumArgs(id, left, args) => {
+                let etype = self.check_pattern(scope.clone(), left, None)?;
+                let variant_id = self.session.get_ref(left.get_id())?;
+                self.session.set_ref(*id, variant_id);
+                let enumdef = self.session.get_def(self.session.get_ref(variant_id)?)?.as_enum()?;
+                println!("{:#?}", enumdef);
+                match enumdef.get_variant_type_by_id(variant_id) {
+                    None => return Err(Error::new(format!("TypeError: enum variant doesn't expect any arguments, but found {:?}", args))),
+                    Some(ttype) => {
+                        let types = ttype.as_vec();
+                        if types.len() != args.len() {
+                            return Err(Error::new(format!("TypeError: number of enum arguments expected doesn't match. Expected {:?}, found {:?}", types.len(), args.len())));
+                        }
+
+                        let mut argtypes = vec!();
+                        for (arg, ttype) in args.iter().zip(types.iter()) {
+                            argtypes.push(self.check_pattern(scope.clone(), &arg, Some(ttype.clone()))?);
+                        }
+
+                        expect_type(self.session, scope.clone(), Some(ttype), Some(Type::Tuple(argtypes)), Check::Def)?;
+                        Ok(enumdef.deftype.clone())
+                    },
+                }
+            },
+            _ => panic!("Not Implemented: {:?}", pat),
         }
     }
 
