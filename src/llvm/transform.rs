@@ -275,7 +275,7 @@ impl<'sess> Transformer<'sess> {
                 exprs
             },
 
-            AST::PtrCast(ttype, node) => {
+            AST::PtrCast(id, ttype, node) => {
                 let mut exprs = vec!();
                 let ltype = self.transform_value_type(ttype);
                 let result = self.transform_as_result(&mut exprs, scope.clone(), node).unwrap();

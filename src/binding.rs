@@ -139,7 +139,7 @@ fn bind_names_node_or_error(session: &Session, scope: ScopeRef, node: &mut AST) 
         },
 
 
-        AST::PtrCast(ref mut ttype, ref mut code) => {
+        AST::PtrCast(ref id, ref mut ttype, ref mut code) => {
             bind_type_names(session, scope.clone(), Some(ttype), false)?;
             bind_names_node(session, scope, code)
         },

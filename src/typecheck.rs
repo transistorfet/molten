@@ -287,7 +287,7 @@ impl<'sess> TypeChecker<'sess> {
                 scope.make_obj(self.session, String::from("()"), vec!())?
             },
 
-            AST::PtrCast(ref ttype, ref code) => {
+            AST::PtrCast(ref id, ref ttype, ref code) => {
                 let ctype = self.check_node(scope.clone(), code, Some(ttype.clone()));
                 debug!("PTRCAST: {:?} <- {:?}", ttype, ctype);
                 // TODO is this quite right?
@@ -378,7 +378,6 @@ impl<'sess> TypeChecker<'sess> {
                 let variant_id = self.session.get_ref(left.get_id())?;
                 self.session.set_ref(*id, variant_id);
                 let enumdef = self.session.get_def(self.session.get_ref(variant_id)?)?.as_enum()?;
-                println!("{:#?}", enumdef);
                 match enumdef.get_variant_type_by_id(variant_id) {
                     None => return Err(Error::new(format!("TypeError: enum variant doesn't expect any arguments, but found {:?}", args))),
                     Some(ttype) => {

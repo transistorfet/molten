@@ -386,9 +386,9 @@ named!(newclass(Span) -> AST,
             delimited!(tag!("("), expression_list, tag!(")")),
             |mut a| { a.insert(0, AST::make_new(Pos::new(pos), cs.clone())); a }
         ) >>
-        (AST::PtrCast(
+        (AST::make_ptr_cast(
             Type::Object(cs.ident.name.clone(), UniqueID(0), cs.types.clone()),
-            r(AST::make_invoke(Pos::new(pos), AST::make_resolve(Pos::new(pos), AST::make_ident(Pos::new(pos), cs.ident.clone()), Ident::from_str("new")), a))))
+            AST::make_invoke(Pos::new(pos), AST::make_resolve(Pos::new(pos), AST::make_ident(Pos::new(pos), cs.ident.clone()), Ident::from_str("new")), a)))
     )
 );
 
@@ -443,7 +443,7 @@ named!(annotation(Span) -> AST,
         e: wscom!(atomic) >>
         wscom!(tag!(":")) >>
         t: type_description >>
-        (AST::PtrCast(t, r(e)))
+        (AST::make_ptr_cast(t, e))
     )
 );
 

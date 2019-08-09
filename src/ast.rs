@@ -97,7 +97,7 @@ pub struct EnumVariant {
 pub enum AST {
     Literal(NodeID, Literal),
     Nil(NodeID),
-    PtrCast(Type, R<AST>),
+    PtrCast(NodeID, Type, R<AST>),
     Ref(NodeID, Pos, R<AST>),
     Deref(NodeID, Pos, R<AST>),
 
@@ -297,6 +297,7 @@ impl AST {
         match *self {
             AST::Literal(ref id, _) |
             AST::Nil(ref id) |
+            AST::PtrCast(ref id, _, _) |
             AST::Ref(ref id, _, _) |
             AST::Deref(ref id, _, _) |
             AST::List(ref id, _, _) |
@@ -327,6 +328,10 @@ impl AST {
             AST::TypeAlias(ref id, _, _, _) => { *id }
             _ => UniqueID(0),
         }
+    }
+
+    pub fn make_ptr_cast(ttype: Type, expr: AST) -> AST {
+        AST::PtrCast(NodeID::generate(), ttype, r(expr))
     }
 
     pub fn make_ref(pos: Pos, expr: AST) -> AST {

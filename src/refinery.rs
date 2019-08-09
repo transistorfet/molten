@@ -333,8 +333,8 @@ impl<'sess> Refinery<'sess> {
                 AST::Import(id, pos, ident, self.refine_vec(decls))
             },
 
-            AST::PtrCast(ttype, value) => {
-                AST::PtrCast(ttype, r(self.refine_node(*value)?))
+            AST::PtrCast(id, ttype, value) => {
+                AST::PtrCast(id, ttype, r(self.refine_node(*value)?))
             },
 
             AST::GetValue(_) => { node },
