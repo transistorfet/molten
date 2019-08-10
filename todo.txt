@@ -18,6 +18,10 @@
 * put intermediate files somewhere else, at least as controlled by the molten script, so as not to clutter source directories
 * add an import as thing
 
+* segfault when optimizing, it seems to be caused primarily by the nested closures in foo (reducedtest).  The foo function itself gets turned into a call
+  to llvm.trap() and then unreachable code.  I can't pinpoint the optimization that's causing it, but -O1 is all it takes.  Replacing the trap call with
+  a return causes it to work properly, so no idea what's going on
+
 
 
 
@@ -49,6 +53,8 @@ Error Messages:
 
 
 Refactoring:
+* it should be possible to remove the &mut in bindings by setting bound types to the id, and using that in the type checking phase instead of the ast type
+* if you remove the &mut in bindings, you can make a visitor for all the ast stuff, and possibly make an HIR
 * improve storing of file info in the Pos structs (maybe rename to Span?)
 * change parser to take session argument or something so it can record the file info, and maybe do other advanced things
 * there must be a way to fix the 'scope exceptions' (Scope::target) that we're doing to make class bodies work... pass in an argument to all scoped functions?  or use scopemap and scope ids?

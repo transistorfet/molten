@@ -131,6 +131,7 @@ impl<'sess> LLVM<'sess> {
             *self.target.borrow_mut() = *target.as_ref().unwrap();
             *self.target_machine.borrow_mut() = LLVMCreateTargetMachine(*self.target.borrow(), target_triple, cstr("generic"), cstr(""), LLVMCodeGenOptLevel::LLVMCodeGenLevelDefault, LLVMRelocMode::LLVMRelocDefault, LLVMCodeModel::LLVMCodeModelDefault);
             *self.target_data.borrow_mut() = LLVMCreateTargetDataLayout(*self.target_machine.borrow());
+            LLVMSetModuleDataLayout(self.module, *self.target_data.borrow());
         }
     }
 
