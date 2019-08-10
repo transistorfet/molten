@@ -349,6 +349,7 @@ fn is_subclass_of(session: &Session, scope: ScopeRef, adef: (&String, UniqueID, 
     let tscope = Scope::new_ref(Some(scope.clone()));
     let mut names = Scope::map_new();
     let mut adef = (adef.0.clone(), adef.1, adef.2.clone());
+    //let mut deftype = session.get_type(adef.1)?.get_params()?;
 
     loop {
         let mut class = session.get_type(adef.1).unwrap();

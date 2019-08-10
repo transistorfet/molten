@@ -1106,7 +1106,7 @@ impl<'sess> Transformer<'sess> {
         exprs
     }
 
-    fn transform_pattern(&self, scope: ScopeRef, pat: &Pattern, valueid: NodeID) -> Vec<LLExpr> {
+    fn transform_pattern(&self, scope: ScopeRef, pat: &Pattern, value_id: NodeID) -> Vec<LLExpr> {
         let mut exprs = vec!();
 
         match pat {
@@ -1115,34 +1115,33 @@ impl<'sess> Transformer<'sess> {
                 let compfunc = self.transform_as_result(&mut exprs, scope.clone(), &AST::Identifier(*id, Pos::empty(), Ident::from_str("=="))).unwrap();
                 let compabi = self.session.get_type(*id).unwrap().get_abi().unwrap();
                 let result = self.transform_as_result(&mut exprs, scope.clone(), lit).unwrap();
-                exprs.extend(self.create_func_invoke(compabi, compfunc, vec!(LLExpr::GetValue(valueid), result)));
+                exprs.extend(self.create_func_invoke(compabi, compfunc, vec!(LLExpr::GetValue(value_id), result)));
             },
             Pattern::Binding(id, ident) => {
-                exprs.extend(self.transform_def_local(scope.clone(), *id, &ident.name, &AST::GetValue(valueid)));
+                exprs.extend(self.transform_def_local(scope.clone(), *id, &ident.name, &AST::GetValue(value_id)));
                 exprs.push(LLExpr::Literal(LLLit::I1(true)));
             },
-            Pattern::Annotation(_, ttype, pat) => {
-                exprs.extend(self.transform_pattern(scope.clone(), pat, valueid));
-                let last = exprs.pop().unwrap();
-                exprs.push(LLExpr::Cast(self.transform_value_type(ttype), r(last)));
+            Pattern::Annotation(id, ttype, pat) => {
+                exprs.push(LLExpr::SetValue(*id, r(LLExpr::Cast(self.transform_value_type(ttype), r(LLExpr::GetValue(value_id))))));
+                exprs.extend(self.transform_pattern(scope.clone(), pat, *id));
             },
             Pattern::Resolve(id, left, field, oid) => {
                 let defid = self.session.get_ref(*id).unwrap();
                 let enumdef = self.session.get_def_from_ref(*oid).unwrap().as_enum().unwrap();
                 let variant = enumdef.get_variant_by_id(defid).unwrap();
-                exprs.push(LLExpr::Cmp(LLCmpType::Equal, r(LLExpr::GetItem(r(LLExpr::GetValue(valueid)), 0)), r(LLExpr::Literal(LLLit::I8(variant as i8)))));
+                exprs.push(LLExpr::Cmp(LLCmpType::Equal, r(LLExpr::GetItem(r(LLExpr::GetValue(value_id)), 0)), r(LLExpr::Literal(LLLit::I8(variant as i8)))));
             },
             Pattern::EnumArgs(id, left, args) => {
                 let variant_id = self.session.get_ref(*id).unwrap();
                 let item_id = NodeID::generate();
-                exprs.push(LLExpr::SetValue(item_id, r(LLExpr::GetItem(r(LLExpr::Cast(self.get_type(variant_id).unwrap(), r(LLExpr::GetValue(valueid)))), 1))));
+                exprs.push(LLExpr::SetValue(item_id, r(LLExpr::GetItem(r(LLExpr::Cast(self.get_type(variant_id).unwrap(), r(LLExpr::GetValue(value_id)))), 1))));
                 for (i, arg) in args.iter().enumerate() {
                     let arg_id = NodeID::generate();
                     exprs.push(LLExpr::SetValue(arg_id, r(LLExpr::GetItem(r(LLExpr::GetValue(item_id)), i))));
                     exprs.extend(self.transform_pattern(scope.clone(), &arg, arg_id));
                 }
                 //let result = exprs.pop();
-                exprs.extend(self.transform_pattern(scope.clone(), left, valueid));
+                exprs.extend(self.transform_pattern(scope.clone(), left, value_id));
             },
             _ => panic!("Not Implemented: {:?}", pat),
         }
