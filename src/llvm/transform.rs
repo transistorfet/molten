@@ -366,15 +366,19 @@ impl<'sess> Transformer<'sess> {
         let mut exprs = vec!();
         let selector = LLType::I8;
 
-        //let types: Vec<Option<LLType>> = variants.iter().map(|variant| variant.ttype.as_ref().map(|v| self.transform_value_type(v))).collect();
-        // TODO this is still broken
-        self.create_enum_struct(id, classspec.ident.name.clone(), selector.clone(), Some(LLType::Array(r(LLType::I8), 40)));
+        self.add_global(LLGlobal::DefNamedStruct(id, classspec.ident.name.clone(), false));
+        self.set_type(id, LLType::Alias(id));
 
+        let mut types = vec!();
         for (i, variant) in variants.iter().enumerate() {
             let name = format!("{}_{}", classspec.ident.name, variant.ident.name);
-            self.transform_enum_variant(variant.id, i as i8, name, selector.clone(), variant.ttype.clone())
+            self.transform_enum_variant(variant.id, i as i8, name, selector.clone(), variant.ttype.clone());
+            if variant.ttype.is_some() {
+                types.push(self.transform_value_type(variant.ttype.as_ref().unwrap()));
+            }
         }
 
+        self.add_global(LLGlobal::SetStructBody(id, vec!(selector.clone(), LLType::Largest(types)), false));
         exprs
     }
 
@@ -412,9 +416,9 @@ impl<'sess> Transformer<'sess> {
             None => { },
         }
 
-        self.set_type(id, LLType::Alias(id));
         self.add_global(LLGlobal::DefNamedStruct(id, name.clone(), false));
         self.add_global(LLGlobal::SetStructBody(id, body, false));
+        self.set_type(id, LLType::Alias(id));
     }
 
     fn transform_def_local(&self, scope: ScopeRef, id: NodeID, name: &String, value: &AST) -> Vec<LLExpr> {

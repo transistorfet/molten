@@ -221,6 +221,13 @@ test4()
 let up = { s with a = 3 }
 println(str(up.a) + " " +str(up.b))
 
+enum Colours =
+| Red
+| Green
+| Blue
+
+let oe = Colours::Red;
+
 enum TestThing =
 | Variant1
 | Variant2(Int)
@@ -241,8 +248,8 @@ enum Value =
 | None
 | Integer(Int)
 | String(String)
-| Pair(String, String)
-| Tree(ref Value)
+| Pair(String, String, Int)
+| Tree(Value)
 
 let val = Value::String("Hey")
 

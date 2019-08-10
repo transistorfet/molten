@@ -18,6 +18,7 @@ pub enum LLType {
     Array(R<LLType>, usize),
     Function(Vec<LLType>, R<LLType>),
     Alias(NodeID),
+    Largest(Vec<LLType>),
 }
 
 impl LLType {

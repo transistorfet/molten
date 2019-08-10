@@ -1,15 +1,13 @@
 
-* find the true size of the enum when creating the overall struct to hold it
-* should you add some means of accessing variant values without pattern matching?
-* allow nested enums
+* make definitions always require an initializer
 
-* make "with" block of try require parens, at least so they match, and maybe change it to catch? I don't know,  I should have a more consistent means of determining syntax
+* limit nested enums to only refs, otherwise it doesn't make sense
 * there is an issue with raise, in that it is considered to return unit () instead of somehow being marked as not returning...  Getting type errors in Option def
-
 * the unmapping function doesn't seem to do anything at the moment.  Mapping back causes object-typevar-params test to fail (possibly related to subclass checking?)  We could
   possibly remove most of the unmapping code, or otherwise fix the failed testcase some other way
 
-* make definitions always require an initializer
+* make "with" block of try require parens, at least so they match, and maybe change it to catch? I don't know,  I should have a more consistent means of determining syntax
+
 * make an HIR
 * add typeclasses
 
@@ -20,10 +18,6 @@
 * put intermediate files somewhere else, at least as controlled by the molten script, so as not to clutter source directories
 * add an import as thing
 
-
-* add pipe operator
-* make loops use phi, and add break
-* update the readme
 
 
 
@@ -102,21 +96,24 @@ Changes:
 * implement return value conversion (this doesn't appear to be needed?  Why didn't it work with tuple closures though?)
 
 * fill in string and list type functions, and finish hashmap (rename to dict?)
-* do you need to implement the proper bidirectional typechecker algorithm
 
 
 
+* add pipe operator
+* make loops use phi, and add break
 * add proper pattern matching for definitions/matchcases/etc
 * add typeclasses/traits
 * implement garbage collection
 * add an iterator type
 * add compiler directives?
+* better support for generics
 
 
 
 
 
 
+* should you add some means of accessing variant values without pattern matching?
 * should you add access modifiers to classes, and maybe functions; public, private, protected
 * should exports also list all the modules that the file imports, so that class definitions in other imports can be found, if needed for arguments
 * should you fix scope resolution to also work on objects, so that you can have static methods from the object without explicitly referencing its type
@@ -134,11 +131,11 @@ Changes:
 * is it even possible to add a special "constrained" type, which has &AST that must type check correctly in order to match (checks done in check_type)
 * you might need to integrate type restrictions which have to get resolved later; like 'a where 'a is object with add(Int) method; not sure how you could be so specific without complexity
 * what if you generalize overloaded types, such that they're checked in check_type, and options are eliminated, or resolved to one type over the course of checking
+* should implement the proper bidirectional typechecker algorithm
+
 * if you make ops methods, then everything has to be type annotated, with the type system as it is; you'd need constrained types, or multiple paths, or bidirectional or something
   make typed functions for all math operations, with the inlinealways attribute, if you decide to make operators methods
-* what if you have a 'context' passed to the node visitors that would allow "if" to know if its' return is used or not, and so whether typechecking must match
 
-* better support for generics
 
 
 EXAMPLE PROGRAM IDEAS:

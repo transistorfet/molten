@@ -20,9 +20,9 @@ use self::llvm_sys::transforms::pass_manager_builder::*;
 
 
 use ast::NodeID;
-use misc::UniqueID;
 use config::Options;
 use session::Session;
+use misc::{ UniqueID, r };
 
 use llvm::llcode::{ LLType, LLLit, LLRef, LLCmpType, LLLink, LLCC, LLExpr, LLGlobal, LLBlock };
 
@@ -33,6 +33,9 @@ pub struct LLVM<'sess> {
     pub context: LLVMContextRef,
     pub module: LLVMModuleRef,
     pub builder: LLVMBuilderRef,
+    pub target: RefCell<LLVMTargetRef>,
+    pub target_machine: RefCell<LLVMTargetMachineRef>,
+    pub target_data: RefCell<LLVMTargetDataRef>,
     pub values: RefCell<HashMap<UniqueID, LLVMValueRef>>,
     pub types: RefCell<HashMap<UniqueID, LLVMTypeRef>>,
     pub curfunc: RefCell<LLVMValueRef>,
@@ -74,6 +77,9 @@ impl<'sess> LLVM<'sess> {
                 context: context,
                 module: module,
                 builder: builder,
+                target: RefCell::new(ptr::null_mut()),
+                target_machine: RefCell::new(ptr::null_mut()),
+                target_data: RefCell::new(ptr::null_mut()),
                 values: RefCell::new(HashMap::new()),
                 types: RefCell::new(HashMap::new()),
                 curfunc: RefCell::new(ptr::null_mut()),
@@ -83,6 +89,8 @@ impl<'sess> LLVM<'sess> {
 
     pub fn initialize(&self) {
         unsafe {
+            self.initialize_target();
+
             self.set_type(TYPEVAR_ID, LLVMPointerType(LLVMStructCreateNamed(self.context, cstr("TypeVar")), 0));
 
             // TODO this buffer size is tricky... I had it set for 8 but got a bunch of segfaults in the testsuite.
@@ -96,6 +104,33 @@ impl<'sess> LLVM<'sess> {
             //LLVMStructSetBody(jmpbuf, body.as_mut_ptr(), body.len() as u32, 0);
 
             self.set_type(EXCEPTION_ID, jmpbuf);
+        }
+    }
+
+    pub fn initialize_target(&self) {
+        unsafe {
+            LLVM_InitializeAllTargetInfos();
+            LLVM_InitializeAllTargets();
+            LLVM_InitializeAllTargetMCs();
+            LLVM_InitializeAllAsmParsers();
+            LLVM_InitializeAllAsmPrinters();
+
+            let target_triple = LLVMGetDefaultTargetTriple();
+            LLVMSetTarget(self.module, target_triple);
+
+            let target: *mut LLVMTargetRef = Box::into_raw(Box::new(ptr::null_mut()));
+            let err_msg: *mut *mut i8 = Box::into_raw(Box::new(ptr::null_mut()));
+            if LLVMGetTargetFromTriple(target_triple, target, err_msg) != 0 {
+                let err = CString::from_raw(*err_msg.as_ref().unwrap());
+                eprintln!("Get LLVM target failed");
+                eprintln!("{}", err.to_str().unwrap());
+                panic!();
+            }
+            LLVMDisposeMessage(*err_msg.as_ref().unwrap());
+
+            *self.target.borrow_mut() = *target.as_ref().unwrap();
+            *self.target_machine.borrow_mut() = LLVMCreateTargetMachine(*self.target.borrow(), target_triple, cstr("generic"), cstr(""), LLVMCodeGenOptLevel::LLVMCodeGenLevelDefault, LLVMRelocMode::LLVMRelocDefault, LLVMCodeModel::LLVMCodeModelDefault);
+            *self.target_data.borrow_mut() = LLVMCreateTargetDataLayout(*self.target_machine.borrow());
         }
     }
 
@@ -139,28 +174,13 @@ impl<'sess> LLVM<'sess> {
 
     pub fn write_object_file(&self, filename: &str) {
         unsafe {
-            LLVM_InitializeAllTargetInfos();
-            LLVM_InitializeAllTargets();
-            LLVM_InitializeAllTargetMCs();
-            LLVM_InitializeAllAsmParsers();
-            LLVM_InitializeAllAsmPrinters();
-
-            let target_triple = LLVMGetDefaultTargetTriple();
-            LLVMSetTarget(self.module, target_triple);
-
-            let target: *mut LLVMTargetRef = Box::into_raw(Box::new(ptr::null_mut()));
             let err_msg: *mut *mut i8 = Box::into_raw(Box::new(ptr::null_mut()));
-            if LLVMGetTargetFromTriple(target_triple, target, err_msg) != 0 {
+            if LLVMTargetMachineEmitToFile(*self.target_machine.borrow(), self.module, cstr(filename), LLVMCodeGenFileType::LLVMObjectFile, err_msg) != 0 {
                 let err = CString::from_raw(*err_msg.as_ref().unwrap());
-                eprintln!("Get LLVM target failed");
+                eprintln!("Emit to object file failed");
                 eprintln!("{}", err.to_str().unwrap());
                 panic!();
             }
-            LLVMDisposeMessage(*err_msg.as_ref().unwrap());
-
-            //LLVMSetDataLayout(self.module, target_machine
-            let target_machine = LLVMCreateTargetMachine(*target.as_ref().unwrap(), target_triple, cstr("generic"), cstr(""), LLVMCodeGenOptLevel::LLVMCodeGenLevelDefault, LLVMRelocMode::LLVMRelocDefault, LLVMCodeModel::LLVMCodeModelDefault);
-            LLVMTargetMachineEmitToFile(target_machine, self.module, cstr(filename), LLVMCodeGenFileType::LLVMObjectFile, err_msg);
         }
     }
 
@@ -263,6 +283,17 @@ impl<'sess> LLVM<'sess> {
             LLType::Array(etype, size) => self.array_type(etype, *size),
             LLType::Function(argtypes, rettype) => self.cfunc_type(argtypes, rettype),
             LLType::Alias(id) => self.get_type(*id).unwrap(),
+            LLType::Largest(types) => {
+                let mut largest = 0;
+                for ltype in types {
+                    let size = LLVMStoreSizeOfType(*self.target_data.borrow(), self.build_type(ltype));
+                    debug!("SIZE of {:#?}: {:?}", ltype, largest);
+                    largest = if size > largest { size } else { largest }
+                }
+                //self.build_type(&LLType::Array(r(LLType::I64), (largest / 8) as usize))
+                let ptrsize = LLVMPointerSize(*self.target_data.borrow());
+                LLVMArrayType(LLVMIntType(ptrsize * 8), (largest as u32) / ptrsize)
+            }
         }
     }
 
