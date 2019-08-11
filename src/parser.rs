@@ -39,10 +39,11 @@ use ast::{ Pos, NodeID, Mutability, Visibility, AssignType, Literal, Ident, Argu
 
 const ERR_IN_FUNC: u32 = 40;
 const ERR_IN_MATCH: u32 = 41;
-const ERR_IN_WHILE: u32 = 42;
-const ERR_IN_FOR: u32 = 43;
-const ERR_IN_CLASS: u32 = 44;
-const ERR_IN_LIST: u32 = 45;
+const ERR_IN_TRY: u32 = 42;
+const ERR_IN_WHILE: u32 = 43;
+const ERR_IN_FOR: u32 = 44;
+const ERR_IN_CLASS: u32 = 45;
+const ERR_IN_LIST: u32 = 46;
 
 pub type Span<'a> = LocatedSpan<CompleteByteSlice<'a>>;
 
@@ -322,8 +323,14 @@ named!(trywith(Span) -> AST,
         pos: position!() >>
         wscom!(tag_word!("try")) >>
         c: expression >>
-        wscom!(tag_word!("with")) >>
+        opt!(wscom!(tag_word!("catch"))) >>
+        return_error!(ErrorKind::Custom(ERR_IN_TRY),
+            wscom!(tag!("{"))
+        ) >>
         l: caselist >>
+        return_error!(ErrorKind::Custom(ERR_IN_TRY),
+            wscom!(tag!("}"))
+        ) >>
         (AST::make_try(Pos::new(pos), c, l))
     )
 );
@@ -343,7 +350,9 @@ named!(matchcase(Span) -> AST,
         wscom!(tag_word!("match")) >>
         c: expression >>
         //wscom!(tag_word!("with")) >>
-        wscom!(tag!("{")) >>
+        return_error!(ErrorKind::Custom(ERR_IN_MATCH),
+            wscom!(tag!("{"))
+        ) >>
         l: caselist >>
         return_error!(ErrorKind::Custom(ERR_IN_MATCH),
             wscom!(tag!("}"))

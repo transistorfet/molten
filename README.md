@@ -245,6 +245,21 @@ match val {
 }
 ```
 
+### Exceptions
+Exceptions aren't quite settled yet.
+```
+try open("file.txt") {
+    e => println("Exception Occurred: " + e)
+}
+
+try {
+    //...
+    raise "Problem"
+} catch {
+    e => println(e)
+}
+```
+
 ### Annotations
 A value can be type annotated using a colon followed by the type.
 ```

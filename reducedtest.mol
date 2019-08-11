@@ -121,7 +121,9 @@ runloop()
 try {
     raise "Test"
     ()
-} with e => println("EXCEPTION! " + e)
+} catch {
+    e => println("EXCEPTION! " + e)
+}
 
 //let mem = bufalloc(10)
 //bufset(mem, 0, thing)

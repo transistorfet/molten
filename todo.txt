@@ -6,8 +6,6 @@
 * the unmapping function doesn't seem to do anything at the moment.  Mapping back causes object-typevar-params test to fail (possibly related to subclass checking?)  We could
   possibly remove most of the unmapping code, or otherwise fix the failed testcase some other way
 
-* make "with" block of try require parens, at least so they match, and maybe change it to catch? I don't know,  I should have a more consistent means of determining syntax
-
 * make an HIR
 * add typeclasses
 
@@ -15,13 +13,13 @@
 * remove the forced visibility in refinery, when you decide on pub/priv semantics
 * make run function return a module object?  Should it also memoize itself?
 * make the molten type convert function for mfuncs use the LLType::Exception instead of i8* (remove molten type convert in transform)
-* put intermediate files somewhere else, at least as controlled by the molten script, so as not to clutter source directories
-* add an import as thing
 
 
 
 
 BUGS:
+* unable to define a method as / MF or / C ABI
+* the infer-arg-as-typevar test fails because str() cannot be resolved to a concrete variant by the time it's typechecked (no backwards affect allowed)
 * there is still a bug with the Phi statement, in that it will return null if you don't cover all cases. there is no check for coverage
 * recursive c functions don't work because it's typechecked as unknown abi, which is called as a closure
 * issue with separator/lf not working when two expressions are on the same line (it should produce a parse error)
@@ -71,36 +69,32 @@ TESTS:
 
 
 Changes:
-* the infer-arg-as-typevar test fails because str() cannot be resolved to a concrete variant by the time it's typechecked (no backwards affect allowed)
-
+* get hashmap in libcore working
 * change how you reference an operator function; like op+ or (+)
+* put intermediate files somewhere else, at least as controlled by the molten script, so as not to clutter source directories
+* there's no way to genericly compare or print tuples or records
 
 * you really need a better way of doing modules
 * how does rust do "use" if there is a circular dependency?
 * the module level scope is now a closed function, so you could return a representation of it as the "module" object
 
-* if, sideeffects, and while loops need bool comparison results to work correctly.  You can either force that in type checking or somehow desugar or use the comps style from match
-* unable to define a method as / MF or / C ABI
-* make an "as" for of decl, like decl buffer_resize as resize: () -> ??
+* comparisons need to be bools, so you can either force that in type checking or somehow desugar or use the comps style from match, or use typeclasses when added
 * you could modify the forloop code to take an iterator in future
 * should vtables be dynamically allocated, or should we add a LLType::ElementOf() type or something to GetElement an aliased type
-* should compare use a trait/typeclass? that would have to come later
-
 * strings, buffers, and all the primative types require vtables if they have methods, but there aren't vtables stored inside them.  You could make static vtable exceptions for them
 * make primative types unable to inherit from, because there's no vtable
 * fix lib to allow builtin classes
 
-* when you box a type to be converted to typevar, you can possibly add a vtable of sorts in the process, possibly containing functions and metadata for copying. You could also
-  make buffer copying functions that take the element size and copy the buffer data into the boxed location.
-* there's no way to genericly compare or print tuples or records
 * can you make a check for nil before unboxing a type... and somehow return an appropriate default value?  I guess that's feasible because only primative types would be
   boxed/unboxed, although records and tuples might be an issue
+* when you box a type to be converted to typevar, you can possibly add a vtable of sorts in the process, possibly containing functions and metadata for copying. You could also
+  make buffer copying functions that take the element size and copy the buffer data into the boxed location.
 * implement return value conversion (this doesn't appear to be needed?  Why didn't it work with tuple closures though?)
 
-* fill in string and list type functions, and finish hashmap (rename to dict?)
 
 
-
+* add 'import as' syntax
+* add 'decl as' syntax
 * add pipe operator
 * make loops use phi, and add break
 * add proper pattern matching for definitions/matchcases/etc

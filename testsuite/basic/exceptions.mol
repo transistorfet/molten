@@ -5,19 +5,22 @@
 
 import lib.libcore
 
-try println(str(123)) with
+try println(str(123)) {
     _ => println("Error")
+}
 
 fn test() {
     raise "error"
 }
 
-try test() with
+try test() {
     _ => println("Error")
+}
 
 try {
     raise "Test"
     ()
-} with
+} catch {
     e => println("EXCEPTION! " + e)
+}
 
