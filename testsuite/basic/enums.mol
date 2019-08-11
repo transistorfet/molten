@@ -1,0 +1,44 @@
+
+//! Red
+//! It's Variant 1
+//! It's soo Variant 2 with 987
+//! It's totally Variant 3 with Hey and Ho
+
+import lib.libcore
+
+// Test an enum with no arguments (it should only be the selector)
+enum Colours =
+| Red
+| Green
+| Blue
+
+let col = Colours::Red
+
+match col {
+    Colours::Red => println("Red")
+    _ => println("Not Red")
+}
+
+
+// Test enums with mixed arguments
+enum TestThing =
+| Variant1
+| Variant2(Int)
+| Variant3(String, String)
+
+fn print_thing(e) {
+    match e {
+        TestThing::Variant1 => println("It's Variant 1")
+        TestThing::Variant2(n) => println("It's soo Variant 2 with " + str(n))
+        TestThing::Variant3(s1, s2) => println("It's totally Variant 3 with " + s1 + " and " + s2)
+        _ => println("I don't know")
+    }
+}
+
+let t1 = TestThing::Variant1
+let t2 = TestThing::Variant2(987)
+let t3 = TestThing::Variant3("Hey", "Ho")
+
+print_thing(t1)
+print_thing(t2)
+print_thing(t3)
