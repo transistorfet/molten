@@ -154,7 +154,7 @@ impl<'sess> Transformer<'sess> {
             });
 
             let fail = vec!(
-                LLExpr::CallC(r(LLExpr::GetNamed("puts".to_string())), vec!(LLExpr::Literal(LLLit::ConstStr(String::from("Uncaught exception.  Terminating"))))),
+                LLExpr::CallC(r(LLExpr::GetNamed("puts".to_string())), vec!(LLExpr::Literal(LLLit::ConstStr(String::from("Uncaught exception.  Terminating")))), LLCC::CCC),
                 LLExpr::Literal(LLLit::I64(-1))
             );
 
@@ -467,7 +467,7 @@ impl<'sess> Transformer<'sess> {
         exprs.push(LLExpr::DefLocal(exp_id, String::from("__exception__"), LLType::Exception, r(LLExpr::Literal(LLLit::Null(LLType::Exception)))));
 
         let ret_id = NodeID::generate();
-        exprs.push(LLExpr::SetValue(ret_id, r(LLExpr::CallC(r(LLExpr::GetNamed("setjmp".to_string())), vec!(LLExpr::GetValue(exp_id))))));
+        exprs.push(LLExpr::SetValue(ret_id, r(LLExpr::CallC(r(LLExpr::GetNamed("setjmp".to_string())), vec!(LLExpr::GetValue(exp_id)), LLCC::CCC))));
         LLExpr::GetValue(ret_id)
     }
 
@@ -484,9 +484,9 @@ impl<'sess> Transformer<'sess> {
         let value = self.transform_as_result(&mut exprs, scope.clone(), valexpr).unwrap();
 
         // TODO either pass the return value to longjmp or set it in the expoint and pass 1 to longjmp...
-        exprs.push(LLExpr::CallC(r(LLExpr::GetNamed("longjmp".to_string())), vec!(LLExpr::GetValue(exp_id), value)));
+        exprs.push(LLExpr::CallC(r(LLExpr::GetNamed("longjmp".to_string())), vec!(LLExpr::GetValue(exp_id), value), LLCC::CCC));
         //exprs.push(LLExpr::StoreRef(r(LLExpr::AccessRef(r(LLExpr::GetValue(exp_id)), vec!(LLRef::Field(1)))), r(LLExpr::Cast(LLType::Var, r(value)))));
-        //exprs.push(LLExpr::CallC(r(LLExpr::GetNamed("longjmp".to_string())), vec!(LLExpr::GetValue(exp_id), LLExpr::Literal(LLLit::I32(1)))));
+        //exprs.push(LLExpr::CallC(r(LLExpr::GetNamed("longjmp".to_string())), vec!(LLExpr::GetValue(exp_id), LLExpr::Literal(LLLit::I32(1))), LLCC::CCC));
 
         exprs.push(LLExpr::Literal(LLLit::I32(0)));
         exprs
@@ -627,7 +627,7 @@ impl<'sess> Transformer<'sess> {
     }
 
     fn create_cfunc_invoke(&self, func: LLExpr, fargs: Vec<LLExpr>) -> Vec<LLExpr> {
-        vec!(LLExpr::CallC(r(func), fargs))
+        vec!(LLExpr::CallC(r(func), fargs, LLCC::CCC))
     }
 
 
@@ -699,7 +699,7 @@ impl<'sess> Transformer<'sess> {
 
     fn create_mfunc_invoke(&self, func: LLExpr, mut fargs: Vec<LLExpr>) -> Vec<LLExpr> {
         fargs.push(LLExpr::GetValue(self.get_exception().unwrap()));
-        vec!(LLExpr::CallC(r(func), fargs))
+        vec!(LLExpr::CallC(r(func), fargs, LLCC::FastCC))
         //self.create_cfunc_invoke(func, fargs)
     }
 

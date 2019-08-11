@@ -576,11 +576,12 @@ impl<'sess> LLVM<'sess> {
             },
 
 
-            LLExpr::CallC(fexpr, args) => {
+            LLExpr::CallC(fexpr, args, cc) => {
                 let function = self.build_expr(fexpr);
                 let mut argvals = self.build_args(args, LLVMTypeOf(function));
                 let call = LLVMBuildCall(self.builder, function, argvals.as_mut_ptr(), argvals.len() as u32, cstr(""));
-                LLVMSetInstructionCallConv(call, LLVMGetFunctionCallConv(function));
+                LLVMSetInstructionCallConv(call, self.get_callconv(*cc) as c_uint);
+                //LLVMSetInstructionCallConv(call, LLVMGetFunctionCallConv(function));
                 call
             },
 

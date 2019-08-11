@@ -100,7 +100,7 @@ pub enum LLExpr {
     GetNamed(String),
     Cast(LLType, R<LLExpr>),
 
-    CallC(R<LLExpr>, Vec<LLExpr>),
+    CallC(R<LLExpr>, Vec<LLExpr>, LLCC),
 
     DefLocal(NodeID, String, LLType, R<LLExpr>),
     GetLocal(NodeID),
