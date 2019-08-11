@@ -18,10 +18,6 @@
 * put intermediate files somewhere else, at least as controlled by the molten script, so as not to clutter source directories
 * add an import as thing
 
-* segfault when optimizing, it seems to be caused primarily by the nested closures in foo (reducedtest).  The foo function itself gets turned into a call
-  to llvm.trap() and then unreachable code.  I can't pinpoint the optimization that's causing it, but -O1 is all it takes.  Replacing the trap call with
-  a return causes it to work properly, so no idea what's going on
-
 
 
 

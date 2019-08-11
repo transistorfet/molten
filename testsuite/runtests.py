@@ -141,7 +141,8 @@ class Test (object):
         print(name + ("." * (64 - len(name))), end="")
 
     def run_test(self, force, short=0):
-        (retcode, stdout, stderr) = runcmd("./molten {flags} run {file}".format(flags='-f' if force else '', file=self.path), shell=True)
+        target = os.path.splitext(self.path)[0] + ".bin"
+        (retcode, stdout, stderr) = runcmd("./molten {flags} run {file} -o {target}".format(flags='-f' if force else '', file=self.path, target=target), shell=True)
         self.load_dec()
 
         if self.check_result(retcode, stdout, stderr):
@@ -174,4 +175,4 @@ def runcmd(cmd, shell=False):
 
 if __name__ == "__main__":
     main()
- 
+

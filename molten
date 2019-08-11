@@ -21,9 +21,11 @@ else:
 RM = "rm"
 BUILD = "cargo build"
 COMPILE = "cargo run --"
-LINK = "llvm-link" + EXT
-OPT = "opt" + EXT
-RUN = "lli" + EXT
+MOLFLAGS = "-O3"
+LINK = "gcc"
+LDFLAGS = "-lc -lm -no-pie"
+ILINK = "llvm-link" + EXT
+IRUN = "lli" + EXT
 
 
 def main():
@@ -32,11 +34,17 @@ def main():
     parser.add_argument('-d', '--debug', action='store_true', help='Run the compiler with debugging on')
     subparsers = parser.add_subparsers()
 
+    def add_build_args(cmd):
+        cmd.add_argument('-S', '--assembly', action='store_true', help='Compile to assembly and use the interpreter')
+        cmd.add_argument('-o', '--output', type=str, help='Output file name')
+
     cmd = subparsers.add_parser("build", help="compile a single file program")
+    add_build_args(cmd)
     cmd.add_argument("filename")
     cmd.set_defaults(command=command_build)
 
     cmd = subparsers.add_parser("run", help="compile and run a single file program")
+    add_build_args(cmd)
     cmd.add_argument("filename")
     cmd.set_defaults(command=command_run)
 
@@ -60,46 +68,55 @@ def main():
 
 
 def command_build(args):
-    target = os.path.splitext(args.filename)[0] + ".bc"
-    flags = "-d" if args.debug else ""
-    compile_and_link(target, [ "lib/libcore.ml", args.filename ], flags=flags, force=args.force)
+    target = args.output if args.output else os.path.splitext(args.filename)[0]
+    if args.assembly:
+        target += ".bc"
+    flags = MOLFLAGS
+    flags += " -d" if args.debug else ""
+    compile_and_link(target, [ "lib/libcore.ml", args.filename ], flags=flags, args=args)
     return target
 
 def command_run(args):
     target = command_build(args)
-    runordie(RUN + " " + target)
+    if args.assembly:
+        runordie(IRUN + " " + target)
+    else:
+        runordie("./{}".format(target))
 
 def command_clean(args):
-    os.system("cd " + args.directory + " && " + RM + " *.ll *.dec *.bc")
+    os.system("cd {dir} && {rm} *.ll *.dec *.bc *.o *.bin".format(dir=args.directory, rm=RM))
 
 def command_cleanall(args):
     for (basedir, dirnames, filenames) in os.walk(args.directory):
         for filename in filenames:
-            if filename.endswith(".bc") or filename.endswith(".ll") or filename.endswith(".dec"):
+            if any(filename.endswith(ext) for ext in [ ".bc", ".ll", ".dec", ".o", ".bin" ]):
                 path = os.path.join(basedir, filename)
                 print("Deleting " + path)
                 os.unlink(path)
 
 
 
-def compile_and_link(target, deps, flags="", force=False):
+def compile_and_link(target, deps, flags, args):
     compiled = [ ]
     main = deps.pop()
     for dep in deps:
-        compiled.append(compile(dep, flags=flags+ " -l", force=force))
-    compiled.append(compile(main, flags=flags, force=force))
-    link(target, compiled)
+        compiled.append(compile(dep, flags=(flags + " -l"), force=args.force, assembly=args.assembly))
+    compiled.append(compile(main, flags=flags, force=args.force, assembly=args.assembly))
+    link(target, compiled, args.assembly)
 
 
-def compile(filename, flags="", force=False):
-    target = os.path.splitext(filename)[0] + ".ll"
+def compile(filename, flags="", force=False, assembly=False):
+    target = os.path.splitext(filename)[0] + (".o" if not assembly else ".ll")
+    flags += " -c" if not assembly else " -S"
     if force or not os.path.exists(target) or os.path.getmtime(filename) > os.path.getmtime(target):
-        runordie(COMPILE + " -S " + flags + " " + filename)
+        runordie("{compile} {flags} {filename}".format(compile=COMPILE, flags=flags, filename=filename))
     return target
 
-
-def link(target, filenames):
-    runordie(LINK + " " + " ".join(filenames) + " > " + target)
+def link(target, filenames, assembly=False):
+    if not assembly:
+        runordie("{ld} {flags} -o {target} {files}".format(ld=LINK, flags=LDFLAGS, target=target, files=" ".join(filenames)))
+    else:
+        runordie("{ld} {files} > {target}".format(ld=ILINK, files=" ".join(filenames), target=target))
 
 
 def runcmd(cmd):
