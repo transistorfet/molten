@@ -1,5 +1,7 @@
 
 * make definitions always require an initializer
+* there was an error where "let ni: newint" with no initializer was causing a type error with "expected class or concrete type", but that was actually because a definition without
+  an initializer is the same as "let ni: newint = nil" and nil could not be cast to a Record, which newint is a typealias of a record
 
 * limit nested enums to only refs, otherwise it doesn't make sense
 * there is an issue with raise, in that it is considered to return unit () instead of somehow being marked as not returning...  Getting type errors in Option def
@@ -18,16 +20,13 @@
 
 
 BUGS:
-* unable to define a method as / MF or / C ABI
 * the infer-arg-as-typevar test fails because str() cannot be resolved to a concrete variant by the time it's typechecked (no backwards affect allowed)
 * there is still a bug with the Phi statement, in that it will return null if you don't cover all cases. there is no check for coverage
-* recursive c functions don't work because it's typechecked as unknown abi, which is called as a closure
 * issue with separator/lf not working when two expressions are on the same line (it should produce a parse error)
 * issue with calling function references store in structs or tuples... it converts them to methods incorrectly
-* if you only have one element in a tuple, or in a record, it parses it as a block or expression
-* there was an error where "let ni: newint" with no initializer was causing a type error with "expected class or concrete type", but that was actually because a definition without
-  an initializer is the same as "let ni: newint = nil" and nil could not be cast to a Record, which newint is a typealias of a record
-* minor bug caught by abi test; the printf function had been added in declare_irregulars, but was decl'ed in the test, and it caused a segfault because you call an undefined function "printf.1"
+
+* mabye not a bug, but unable to define a method as / MF or / C ABI
+* not really a bug, but if you only have one element in a tuple, or in a record, it parses it as a block or expression
 * not really a bug, but empty lists cannot be typechecked to concrete types unless it's explicitly provided ("[]" on its own)
 
 

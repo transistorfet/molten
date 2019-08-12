@@ -362,6 +362,10 @@ impl Scope {
                                 // TODO this is almost certainly wrong, but it stops the infinite loop
                                 //session.set_type(*oid, mtype.clone());
                                 //return otype;
+
+                                //let otype = session.get_type(*oid).unwrap();
+                                //session.set_type(*mid, otype.clone());
+                                //return otype;
                             }
                         },
                         _ => { },

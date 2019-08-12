@@ -1,4 +1,4 @@
-Fri Aug  9 20:06:36 PDT 2019
+Sun Aug 11 20:25:57 PDT 2019
 [01/63] basic/abi-across-exprs.mol......................................success
 [02/63] basic/block-assign.mol..........................................success
 [03/63] basic/block-invoke.mol..........................................success
@@ -29,8 +29,8 @@ Fri Aug  9 20:06:36 PDT 2019
 [28/63] basic/record-member-order.mol...................................success
 [29/63] basic/record-update.mol.........................................success
 [30/63] basic/records.mol...............................................success
-[31/63] basic/recursion-c.mol...........................................FAIL
-[32/63] basic/recursion-mf.mol..........................................FAIL
+[31/63] basic/recursion-c.mol...........................................success
+[32/63] basic/recursion-mf.mol..........................................success
 [33/63] basic/recursion.mol.............................................success
 [34/63] basic/refs-assignment.mol.......................................success
 [35/63] basic/refs.mol..................................................success
@@ -62,4 +62,4 @@ Fri Aug  9 20:06:36 PDT 2019
 [61/63] typecheck/infer-forward-method.mol..............................success
 [62/63] typecheck/method-overload-mismatch.mol..........................FAIL
 [63/63] typecheck/object-typevar-params.mol.............................success
-57 tests passed, 6 tests failed, 63 total
+59 tests passed, 4 tests failed, 63 total

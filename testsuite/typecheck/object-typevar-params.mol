@@ -23,8 +23,7 @@ class Option2<'item> {
     }
 
     fn none() {
-        // TODO I've purposely left this as item2... perhaps there should actually be a check to make this fail (where all vars in def must be declared in typeparams)
-        let opt = new Option2<'item2>()
+        let opt = new Option2<'item>()
         opt.has = false
         opt.item = nil
         opt

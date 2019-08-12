@@ -60,13 +60,16 @@ impl<'sess> TypeChecker<'sess> {
                 }
             },
 
-            AST::Function(ref id, _, _, ref ident, ref args, ref rtype, ref body, ref abi) => {
+            AST::Function(ref id, _, _, ref ident, ref args, _, ref body, ref abi) => {
                 let fscope = self.session.map.get(id);
+                let dftype = self.session.get_type(*id).unwrap();
+                let rtype = dftype.get_rettype()?;
 
                 let mut argtypes = vec!();
                 for arg in args.iter() {
-                    let vtype = arg.default.clone().map(|ref vexpr| self.check_node(scope.clone(), vexpr, arg.ttype.clone()));
-                    let mut atype = expect_type(self.session, fscope.clone(), arg.ttype.clone(), vtype, Check::Def)?;
+                    let ttype = self.session.get_type(arg.id);
+                    let vtype = arg.default.clone().map(|ref vexpr| self.check_node(scope.clone(), vexpr, ttype.clone()));
+                    let mut atype = expect_type(self.session, fscope.clone(), ttype, vtype, Check::Def)?;
                     if &arg.ident.name[..] == "self" {
                         let stype = fscope.find_type(self.session, &String::from("Self")).unwrap();
                         atype = expect_type(self.session, fscope.clone(), Some(atype), Some(stype), Check::Def)?;
@@ -75,7 +78,7 @@ impl<'sess> TypeChecker<'sess> {
                     argtypes.push(atype);
                 }
 
-                let rettype = expect_type(self.session, fscope.clone(), rtype.clone(), Some(self.check_node(fscope.clone(), body, rtype.clone())), Check::Def)?;
+                let rettype = expect_type(self.session, fscope.clone(), Some(rtype.clone()), Some(self.check_node(fscope.clone(), body, Some(rtype.clone()))), Check::Def)?;
 
                 // Resolve type variables that can be
                 for i in 0 .. argtypes.len() {
@@ -87,7 +90,9 @@ impl<'sess> TypeChecker<'sess> {
                 let nftype = Type::Function(r(tupleargs.clone()), r(rettype), *abi);
 
                 if let Ok(Def::Overload(ol)) = self.session.get_def_from_ref(*id) {
-                    if ol.find_local_variants(self.session, scope.clone(), tupleargs.clone()).0.len() > 0 {
+                    let (mut found, _) = ol.find_local_variants(self.session, scope.clone(), tupleargs.clone());
+                    found = found.into_iter().filter(|(fid, _)| *id != *fid).collect();
+                    if found.len() > 0 {
                         return Err(Error::new(format!("OverloadError: things {:?}", ident)));
                     }
                 }
@@ -141,15 +146,15 @@ impl<'sess> TypeChecker<'sess> {
                 ltype.unwrap()
             },
 
-            AST::Definition(ref id, _, _, _, ref ttype, ref body) => {
-                let btype = expect_type(self.session, scope.clone(), ttype.clone(), Some(self.check_node(scope.clone(), body, ttype.clone())), Check::Def)?;
+            AST::Definition(ref id, _, _, _, _, ref body) => {
+                let dtype = self.session.get_type(*id);
+                let btype = expect_type(self.session, scope.clone(), dtype.clone(), Some(self.check_node(scope.clone(), body, dtype)), Check::Def)?;
                 self.session.update_type(scope.clone(), *id, btype.clone())?;
                 btype
             },
 
-            AST::Declare(ref id, _, _, ref _ident, ref ttype) => {
-                self.session.update_type(scope.clone(), *id, ttype.clone())?;
-                ttype.clone()
+            AST::Declare(ref id, _, _, _, _) => {
+                self.session.get_type(*id).unwrap()
             },
 
             AST::Identifier(ref id, _, ref ident) => {
@@ -287,20 +292,21 @@ impl<'sess> TypeChecker<'sess> {
                 scope.make_obj(self.session, String::from("()"), vec!())?
             },
 
-            AST::PtrCast(ref id, ref ttype, ref code) => {
-                let ctype = self.check_node(scope.clone(), code, Some(ttype.clone()));
+            AST::PtrCast(ref id, _, ref code) => {
+                let ttype = self.session.get_type(*id);
+                let ctype = self.check_node(scope.clone(), code, ttype.clone());
                 debug!("PTRCAST: {:?} <- {:?}", ttype, ctype);
-                // TODO is this quite right?
-                expect_type(self.session, scope, Some(ttype.clone()), Some(ctype), Check::List)?;
-                ttype.clone()
+                expect_type(self.session, scope, ttype.clone(), Some(ctype), Check::List)?;
+                ttype.unwrap()
             },
 
-            AST::New(ref id, _, ClassSpec { ref ident, ref types, .. }) => {
+            AST::New(ref id, _, _) => {
+                let classtype = self.session.get_type(*id).unwrap();
                 let dtype = self.session.get_type_from_ref(*id)?;
                 let tscope = Scope::new_ref(Some(scope.clone()));
                 let mtype = tscope.map_all_typevars(self.session, dtype.clone());
-                check_type_params(self.session, scope.clone(), &mtype.get_params()?, types, Check::Def, true)?;
-                scope.make_obj(self.session, ident.name.clone(), types.clone())?
+                check_type_params(self.session, scope.clone(), &mtype.get_params()?, &classtype.get_params()?, Check::Def, true)?;
+                classtype
             },
 
             AST::Class(ref id, _, _, _, ref body) => {
@@ -360,9 +366,10 @@ impl<'sess> TypeChecker<'sess> {
                 self.session.update_type(scope.clone(), *id, btype.clone())?;
                 Ok(btype)
             },
-            Pattern::Annotation(_, ref ttype, ref pat) => {
-                let etype = self.check_pattern(scope.clone(), pat, Some(ttype.clone()))?;
-                expect_type(self.session, scope, Some(ttype.clone()), Some(etype), Check::Def)
+            Pattern::Annotation(ref id, _, ref pat) => {
+                let ttype = self.session.get_type(*id);
+                let etype = self.check_pattern(scope.clone(), pat, ttype.clone())?;
+                expect_type(self.session, scope, ttype, Some(etype), Check::Def)
             },
             Pattern::Resolve(ref id, ref left, ref field, ref oid) => {
                 let ltype = self.session.get_type_from_ref(*oid).unwrap();
