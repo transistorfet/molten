@@ -73,7 +73,7 @@ def command_build(args):
         target += ".bc"
     flags = MOLFLAGS
     flags += " -d" if args.debug else ""
-    compile_and_link(target, [ "lib/libcore.ml", args.filename ], flags=flags, args=args)
+    compile_and_link(target, [ "lib/libcore.mol", args.filename ], flags=flags, args=args)
     return target
 
 def command_run(args):
