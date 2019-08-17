@@ -687,12 +687,11 @@ impl<'sess> LLVM<'sess> {
                     self.set_type(*id, self.build_type(ltype));
                 },
 
-                LLGlobal::DefGlobal(id, name, ltype) => {
+                LLGlobal::DefGlobal(id, link, name, ltype) => {
                     let rtype = self.build_type(ltype);
                     let global = LLVMAddGlobal(self.module, rtype, cstr(name.as_str()));
                     LLVMSetInitializer(global, self.null_const(rtype));
-                    // TODO this is uesd by vtables but might not be wanted for other uses...
-                    LLVMSetLinkage(global, LLVMLinkage::LLVMLinkOnceAnyLinkage);
+                    self.build_linkage(global, *link);
                     self.set_value(*id, global);
                 },
 
@@ -746,7 +745,7 @@ impl<'sess> LLVM<'sess> {
                 },
 
                 LLGlobal::DefType(_, _, _) |
-                LLGlobal::DefGlobal(_, _, _) |
+                LLGlobal::DefGlobal(_, _, _, _) |
                 LLGlobal::DeclCFunc(_, _, _, _) |
                 LLGlobal::DefNamedStruct(_, _, _) |
                 LLGlobal::SetStructBody(_, _, _) => { /* Nothing Needs To Be Done */ }

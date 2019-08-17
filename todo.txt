@@ -11,9 +11,9 @@
 * make an HIR
 * add typeclasses
 
-* fix modules system
+* should it be allowed to have duplicate decls as long as they are identical types?
+* fix modules import system to be less dependent on file paths...
 * remove the forced visibility in refinery, when you decide on pub/priv semantics
-* make run function return a module object?  Should it also memoize itself?
 * make the molten type convert function for mfuncs use the LLType::Exception instead of i8* (remove molten type convert in transform)
 
 
@@ -110,6 +110,7 @@ Changes:
 
 * should you add some means of accessing variant values without pattern matching?
 * should you add access modifiers to classes, and maybe functions; public, private, protected
+* should module init return something other than 0, like a module object?  Is that even useful?
 * should exports also list all the modules that the file imports, so that class definitions in other imports can be found, if needed for arguments
 * should you fix scope resolution to also work on objects, so that you can have static methods from the object without explicitly referencing its type
 * should you remove the Nil type? (yes, but it'll be a bit tricky)

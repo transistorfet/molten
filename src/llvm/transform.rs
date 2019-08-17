@@ -121,47 +121,75 @@ impl<'sess> Transformer<'sess> {
 
 
     pub fn transform_code(&self, scope: ScopeRef, code: &Vec<AST>) {
+        let run_id = self.build_run_func(scope.clone(), code);
+
+        if !Options::as_ref().is_library {
+            self.build_main_func(scope.clone(), run_id);
+        }
+    }
+
+    pub fn build_run_func(&self, scope: ScopeRef, code: &Vec<AST>) -> NodeID {
+        // Define a global that will store whether we've run this function or not
+        let module_memo_id = NodeID::generate();
+        self.add_global(LLGlobal::DefGlobal(module_memo_id, LLLink::Public, format!("memo.{}", self.session.name), LLType::I1));
+
         let run_id = NodeID::generate();
         let run_ltype = self.convert_to_mfunc_def_type(LLType::Function(vec!(), r(LLType::I64)));
         self.set_type(run_id, run_ltype.clone());
 
-        let exp_id = NodeID::generate();
-
         let mut fargs = vec!();
+        let exp_id = NodeID::generate();
         self.convert_mfunc_def_args(scope.clone(), exp_id, &mut fargs);
 
-        let mut body = self.with_context(CodeContext::Func(ABI::MoltenFunc, run_id), || {
-            self.with_exception(exp_id, || {
-                self.transform_vec(scope.clone(), &code)
+        // Set the memo, execute the module's top level scope, and then return 0
+        let mut body = vec!();
+        body.push(LLExpr::SetGlobal(module_memo_id, r(LLExpr::Literal(LLLit::I1(true)))));
+        body.extend(
+            self.with_context(CodeContext::Func(ABI::MoltenFunc, run_id), || {
+                self.with_exception(exp_id, || {
+                    self.transform_vec(scope.clone(), &code)
+                })
             })
-        });
+        );
         body.push(LLExpr::Literal(LLLit::I64(0)));
 
+        // If we've run before, return 0, else execute the body
+        let run_body = vec!(LLExpr::Phi(vec!(
+            vec!(LLExpr::Cmp(LLCmpType::Equal, r(LLExpr::GetGlobal(module_memo_id)), r(LLExpr::Literal(LLLit::I1(true))))),
+            vec!(LLExpr::Literal(LLLit::I1(true)))
+        ), vec!(
+            vec!(LLExpr::Literal(LLLit::I64(0))),
+            body
+        )));
+
         let module_run_name = format!("run.{}", self.session.name);
-        self.add_global(LLGlobal::DefCFunc(run_id, LLLink::Public, module_run_name, run_ltype, fargs, body, LLCC::FastCC));
+        self.add_global(LLGlobal::DefCFunc(run_id, LLLink::Public, module_run_name, run_ltype, fargs, run_body, LLCC::FastCC));
 
+        run_id
+    }
 
-        if !Options::as_ref().is_library {
-            let main_id = NodeID::generate();
-            let main_ltype = LLType::Function(vec!(), r(LLType::I64));
-            let mut main_body = vec!();
+    pub fn build_main_func(&self, scope: ScopeRef, run_id: NodeID) {
+        let main_id = NodeID::generate();
+        let main_ltype = LLType::Function(vec!(), r(LLType::I64));
+        let mut main_body = vec!();
 
-            let exp_id = NodeID::generate();
-            let expoint = self.create_exception_point(&mut main_body, exp_id);
+        let exp_id = NodeID::generate();
+        let expoint = self.create_exception_point(&mut main_body, exp_id);
 
-            let body = self.with_exception(exp_id, || {
-                self.create_mfunc_invoke(LLExpr::GetValue(run_id), vec!())
-            });
+        // Try calling the module's run function
+        let try = self.with_exception(exp_id, || {
+            self.create_mfunc_invoke(LLExpr::GetValue(run_id), vec!())
+        });
 
-            let fail = vec!(
-                LLExpr::CallC(r(LLExpr::GetNamed("puts".to_string())), vec!(LLExpr::Literal(LLLit::ConstStr(String::from("Uncaught exception.  Terminating")))), LLCC::CCC),
-                LLExpr::Literal(LLLit::I64(-1))
-            );
+        // If an exception occurs, print a message and exit with -1
+        let catch = vec!(
+            LLExpr::CallC(r(LLExpr::GetNamed("puts".to_string())), vec!(LLExpr::Literal(LLLit::ConstStr(String::from("Uncaught exception.  Terminating")))), LLCC::CCC),
+            LLExpr::Literal(LLLit::I64(-1))
+        );
 
-            main_body.extend(self.create_exception_block(expoint, body, fail));
+        main_body.extend(self.create_exception_block(expoint, try, catch));
 
-            self.add_global(LLGlobal::DefCFunc(main_id, LLLink::Public, String::from("main"), main_ltype, vec!(), main_body, LLCC::CCC));
-        }
+        self.add_global(LLGlobal::DefCFunc(main_id, LLLink::Public, String::from("main"), main_ltype, vec!(), main_body, LLCC::CCC));
     }
 
     pub fn transform_vec(&self, scope: ScopeRef, code: &Vec<AST>) -> Vec<LLExpr> {
@@ -756,7 +784,7 @@ impl<'sess> Transformer<'sess> {
         let fname = self.transform_func_name(scope.clone(), Some(name), id);
 
         let did = NodeID::generate();
-        self.add_global(LLGlobal::DefGlobal(did, fname.clone(), self.transform_value_type(ttype)));
+        self.add_global(LLGlobal::DefGlobal(did, LLLink::Once, fname.clone(), self.transform_value_type(ttype)));
         vec!(LLExpr::SetValue(id, r(LLExpr::GetLocal(did))))
     }
 
@@ -820,7 +848,7 @@ impl<'sess> Transformer<'sess> {
 
         if vis == Visibility::Public {
             let gid = NodeID::generate();
-            self.add_global(LLGlobal::DefGlobal(gid, fname.clone(), structtype));
+            self.add_global(LLGlobal::DefGlobal(gid, LLLink::Once, fname.clone(), structtype));
             exprs.push(LLExpr::SetGlobal(gid, r(LLExpr::GetLocal(did))));
         }
 
@@ -950,7 +978,7 @@ impl<'sess> Transformer<'sess> {
         let mut exprs = vec!();
         let tscope = self.session.map.get(&classdef.id);
 
-        self.add_global(LLGlobal::DefGlobal(classdef.vtable.id, format!("__{}_vtable", tscope.get_basename()), self.get_type(classdef.vtable.id).unwrap()));
+        self.add_global(LLGlobal::DefGlobal(classdef.vtable.id, LLLink::Once, format!("__{}_vtable", tscope.get_basename()), self.get_type(classdef.vtable.id).unwrap()));
         // TODO should vtables be dynamically allocated, or should we add a LLType::ElementOf() type or something to GetElement an aliased type
         exprs.push(LLExpr::SetGlobal(classdef.vtable.id, r(LLExpr::AllocRef(NodeID::generate(), self.get_type(classdef.vtable.id).unwrap(), None))));
         classdef.vtable.foreach_enumerated(|i, id, _, ttype| {
