@@ -34,7 +34,7 @@ fn build_index_node(index: &mut String, session: &Session, scope: ScopeRef, node
                 if *vis == Visibility::Public {
                     //let name = get_mangled_name(session, scope.clone(), &ident.name, *id);
                     let ttype = session.get_type(*id).unwrap();
-                    index.push_str(format!("decl {} : {}\n", ident.name.clone(), unparse_type(session, scope.clone(), ttype)).as_str());
+                    index.push_str(format!("decl {}{}\n", ident.name.clone(), unparse_type(session, scope.clone(), ttype)).as_str());
                 }
             }
         },
@@ -54,8 +54,8 @@ fn build_index_node(index: &mut String, session: &Session, scope: ScopeRef, node
             };
 
             index.push_str(format!("class {} {{\n", fullspec).as_str());
-            //index.push_str(format!("    decl __alloc__ : () -> {}\n", namespec).as_str());
-            //index.push_str(format!("    decl __init__ : ({}) -> Nil\n", namespec).as_str());
+            //index.push_str(format!("    decl __alloc__() -> {}\n", namespec).as_str());
+            //index.push_str(format!("    decl __init__({}) -> Nil\n", namespec).as_str());
             for node in body {
                 match *node {
                     AST::Definition(ref id, _, ref mutable, ref ident, _, _) => {
@@ -67,7 +67,7 @@ fn build_index_node(index: &mut String, session: &Session, scope: ScopeRef, node
                             if *vis == Visibility::Public {
                                 //let name = get_mangled_name(session, tscope.clone(), &ident.name, *id);
                                 let ttype = session.get_type(*id).unwrap();
-                                index.push_str(format!("    decl {} : {}\n", ident.name.clone(), unparse_type(session, tscope.clone(), ttype)).as_str());
+                                index.push_str(format!("    decl {}{}\n", ident.name.clone(), unparse_type(session, tscope.clone(), ttype)).as_str());
                             }
                         }
                     },

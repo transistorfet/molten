@@ -279,8 +279,8 @@ also be defined with an ABI specifier so that they are accessible to
 other languages.  Only C support is currently implemented. A C function
 cannot be a closure.
 ```
-decl foo : (Int) -> Int         // external molten function
-decl bar : (Int) -> Int / C     // external C function
+decl foo(Int) -> Int         // external molten function
+decl bar(Int) -> Int / C     // external C function
 
 fn baz(i: Int) / C {
     // molten function that can be called from C

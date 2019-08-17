@@ -2,7 +2,7 @@
 //! Hey
 //! Ho
 
-decl printf : (String) -> Int / C
+decl printf(String) -> Int / C
 
 let f = if 1 == 1 then {
     printf

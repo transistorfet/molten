@@ -406,9 +406,8 @@ named!(declare(Span) -> AST,
         pos: position!() >>
         vis: opt!(wscom!(tag_word!("pub"))) >>
         wscom!(tag_word!("decl")) >>
-        n: symbol_name >>
-        wscom!(tag!(":")) >>
-        t: type_description >>
+        n: alt_complete!(identifier | any_op) >>
+        t: type_function >>
         (AST::make_decl(Pos::new(pos), if vis.is_some() { Visibility::Public } else { Visibility::Private }, n, t))
     )
 );
@@ -691,14 +690,6 @@ named!(identifier_typed(Span) -> (Pos, Ident, Option<Type>),
         (Pos::new(pos), i, t)
     ))
 );
-
-named!(symbol_name(Span) -> Ident,
-    wscom!(do_parse!(
-        s: recognize!(take_while!(is_not_colon)) >>
-        (Ident::from_span(s))
-    ))
-);
-
 
 named!(any_op(Span) -> Ident,
     alt!(infix_op | prefix_op | map_ident!(alt!(tag!("[]") | tag!("::"))))
@@ -1097,10 +1088,6 @@ pub fn is_alpha_underscore(ch: u8) -> bool {
 
 pub fn is_alphanumeric_underscore(ch: u8) -> bool {
     ch == b'_' || is_alphanumeric(ch)
-}
-
-pub fn is_not_colon(ch: u8) -> bool {
-    ch != b':' && !is_space(ch)
 }
 
 

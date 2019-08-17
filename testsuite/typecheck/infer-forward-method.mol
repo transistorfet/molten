@@ -1,9 +1,9 @@
 
 
 //!dec class Test {
-//!dec     decl test : \(Test, Int\) -> Int
-//!dec     decl test2 : \(Test, Int\) -> Int
-//!dec     decl __init__ : \(Test\) -> Test
+//!dec     decl test\(Test, Int\) -> Int
+//!dec     decl test2\(Test, Int\) -> Int
+//!dec     decl __init__\(Test\) -> Test
 //!dec }
 
 class Test {
