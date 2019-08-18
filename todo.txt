@@ -11,10 +11,8 @@
 * make an HIR
 * add typeclasses
 
-* should it be allowed to have duplicate decls as long as they are identical types?
 * fix modules import system to be less dependent on file paths...
 * remove the forced visibility in refinery, when you decide on pub/priv semantics
-* make the molten type convert function for mfuncs use the LLType::Exception instead of i8* (remove molten type convert in transform)
 
 
 
@@ -52,6 +50,7 @@ Refactoring:
 * change parser to take session argument or something so it can record the file info, and maybe do other advanced things
 * there must be a way to fix the 'scope exceptions' (Scope::target) that we're doing to make class bodies work... pass in an argument to all scoped functions?  or use scopemap and scope ids?
 * add the .set_id() functions to simplify ast builders
+* try making a simple trait for function transforms, for the 3 types (might be more trouble than the current approach)
 
 
 

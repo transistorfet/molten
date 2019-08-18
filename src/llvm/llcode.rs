@@ -12,7 +12,7 @@ pub enum LLType {
     I64,
     F64,
     Var,
-    Exception,
+    ExceptionPoint,
     Ptr(R<LLType>),
     Struct(Vec<LLType>),
     Array(R<LLType>, usize),

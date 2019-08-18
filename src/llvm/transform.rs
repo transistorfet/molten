@@ -21,6 +21,7 @@ use misc::{ r };
 use llvm::llcode::{ LLType, LLLit, LLRef, LLCmpType, LLLink, LLCC, LLExpr, LLGlobal };
 
 
+static EXCEPTION_POINT_NAME: &str = "__ExceptionPoint__";
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum CodeContext {
@@ -49,6 +50,8 @@ impl<'sess> Transformer<'sess> {
     }
 
     pub fn initialize(&self) {
+        let global = self.session.map.get_global();
+
         /*
             "()" => LLType::Void,
             "Nil" => LLType::Ptr(LLType::I8),
@@ -59,6 +62,10 @@ impl<'sess> Transformer<'sess> {
             "String" => LLType::Ptr(LLType::I8),
             "Buffer" => LLType::Ptr(LLType::Ptr(LLType::I8)),
         */
+
+        let expoint_id = NodeID::generate();
+        global.define_type(String::from(EXCEPTION_POINT_NAME), Some(expoint_id));
+        self.session.set_type(expoint_id, Type::Object(String::from(EXCEPTION_POINT_NAME), expoint_id, vec!()));
     }
 
     fn set_type(&self, id: NodeID, ltype: LLType) {
@@ -492,7 +499,7 @@ impl<'sess> Transformer<'sess> {
     }
 
     fn create_exception_point(&self, exprs: &mut Vec<LLExpr>, exp_id: NodeID) -> LLExpr {
-        exprs.push(LLExpr::DefLocal(exp_id, String::from("__exception__"), LLType::Exception, r(LLExpr::Literal(LLLit::Null(LLType::Exception)))));
+        exprs.push(LLExpr::DefLocal(exp_id, String::from("__exception__"), LLType::ExceptionPoint, r(LLExpr::Literal(LLLit::Null(LLType::ExceptionPoint)))));
 
         let ret_id = NodeID::generate();
         exprs.push(LLExpr::SetValue(ret_id, r(LLExpr::CallC(r(LLExpr::GetNamed("setjmp".to_string())), vec!(LLExpr::GetValue(exp_id)), LLCC::CCC))));
@@ -670,8 +677,8 @@ impl<'sess> Transformer<'sess> {
     fn convert_to_mfunc_def_type(&self, ltype: LLType) -> LLType {
         match ltype {
             LLType::Function(mut args, ret) => {
-                //args.push(LLType::Ptr(r(LLType::Exception)));
-                args.push(LLType::Ptr(r(LLType::I8)));
+                args.push(LLType::Ptr(r(LLType::ExceptionPoint)));
+                //args.push(LLType::Ptr(r(LLType::I8)));
                 LLType::Function(args, ret)
             },
             _ => ltype
@@ -682,7 +689,7 @@ impl<'sess> Transformer<'sess> {
         match ttype {
             Type::Function(argtypes, rettype, _) => {
                 let mut argtypes = argtypes.as_vec();
-                argtypes.push(scope.find_type(self.session, &String::from("String")).unwrap());
+                argtypes.push(scope.find_type(self.session, &String::from(EXCEPTION_POINT_NAME)).unwrap());
                 Type::Function(r(Type::Tuple(argtypes)), rettype, ABI::C)
             },
             ttype @ _ => ttype,
@@ -1227,6 +1234,7 @@ impl<'sess> Transformer<'sess> {
                 "Real" => LLType::F64,
                 "String" => LLType::Ptr(r(LLType::I8)),
                 "Buffer" => LLType::Ptr(r(LLType::Ptr(r(LLType::I8)))),
+                t if t == EXCEPTION_POINT_NAME => LLType::Ptr(r(LLType::ExceptionPoint)),
                 _ => self.types.borrow().get(id).unwrap().clone(),
             },
             Type::Ref(ttype) => LLType::Ptr(r(self.transform_value_type(ttype))),

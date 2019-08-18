@@ -278,7 +278,7 @@ impl<'sess> LLVM<'sess> {
             LLType::I64 => self.i64_type(),
             LLType::F64 => self.f64_type(),
             LLType::Var => self.get_type(TYPEVAR_ID).unwrap(),
-            LLType::Exception => self.get_type(EXCEPTION_ID).unwrap(),
+            LLType::ExceptionPoint => self.get_type(EXCEPTION_ID).unwrap(),
             LLType::Ptr(etype) => LLVMPointerType(self.build_type(etype), 0),
             LLType::Struct(etypes) => self.struct_type(etypes),
             LLType::Array(etype, size) => self.array_type(etype, *size),
