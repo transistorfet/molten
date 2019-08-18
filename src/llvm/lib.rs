@@ -15,6 +15,7 @@ use parser::{ parse_type };
 use ast::{ NodeID, Mutability, Visibility };
 use scope::{ Scope, ScopeRef, ScopeMapRef, Context };
 use binding::{ bind_type_names };
+use config::Options;
 use misc::UniqueID;
 
 use defs::classes::{ ClassDef, Define };
@@ -169,14 +170,21 @@ pub unsafe fn declare_c_function(llvm: &LLVM, name: &str, args: &mut [LLVMTypeRe
 }
 
 unsafe fn declare_irregular_functions(llvm: &LLVM) {
-    //declare_function(llvm, "malloc", &mut [llvm.i64_type()], llvm.str_type(), false);
-    //declare_function(llvm, "realloc", &mut [llvm.str_type(), llvm.i64_type()], llvm.str_type(), false);
-    //declare_function(llvm, "free", &mut [llvm.str_type()], LLVMVoidType(), false);
+    if Options::as_ref().no_gc {
+        declare_c_function(llvm, "malloc", &mut [llvm.i64_type()], llvm.str_type(), false);
+        declare_c_function(llvm, "realloc", &mut [llvm.str_type(), llvm.i64_type()], llvm.str_type(), false);
+        declare_c_function(llvm, "free", &mut [llvm.str_type()], LLVMVoidType(), false);
+    } else {
+        declare_c_function(llvm, "GC_init", &mut [], LLVMVoidType(), false);
+        declare_c_function(llvm, "GC_malloc", &mut [llvm.i64_type()], llvm.str_type(), false);
+        declare_c_function(llvm, "GC_realloc", &mut [llvm.str_type(), llvm.i64_type()], llvm.str_type(), false);
+        declare_c_function(llvm, "GC_free", &mut [llvm.str_type()], LLVMVoidType(), false);
+    }
 
-    //declare_function(llvm, "strlen", &mut [llvm.str_type()], llvm.i64_type(), false);
-    //declare_function(llvm, "memcpy", &mut [llvm.str_type(), llvm.str_type(), llvm.i64_type()], llvm.str_type(), false);
+    //declare_c_function(llvm, "strlen", &mut [llvm.str_type()], llvm.i64_type(), false);
+    //declare_c_function(llvm, "memcpy", &mut [llvm.str_type(), llvm.str_type(), llvm.i64_type()], llvm.str_type(), false);
 
-    //declare_function(llvm, "puts", &mut [llvm.str_type()], llvm.i64_type(), false);
+    //declare_c_function(llvm, "puts", &mut [llvm.str_type()], llvm.i64_type(), false);
     //declare_c_function(llvm, "printf", &mut [llvm.str_type()], llvm.i64_type(), true);
     declare_c_function(llvm, "sprintf", &mut [llvm.str_type(), llvm.str_type()], llvm.i64_type(), true);
 
@@ -247,10 +255,11 @@ pub fn get_builtins<'sess>() -> Vec<BuiltinDef<'sess>> {
         //BuiltinDef::Class(id(), "List",   vec!(Type::Variable(String::from("item"), UniqueID(0))), vec!(), vec!()),
         //BuiltinDef::Class(id(), "Class",  Type::Object(String::from("Class"), vec!())),
 
+        BuiltinDef::Func(id(), "molten_init",    "() -> () / C",                FuncKind::Function(molten_init)),
+        BuiltinDef::Func(id(), "molten_malloc",  "(Int) -> 'ptr / C",           FuncKind::Function(molten_malloc)),
+        BuiltinDef::Func(id(), "molten_realloc", "('ptr, Int) -> 'ptr / C",     FuncKind::Function(molten_realloc)),
+        BuiltinDef::Func(id(), "molten_free",    "('ptr) -> () / C",            FuncKind::Function(molten_free)),
 
-        BuiltinDef::Func(id(), "malloc",     "(Int) -> 'ptr / C",               FuncKind::External),
-        BuiltinDef::Func(id(), "realloc",    "('ptr, Int) -> 'ptr / C",         FuncKind::External),
-        BuiltinDef::Func(id(), "free",       "('ptr) -> () / C",                FuncKind::External),
         BuiltinDef::Func(id(), "memcpy",     "('ptr, 'ptr, Int) -> 'ptr / C",   FuncKind::External),
         BuiltinDef::Func(id(), "strcmp",     "(String, String) -> Int / C",     FuncKind::External),
         BuiltinDef::Func(id(), "puts",       "(String) -> () / C",              FuncKind::External),
@@ -375,6 +384,40 @@ fn sprintf(llvm: &LLVM, mut args: Vec<LLVMValueRef>) -> LLVMValueRef {
     }
 }
 
+
+unsafe fn molten_init(llvm: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef {
+    if !Options::as_ref().no_gc {
+        llvm.build_call_by_name("GC_init", &mut vec!());
+    }
+    llvm.i32_const(0)
+}
+
+unsafe fn molten_malloc(llvm: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef {
+    //llvm.build_call_by_name("puts", &mut vec!(LLVMBuildGlobalStringPtr(llvm.builder, cstr("MALLOC"), cstr("__string"))));
+    let name = if Options::as_ref().no_gc { "malloc" } else { "GC_malloc" };
+
+    let ptr = llvm.build_call_by_name(name, &mut vec!(args[0]));
+    LLVMBuildPointerCast(llvm.builder, ptr, llvm.ptr_type(), cstr("ptr"))
+}
+
+unsafe fn molten_realloc(llvm: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef {
+    let name = if Options::as_ref().no_gc { "realloc" } else { "GC_realloc" };
+
+    let buffer = LLVMBuildPointerCast(llvm.builder, args[0], llvm.str_type(), cstr(""));
+    let ptr = llvm.build_call_by_name(name, &mut vec!(buffer, args[1]));
+    LLVMBuildPointerCast(llvm.builder, ptr, llvm.ptr_type(), cstr("ptr"))
+}
+
+unsafe fn molten_free(llvm: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef {
+    let name = if Options::as_ref().no_gc { "free" } else { "GC_free" };
+
+    let buffer = LLVMBuildPointerCast(llvm.builder, args[0], llvm.str_type(), cstr(""));
+    llvm.build_call_by_name(name, &mut vec!(buffer));
+    llvm.i32_const(0)
+}
+
+
+
 unsafe fn sizeof_value(llvm: &LLVM, mut args: Vec<LLVMValueRef>) -> LLVMValueRef {
     let ltype = LLVMPointerType(LLVMTypeOf(args[0]), 0);
     let mut indices = vec!(llvm.i32_const(1));
@@ -395,14 +438,15 @@ unsafe fn buffer_get(llvm: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef {
 
 
 unsafe fn buffer_alloc(llvm: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef {
-    let ptr = LLVMBuildArrayMalloc(llvm.builder, LLVMInt64TypeInContext(llvm.context), args[0], cstr("tmp"));
+    let size = LLVMBuildMul(llvm.builder, args[0], LLVMSizeOf(llvm.i64_type()), cstr(""));
+    let ptr = llvm.build_call_by_name("molten_malloc", &mut vec!(size));
     LLVMBuildPointerCast(llvm.builder, ptr, llvm.ptr_type(), cstr("ptr"))
 }
 
 unsafe fn buffer_resize(llvm: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef {
-    let buffer = LLVMBuildPointerCast(llvm.builder, args[0], llvm.str_type(), cstr("tmp"));
-    let size = LLVMBuildMul(llvm.builder, args[1], LLVMSizeOf(LLVMInt64TypeInContext(llvm.context)), cstr("tmp"));
-    let newptr = llvm.build_call_by_name("realloc", &mut vec!(llvm.cast_typevars(llvm.build_type(&LLType::Var), buffer), size));
+    let buffer = LLVMBuildPointerCast(llvm.builder, args[0], llvm.str_type(), cstr(""));
+    let size = LLVMBuildMul(llvm.builder, args[1], LLVMSizeOf(llvm.i64_type()), cstr(""));
+    let newptr = llvm.build_call_by_name("molten_realloc", &mut vec!(llvm.cast_typevars(llvm.build_type(&LLType::Var), buffer), size));
     LLVMBuildPointerCast(llvm.builder, newptr, llvm.ptr_type(), cstr("ptr"))
 }
 
@@ -461,7 +505,8 @@ unsafe fn buffer_allocator(llvm: &LLVM, objtype: LLVMTypeRef, mut args: Vec<LLVM
 }
 
 unsafe fn buffer_constructor(llvm: &LLVM, objtype: LLVMTypeRef, args: Vec<LLVMValueRef>) -> LLVMValueRef {
-    let ptr = LLVMBuildArrayMalloc(llvm.builder, LLVMInt64TypeInContext(llvm.context), args[1], cstr("tmp"));
+    let size = LLVMBuildMul(llvm.builder, args[1], LLVMSizeOf(llvm.i64_type()), cstr(""));
+    let ptr = llvm.build_call_by_name("molten_malloc", &mut vec!(size));
     LLVMBuildPointerCast(llvm.builder, ptr, objtype, cstr("ptr"))
 }
 

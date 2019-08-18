@@ -67,6 +67,10 @@ fn main() {
             .arg(Arg::with_name("debug")
                 .short("d")
                 .help("Enables debug logging"))
+            .arg(Arg::with_name("no-gc")
+                .short("G")
+                .long("no-gc")
+                .help("Disables garbage collection and uses malloc directly"))
             .get_matches();
 
     build_options(&matches);
@@ -84,6 +88,7 @@ fn build_options(matches: &ArgMatches) {
     Options::init();
     Options::as_ref().debug = matches.occurrences_of("debug") > 0;
     Options::as_ref().is_library = matches.occurrences_of("library") > 0;
+    Options::as_ref().no_gc = matches.occurrences_of("no-gc") > 0;
 
     Options::as_ref().format = if matches.occurrences_of("assemble") > 0 {
         EmitAs::LLIR

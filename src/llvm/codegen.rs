@@ -489,7 +489,7 @@ impl<'sess> LLVM<'sess> {
     }
 
     pub unsafe fn build_boxed(&self, rtype: LLVMTypeRef, value: LLVMValueRef) -> LLVMValueRef {
-        let mem = LLVMBuildMalloc(self.builder, LLVMGetElementType(rtype), cstr(""));
+        let mem = self.build_call_by_name("molten_malloc", &mut vec!(LLVMSizeOf(LLVMGetElementType(rtype))));
         let reference = LLVMBuildPointerCast(self.builder, mem, rtype, cstr(""));
         LLVMBuildStore(self.builder, value, reference);
         reference

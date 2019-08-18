@@ -19,15 +19,18 @@ Installing
 
 You will need `rustc` and `cargo` installed.  It's recommended that you use
 `rustup` to install these.  I've most recently tested it with rustc version 1.28.
-You will also need LLVM 7 installed.
+You will also need LLVM 7 installed, as well as libgc (Boehm-Demers-Weiser's
+Garbage Collector), and clang, although clang can be replace with gcc by editing
+the `molten` python script.
 
 On Debian/Ubuntu, run:
-`sudo apt-get install llvm-7 llvm-7-runtime llvm-7-dev`
+`sudo apt-get install llvm-7 llvm-7-runtime llvm-7-dev clang libgc-dev`
 
 On macOS, run:
 `brew install llvm@7`
 
-You may need to add /usr/local/opt/llvm@7/bin to your path
+You may need to add /usr/local/opt/llvm@7/bin to your path, and you will probably
+need to install libgc separately
 
 Running
 -------
@@ -35,12 +38,13 @@ Running
 The `molten` script helps with compiling and linking IR files.  To run an example:
 
 ```
-./molten run examples/fac.ml
+./molten run examples/fac.mol
 ```
 
-This will run cargo to build the compiler if needed, then compile the fac.ml
-file, as well as the libcore.ml library, link them together, and then run the
-output using `lli-7`
+This will run cargo to build the compiler if needed, then compile the fac.mol
+file, as well as the libcore.mol library, link them together using clang, along
+with libgc, and then run the binary.  It can also compile to LLVM IR, and run
+LLVM bitcode using `lli-7` by using the `-S` flag.
 
 The `*.ll` files contain IR code for a single file.  The `*.dec` files contain
 declarations for use when importing from another file.  The `*.bc` files
@@ -50,7 +54,7 @@ contain LLVM Bitcode, which can be executed using `lli-7` or compiled using
 ```
 llc-7 -filetype=obj lib/libcore.ll
 llc-7 -filetype=obj example/fac.ll
-gcc -lm -no-pie example/fac.o lib/libcore.o
+gcc -lm -lgc -no-pie example/fac.o lib/libcore.o
 ```
 Note: the `-no-pie` flag may be required when linking or you may get an error
 
@@ -288,14 +292,6 @@ fn baz(i: Int) / C {
 ```
 
 
-Yet To Complete
----------------
-
-- Garbage collection is not yet implemented
-
-- Improved pattern matching
-
-
 Previously Uncompleted
 ----------------------
 
@@ -317,6 +313,11 @@ Previously Uncompleted
   to use an enum inside itself (eg. to make a tree data structure).  It
   also doesn't properly calculate the enum size, because that will require
   having the target architecture info.
+
+- Garbage collection has been added using the Boehm-Demers-Weiser
+  Conservative C Garbage Collector.  It is possible to compile without
+  the garbage collector by using the `--no-gc` command line argument.
+
 
 I'd be happy to hear of any additional features ideas or suggestions, if
 you'd like to leave them under "Issues" on github.

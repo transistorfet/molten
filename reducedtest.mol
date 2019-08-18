@@ -259,3 +259,11 @@ match val {
     Value::String(s) => println(s)
     _ => ()
 }
+
+
+/*
+while true {
+    let ptr: String = molten_malloc(10)
+}
+*/
+

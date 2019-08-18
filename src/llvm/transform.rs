@@ -180,6 +180,9 @@ impl<'sess> Transformer<'sess> {
         let main_ltype = LLType::Function(vec!(), r(LLType::I64));
         let mut main_body = vec!();
 
+        // Initialize the garbage collector
+        main_body.push(LLExpr::CallC(r(LLExpr::GetNamed("molten_init".to_string())), vec!(), LLCC::CCC));
+
         let exp_id = NodeID::generate();
         let expoint = self.create_exception_point(&mut main_body, exp_id);
 

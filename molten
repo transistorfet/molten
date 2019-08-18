@@ -22,8 +22,8 @@ RM = "rm"
 BUILD = "cargo build"
 COMPILE = "cargo run --"
 MOLFLAGS = "-O3"
-LINK = "gcc"
-LDFLAGS = "-lc -lm -no-pie"
+LINK = "clang"
+LDFLAGS = "-lc -lm -lgc -no-pie"
 ILINK = "llvm-link" + EXT
 IRUN = "lli" + EXT
 
@@ -63,7 +63,7 @@ def main():
         try:
             args.command(args)
         except Exception as e:
-            sys.stderr.write("Command failed: " + str(e))
+            sys.stderr.write("Command failed: " + str(e) + "\n")
             sys.exit(-1)
 
 
@@ -107,7 +107,7 @@ def compile_and_link(target, deps, flags, args):
 
 def compile(filename, flags="", force=False, assembly=False):
     target = os.path.splitext(filename)[0] + (".o" if not assembly else ".ll")
-    flags += " -c" if not assembly else " -S"
+    flags += " -c" if not assembly else " -S --no-gc"
     if force or not os.path.exists(target) or os.path.getmtime(filename) > os.path.getmtime(target):
         runordie("{compile} {flags} {filename}".format(compile=COMPILE, flags=flags, filename=filename))
     return target

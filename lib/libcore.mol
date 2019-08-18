@@ -8,14 +8,14 @@ class String {
     fn push(self, s) {
         let selflength = strlen(self)
         let slength = strlen(s)
-        let buffer: String = malloc(selflength + slength + 1)
+        let buffer: String = molten_malloc(selflength + slength + 1)
         sprintf(buffer, "%s%s", self, s)
         buffer
     }
 
     // TODO this doesn't handle UTF-8
     fn substr(self, start: Int, length: Int) {
-        let newstr: String = malloc(length + 1)
+        let newstr: String = molten_malloc(length + 1)
         // TODO this doesn't work because you can't get a pointer to an indexed position
         memcpy(newstr, self, length)
         //newstr[length] = 0
@@ -41,7 +41,7 @@ pub fn +(s1: String, s2: String) -> String / MF {
     //s1.push(s2)
     let s1length = strlen(s1)
     let s2length = strlen(s2)
-    let buffer: String = malloc(s1length + s2length + 1)
+    let buffer: String = molten_malloc(s1length + s2length + 1)
     sprintf(buffer, "%s%s", s1, s2)
     buffer
 }
@@ -59,19 +59,19 @@ pub fn str(num: Bool) -> String {
 }
 
 pub fn str(num: Int) -> String {
-    let buffer: String = malloc(22)
+    let buffer: String = molten_malloc(22)
     sprintf(buffer, "%ld", num, ())
     buffer
 }
 
 pub fn hex(num: Int) -> String {
-    let buffer: String = malloc(22)
+    let buffer: String = molten_malloc(22)
     sprintf(buffer, "0x%lX", num, ())
     buffer
 }
 
 pub fn str(num: Real) -> String {
-    let buffer: String = malloc(22)
+    let buffer: String = molten_malloc(22)
     sprintf(buffer, "%f", num, ())
     buffer
 }

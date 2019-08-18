@@ -12,6 +12,7 @@ pub struct Options<'a> {
     pub libpath: Vec<&'a str>,
     pub format: EmitAs,
     pub optlevel: u32,
+    pub no_gc: bool,
 }
 
 
@@ -29,7 +30,8 @@ impl Options<'static> {
                 is_library: false,
                 libpath: vec!(".", "lib"),
                 format: EmitAs::LLIR,
-                optlevel: 0
+                optlevel: 0,
+                no_gc: false,
             });
         }
     }

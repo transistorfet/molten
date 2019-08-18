@@ -97,7 +97,6 @@ Changes:
 * make loops use phi, and add break
 * add proper pattern matching for definitions/matchcases/etc
 * add typeclasses/traits
-* implement garbage collection
 * add an iterator type
 * add compiler directives?
 * better support for generics
