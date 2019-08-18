@@ -93,7 +93,7 @@ impl<'sess> TypeChecker<'sess> {
                     let (mut found, _) = ol.find_local_variants(self.session, scope.clone(), tupleargs.clone());
                     found = found.into_iter().filter(|(fid, _)| *id != *fid).collect();
                     if found.len() > 0 {
-                        return Err(Error::new(format!("OverloadError: things {:?}", ident)));
+                        return Err(Error::new(format!("OverloadError: things {:?}\nvariants found [{}]", ident, found.iter().map(|(_, t)| format!("{}", t)).collect::<Vec<String>>().join(", "))));
                     }
                 }
 

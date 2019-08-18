@@ -1,0 +1,21 @@
+
+import lib.libcore
+
+class Stuff {
+    fn new(self) { }
+
+    fn foo(self, a) {
+        a * 4
+    }
+
+    // TODO with this uncommented, we get an overload error on both foo methods because
+    //      the type is inserted (with type variables) during name binding phase, which
+    //      matches the currently typechecked definitions, which is an overload error...
+    fn foo(self, a) {
+        a * 4.0
+    }
+}
+
+let s = new Stuff()
+println(str(s.foo(123)))
+

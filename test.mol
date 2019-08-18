@@ -15,7 +15,7 @@
         else
             e
 
-        // TODO this ends up causing various problems
+        // TODO this ends up causing various problems.  It's not currently enabled in the compiler
         //(12).add(3)
         //e.add(3)
         //fn test(x: Int) => x.add(2)
@@ -38,17 +38,14 @@
         let test3 = fn x => x() + 1
         println(str(test3(fn => 3)))
 
-        /*
-        // TODO why does this work, when the recursive reference requires a closure?  I guess when compiling, I'm somehow
-        //  making an exception for accessing functions by name instead of accessing the variable the name is actually refering to
-        let recfoo = fn x => begin  //comment
-            if x < 1 then           //comment
-                1                   //comment
-            else                    //comment
-                x * recfoo(x - 1)   //comment
-        end                         //comment
-        println(str(recfoo(5)))
-        */
+        // TODO this doesn't work because recfoo is not set when the recursive call is made.  Normal fn syntax works
+        //let recfoo = fn x => begin  //comment
+        //    if x < 1 then           //comment
+        //        1                   //comment
+        //    else                    //comment
+        //        x * recfoo(x - 1)   //comment
+        //end                         //comment
+        //println(str(recfoo(5)))
 
         0123
         0x234
@@ -95,9 +92,10 @@
                 a * 4
             }
 
-            fn foo2(self, a) {
-                a * 4.0
-            }
+            // TODO if this is uncommented, we get an OverloadError
+            //fn foo2(self, a) {
+            //    a * 4.0
+            //}
 
             let mut a = 1
             let b: String = "aoeu"
@@ -182,13 +180,13 @@
         println("semicolon: " + str(d))
 
         fn strnum(num: Int) -> String {
-            let buffer: String = malloc(22)
+            let buffer: String = molten_malloc(22)
             sprintf(buffer, "%d", num, nil: String)     // TODO the type annotation of nil is required or else the typevar isn't resolved
             buffer
         }
 
         fn strnum(num: Real) -> String {
-            let buffer: String = malloc(22)
+            let buffer: String = molten_malloc(22)
             sprintf(buffer, "%f", num, nil: String)     // TODO the type annotation of nil is required or else the typevar isn't resolved
             buffer
         }
@@ -232,9 +230,10 @@
 
         /// Exceptions
 
-        // TODO not yet implemented
-        //try str(123) with
+        // TODO causes ununified variable where the wildcard is
+        //try str(123) catch {
         //    _ => a * 16
+        //}
 
         //try raise a with
         //    1 => a
@@ -242,10 +241,10 @@
         //    _ => a * 16
 
 
-
         /// Lists, Buffers, Alloc
 
-        //let alloc = malloc(30)
+        // Never do this
+        let alloc: String = molten_malloc(30)
 
         // TODO buffer is no longer a class
         //let buffer = new Buffer<Int>(5)
@@ -404,8 +403,8 @@
         let v = !rr
         println(str(v))
 
-        // TODO this causes a segfault
-        //println(str(sizeof(1)))
+        println(str(sizeof(1)))
+        println(str(sizeof(("1", "2", "3"))))   // Should be 24, but prints as 8
 
 
         /// Closures

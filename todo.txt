@@ -18,15 +18,19 @@
 
 
 BUGS:
+* parse error for if statements in an expression, they require brackets around them: let h = 5 + if r > 4 then 5 else 10
+* exceptions with only a wildcard match arm have an unresolved typevar for the value of the exception, but that being a typevar anyways means that it's not type checked
+  and you can raise anything and catch anything, regardless of whether they are the same type... the easy solution might be to require it to inherit from Exception
+* cannot annotate a wildcard in a pattern, it inteprets it as an identifier which isn't defined
+* unwrap error when recursively calling in `let recfoo = fn x =>` because the actual DefLocal is inserted after the initializer code is transformed, but if this was fixed,
+  would it be possible to access recfoo before it's been initialized, such as in `let something: Int = { something; 0 }`
+* the overload check seems to fail in test.mol lines 94/111 with foo2 in Stuff because of the new overload code.  It's giving an overload error unless foo2 which takes a
+  single Real is commented out.  It's because the types are added during the name binding phase.  This needs to be added as a test case
 * the infer-arg-as-typevar test fails because str() cannot be resolved to a concrete variant by the time it's typechecked (no backwards affect allowed)
 * there is still a bug with the Phi statement, in that it will return null if you don't cover all cases. there is no check for coverage
 * issue with separator/lf not working when two expressions are on the same line (it should produce a parse error)
 * issue with calling function references store in structs or tuples... it converts them to methods incorrectly
-
-* mabye not a bug, but unable to define a method as / MF or / C ABI
-* not really a bug, but if you only have one element in a tuple, or in a record, it parses it as a block or expression
-* not really a bug, but empty lists cannot be typechecked to concrete types unless it's explicitly provided ("[]" on its own)
-
+* sizeof can only calculate the size of a pointer.  I think it has to be an AST element in order to work
 
 
 
@@ -136,6 +140,13 @@ EXAMPLE PROGRAM IDEAS:
 
 * hash table
 * regex matcher
+
+
+NOT REALLY BUGS:
+
+* mabye not a bug, but unable to define a method as / MF or / C ABI
+* not really a bug, but if you only have one element in a tuple, or in a record, it parses it as a block or expression
+* not really a bug, but empty lists cannot be typechecked to concrete types unless it's explicitly provided ("[]" on its own)
 
 
 COMPLETED TESTS (for reference):

@@ -272,7 +272,7 @@ pub fn get_builtins<'sess>() -> Vec<BuiltinDef<'sess>> {
         BuiltinDef::Func(id(), "println",    "(String) -> () / C",              FuncKind::Function(println)),
         //BuiltinDef::Func(id(), "readline",   "() -> String / C",                FuncKind::Function(readline)),
 
-        BuiltinDef::Func(id(), "sizeof",    "('ptr) -> Int",                    FuncKind::Function(sizeof_value)),
+        BuiltinDef::Func(id(), "sizeof",    "('ptr) -> Int / C",                FuncKind::Function(sizeof_value)),
 
 
         BuiltinDef::Class(id(), "Buffer", vec!(Type::Variable(String::from("item"), UniqueID(0), true)), vec!(), vec!()),

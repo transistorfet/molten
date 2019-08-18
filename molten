@@ -30,11 +30,11 @@ IRUN = "lli" + EXT
 
 def main():
     parser = argparse.ArgumentParser(prog='molten', formatter_class=argparse.ArgumentDefaultsHelpFormatter, description='Simple build script for molten programs')
-    parser.add_argument('-f', '--force', action='store_true', help='Force a recompile of all files')
-    parser.add_argument('-d', '--debug', action='store_true', help='Run the compiler with debugging on')
     subparsers = parser.add_subparsers()
 
     def add_build_args(cmd):
+        cmd.add_argument('-f', '--force', action='store_true', help='Force a recompile of all files')
+        cmd.add_argument('-d', '--debug', action='store_true', help='Run the compiler with debugging on')
         cmd.add_argument('-S', '--assembly', action='store_true', help='Compile to assembly and use the interpreter')
         cmd.add_argument('-o', '--output', type=str, help='Output file name')
 

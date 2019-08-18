@@ -267,3 +267,6 @@ while true {
 }
 */
 
+let aoeu = 1
+println(str(sizeof(tt)))
+
