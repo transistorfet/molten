@@ -14,7 +14,7 @@ use defs::types::TypeAliasDef;
 use defs::variables::{ AnyVar, VarDef, ArgDef };
 
 
-pub fn bind_names(session: &Session, scope: ScopeRef, code: &mut Vec<AST>) {
+pub fn bind_names(session: &Session, scope: ScopeRef, code: &Vec<AST>) {
     bind_names_vec(session, scope, code);
     if session.errors.get() > 0 {
         panic!("Exiting due to previous errors");
@@ -22,13 +22,13 @@ pub fn bind_names(session: &Session, scope: ScopeRef, code: &mut Vec<AST>) {
     debug!("POST-BINDING: {:?}", code);
 }
 
-pub fn bind_names_vec(session: &Session, scope: ScopeRef, code: &mut Vec<AST>) {
+pub fn bind_names_vec(session: &Session, scope: ScopeRef, code: &Vec<AST>) {
     for node in code {
         bind_names_node(session, scope.clone(), node);
     }
 }
 
-pub fn bind_names_node(session: &Session, scope: ScopeRef, node: &mut AST) {
+pub fn bind_names_node(session: &Session, scope: ScopeRef, node: &AST) {
     match bind_names_node_or_error(session, scope, node) {
         Ok(_) => { },
         Err(err) => session.print_error(err.add_pos(&node.get_pos())),
@@ -36,48 +36,50 @@ pub fn bind_names_node(session: &Session, scope: ScopeRef, node: &mut AST) {
 }
 
 #[must_use]
-fn bind_names_node_or_error(session: &Session, scope: ScopeRef, node: &mut AST) -> Result<(), Error> {
+fn bind_names_node_or_error(session: &Session, scope: ScopeRef, node: &AST) -> Result<(), Error> {
     match *node {
-        AST::Function(ref id, _, ref vis, ref ident, ref mut args, ref mut ret, ref mut body, ref abi) => {
+        AST::Function(ref id, _, ref vis, ref ident, ref args, ref ret, ref body, ref abi) => {
             let fscope = session.map.add(*id, Some(scope.clone()));
             fscope.set_basename(ident.as_ref().map_or(format!("anon{}", id), |ident| ident.name.clone()));
 
             // Check for typevars in the type params
-            for ref mut arg in &mut args.iter_mut() {
-                bind_type_names(session, fscope.clone(), arg.ttype.as_mut(), false)?;
+            let mut argtypes = vec!();
+            for ref arg in args.iter() {
+                let mut ttype = arg.ttype.clone();
+                bind_type_names(session, fscope.clone(), ttype.as_mut(), false)?;
+                // TODO this is assumed to be always immutable, but maybe shouldn't be
+                ArgDef::define(session, fscope.clone(), arg.id, Mutability::Immutable, &arg.ident.name, ttype.clone())?;
+                argtypes.push(ttype.unwrap_or_else(|| scope.new_typevar(session, false)));
             }
+            let mut ret = ret.clone();
             bind_type_names(session, fscope.clone(), ret.as_mut(), false)?;
 
             // Build type according to the definition, using typevars for missing types
-            let tuple = Type::Tuple(args.iter().map(|arg| arg.ttype.clone().unwrap_or_else(|| scope.new_typevar(session, false))).collect());
-            let nftype = Type::Function(r(tuple), r(ret.clone().unwrap_or_else(|| scope.new_typevar(session, false))), *abi);
+            let nftype = Type::Function(r(Type::Tuple(argtypes)), r(ret.unwrap_or_else(|| scope.new_typevar(session, false))), *abi);
 
             // Define the function variable and it's arguments variables
             AnyFunc::define(session, scope.clone(), *id, *vis, &ident.as_ref().map(|ref ident| String::from(ident.as_str())), *abi, Some(nftype))?;
 
-            for ref arg in args.iter() {
-                // TODO this is assumed to be always immutable, but maybe shouldn't be
-                ArgDef::define(session, fscope.clone(), arg.id, Mutability::Immutable, &arg.ident.name, arg.ttype.clone())?;
-            }
-
             bind_names_node(session, fscope, body)
         },
 
-        AST::Invoke(_, _, ref mut fexpr, ref mut args) => {
+        AST::Invoke(_, _, ref fexpr, ref args) => {
             bind_names_node(session, scope.clone(), fexpr);
             bind_names_vec(session, scope, args);
         },
 
-        AST::Definition(ref id, _, ref mutable, ref ident, ref mut ttype, ref mut code) => {
+        AST::Definition(ref id, _, ref mutable, ref ident, ref ttype, ref code) => {
+            let mut ttype = ttype.clone();
             bind_type_names(session, scope.clone(), ttype.as_mut(), false)?;
-            AnyVar::define(session, scope.clone(), *id, *mutable, &ident.name, ttype.clone())?;
+            AnyVar::define(session, scope.clone(), *id, *mutable, &ident.name, ttype)?;
             bind_names_node(session, scope, code);
         },
 
-        AST::Declare(ref id, _, ref vis, ref ident, ref mut ttype) => {
-            bind_type_names(session, scope.clone(), Some(ttype), false)?;
+        AST::Declare(ref id, _, ref vis, ref ident, ref ttype) => {
+            let mut ttype = ttype.clone();
+            bind_type_names(session, scope.clone(), Some(&mut ttype), false)?;
             let abi = ttype.get_abi().unwrap_or(ABI::Molten);
-            AnyFunc::define(session, scope.clone(), *id, *vis, &Some(ident.name.clone()), abi, Some(ttype.clone()))?;
+            AnyFunc::define(session, scope.clone(), *id, *vis, &Some(ident.name.clone()), abi, Some(ttype))?;
         },
 
         AST::Identifier(ref id, _, ref ident) => {
@@ -91,83 +93,87 @@ fn bind_names_node_or_error(session: &Session, scope: ScopeRef, node: &mut AST) 
             }
         },
 
-        AST::SideEffect(_, _, _, ref mut args) => {
+        AST::SideEffect(_, _, _, ref args) => {
             bind_names_vec(session, scope, args);
         },
 
-        AST::If(_, _, ref mut cond, ref mut texpr, ref mut fexpr) => {
+        AST::If(_, _, ref cond, ref texpr, ref fexpr) => {
             bind_names_node(session, scope.clone(), cond);
             bind_names_node(session, scope.clone(), texpr);
             bind_names_node(session, scope, fexpr);
         },
 
-        AST::Try(_, _, ref mut cond, ref mut cases) |
-        AST::Match(_, _, ref mut cond, ref mut cases) => {
+        AST::Try(_, _, ref cond, ref cases) |
+        AST::Match(_, _, ref cond, ref cases) => {
             bind_names_node(session, scope.clone(), cond);
             // TODO check to make sure Pattern::Wild only occurs as the last case, if at all
             for ref mut case in cases {
                 let lscope = session.map.add(case.id, Some(scope.clone()));
                 lscope.set_context(Context::Block);
-                bind_names_pattern(session, lscope.clone(), &mut case.pat)?;
-                bind_names_node(session, lscope.clone(), &mut case.body);
+                bind_names_pattern(session, lscope.clone(), &case.pat)?;
+                bind_names_node(session, lscope.clone(), &case.body);
             }
         },
 
-        AST::Raise(_, _, ref mut expr) => {
+        AST::Raise(_, _, ref expr) => {
             bind_names_node(session, scope, expr);
         },
 
-        AST::While(_, _, ref mut cond, ref mut body) => {
+        AST::While(_, _, ref cond, ref body) => {
             bind_names_node(session, scope.clone(), cond);
             bind_names_node(session, scope, body);
         },
 
-        AST::Ref(_, _, ref mut code) |
-        AST::Deref(_, _, ref mut code) => { bind_names_node(session, scope, code.as_mut()); },
+        AST::Ref(_, _, ref code) |
+        AST::Deref(_, _, ref code) => { bind_names_node(session, scope, code); },
 
-        AST::Tuple(_, _, ref mut code) |
-        AST::Block(_, _, ref mut code) => { bind_names_vec(session, scope, code); },
+        AST::Tuple(_, _, ref code) |
+        AST::Block(_, _, ref code) => { bind_names_vec(session, scope, code); },
 
-        AST::Record(_, _, ref mut items) => {
-            for &mut (_, ref mut expr) in items {
+        AST::Record(_, _, ref items) => {
+            for &(_, ref expr) in items {
                 bind_names_node(session, scope.clone(), expr);
             }
         },
 
-        AST::RecordUpdate(_, _, ref mut record, ref mut items) => {
+        AST::RecordUpdate(_, _, ref record, ref items) => {
             bind_names_node(session, scope.clone(), record);
-            for &mut (_, ref mut expr) in items {
+            for &(_, ref expr) in items {
                 bind_names_node(session, scope.clone(), expr);
             }
         },
 
 
-        AST::PtrCast(ref id, ref mut ttype, ref mut code) => {
-            bind_type_names(session, scope.clone(), Some(ttype), false)?;
-            session.set_type(*id, ttype.clone());
+        AST::PtrCast(ref id, ref ttype, ref code) => {
+            let mut ttype = ttype.clone();
+            bind_type_names(session, scope.clone(), Some(&mut ttype), false)?;
+            session.set_type(*id, ttype);
             bind_names_node(session, scope, code)
         },
 
-        AST::New(ref id, _, ref mut classspec) => {
-            bind_classspec_type_names(session, scope.clone(), classspec, false)?;
+        AST::New(ref id, _, ref classspec) => {
+            let mut classspec = classspec.clone();
+            bind_classspec_type_names(session, scope.clone(), &mut classspec, false)?;
             let classtype = scope.make_obj(session, classspec.ident.name.clone(), classspec.types.clone())?;
-            session.set_type(*id, classtype.clone());
+            session.set_type(*id, classtype);
             match scope.get_type_def(&classspec.ident.name) {
                 Some(defid) => session.set_ref(*id, defid),
                 None => return Err(Error::new(format!("NameError: undefined identifier {:?}", classspec.ident.name)))
             }
         },
 
-        AST::Class(ref id, _, ref mut classspec, ref mut parentspec, ref mut body) => {
+        AST::Class(ref id, _, ref classspec, ref parentspec, ref body) => {
             let tscope = ClassDef::create_class_scope(session, scope.clone(), *id);
 
             // Check for typevars in the type params
-            bind_classspec_type_names(session, tscope.clone(), classspec, true)?;
-            if let &mut Some(ref mut pspec) = parentspec {
+            let mut classspec = classspec.clone();
+            let mut parentspec = parentspec.clone();
+            bind_classspec_type_names(session, tscope.clone(), &mut classspec, true)?;
+            if let &mut Some(ref mut pspec) = &mut parentspec {
                 bind_classspec_type_names(session, tscope.clone(), pspec, false)?;
             }
 
-            let classtype = Type::Object(classspec.ident.name.clone(), *id, classspec.types.clone());
+            let classtype = Type::Object(classspec.ident.name, *id, classspec.types);
             let parenttype = match parentspec {
                 Some(p) => Some(scope.make_obj(session, p.ident.name.clone(), p.types.clone())?),
                 None => None
@@ -181,28 +187,33 @@ fn bind_names_node_or_error(session: &Session, scope: ScopeRef, node: &mut AST) 
             bind_names_vec(session, tscope, body);
         },
 
-        AST::TypeAlias(ref id, _, ref mut classspec, ref mut ttype) => {
-            bind_classspec_type_names(session, scope.clone(), classspec, true)?;
-            bind_type_names(session, scope.clone(), Some(ttype), false)?;
+        AST::TypeAlias(ref id, _, ref classspec, ref ttype) => {
+            let mut ttype = ttype.clone();
+            let mut classspec = classspec.clone();
+            bind_classspec_type_names(session, scope.clone(), &mut classspec, true)?;
+            bind_type_names(session, scope.clone(), Some(&mut ttype), false)?;
 
-            let deftype = Type::Object(classspec.ident.name.clone(), *id, classspec.types.clone());
-            TypeAliasDef::define(session, scope.clone(), *id, deftype, ttype.clone())?;
+            let deftype = Type::Object(classspec.ident.name, *id, classspec.types);
+            TypeAliasDef::define(session, scope.clone(), *id, deftype, ttype)?;
             //scope.define_type(classspec.ident.name.clone(), Some(*id));
             //session.set_type(*id, ttype.clone());
         },
 
-        AST::TypeEnum(ref id, _, ref mut classspec, ref mut variants) => {
-            bind_classspec_type_names(session, scope.clone(), classspec, true)?;
-            let deftype = Type::Object(classspec.ident.name.clone(), *id, classspec.types.clone());
+        AST::TypeEnum(ref id, _, ref classspec, ref variants) => {
+            let mut classspec = classspec.clone();
+            bind_classspec_type_names(session, scope.clone(), &mut classspec, true)?;
+            let deftype = Type::Object(classspec.ident.name, *id, classspec.types);
             let enumdef = EnumDef::define(session, scope.clone(), *id, deftype)?;
 
-            for variant in variants.iter_mut() {
+            for variant in variants.iter() {
+                // TODO this still requires mut
+                let mut variant = variant.clone();
                 bind_type_names(session, scope.clone(), variant.ttype.as_mut(), false)?;
-                enumdef.add_variant(session, scope.clone(), variant.clone())?;
+                enumdef.add_variant(session, scope.clone(), variant)?;
             }
         },
 
-        AST::Resolver(_, _, ref mut left, _, ref oid) => {
+        AST::Resolver(_, _, ref left, _, ref oid) => {
             // TODO should this always work on a type reference, or should classes be added as values as well as types?
             //bind_names_node(session, scope, left);
             match **left {
@@ -216,16 +227,16 @@ fn bind_names_node_or_error(session: &Session, scope: ScopeRef, node: &mut AST) 
             }
         },
 
-        AST::Accessor(_, _, ref mut left, _, _) => {
+        AST::Accessor(_, _, ref left, _, _) => {
             bind_names_node(session, scope, left);
         },
 
-        AST::Assignment(_, _, ref mut left, ref mut right, _) => {
+        AST::Assignment(_, _, ref left, ref right, _) => {
             bind_names_node(session, scope.clone(), left);
             bind_names_node(session, scope, right);
         },
 
-        AST::Import(_, _, _, ref mut decls) => {
+        AST::Import(_, _, _, ref decls) => {
             bind_names_vec(session, scope, decls);
         },
 
@@ -241,14 +252,15 @@ fn bind_names_node_or_error(session: &Session, scope: ScopeRef, node: &mut AST) 
 }
 
 #[must_use]
-pub fn bind_names_pattern(session: &Session, scope: ScopeRef, pat: &mut Pattern) -> Result<(), Error> {
+pub fn bind_names_pattern(session: &Session, scope: ScopeRef, pat: &Pattern) -> Result<(), Error> {
     match pat {
         Pattern::Binding(id, ident) => {
             VarDef::define(session, scope.clone(), *id, Mutability::Immutable, &ident.name, None)?;
         },
         Pattern::Annotation(id, ttype, pat) => {
-            bind_type_names(session, scope.clone(), Some(ttype), false)?;
-            session.set_type(*id, ttype.clone());
+            let mut ttype = ttype.clone();
+            bind_type_names(session, scope.clone(), Some(&mut ttype), false)?;
+            session.set_type(*id, ttype);
             bind_names_pattern(session, scope, pat)?
         },
         Pattern::Resolve(id, left, ident, oid) => {

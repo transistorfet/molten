@@ -142,7 +142,7 @@ class Test (object):
 
     def run_test(self, force, short=0):
         target = os.path.splitext(self.path)[0] + ".bin"
-        (retcode, stdout, stderr) = runcmd("./molten {flags} run {file} -o {target}".format(flags='-f' if force else '', file=self.path, target=target), shell=True)
+        (retcode, stdout, stderr) = runcmd("./molten run {flags} {file} -o {target}".format(flags='-f' if force else '', file=self.path, target=target), shell=True)
         self.load_dec()
 
         if self.check_result(retcode, stdout, stderr):

@@ -108,8 +108,8 @@ fn compile_file(input: &str, output: Option<&str>) {
     let builtins = llvm::lib::get_builtins();
     llvm::lib::make_global(&session, &builtins);
 
-    let mut code = session.parse_file(input, false);
-    binding::bind_names(&session, session.map.get_global(), &mut code);
+    let code = session.parse_file(input, false);
+    binding::bind_names(&session, session.map.get_global(), &code);
     TypeChecker::check(&session, session.map.get_global(), &code);
 
     if Options::as_ref().debug {

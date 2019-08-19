@@ -250,9 +250,10 @@ impl<'sess> Transformer<'sess> {
                 self.transform_func_def(scope.clone(), *abi, *id, *vis, ident.as_ref().map(|ident| &ident.name), args, body)
             },
 
-            AST::Declare(id, _, vis, ident, ttype) => {
-                let abi = self.session.get_type(*id).unwrap().get_abi().unwrap();
-                self.transform_func_decl(scope.clone(), abi, *id, *vis, &ident.name, ttype)
+            AST::Declare(id, _, vis, ident, _) => {
+                let ttype = self.session.get_type(*id).unwrap();
+                let abi = ttype.get_abi().unwrap();
+                self.transform_func_decl(scope.clone(), abi, *id, *vis, &ident.name, &ttype)
             },
 
             AST::Invoke(id, _, func, args) => {
@@ -298,8 +299,8 @@ impl<'sess> Transformer<'sess> {
                 self.transform_record_update(scope.clone(), *id, &record, &items)
             },
 
-            AST::TypeEnum(id, _, classspec, variants) => {
-                self.transform_enum_def(scope.clone(), *id, &classspec, &variants)
+            AST::TypeEnum(id, _, classspec, _) => {
+                self.transform_enum_def(scope.clone(), *id, &classspec.ident.name)
             },
 
 
@@ -313,9 +314,9 @@ impl<'sess> Transformer<'sess> {
                 exprs
             },
 
-            AST::PtrCast(id, ttype, node) => {
+            AST::PtrCast(id, _, node) => {
                 let mut exprs = vec!();
-                let ltype = self.transform_value_type(ttype);
+                let ltype = self.transform_value_type(&self.session.get_type(*id).unwrap());
                 let result = self.transform_as_result(&mut exprs, scope.clone(), node).unwrap();
                 exprs.push(LLExpr::Cast(ltype, r(result)));
                 exprs
@@ -400,16 +401,17 @@ impl<'sess> Transformer<'sess> {
         exprs
     }
 
-    fn transform_enum_def(&self, scope: ScopeRef, id: NodeID, classspec: &ClassSpec, variants: &Vec<EnumVariant>) -> Vec<LLExpr> {
+    fn transform_enum_def(&self, scope: ScopeRef, id: NodeID, name: &String) -> Vec<LLExpr> {
         let mut exprs = vec!();
         let selector = LLType::I8;
+        let enumdef = self.session.get_def(id).unwrap().as_enum().unwrap();
 
-        self.add_global(LLGlobal::DefNamedStruct(id, classspec.ident.name.clone(), false));
+        self.add_global(LLGlobal::DefNamedStruct(id, name.clone(), false));
         self.set_type(id, LLType::Alias(id));
 
         let mut types = vec!();
-        for (i, variant) in variants.iter().enumerate() {
-            let name = format!("{}_{}", classspec.ident.name, variant.ident.name);
+        for (i, variant) in enumdef.variants.borrow().iter().enumerate() {
+            let name = format!("{}_{}", name, variant.ident.name);
             self.transform_enum_variant(variant.id, i as i8, name, selector.clone(), variant.ttype.clone());
             if variant.ttype.is_some() {
                 types.push(self.transform_value_type(variant.ttype.as_ref().unwrap()));
@@ -1014,8 +1016,9 @@ impl<'sess> Transformer<'sess> {
                     // TODO i switched to using scope here instead of tscope because it was causing problems with references inside closures
                     exprs.extend(self.transform_func_def(tscope.clone(), *abi, *id, *vis, ident.as_ref().map(|ident| &ident.name), args, body));
                 },
-                AST::Declare(id, _, vis, ident, ttype) => {
-                    exprs.extend(self.transform_func_decl(tscope.clone(), ttype.get_abi().unwrap(), *id, *vis, &ident.name, ttype));
+                AST::Declare(id, _, vis, ident, _) => {
+                    let ttype = self.session.get_type(*id).unwrap();
+                    exprs.extend(self.transform_func_decl(tscope.clone(), ttype.get_abi().unwrap(), *id, *vis, &ident.name, &ttype));
                 },
                 AST::Definition(_, _, _, _, _, _) => { },
                 _ => panic!("Not Implemented: {:?}", node),
@@ -1163,8 +1166,9 @@ impl<'sess> Transformer<'sess> {
                 exprs.extend(self.transform_def_local(scope.clone(), *id, &ident.name, &AST::GetValue(value_id)));
                 exprs.push(LLExpr::Literal(LLLit::I1(true)));
             },
-            Pattern::Annotation(id, ttype, pat) => {
-                exprs.push(LLExpr::SetValue(*id, r(LLExpr::Cast(self.transform_value_type(ttype), r(LLExpr::GetValue(value_id))))));
+            Pattern::Annotation(id, _, pat) => {
+                let ttype = self.session.get_type(*id).unwrap();
+                exprs.push(LLExpr::SetValue(*id, r(LLExpr::Cast(self.transform_value_type(&ttype), r(LLExpr::GetValue(value_id))))));
                 exprs.extend(self.transform_pattern(scope.clone(), pat, *id));
             },
             Pattern::Resolve(id, left, field, oid) => {
