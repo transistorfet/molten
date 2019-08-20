@@ -6,6 +6,7 @@ Cargo.lock
 *.ll
 *.bc
 *.dec
+*.l
 *.o
 *.bin
 a.out

@@ -1,4 +1,5 @@
 
+* classes shouldn't require a new function if all data has initializers...
 * make definitions always require an initializer
 * there was an error where "let ni: newint" with no initializer was causing a type error with "expected class or concrete type", but that was actually because a definition without
   an initializer is the same as "let ni: newint = nil" and nil could not be cast to a Record, which newint is a typealias of a record
@@ -9,10 +10,13 @@
   possibly remove most of the unmapping code, or otherwise fix the failed testcase some other way
 
 * make an HIR
+* make visitor
 * add typeclasses
 
+* add a module keyword which is automatically inserted into .dec files, which actually calls the run function
 * fix modules import system to be less dependent on file paths...
 * remove the forced visibility in refinery, when you decide on pub/priv semantics
+* update readme for auto-linking
 
 
 
@@ -48,8 +52,7 @@ Error Messages:
 
 
 Refactoring:
-* it should be possible to remove the &mut in bindings by setting bound types to the id, and using that in the type checking phase instead of the ast type
-* if you remove the &mut in bindings, you can make a visitor for all the ast stuff, and possibly make an HIR
+* make a visitor for all the ast stuff, and possibly make an HIR
 * improve storing of file info in the Pos structs (maybe rename to Span?)
 * change parser to take session argument or something so it can record the file info, and maybe do other advanced things
 * there must be a way to fix the 'scope exceptions' (Scope::target) that we're doing to make class bodies work... pass in an argument to all scoped functions?  or use scopemap and scope ids?
@@ -61,11 +64,11 @@ Refactoring:
 
 
 TESTS:
-* test module system (might need a test opt-out for submodules in a test)
 * test for static method vtable access, dynamic dispatch via that mechanism, and overloading used with resolve
 * error conditions, lack of typing should error, etc
 * test that non-closures accessing values outside their scope produces meaningful errors
 * test that you don't allow overloading of overlapping function types, and different function types (??)
+* test module system (might need a test opt-out for submodules in a test)
 
 
 
@@ -74,9 +77,10 @@ Changes:
 * get hashmap in libcore working
 * change how you reference an operator function; like op+ or (+)
 * put intermediate files somewhere else, at least as controlled by the molten script, so as not to clutter source directories
-* there's no way to genericly compare or print tuples or records
+* there's no way to genericly compare or print tuples or records (maybe memcmp based comparison)
 
-* you really need a better way of doing modules
+* improve library path handling
+* should it be possible to not import all symbols from a module?  Should there be a namespaced object thing?
 * how does rust do "use" if there is a circular dependency?
 * the module level scope is now a closed function, so you could return a representation of it as the "module" object
 
@@ -85,7 +89,7 @@ Changes:
 * should vtables be dynamically allocated, or should we add a LLType::ElementOf() type or something to GetElement an aliased type
 * strings, buffers, and all the primative types require vtables if they have methods, but there aren't vtables stored inside them.  You could make static vtable exceptions for them
 * make primative types unable to inherit from, because there's no vtable
-* fix lib to allow builtin classes
+* fix lib to allow builtin classes??
 
 * can you make a check for nil before unboxing a type... and somehow return an appropriate default value?  I guess that's feasible because only primative types would be
   boxed/unboxed, although records and tuples might be an issue

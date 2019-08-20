@@ -49,14 +49,21 @@ fn main() {
                 .value_name("OUTPUT")
                 .takes_value(true)
                 .help("Sets the output file"))
-            .arg(Arg::with_name("compile")
-                .short("c")
+            .arg(Arg::with_name("linkfile")
+                .short("b")
                 .conflicts_with("assemble")
-                .help("Compiles to an object file"))
+                .conflicts_with("compile")
+                .help("Produces the link file and then exits"))
             .arg(Arg::with_name("assemble")
                 .short("S")
+                .conflicts_with("linkfile")
                 .conflicts_with("compile")
                 .help("Compiles to an assembly file"))
+            .arg(Arg::with_name("compile")
+                .short("c")
+                .conflicts_with("linkfile")
+                .conflicts_with("assemble")
+                .help("Compiles to an object file"))
             .arg(Arg::with_name("library")
                 .short("l")
                 .help("Compiles as a library, without a main function"))
@@ -77,7 +84,7 @@ fn main() {
 
     let input = matches.value_of("INPUT").unwrap();
     let output = matches.value_of("output");
-    if matches.occurrences_of("compile") > 0 || matches.occurrences_of("assemble") > 0 {
+    if matches.occurrences_of("linkfile") > 0 || matches.occurrences_of("assemble") > 0 || matches.occurrences_of("compile") > 0 {
         compile_file(input, output);
     } else {
         println!("Use the -c flag to compile");
@@ -89,6 +96,7 @@ fn build_options(matches: &ArgMatches) {
     Options::as_ref().debug = matches.occurrences_of("debug") > 0;
     Options::as_ref().is_library = matches.occurrences_of("library") > 0;
     Options::as_ref().no_gc = matches.occurrences_of("no-gc") > 0;
+    Options::as_ref().linkfile_only = matches.occurrences_of("linkfile") > 0;
 
     Options::as_ref().format = if matches.occurrences_of("assemble") > 0 {
         EmitAs::LLIR
@@ -109,6 +117,11 @@ fn compile_file(input: &str, output: Option<&str>) {
     llvm::lib::make_global(&session, &builtins);
 
     let code = session.parse_file(input, false);
+    session.write_link_file();
+    if Options::as_ref().linkfile_only {
+        return;
+    }
+
     binding::bind_names(&session, session.map.get_global(), &code);
     TypeChecker::check(&session, session.map.get_global(), &code);
 

@@ -13,6 +13,7 @@ pub struct Options<'a> {
     pub format: EmitAs,
     pub optlevel: u32,
     pub no_gc: bool,
+    pub linkfile_only: bool,
 }
 
 
@@ -32,6 +33,7 @@ impl Options<'static> {
                 format: EmitAs::LLIR,
                 optlevel: 0,
                 no_gc: false,
+                linkfile_only: false,
             });
         }
     }

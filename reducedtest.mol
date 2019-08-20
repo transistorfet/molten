@@ -260,6 +260,20 @@ match val {
     _ => ()
 }
 
+fn print_node(node) {
+    match node {
+        Value::String(s) => println("So " + s)
+        Value::Tree(t) => {
+            println("Tree")
+            print_node(t)
+        }
+        _ => println("Nothing")
+    }
+}
+
+let val2 = Value::Tree(Value::Tree(Value::String("Hey")))
+print_node(val2)
+
 
 /*
 while true {

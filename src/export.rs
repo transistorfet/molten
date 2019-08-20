@@ -11,36 +11,36 @@ use ast::{ AST, Mutability, Visibility };
 
 
 pub fn write_exports(session: &Session, scope: ScopeRef, filename: &str, code: &Vec<AST>) {
-    let index_text = build_index(session, scope, code);
-    let mut index_file = File::create(filename).expect("Error creating index file");
-    index_file.write_all(index_text.as_bytes()).unwrap();
+    let declarations_text = build_declarations(session, scope, code);
+    let mut declarations_file = File::create(filename).expect("Error creating declarations file");
+    declarations_file.write_all(declarations_text.as_bytes()).unwrap();
     if Options::as_ref().debug {
-        println!("{}", index_text);
+        println!("{}", declarations_text);
     }
 }
 
-pub fn build_index(session: &Session, scope: ScopeRef, code: &Vec<AST>) -> String {
-    let mut index = String::new();
+pub fn build_declarations(session: &Session, scope: ScopeRef, code: &Vec<AST>) -> String {
+    let mut declarations = String::new();
     for node in code {
-        build_index_node(&mut index, session, scope.clone(), node);
+        build_declarations_node(&mut declarations, session, scope.clone(), node);
     }
-    index
+    declarations
 }
 
-fn build_index_node(index: &mut String, session: &Session, scope: ScopeRef, node: &AST) {
+fn build_declarations_node(declarations: &mut String, session: &Session, scope: ScopeRef, node: &AST) {
     match *node {
         AST::Function(ref id, _, ref vis, ref ident, _, _, _, _) => {
             if let Some(ref ident) = *ident {
                 if *vis == Visibility::Public {
                     //let name = get_mangled_name(session, scope.clone(), &ident.name, *id);
                     let ttype = session.get_type(*id).unwrap();
-                    index.push_str(format!("decl {}{}\n", ident.name.clone(), unparse_type(session, scope.clone(), ttype)).as_str());
+                    declarations.push_str(format!("decl {}{}\n", ident.name.clone(), unparse_type(session, scope.clone(), ttype)).as_str());
                 }
             }
         },
 
         AST::Definition(_, _, _, _, _, ref body) => match **body {
-            ref node @ AST::Class(_, _, _, _, _) => build_index_node(index, session, scope.clone(), node),
+            ref node @ AST::Class(_, _, _, _, _) => build_declarations_node(declarations, session, scope.clone(), node),
             _ => { },
         },
 
@@ -53,28 +53,28 @@ fn build_index_node(index: &mut String, session: &Session, scope: ScopeRef, node
                 namespec.clone()
             };
 
-            index.push_str(format!("class {} {{\n", fullspec).as_str());
-            //index.push_str(format!("    decl __alloc__() -> {}\n", namespec).as_str());
-            //index.push_str(format!("    decl __init__({}) -> Nil\n", namespec).as_str());
+            declarations.push_str(format!("class {} {{\n", fullspec).as_str());
+            //declarations.push_str(format!("    decl __alloc__() -> {}\n", namespec).as_str());
+            //declarations.push_str(format!("    decl __init__({}) -> Nil\n", namespec).as_str());
             for node in body {
                 match *node {
                     AST::Definition(ref id, _, ref mutable, ref ident, _, _) => {
                         let ttype = session.get_type(*id).unwrap();
-                        index.push_str(format!("    let {}{} : {}\n", if let Mutability::Mutable = mutable { "mut " } else { "" }, ident.name, unparse_type(session, tscope.clone(), ttype)).as_str());
+                        declarations.push_str(format!("    let {}{} : {}\n", if let Mutability::Mutable = mutable { "mut " } else { "" }, ident.name, unparse_type(session, tscope.clone(), ttype)).as_str());
                     },
                     AST::Function(ref id, _, ref vis, ref ident, _, _, _, _) => {
                         if let Some(ref ident) = *ident {
                             if *vis == Visibility::Public {
                                 //let name = get_mangled_name(session, tscope.clone(), &ident.name, *id);
                                 let ttype = session.get_type(*id).unwrap();
-                                index.push_str(format!("    decl {}{}\n", ident.name.clone(), unparse_type(session, tscope.clone(), ttype)).as_str());
+                                declarations.push_str(format!("    decl {}{}\n", ident.name.clone(), unparse_type(session, tscope.clone(), ttype)).as_str());
                             }
                         }
                     },
                     _ => {  },
                 }
             }
-            index.push_str(format!("}}\n").as_str());
+            declarations.push_str(format!("}}\n").as_str());
         },
         _ => { },
     }

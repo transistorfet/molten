@@ -26,6 +26,7 @@ LINK = "clang"
 LDFLAGS = "-lc -lm -lgc -no-pie"
 ILINK = "llvm-link" + EXT
 IRUN = "lli" + EXT
+PRELINK = "{} -b".format(COMPILE)
 
 
 def main():
@@ -37,6 +38,7 @@ def main():
         cmd.add_argument('-d', '--debug', action='store_true', help='Run the compiler with debugging on')
         cmd.add_argument('-S', '--assembly', action='store_true', help='Compile to assembly and use the interpreter')
         cmd.add_argument('-o', '--output', type=str, help='Output file name')
+        cmd.add_argument('--no-pre-link', action='store_true', help='Do not generate link files before compiling')
 
     cmd = subparsers.add_parser("build", help="compile a single file program")
     add_build_args(cmd)
@@ -73,7 +75,8 @@ def command_build(args):
         target += ".bc"
     flags = MOLFLAGS
     flags += " -d" if args.debug else ""
-    compile_and_link(target, [ "lib/libcore.mol", args.filename ], flags=flags, args=args)
+    deps = list(reversed(build_deps(args.filename, False if args.no_pre_link else True)))
+    compile_and_link(target, deps, flags=flags, args=args)
     return target
 
 def command_run(args):
@@ -95,6 +98,21 @@ def command_cleanall(args):
                 os.unlink(path)
 
 
+def build_deps(filename, generate=True, alldeps=[]):
+    if generate:
+        generate_link_file(filename)
+
+    alldeps.append(filename)
+    basename = os.path.splitext(filename)[0]
+    with open(basename + '.l', 'r') as f:
+        deps = f.readlines()
+        deps.pop(0)
+        for dep in deps:
+            dep = dep.strip()
+            if dep in alldeps:
+                continue
+            build_deps(dep + '.mol', alldeps)
+    return alldeps
 
 def compile_and_link(target, deps, flags, args):
     compiled = [ ]
@@ -104,6 +122,9 @@ def compile_and_link(target, deps, flags, args):
     compiled.append(compile(main, flags=flags, force=args.force, assembly=args.assembly))
     link(target, compiled, args.assembly)
 
+
+def generate_link_file(filename):
+    runordie("{prelink} {filename}".format(prelink=PRELINK, filename=filename))
 
 def compile(filename, flags="", force=False, assembly=False):
     target = os.path.splitext(filename)[0] + (".o" if not assembly else ".ll")
@@ -125,7 +146,7 @@ def runcmd(cmd):
     return result.returncode
 
 def runordie(cmd):
-    #print(cmd)
+    #print("RUNORDIE: ", cmd)
     result = subprocess.run(cmd, shell=True)
     if result.returncode != 0:
         raise Exception("{} exited with code {}".format(cmd, result.returncode))

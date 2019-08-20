@@ -73,6 +73,17 @@ impl Session {
         self.parse_string(filename, contents)
     }
 
+    pub fn write_link_file(&self) {
+        let mut link_text = String::new();
+        for (ref file, _) in self.files.borrow().iter() {
+            let source = file.rsplitn(2, '.').collect::<Vec<&str>>()[1];
+            link_text = link_text + source + "\n";
+        }
+
+        let mut link_file = File::create(format!("{}.l", self.target)).expect("Error creating link file");
+        link_file.write_all(link_text.as_bytes()).unwrap();
+    }
+
 
 
     pub fn print_error(&self, err: Error) {
