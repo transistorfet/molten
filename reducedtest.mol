@@ -284,3 +284,11 @@ while true {
 let aoeu = 1
 println(str(sizeof(tt)))
 
+//let teststr = "this is totally a string"
+//println(str(teststr[0]))
+
+//while true {
+//    println(readline())
+//}
+
+

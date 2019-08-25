@@ -81,10 +81,14 @@ def command_build(args):
 
 def command_run(args):
     target = command_build(args)
-    if args.assembly:
-        runordie(IRUN + " " + target)
-    else:
-        runordie("./{}".format(target))
+
+    try:
+        if args.assembly:
+            runordie(IRUN + " " + target)
+        else:
+            runordie("./{}".format(target))
+    except KeyboardInterrupt:
+        print("\nKeyboardInterrupt")
 
 def command_clean(args):
     os.system("cd {dir} && {rm} *.ll *.dec *.bc *.o *.bin".format(dir=args.directory, rm=RM))

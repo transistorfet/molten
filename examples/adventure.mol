@@ -8,10 +8,10 @@ class Input {
 
     fn loop(self) {
         while not self.stopflag {
-            println("> ")
+            print("> ")
             let input = readline()
 
-            if input == "quit" then {
+            if input == "quit\n" then {
                 self.stopflag = true;
             }
             else {

@@ -50,7 +50,7 @@ pub fn make_global<'sess>(session: &Session, builtins: &Vec<BuiltinDef<'sess>>) 
     declare_builtins_vec(session, primatives.clone(), builtins);
 
     let global = session.map.add(ScopeMapRef::GLOBAL, Some(primatives));
-    // TODO disabling this allows the identifier closure convertor to convert references to variables inside the main function
+    // NOTE disabling this allows the identifier closure convertor to convert references to variables inside the main function
     //global.set_context(Context::Global);
 }
 
@@ -197,6 +197,22 @@ unsafe fn declare_irregular_functions(llvm: &LLVM) {
     //declare_c_function(llvm, "llvm.stacksave", &mut [], llvm.str_type(), false);
 
     //declare_function(llvm, "__gxx_personality_v0", &mut [llvm.str_type(), llvm.str_type()], llvm.i64_type(), true);
+
+
+    let filetype = LLVMStructCreateNamed(llvm.context, cstr("struct._IO_FILE"));
+    let filetypeptr = LLVMPointerType(filetype, 0);
+
+    let stdout = LLVMAddGlobal(llvm.module, filetypeptr, cstr("stdout"));
+    LLVMSetLinkage(stdout, llvm::LLVMLinkage::LLVMExternalLinkage);
+    LLVMSetAlignment(stdout, 8);
+
+    let stdin = LLVMAddGlobal(llvm.module, filetypeptr, cstr("stdin"));
+    LLVMSetLinkage(stdin, llvm::LLVMLinkage::LLVMExternalLinkage);
+    LLVMSetAlignment(stdin, 8);
+
+    declare_c_function(llvm, "fgetc", &mut [filetypeptr], llvm.i32_type(), false);
+    declare_c_function(llvm, "fgets", &mut [llvm.str_type(), llvm.i64_type(), filetypeptr], llvm.i64_type(), false);
+    declare_c_function(llvm, "fputs", &mut [llvm.str_type(), filetypeptr], llvm.i64_type(), false);
 }
 
 unsafe fn build_lib_function(llvm: &LLVM, name: &str, ltype: &LLType, func: PlainFunction) -> LLVMValueRef {
@@ -269,8 +285,9 @@ pub fn get_builtins<'sess>() -> Vec<BuiltinDef<'sess>> {
         //BuiltinDef::Func(id(), "sprintf2",    "(String, String, '__a1, '__a2) -> () / C", FuncKind::Function(sprintf)),
         BuiltinDef::Func(id(), "sprintf",    "(String, String, '__a1, '__a2) -> () / C", FuncKind::FromNamed),
 
+        BuiltinDef::Func(id(), "print",      "(String) -> () / C",              FuncKind::Function(print)),
         BuiltinDef::Func(id(), "println",    "(String) -> () / C",              FuncKind::Function(println)),
-        //BuiltinDef::Func(id(), "readline",   "() -> String / C",                FuncKind::Function(readline)),
+        BuiltinDef::Func(id(), "readline",   "() -> String / C",                FuncKind::Function(readline)),
 
         BuiltinDef::Func(id(), "sizeof",    "('ptr) -> Int / C",                FuncKind::Function(sizeof_value)),
 
@@ -378,6 +395,7 @@ fn not_bool(llvm: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLV
 fn always_true(llvm: &LLVM, _args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { llvm.i1_const(true) } }
 fn always_false(llvm: &LLVM, _args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { llvm.i1_const(false) } }
 
+
 fn sprintf(llvm: &LLVM, mut args: Vec<LLVMValueRef>) -> LLVMValueRef {
     unsafe {
         llvm.build_call_by_name("sprintf", &mut args)
@@ -426,17 +444,6 @@ unsafe fn sizeof_value(llvm: &LLVM, mut args: Vec<LLVMValueRef>) -> LLVMValueRef
 }
 
 
-/*
-unsafe fn buffer_get(llvm: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef {
-    let size = LLVMBuildMul(llvm.builder, args[1], args[2], cstr(""));
-    let mut indices = vec!(size);
-    let pointer = LLVMBuildGEP(llvm.builder, args[0], indices.as_mut_ptr(), indices.len() as u32, cstr(""));
-    let value = LLVMBuildLoad(llvm.builder, pointer, cstr(""));
-    LLVMBuildCast(llvm.builder, llvm::LLVMOpcode::LLVMZExt, value, llvm.i64_type(), cstr("tmp"))
-}
-*/
-
-
 unsafe fn buffer_alloc(llvm: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef {
     let size = LLVMBuildMul(llvm.builder, args[0], LLVMSizeOf(llvm.i64_type()), cstr(""));
     let ptr = llvm.build_call_by_name("molten_malloc", &mut vec!(size));
@@ -481,23 +488,33 @@ unsafe fn buffer_set(llvm: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef {
 
 unsafe fn string_get(llvm: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef {
     let mut indices = vec!(args[1]);
-    let pointer = LLVMBuildGEP(llvm.builder, args[0], indices.as_mut_ptr(), indices.len() as u32, cstr("tmp"));
-    let value = LLVMBuildLoad(llvm.builder, pointer, cstr("tmp"));
-    LLVMBuildCast(llvm.builder, llvm::LLVMOpcode::LLVMZExt, value, llvm.i64_type(), cstr("tmp"))
+    let pointer = LLVMBuildGEP(llvm.builder, args[0], indices.as_mut_ptr(), indices.len() as u32, cstr(""));
+    let value = LLVMBuildLoad(llvm.builder, pointer, cstr(""));
+    LLVMBuildCast(llvm.builder, llvm::LLVMOpcode::LLVMZExt, value, llvm.i64_type(), cstr(""))
 }
 
+
+unsafe fn print(llvm: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef {
+    llvm.build_call_by_name("fputs", &mut vec!(args[0], llvm.build_load(LLVMGetNamedGlobal(llvm.module, cstr("stdout")))));
+    llvm.i32_const(0)
+}
 
 unsafe fn println(llvm: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef {
     llvm.build_call_by_name("puts", &mut vec!(args[0]));
     llvm.i32_const(0)
 }
 
-//unsafe fn readline(llvm: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef {
-//    let buffer = llvm.build_call_by_name("malloc", &mut vec!(llvm.i32_const(2048)));
-//    llvm.build_call_by_name("gets", &mut vec!(buffer));
-//    let len = llvm.build_call_by_name("strlen", &mut vec!(buffer));
-//    llvm.build_call_by_name("realloc", &mut vec!(buffer, len))
-//}
+
+unsafe fn readline(llvm: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef {
+    let buffer = llvm.build_cast(llvm.str_type(), llvm.build_call_by_name("molten_malloc", &mut vec!(llvm.i64_const(2048))));
+
+    let ret = llvm.build_call_by_name("fgets", &mut vec!(buffer, llvm.i64_const(2048), llvm.build_load(LLVMGetNamedGlobal(llvm.module, cstr("stdin")))));
+    // TODO we ignore ret which could cause the buffer to not be null terminated
+    let len = llvm.build_call_by_name("strlen", &mut vec!(buffer));
+    llvm.build_call_by_name("molten_realloc", &mut vec!(llvm.build_cast(llvm.tvar_type(), buffer), len))
+}
+
+
 
 /*
 unsafe fn buffer_allocator(llvm: &LLVM, objtype: LLVMTypeRef, mut args: Vec<LLVMValueRef>) -> LLVMValueRef {

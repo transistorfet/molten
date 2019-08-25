@@ -1,4 +1,12 @@
 
+* it should be possible to decl something multiple times?  only one decl should be emitted
+* decls must be exportable somehow... extern decls specifically
+* allow auto compiling and linking of c files by the molten script?
+* for c files, dec files would be deleted by the clean function, so can't really be used as manually-written files, can they?
+* need a way to import/compile directory of many files (libcore as many files)
+* should you make cstrings be ByteArray type and make vtabled String type
+
+* maybe change ! to * if you're going to be closer to C/Rust syntax vs ML syntax
 * classes shouldn't require a new function if all data has initializers...
 * make definitions always require an initializer
 * there was an error where "let ni: newint" with no initializer was causing a type error with "expected class or concrete type", but that was actually because a definition without
@@ -13,8 +21,7 @@
 * make visitor
 * add typeclasses
 
-* add a module keyword which is automatically inserted into .dec files, which actually calls the run function
-* fix modules import system to be less dependent on file paths...
+* add a module keyword which is automatically inserted into .dec files, which actually calls the run function, including the canonical name/path when the module was compiled
 * remove the forced visibility in refinery, when you decide on pub/priv semantics
 * update readme for auto-linking
 

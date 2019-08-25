@@ -67,7 +67,6 @@ pub enum LLRef {
     Deref,
     Field(usize),
     Index(usize),
-    //Ident(NodeID),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]

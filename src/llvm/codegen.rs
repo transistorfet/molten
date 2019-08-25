@@ -240,6 +240,10 @@ impl<'sess> LLVM<'sess> {
         LLVMPointerType(etype, 0)
     }
 
+    pub unsafe fn tvar_type(&self) -> LLVMTypeRef {
+        self.get_type(TYPEVAR_ID).unwrap()
+    }
+
     pub unsafe fn exp_type(&self) -> LLVMTypeRef {
         self.get_type(EXCEPTION_ID).unwrap()
     }
@@ -277,8 +281,8 @@ impl<'sess> LLVM<'sess> {
             LLType::I32 => self.i32_type(),
             LLType::I64 => self.i64_type(),
             LLType::F64 => self.f64_type(),
-            LLType::Var => self.get_type(TYPEVAR_ID).unwrap(),
-            LLType::ExceptionPoint => self.get_type(EXCEPTION_ID).unwrap(),
+            LLType::Var => self.tvar_type(),
+            LLType::ExceptionPoint => self.exp_type(),
             LLType::Ptr(etype) => LLVMPointerType(self.build_type(etype), 0),
             LLType::Struct(etypes) => self.struct_type(etypes),
             LLType::Array(etype, size) => self.array_type(etype, *size),
@@ -362,6 +366,10 @@ impl<'sess> LLVM<'sess> {
         LLVMConstInt(self.i1_type(), if num { 1 } else { 0 }, 0)
     }
 
+    pub unsafe fn i8_const(&self, num: i8) -> LLVMValueRef {
+        LLVMConstInt(self.i8_type(), num as u64, 0)
+    }
+
     pub unsafe fn i32_const(&self, num: i32) -> LLVMValueRef {
         LLVMConstInt(self.i32_type(), num as u64, 0)
     }
@@ -442,8 +450,8 @@ impl<'sess> LLVM<'sess> {
         LLVMBuildCall(self.builder, function, largs.as_mut_ptr(), largs.len() as u32, cstr(""))
     }
 
-    pub unsafe fn build_def_local(&self, name: &String, rtype: LLVMTypeRef, initval: LLVMValueRef) -> LLVMValueRef {
-        let pointer = LLVMBuildAlloca(self.builder, rtype, cstring(&name));
+    pub unsafe fn build_def_local(&self, name: &str, rtype: LLVMTypeRef, initval: LLVMValueRef) -> LLVMValueRef {
+        let pointer = LLVMBuildAlloca(self.builder, rtype, cstr(&name));
         LLVMBuildStore(self.builder, self.build_cast(rtype, initval), pointer);
         pointer
     }
@@ -457,7 +465,7 @@ impl<'sess> LLVM<'sess> {
         value
     }
 
-    pub unsafe fn build_access(&self, base: LLVMValueRef, refs: &Vec<LLRef>) -> LLVMValueRef {
+    pub unsafe fn build_access_refs(&self, refs: &Vec<LLRef>) -> Vec<LLVMValueRef> {
         let mut indices = vec!(self.i32_const(0));
         for lref in refs {
             match &lref {
@@ -466,6 +474,10 @@ impl<'sess> LLVM<'sess> {
                 LLRef::Index(index) => indices.push(self.i32_const(*index as i32)),
             }
         }
+        indices
+    }
+
+    pub unsafe fn build_access(&self, base: LLVMValueRef, mut indices: Vec<LLVMValueRef>) -> LLVMValueRef {
         LLVMBuildGEP(self.builder, base, indices.as_mut_ptr(), indices.len() as u32, cstr(""))
     }
 
@@ -643,7 +655,7 @@ impl<'sess> LLVM<'sess> {
                     LLVMDumpType(LLVMTypeOf(base));
                     debug!("\n{:?}", expr);
                 }
-                self.build_access(base, refs)
+                self.build_access(base, self.build_access_refs(refs))
             },
 
             LLExpr::LoadRef(expr) => {
