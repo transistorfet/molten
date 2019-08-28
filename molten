@@ -22,6 +22,7 @@ RM = "rm"
 BUILD = "cargo build"
 COMPILE = "cargo run --"
 MOLFLAGS = "-O3"
+CC = "clang"
 LINK = "clang"
 LDFLAGS = "-lc -lm -lgc -no-pie"
 ILINK = "llvm-link" + EXT
@@ -79,6 +80,7 @@ def command_build(args):
     compile_and_link(target, deps, flags=flags, args=args)
     return target
 
+
 def command_run(args):
     target = command_build(args)
 
@@ -90,8 +92,10 @@ def command_run(args):
     except KeyboardInterrupt:
         print("\nKeyboardInterrupt")
 
+
 def command_clean(args):
     os.system("cd {dir} && {rm} *.ll *.dec *.bc *.o *.bin".format(dir=args.directory, rm=RM))
+
 
 def command_cleanall(args):
     for (basedir, dirnames, filenames) in os.walk(args.directory):
@@ -118,6 +122,7 @@ def build_deps(filename, generate=True, alldeps=[]):
             build_deps(dep + '.mol', alldeps)
     return alldeps
 
+
 def compile_and_link(target, deps, flags, args):
     compiled = [ ]
     main = deps.pop()
@@ -130,12 +135,14 @@ def compile_and_link(target, deps, flags, args):
 def generate_link_file(filename):
     runordie("{prelink} {filename}".format(prelink=PRELINK, filename=filename))
 
+
 def compile(filename, flags="", force=False, assembly=False):
     target = os.path.splitext(filename)[0] + (".o" if not assembly else ".ll")
     flags += " -c" if not assembly else " -S --no-gc"
     if force or not os.path.exists(target) or os.path.getmtime(filename) > os.path.getmtime(target):
         runordie("{compile} {flags} {filename}".format(compile=COMPILE, flags=flags, filename=filename))
     return target
+
 
 def link(target, filenames, assembly=False):
     if not assembly:
@@ -148,6 +155,7 @@ def runcmd(cmd):
     #print(cmd)
     result = subprocess.run(cmd, shell=True)
     return result.returncode
+
 
 def runordie(cmd):
     #print("RUNORDIE: ", cmd)

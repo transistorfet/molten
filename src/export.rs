@@ -7,7 +7,7 @@ use misc::UniqueID;
 use config::Options;
 use session::Session;
 use scope::{ ScopeRef };
-use ast::{ AST, Mutability, Visibility };
+use ast::{ AST, Mutability, Visibility, NodeID };
 
 
 pub fn write_exports(session: &Session, scope: ScopeRef, filename: &str, code: &Vec<AST>) {
@@ -29,13 +29,13 @@ pub fn build_declarations(session: &Session, scope: ScopeRef, code: &Vec<AST>) -
 
 fn build_declarations_node(declarations: &mut String, session: &Session, scope: ScopeRef, node: &AST) {
     match *node {
+        AST::Declare(ref id, _, ref vis, ref ident, _) => {
+            declarations.push_str(&emit_declaration(session, scope.clone(), *id, *vis, &ident.name));
+        },
+
         AST::Function(ref id, _, ref vis, ref ident, _, _, _, _) => {
             if let Some(ref ident) = *ident {
-                if *vis == Visibility::Public {
-                    //let name = get_mangled_name(session, scope.clone(), &ident.name, *id);
-                    let ttype = session.get_type(*id).unwrap();
-                    declarations.push_str(format!("decl {}{}\n", ident.name.clone(), unparse_type(session, scope.clone(), ttype)).as_str());
-                }
+                declarations.push_str(&emit_declaration(session, scope.clone(), *id, *vis, &ident.name));
             }
         },
 
@@ -59,16 +59,17 @@ fn build_declarations_node(declarations: &mut String, session: &Session, scope: 
             for node in body {
                 match *node {
                     AST::Definition(ref id, _, ref mutable, ref ident, _, _) => {
-                        let ttype = session.get_type(*id).unwrap();
-                        declarations.push_str(format!("    let {}{} : {}\n", if let Mutability::Mutable = mutable { "mut " } else { "" }, ident.name, unparse_type(session, tscope.clone(), ttype)).as_str());
+                        declarations.push_str("    ");
+                        declarations.push_str(&emit_field(session, tscope.clone(), *id, *mutable, &ident.name));
+                    },
+                    AST::Declare(ref id, _, ref vis, ref ident, _) => {
+                        declarations.push_str("    ");
+                        declarations.push_str(&emit_declaration(session, tscope.clone(), *id, *vis, &ident.name));
                     },
                     AST::Function(ref id, _, ref vis, ref ident, _, _, _, _) => {
                         if let Some(ref ident) = *ident {
-                            if *vis == Visibility::Public {
-                                //let name = get_mangled_name(session, tscope.clone(), &ident.name, *id);
-                                let ttype = session.get_type(*id).unwrap();
-                                declarations.push_str(format!("    decl {}{}\n", ident.name.clone(), unparse_type(session, tscope.clone(), ttype)).as_str());
-                            }
+                            declarations.push_str("    ");
+                            declarations.push_str(&emit_declaration(session, tscope.clone(), *id, *vis, &ident.name));
                         }
                     },
                     _ => {  },
@@ -78,6 +79,22 @@ fn build_declarations_node(declarations: &mut String, session: &Session, scope: 
         },
         _ => { },
     }
+}
+
+fn emit_declaration(session: &Session, scope: ScopeRef, id: NodeID, vis: Visibility, name: &String) -> String {
+    if vis == Visibility::Public {
+        //let name = get_mangled_name(session, tscope.clone(), &ident.name, *id);
+        let ttype = session.get_type(id).unwrap();
+        format!("decl {}{}\n", name, unparse_type(session, scope.clone(), ttype))
+    } else {
+        String::from("")
+    }
+}
+
+fn emit_field(session: &Session, scope: ScopeRef, id: NodeID, mutable: Mutability, name: &String) -> String {
+    let ttype = session.get_type(id).unwrap();
+    let mutable_str = if let Mutability::Mutable = mutable { "mut " } else { "" };
+    format!("let {}{}: {}\n", mutable_str, name, unparse_type(session, scope.clone(), ttype))
 }
 
 pub fn unparse_type(session: &Session, scope: ScopeRef, ttype: Type) -> String {

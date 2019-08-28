@@ -207,10 +207,10 @@ fn ctest() / C {
 }
 
 fn test4() {
-    let clo = "Awww poops"
+    let clo = "from test4 scope"
     match "thing" {
         e => {
-            let a = "This Is Scope"
+            let a = "from match arm scope"
             println("e was " + e)
             println(a)
             println(clo)
@@ -251,7 +251,7 @@ enum Value =
 | Integer(Int)
 | String(String)
 | Pair(String, String, Int)
-| Tree(Value)
+| Tree(ref Value)
 
 let val = Value::String("Hey")
 
@@ -265,13 +265,13 @@ fn print_node(node) {
         Value::String(s) => println("So " + s)
         Value::Tree(t) => {
             println("Tree")
-            print_node(t)
+            print_node(!t)
         }
         _ => println("Nothing")
     }
 }
 
-let val2 = Value::Tree(Value::Tree(Value::String("Hey")))
+let val2 = Value::Tree(ref Value::Tree(ref Value::Tree(ref Value::Tree(ref Value::String("Hey")))))
 print_node(val2)
 
 
