@@ -66,11 +66,16 @@ impl Session {
         code
     }
 
-    pub fn parse_file(&self, filename: &str, search: bool) -> Vec<AST> {
-        let mut f = Session::find_file(filename, search);
-        let mut contents = String::new();
-        f.read_to_string(&mut contents).expect("Error reading file contents");
-        self.parse_string(filename, contents)
+    pub fn parse_file(&self, filename: &str, import: bool) -> Vec<AST> {
+        if import && Options::as_ref().linkfile_only {
+            self.files.borrow_mut().push((String::from(filename), String::from("")));
+            vec!()
+        } else {
+            let mut f = Session::find_file(filename, import);
+            let mut contents = String::new();
+            f.read_to_string(&mut contents).expect("Error reading file contents");
+            self.parse_string(filename, contents)
+        }
     }
 
     pub fn write_link_file(&self) {
