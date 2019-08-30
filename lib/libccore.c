@@ -7,7 +7,7 @@
 
 #define BUFFER_SIZE     1024
 
-int run_lib_libcore_c(void) {
+int run_lib_libccore(void) {
     return 0;
 }
 

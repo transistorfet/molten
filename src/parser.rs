@@ -81,9 +81,9 @@ macro_rules! wscoml {
         //delimited!($i, multispace_comment, $submac!($($args)*), multispace_comment)
     });
 
-    ($i:expr, $f:expr) => (
-        wscom!($i, call!($f));
-    );
+    //($i:expr, $f:expr) => (
+    //    wscom!($i, call!($f));
+    //);
 }
 
 #[macro_export]

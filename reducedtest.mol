@@ -1,5 +1,4 @@
 
-import lib.libcore_c
 import lib.libcore
 
 4 < 3 or 5 > 10
