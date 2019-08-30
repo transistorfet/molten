@@ -5,10 +5,11 @@
 
 * add an iterator type, (need to settle option type first)
 * add namespace of some kind, such that you can group functions?  like 'module' from ML?? like impl from rust?? or like namespace from C
+* maybe change ! to * if you're going to be closer to C/Rust syntax vs ML syntax
 
 * should you make cstrings be ByteArray type and make vtabled String type
 
-* maybe change ! to * if you're going to be closer to C/Rust syntax vs ML syntax
+
 * classes shouldn't require a new function if all data has initializers...
 * make definitions always require an initializer
 * there was an error where "let ni: newint" with no initializer was causing a type error with "expected class or concrete type", but that was actually because a definition without
@@ -19,6 +20,7 @@
 * the unmapping function doesn't seem to do anything at the moment.  Mapping back causes object-typevar-params test to fail (possibly related to subclass checking?)  We could
   possibly remove most of the unmapping code, or otherwise fix the failed testcase some other way
 * limit nested enums to only refs, otherwise it's a memory error; that or make all enums be allocated objects referenced by pointers
+
 
 * make an HIR
 * make visitor

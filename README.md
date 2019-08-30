@@ -42,21 +42,10 @@ The `molten` script helps with compiling and linking IR files.  To run an exampl
 ```
 
 This will run cargo to build the compiler if needed, then compile the fac.mol
-file, as well as the libcore.mol library, link them together using clang, along
-with libgc, and then run the binary.  It can also compile to LLVM IR, and run
-LLVM bitcode using `lli-7` by using the `-S` flag.
-
-The `*.ll` files contain IR code for a single file.  The `*.dec` files contain
-declarations for use when importing from another file.  The `*.bc` files
-contain LLVM Bitcode, which can be executed using `lli-7` or compiled using
-`llc-7`.
-
-```
-llc-7 -filetype=obj lib/libcore.ll
-llc-7 -filetype=obj example/fac.ll
-gcc -lm -lgc -no-pie example/fac.o lib/libcore.o
-```
-Note: the `-no-pie` flag may be required when linking or you may get an error
+file, as well as all of its dependencies (in this case, the libcore.mol library),
+link them together using clang, along with libgc, and then run the binary.  It
+can also compile to LLVM IR, and run LLVM bitcode by using the `-S` flag.  The
+resulting .bc file can be run using `lli-7`.
 
 
 Example
@@ -290,6 +279,15 @@ fn baz(i: Int) / C {
     // molten function that can be called from C
 }
 ```
+
+### Linking to C
+An example of writing a C file, and linking it to a molten program is shown
+in `lib/libccore.c`.  When imported into a molten file and compiled with the
+`molten` script, the library will be compiling using clang and the
+`libccore.cdec` (manually maintained) will be copied to `libccore.dec`.  The
+importing molten program will be able to use declarations from libccore.cdec.
+Some declarations that can be used in C are in `include/molten.h`, such as
+accessing the garbage collected allocator.
 
 
 Previously Uncompleted
