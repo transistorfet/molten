@@ -153,7 +153,6 @@ named!(statement(Span) -> (AST, Option<AST>),
             typealias |
             typeenum |
             expression
-            // TODO should class be here too?
         )) >>
         separator >>
         t: opt!(map!(tag!(";"), |_| AST::make_lit(Literal::Unit))) >>
@@ -264,7 +263,7 @@ named!(enum_variant(Span) -> EnumVariant,
 
 
 named!(expression_list(Span) -> Vec<AST>,
-    separated_list_complete!(tag!(","), expression)
+    separated_list_complete!(wscom!(tag!(",")), expression)
 );
 
 named!(expression(Span) -> AST,
@@ -363,14 +362,14 @@ named!(matchcase(Span) -> AST,
 
 named!(caselist(Span) -> Vec<MatchCase>,
     //separated_list_complete!(wscom!(tag!("|")), do_parse!(
-    many1!(do_parse!(
+    many1!(wscom!(do_parse!(
         //wscom!(tag!("|")) >>
         c: pattern >>
         wscom!(tag!("=>")) >>
         e: expression >>
         //wscom!(tag!(",")) >>
         (MatchCase::new(c, e))
-    ))
+    )))
 );
 
 named!(forloop(Span) -> AST,
@@ -556,21 +555,21 @@ impl AST {
 named!(infix(Span) -> AST,
     do_parse!(
         left: atomic >>
-        operations: many0!(tuple!(position!(), infix_op, atomic)) >>
+        operations: many0!(tuple!(position!(), wscom!(infix_op), atomic)) >>
         (AST::fold_op(left, operations))
     )
 );
 
 named!(atomic(Span) -> AST,
-    wscom!(alt_complete!(
+    alt_complete!(
         prefix |
         subatomic_operation
-    ))
+    )
 );
 
 named!(prefix_op(Span) -> Ident,
     map_ident!(alt!(
-        tag_word!("not") |
+        ws!(tag_word!("not")) |
         tag!("~")
     ))
 );
@@ -638,7 +637,7 @@ named!(record_update(Span) -> AST,
             pos: position!() >>
             i: wscom!(identifier_node) >>
             wscom!(tag_word!("with")) >>
-            l: record_field_assignments >>
+            l: wscom!(record_field_assignments) >>
             (AST::make_record_update(Pos::new(pos), i, l))
         ),
         return_error!(ErrorKind::Custom(ERR_IN_LIST), tag!("}"))
@@ -910,7 +909,7 @@ named!(record(Span) -> AST,
         pos: position!() >>
         l: delimited!(
             tag!("{"),
-            record_field_assignments,
+            wscom!(record_field_assignments),
             return_error!(ErrorKind::Custom(ERR_IN_LIST), tag!("}"))
         ) >>
         (AST::make_record(Pos::new(pos), l))
@@ -918,21 +917,21 @@ named!(record(Span) -> AST,
 );
 
 named!(record_field_assignments(Span) -> Vec<(Ident, AST)>,
-    wscom!(separated_list_complete!(wscom!(tag!(",")), do_parse!(
+    separated_list_complete!(wscom!(tag!(",")), do_parse!(
         i: identifier >>
         wscom!(tag!("=")) >>
         e: expression >>
         ((i, e))
-    )))
+    ))
 );
 
 named!(list(Span) -> AST,
     do_parse!(
         pos: position!() >>
         l: delimited!(
-            wscom!(tag!("[")),
-            separated_list_complete!(wscom!(tag!(",")), expression),
-            wscom!(tag!("]"))
+            tag!("["),
+            wscom!(separated_list_complete!(wscom!(tag!(",")), expression)),
+            tag!("]")
         ) >>
         (AST::make_list(Pos::new(pos), l))
     )
