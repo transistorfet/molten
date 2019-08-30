@@ -169,7 +169,7 @@ impl<'sess> Transformer<'sess> {
             body
         )));
 
-        let module_run_name = format!("run.{}", self.session.name);
+        let module_run_name = format!("run_{}", self.session.name.replace(".", "_"));
         self.add_global(LLGlobal::DefCFunc(run_id, LLLink::Public, module_run_name, run_ltype, fargs, run_body, LLCC::FastCC));
 
         run_id
@@ -472,7 +472,7 @@ impl<'sess> Transformer<'sess> {
     fn transform_import(&self, scope: ScopeRef, name: &String, decls: &Vec<AST>) -> Vec<LLExpr> {
         let mut exprs = vec!();
         let rid = NodeID::generate();
-        let module_run_name = format!("run.{}", name);
+        let module_run_name = format!("run_{}", name.replace(".", "_"));
         let rftype = LLType::Function(vec!(), r(LLType::I64));
         self.add_global(LLGlobal::DeclCFunc(rid, module_run_name, rftype, LLCC::FastCC));
         exprs.extend(self.create_cfunc_invoke(LLExpr::GetValue(rid), vec!()));

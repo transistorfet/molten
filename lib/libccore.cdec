@@ -1,0 +1,1 @@
+decl readline() -> String / C

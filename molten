@@ -5,6 +5,7 @@ import sys
 import shutil
 import os.path
 import argparse
+import traceback
 import subprocess
 
 
@@ -23,6 +24,7 @@ BUILD = "cargo build"
 COMPILE = "cargo run --"
 MOLFLAGS = "-O3"
 CC = "clang"
+CFLAGS = "-Iinclude"
 LINK = "clang"
 LDFLAGS = "-lc -lm -lgc -no-pie"
 ILINK = "llvm-link" + EXT
@@ -66,6 +68,7 @@ def main():
         try:
             args.command(args)
         except Exception as e:
+            traceback.print_exc()
             sys.stderr.write("Command failed: " + str(e) + "\n")
             sys.exit(-1)
 
@@ -74,10 +77,8 @@ def command_build(args):
     target = args.output if args.output else os.path.splitext(args.filename)[0]
     if args.assembly:
         target += ".bc"
-    flags = MOLFLAGS
-    flags += " -d" if args.debug else ""
     deps = list(reversed(build_deps(args.filename, False if args.no_pre_link else True)))
-    compile_and_link(target, deps, flags=flags, args=args)
+    compile_and_link(target, deps, args=args)
     return target
 
 
@@ -107,10 +108,13 @@ def command_cleanall(args):
 
 
 def build_deps(filename, generate=True, alldeps=[]):
+    alldeps.append(filename)
+    if not filename.endswith('.mol'):
+        return alldeps
+
     if generate:
         generate_link_file(filename)
 
-    alldeps.append(filename)
     basename = os.path.splitext(filename)[0]
     with open(basename + '.l', 'r') as f:
         deps = f.readlines()
@@ -119,16 +123,23 @@ def build_deps(filename, generate=True, alldeps=[]):
             dep = dep.strip()
             if dep in alldeps:
                 continue
-            build_deps(dep + '.mol', alldeps)
+            build_deps(find_file(dep), alldeps)
     return alldeps
 
 
-def compile_and_link(target, deps, flags, args):
+def find_file(name):
+    for ext in [ '.mol', '.c' ]:
+        if os.path.exists(name + ext):
+            return name + ext
+    raise Exception("Unable to find dependency: {}".format(name))
+
+
+def compile_and_link(target, deps, args):
     compiled = [ ]
     main = deps.pop()
     for dep in deps:
-        compiled.append(compile(dep, flags=(flags + " -l"), force=args.force, assembly=args.assembly))
-    compiled.append(compile(main, flags=flags, force=args.force, assembly=args.assembly))
+        compiled.append(compile(dep, mainfunc=False, force=args.force, assembly=args.assembly, debug=args.debug))
+    compiled.append(compile(main, mainfunc=True, force=args.force, assembly=args.assembly, debug=args.debug))
     link(target, compiled, args.assembly)
 
 
@@ -136,12 +147,33 @@ def generate_link_file(filename):
     runordie("{prelink} {filename}".format(prelink=PRELINK, filename=filename))
 
 
-def compile(filename, flags="", force=False, assembly=False):
+def compile(filename, mainfunc=False, force=False, assembly=False, debug=False):
     target = os.path.splitext(filename)[0] + (".o" if not assembly else ".ll")
-    flags += " -c" if not assembly else " -S --no-gc"
     if force or not os.path.exists(target) or os.path.getmtime(filename) > os.path.getmtime(target):
-        runordie("{compile} {flags} {filename}".format(compile=COMPILE, flags=flags, filename=filename))
+        if filename.endswith('.mol'):
+            compile_molten(filename, target, mainfunc, force, assembly, debug)
+        elif filename.endswith('.c'):
+            compile_c(filename, target, mainfunc, force, assembly, debug)
+        else:
+            raise Exception("Unsupported source file extension")
     return target
+
+
+def compile_molten(filename, target, mainfunc=False, force=False, assembly=False, debug=False):
+    flags = MOLFLAGS
+    flags += " -l" if not mainfunc else ""
+    flags += " -d" if debug else ""
+    flags += " -c" if not assembly else " -S --no-gc"
+    runordie("{compile} {flags} {filename}".format(compile=COMPILE, flags=flags, filename=filename))
+
+
+def compile_c(filename, target, mainfunc=False, force=False, assembly=False, debug=False):
+    flags = ""
+    flags += " -c" if not assembly else " -S"
+    flags += " " + CFLAGS
+    name = os.path.splitext(filename)[0]
+    shutil.copyfile("{}.cdec".format(name), "{}.dec".format(name))
+    runordie("{compile} {flags} -o {target} {filename}".format(compile=CC, flags=flags, target=target, filename=filename))
 
 
 def link(target, filenames, assembly=False):

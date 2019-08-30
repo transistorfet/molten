@@ -710,7 +710,10 @@ impl<'sess> LLVM<'sess> {
                 LLGlobal::DeclCFunc(id, name, ltype, cc) |
                 LLGlobal::DefCFunc(id, _, name, ltype, _, _, cc) => {
                     let ftype = self.build_type(ltype);
-                    let function = LLVMAddFunction(self.module, cstring(&name), ftype);
+                    let mut function = LLVMGetNamedFunction(self.module, cstring(&name));
+                    if function == ptr::null_mut() {
+                        function = LLVMAddFunction(self.module, cstring(&name), ftype);
+                    }
                     LLVMSetFunctionCallConv(function, self.get_callconv(*cc) as c_uint);
                     self.set_value(*id, function);
                 },

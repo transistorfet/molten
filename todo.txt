@@ -1,23 +1,24 @@
 
-* add an iterator type, (need to settle option type first)
-
+* need a way to import/compile directory of many files (libcore as many files)
 * add a module keyword which is automatically inserted into .dec files, which actually calls the run function, including the canonical name/path when the module was compiled
 * remove the forced visibility in refinery, when you decide on pub/priv semantics
-* it should be possible to decl something multiple times?  only one decl should be emitted
-* allow auto compiling and linking of c files by the molten script?
-* for c files, dec files would be deleted by the clean function, so can't really be used as manually-written files, can they?
-* need a way to import/compile directory of many files (libcore as many files)
+
+* add an iterator type, (need to settle option type first)
+* add namespace of some kind, such that you can group functions?  like 'module' from ML?? like impl from rust?? or like namespace from C
+
 * should you make cstrings be ByteArray type and make vtabled String type
 
-* limit nested enums to only refs, otherwise it's a memory error; that or make all enums be allocated objects referenced by pointers
 * maybe change ! to * if you're going to be closer to C/Rust syntax vs ML syntax
 * classes shouldn't require a new function if all data has initializers...
 * make definitions always require an initializer
 * there was an error where "let ni: newint" with no initializer was causing a type error with "expected class or concrete type", but that was actually because a definition without
   an initializer is the same as "let ni: newint = nil" and nil could not be cast to a Record, which newint is a typealias of a record
+* exceptions with only a wildcard match arm have an unresolved typevar for the value of the exception, but that being a typevar anyways means that it's not type checked
+  and you can raise anything and catch anything, regardless of whether they are the same type... the easy solution might be to require it to inherit from Exception
 * there is an issue with raise, in that it is considered to return unit () instead of somehow being marked as not returning...  Getting type errors in Option def
 * the unmapping function doesn't seem to do anything at the moment.  Mapping back causes object-typevar-params test to fail (possibly related to subclass checking?)  We could
   possibly remove most of the unmapping code, or otherwise fix the failed testcase some other way
+* limit nested enums to only refs, otherwise it's a memory error; that or make all enums be allocated objects referenced by pointers
 
 * make an HIR
 * make visitor
@@ -30,8 +31,6 @@
 
 BUGS:
 * parse error for if statements in an expression, they require brackets around them: let h = 5 + if r > 4 then 5 else 10
-* exceptions with only a wildcard match arm have an unresolved typevar for the value of the exception, but that being a typevar anyways means that it's not type checked
-  and you can raise anything and catch anything, regardless of whether they are the same type... the easy solution might be to require it to inherit from Exception
 * cannot annotate a wildcard in a pattern, it inteprets it as an identifier which isn't defined
 * unwrap error when recursively calling in `let recfoo = fn x =>` because the actual DefLocal is inserted after the initializer code is transformed, but if this was fixed,
   would it be possible to access recfoo before it's been initialized, such as in `let something: Int = { something; 0 }`
