@@ -81,9 +81,9 @@ macro_rules! wscoml {
         //delimited!($i, multispace_comment, $submac!($($args)*), multispace_comment)
     });
 
-    //($i:expr, $f:expr) => (
-    //    wscom!($i, call!($f));
-    //);
+    ($i:expr, $f:expr) => (
+        wscoml!($i, call!($f));
+    );
 }
 
 #[macro_export]
@@ -127,7 +127,7 @@ named!(pub parse(Span) -> Vec<AST>,
 
 named!(statement_list(Span) -> Vec<AST>,
     map!(
-        fold_many0!(statement, (Vec::new(), None), |(mut list, mut term): (Vec<AST>, Option<AST>), (s, t)| {
+        fold_many0!(wscom!(statement), (Vec::new(), None), |(mut list, mut term): (Vec<AST>, Option<AST>), (s, t)| {
             list.push(s);
             term = t;
             (list, term)
@@ -144,7 +144,7 @@ named!(statement_list(Span) -> Vec<AST>,
 named!(statement(Span) -> (AST, Option<AST>),
     //separated_list_complete!(ws!(tag!(",")), do_parse!(
     do_parse!(
-        s: wscom!(alt_complete!(
+        s: alt_complete!(
             import |
             definition |
             assignment |
@@ -153,7 +153,7 @@ named!(statement(Span) -> (AST, Option<AST>),
             typealias |
             typeenum |
             expression
-        )) >>
+        ) >>
         separator >>
         t: opt!(map!(tag!(";"), |_| AST::make_lit(Literal::Unit))) >>
         (s, t)
@@ -217,13 +217,13 @@ named!(class(Span) -> AST,
         i: class_spec >>
         p: opt!(preceded!(wscom!(tag_word!("extends")), class_spec)) >>
         wscom!(tag!("{")) >>
-        s: many0!(alt_complete!(
-                typealias |
-                definition |
-                declare |
-                function
-                )) >>
-        return_error!(ErrorKind::Custom(ERR_IN_CLASS), wscom!(tag!("}"))) >>
+        s: many0!(wscom!(alt_complete!(
+            typealias |
+            definition |
+            declare |
+            function
+        ))) >>
+        return_error!(ErrorKind::Custom(ERR_IN_CLASS), tag!("}")) >>
         (AST::make_class(Pos::new(pos), i, p, s))
         )
     );
@@ -269,7 +269,6 @@ named!(expression_list(Span) -> Vec<AST>,
 named!(expression(Span) -> AST,
     alt_complete!(
         //underscore |
-        //block |
         ifexpr |
         trywith |
         raise |
@@ -292,13 +291,13 @@ named!(expression(Span) -> AST,
 
 named!(block(Span) -> AST,
     delimited!(
-        wscom!(alt!(tag_word!("begin") | tag!("{"))),
+        alt!(tag_word!("begin") | tag!("{")),
         do_parse!(
             pos: position!() >>
-            s: statement_list >>
+            s: wscom!(statement_list) >>
             (AST::make_block(Pos::new(pos), s))
         ),
-        wscom!(alt!(tag_word!("end") | tag!("}")))
+        alt!(tag_word!("end") | tag!("}"))
     )
 );
 
@@ -321,14 +320,14 @@ named!(trywith(Span) -> AST,
     do_parse!(
         pos: position!() >>
         wscom!(tag_word!("try")) >>
-        c: expression >>
+        c: wscom!(expression) >>
         opt!(wscom!(tag_word!("catch"))) >>
         return_error!(ErrorKind::Custom(ERR_IN_TRY),
-            wscom!(tag!("{"))
+            tag!("{")
         ) >>
         l: caselist >>
         return_error!(ErrorKind::Custom(ERR_IN_TRY),
-            wscom!(tag!("}"))
+            tag!("}")
         ) >>
         (AST::make_try(Pos::new(pos), c, l))
     )
@@ -347,14 +346,14 @@ named!(matchcase(Span) -> AST,
     do_parse!(
         pos: position!() >>
         wscom!(tag_word!("match")) >>
-        c: expression >>
+        c: wscom!(expression) >>
         //wscom!(tag_word!("with")) >>
         return_error!(ErrorKind::Custom(ERR_IN_MATCH),
-            wscom!(tag!("{"))
+            tag!("{")
         ) >>
         l: caselist >>
         return_error!(ErrorKind::Custom(ERR_IN_MATCH),
-            wscom!(tag!("}"))
+            tag!("}")
         ) >>
         (AST::make_match(Pos::new(pos), c, l))
     )
@@ -430,7 +429,7 @@ named!(function(Span) -> AST,
         a: abi_specifier >>
         e: alt_complete!(
             preceded!(wscom!(tag!("=>")), return_error!(ErrorKind::Custom(ERR_IN_FUNC), expression)) |
-            return_error!(ErrorKind::Custom(ERR_IN_FUNC), block)
+            return_error!(ErrorKind::Custom(ERR_IN_FUNC), wscoml!(block))
         ) >>
         (AST::make_func(Pos::new(pos), if vis.is_some() { Visibility::Public } else { Visibility::Private }, l.0, l.1, r, e, a))
     )
@@ -447,7 +446,7 @@ named!(reference(Span) -> AST,
 
 named!(annotation(Span) -> AST,
     do_parse!(
-        e: wscom!(atomic) >>
+        e: atomic >>
         wscom!(tag!(":")) >>
         t: type_description >>
         (AST::make_ptr_cast(t, e))
@@ -455,10 +454,10 @@ named!(annotation(Span) -> AST,
 );
 
 named!(argument_list(Span) -> Vec<Argument>,
-    separated_list_complete!(tag!(","),
+    separated_list_complete!(wscom!(tag!(",")),
         do_parse!(
             i: identifier_typed >>
-            d: opt!(preceded!(tag!("="), expression)) >>
+            d: opt!(preceded!(wscom!(tag!("=")), expression)) >>
             (Argument::new(i.0, i.1, i.2, d))
         )
     )
@@ -682,12 +681,12 @@ named!(class_spec(Span) -> ClassSpec,
 );
 
 named!(identifier_typed(Span) -> (Pos, Ident, Option<Type>),
-    wscom!(do_parse!(
+    do_parse!(
         pos: position!() >>
         i: identifier >>
         t: opt!(preceded!(wscom!(tag!(":")), type_description)) >>
         (Pos::new(pos), i, t)
-    ))
+    )
 );
 
 named!(any_op(Span) -> Ident,
