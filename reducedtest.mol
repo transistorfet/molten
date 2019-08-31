@@ -61,6 +61,7 @@ println(result)
 
 
 
+
 println(str(4))
 
 let s = { a = 2, b = 5 }
@@ -290,5 +291,6 @@ println(str(sizeof(tt)))
 //    println(readline())
 //}
 
-1 4
+1
+4
 

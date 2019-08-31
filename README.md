@@ -128,11 +128,13 @@ Foo::static(5)
 ```
 
 ### Blocks
-A block is a collection of statements which return the result of the last
+A block is a collection of expressions which return the result of the last
 expression in the block.  They can be used in place of a single expression.
 They do not create their own local scope, at least at the moment, so variables
 defined inside blocks will appear in the parent scope (usually the function
-the block is in).
+the block is in).  Each expression in the block must end in a newline or
+semi-colon character (or be the last expression in the block).  This applies
+to the top level.
 ```
 let is_zero = if self.x <= 0 then {
     self.x = 0

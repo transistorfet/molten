@@ -28,7 +28,8 @@
     println(str(Inf))
     println(str(-Inf))
     println(str(NaN))
-    true false      // maybe this should fail... but currently it passes
+    true
+    false
 
     println(str(2 * (10 + -3) + 5))
     println(str(2 + 4 * 7 - 1 / 20  * 10 - 50 * 12))

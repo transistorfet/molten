@@ -126,37 +126,43 @@ named!(pub parse(Span) -> Vec<AST>,
 );
 
 named!(statement_list(Span) -> Vec<AST>,
-    map!(
-        fold_many0!(wscom!(statement), (Vec::new(), None), |(mut list, mut term): (Vec<AST>, Option<AST>), (s, t)| {
-            list.push(s);
-            term = t;
-            (list, term)
-        }),
-        |(mut list, term)| {
-            if let Some(term) = term {
-                list.push(term);
-            }
-            list
-        }
+    do_parse!(
+        l: wscom!(separated_list_complete!(terminator, statement)) >>
+        t: opt!(terminator) >>
+        (add_terminator(l, t.unwrap_or(None)))
     )
 );
 
-named!(statement(Span) -> (AST, Option<AST>),
-    //separated_list_complete!(ws!(tag!(",")), do_parse!(
+fn add_terminator(mut list: Vec<AST>, term: Option<AST>) -> Vec<AST> {
+    if let Some(term) = term {
+        list.push(term);
+    }
+    list
+}
+
+named!(terminator(Span) -> Option<AST>,
     do_parse!(
-        s: alt_complete!(
-            import |
-            definition |
-            assignment |
-            whileloop |
-            class |
-            typealias |
-            typeenum |
-            expression
+        opt!(space_comment) >>
+        t: alt!(
+            //map!(peek!(wscom!(tag!("}"))), |_| None) |
+            map!(line_ending, |_| None) |
+            map!(tag!(";"), |_| Some(AST::make_lit(Literal::Unit)))
         ) >>
-        separator >>
-        t: opt!(map!(tag!(";"), |_| AST::make_lit(Literal::Unit))) >>
-        (s, t)
+        opt!(multispace_comment) >>
+        (t)
+    )
+);
+
+named!(statement(Span) -> AST,
+    alt_complete!(
+        import |
+        definition |
+        assignment |
+        whileloop |
+        class |
+        typealias |
+        typeenum |
+        expression
     )
 );
 
@@ -361,14 +367,14 @@ named!(matchcase(Span) -> AST,
 
 named!(caselist(Span) -> Vec<MatchCase>,
     //separated_list_complete!(wscom!(tag!("|")), do_parse!(
-    many1!(wscom!(do_parse!(
+    dbg_dmp!(many1!(wscom!(do_parse!(
         //wscom!(tag!("|")) >>
         c: pattern >>
         wscom!(tag!("=>")) >>
         e: expression >>
         //wscom!(tag!(",")) >>
         (MatchCase::new(c, e))
-    )))
+    ))))
 );
 
 named!(forloop(Span) -> AST,
@@ -746,28 +752,28 @@ named!(type_tuple(Span) -> Type,
 named!(type_record(Span) -> Type,
     wscom!(do_parse!(
         types: delimited!(
-            wscom!(tag!("{")),
-            separated_list_complete!(wscom!(tag!(",")), do_parse!(
+            tag!("{"),
+            wscom!(separated_list_complete!(wscom!(tag!(",")), do_parse!(
                 i: identifier >>
                 wscom!(tag!(":")) >>
                 t: type_description >>
                 ((i.name, t))
-            )),
-            wscom!(tag!("}"))
+            ))),
+            tag!("}")
         ) >>
         (Type::Record(types))
     ))
 );
 
 named!(type_function(Span) -> Type,
-    wscom!(do_parse!(
+    do_parse!(
         //args: delimited!(tag!("("), separated_list_complete!(wscom!(tag!(",")), type_description), tag!(")")) >>
         args: alt_complete!(type_tuple | type_variable | type_object) >>
         wscom!(tag!("->")) >>
         ret: type_description >>
         abi: abi_specifier >>
         (Type::Function(r(args), r(ret), abi))
-    ))
+    )
 );
 
 // TODO this used to be Overload, but it could potentially be useful as a contrained type of sorts

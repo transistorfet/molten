@@ -40,7 +40,6 @@ BUGS:
   single Real is commented out.  It's because the types are added during the name binding phase.  This needs to be added as a test case
 * the infer-arg-as-typevar test fails because str() cannot be resolved to a concrete variant by the time it's typechecked (no backwards affect allowed)
 * there is still a bug with the Phi statement, in that it will return null if you don't cover all cases. there is no check for coverage
-* issue with separator/lf not working when two expressions are on the same line (it should produce a parse error)
 * issue with calling function references store in structs or tuples... it converts them to methods incorrectly
 * sizeof can only calculate the size of a pointer.  I think it has to be an AST element in order to work
 
@@ -48,8 +47,6 @@ BUGS:
 
 Error Messages:
 * there is no context info for the ununified variables, which makes it hard to find the issue
-* there are poor error messages when deleting the "=" from a "let something = fn x => ..." both inside and outside classes.... shouldn't be doing this (actually, because of
-  let without init, and the lf issue... lf fix would solve this)
 * you can put a restriction on type aliases such that a type can only use type vars defined in the declaration
 * you could require that classes explicitly define their type variables by name, to catch type errors.  So every method or definition in the top level of the class
   could only use explicitly declared type variables
