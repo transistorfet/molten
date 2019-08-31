@@ -493,11 +493,9 @@ impl<'sess> Transformer<'sess> {
         });
 
 
-        // TODO either match on the return from setjmp or get the return value from the expoint
-        let matchblock = self.transform_match(scope.clone(), &AST::GetValue(expoint_id), cases);
-        //let expret_id = NodeID::generate();
-        //exprs.push(LLExpr::SetValue(expret_id, r(LLExpr::GetItem(r(LLExpr::GetLocal(exp_id)), 1))));
-        //let matchblock = self.transform_match(scope.clone(), &AST::GetValue(expret_id), cases);
+        let exret_id = NodeID::generate();
+        exprs.push(LLExpr::SetValue(exret_id, r(LLExpr::GetItem(r(LLExpr::GetLocal(exp_id)), 1))));
+        let matchblock = self.transform_match(scope.clone(), &AST::GetValue(exret_id), cases);
 
         exprs.extend(self.create_exception_block(LLExpr::GetValue(expoint_id), tryblock, matchblock));
         exprs
@@ -523,10 +521,8 @@ impl<'sess> Transformer<'sess> {
         let exp_id = self.get_exception().unwrap();
         let value = self.transform_as_result(&mut exprs, scope.clone(), valexpr).unwrap();
 
-        // TODO either pass the return value to longjmp or set it in the expoint and pass 1 to longjmp...
-        exprs.push(LLExpr::CallC(r(LLExpr::GetNamed("longjmp".to_string())), vec!(LLExpr::GetValue(exp_id), value), LLCC::CCC));
-        //exprs.push(LLExpr::StoreRef(r(LLExpr::AccessRef(r(LLExpr::GetValue(exp_id)), vec!(LLRef::Field(1)))), r(LLExpr::Cast(LLType::Var, r(value)))));
-        //exprs.push(LLExpr::CallC(r(LLExpr::GetNamed("longjmp".to_string())), vec!(LLExpr::GetValue(exp_id), LLExpr::Literal(LLLit::I32(1))), LLCC::CCC));
+        exprs.push(LLExpr::StoreRef(r(LLExpr::AccessRef(r(LLExpr::GetValue(exp_id)), vec!(LLRef::Field(1)))), r(LLExpr::Cast(LLType::Var, r(value)))));
+        exprs.push(LLExpr::CallC(r(LLExpr::GetNamed("longjmp".to_string())), vec!(LLExpr::GetValue(exp_id), LLExpr::Literal(LLLit::I32(1))), LLCC::CCC));
 
         exprs.push(LLExpr::Literal(LLLit::I32(0)));
         exprs
