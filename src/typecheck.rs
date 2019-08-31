@@ -188,7 +188,8 @@ impl<'sess> TypeChecker<'sess> {
                     AST::Try(_, _, _, _) => {
                         self.check_node(scope.clone(), cond, None);
                         // TODO this is problematic.  If the value that's raised is not used, this var will be unresolved.  We aren't really checking the raised type anywhere though
-                        scope.new_typevar(self.session, false)
+                        //scope.new_typevar(self.session, false)
+                        scope.make_obj(self.session, String::from("Exception"), vec!())?
                     },
                     _ => panic!(""),
                 };
@@ -204,7 +205,8 @@ impl<'sess> TypeChecker<'sess> {
 
             AST::Raise(_, _, ref expr) => {
                 // TODO should you check for a special error/exception type?
-                self.check_node(scope.clone(), expr, None);
+                let extype = scope.make_obj(self.session, String::from("Exception"), vec!())?;
+                expect_type(self.session, scope.clone(), Some(extype.clone()), Some(self.check_node(scope.clone(), expr, Some(extype))), Check::Def)?;
                 scope.make_obj(self.session, String::from("()"), vec!())?
             },
 

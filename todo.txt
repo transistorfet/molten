@@ -5,17 +5,14 @@
 
 * add an iterator type, (need to settle option type first)
 * add namespace of some kind, such that you can group functions?  like 'module' from ML?? like impl from rust?? or like namespace from C
-
 * should you make cstrings be ByteArray type and make vtabled String type
 
+* there is an issue with raise, in that it is considered to return unit () instead of somehow being marked as not returning...  Getting type errors in Option def
 
 * classes shouldn't require a new function if all data has initializers...
 * make definitions always require an initializer
 * there was an error where "let ni: newint" with no initializer was causing a type error with "expected class or concrete type", but that was actually because a definition without
   an initializer is the same as "let ni: newint = nil" and nil could not be cast to a Record, which newint is a typealias of a record
-* exceptions with only a wildcard match arm have an unresolved typevar for the value of the exception, but that being a typevar anyways means that it's not type checked
-  and you can raise anything and catch anything, regardless of whether they are the same type... the easy solution might be to require it to inherit from Exception
-* there is an issue with raise, in that it is considered to return unit () instead of somehow being marked as not returning...  Getting type errors in Option def
 * the unmapping function doesn't seem to do anything at the moment.  Mapping back causes object-typevar-params test to fail (possibly related to subclass checking?)  We could
   possibly remove most of the unmapping code, or otherwise fix the failed testcase some other way
 * limit nested enums to only refs, otherwise it's a memory error; that or make all enums be allocated objects referenced by pointers

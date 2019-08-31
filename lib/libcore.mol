@@ -113,7 +113,7 @@ class Option<'item> {
 
     fn unwrap(self) -> 'item {
         if not self.has then {
-            raise "Panic: unwrap on none"
+            raise new Exception("Panic: unwrap on none")
             // TODO this is here because raise returns unit instead of being marked as 'no return' somehow
             self.item
         }

@@ -369,7 +369,7 @@ fn is_subclass_of(session: &Session, scope: ScopeRef, adef: (&String, UniqueID, 
 
         let classdef = session.get_def(adef.1)?.as_class()?;
         if classdef.parenttype.is_none() {
-            return Err(Error::new(format!("TypeError: type mismatch, expected {} but found {}", Type::Object(adef.0.clone(), adef.1, adef.2), Type::Object(bdef.0.clone(), bdef.1, bdef.2.clone()))));
+            return Err(Error::new(format!("TypeError: type mismatch, expected {} but found {}", Type::Object(bdef.0.clone(), bdef.1, bdef.2.clone()), Type::Object(adef.0.clone(), adef.1, adef.2))));
         }
         let parent = tscope.map_typevars(session, &mut names, classdef.parenttype.clone().unwrap());
         match resolve_type(session, parent, false)? {

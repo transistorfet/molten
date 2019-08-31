@@ -1,4 +1,4 @@
-Fri Aug 30 20:28:23 PDT 2019
+Sat Aug 31 10:30:36 PDT 2019
 [01/65] basic/abi-across-exprs.mol......................................success
 [02/65] basic/block-assign.mol..........................................success
 [03/65] basic/block-invoke.mol..........................................success
@@ -10,7 +10,7 @@ Fri Aug 30 20:28:23 PDT 2019
 [09/65] basic/conditionals-strings.mol..................................success
 [10/65] basic/enums.mol.................................................success
 [11/65] basic/exception-in-c-fail.mol...................................success
-[12/65] basic/exceptions.mol............................................FAIL
+[12/65] basic/exceptions.mol............................................success
 [13/65] basic/forloops.mol..............................................success
 [14/65] basic/func-with-func-arg.mol....................................success
 [15/65] basic/funcs-lambda-direct.mol...................................success
@@ -64,4 +64,4 @@ Fri Aug 30 20:28:23 PDT 2019
 [63/65] typecheck/infer-forward-method.mol..............................success
 [64/65] typecheck/method-overload-mismatch.mol..........................FAIL
 [65/65] typecheck/object-typevar-params.mol.............................success
-60 tests passed, 5 tests failed, 65 total
+61 tests passed, 4 tests failed, 65 total

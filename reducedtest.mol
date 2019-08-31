@@ -119,10 +119,10 @@ runloop()
 
 
 try {
-    raise "Test"
+    raise new Exception("Test")
     ()
 } catch {
-    e => println("EXCEPTION! " + e)
+    e => println("EXCEPTION! " + e.msg)
 }
 
 //let mem = bufalloc(10)

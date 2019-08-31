@@ -10,7 +10,7 @@ try println(str(123)) {
 }
 
 fn test() {
-    raise "error"
+    raise new Exception("error")
 }
 
 try test() {
@@ -18,9 +18,9 @@ try test() {
 }
 
 try {
-    raise "Test"
+    raise new Exception("Test")
     ()
 } catch {
-    e => println("EXCEPTION! " + e)
+    e => println("EXCEPTION! " + e.msg)
 }
 
