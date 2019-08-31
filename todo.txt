@@ -5,7 +5,6 @@
 
 * add an iterator type, (need to settle option type first)
 * add namespace of some kind, such that you can group functions?  like 'module' from ML?? like impl from rust?? or like namespace from C
-* maybe change ! to * if you're going to be closer to C/Rust syntax vs ML syntax
 
 * should you make cstrings be ByteArray type and make vtabled String type
 

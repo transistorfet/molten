@@ -1,10 +1,9 @@
 
 
-// TODO this needs to be fixed in the parser
-// this is intepreted as (let x = ( Invoke(ref { a = 2, b = 5 })(deref x) ) . a)  [ accessor of an invoke of a literal record ]
+// this was previously intepreted as (let x = ( Invoke(ref { a = 2, b = 5 })(deref x) ) . a)  [ accessor of an invoke of a literal record ]
 let x = ref { a = 2, b = 5 }
-(!x).a
+(*x).a
 
 let y = ref { a = 2, b = 5 }
-!y.a
+*y.a
 

@@ -167,6 +167,17 @@ the second expression if the result can be determined from the first
 expression.  The resulting value is the last expression that was executed.
 Operands are not limited to Bool values, although that may change in future.
 
+### Math
+Infix operators are evaluated using order of operations.  Both sides of an
+infix operation must be on the same line, or else a `\` character can be used
+to continue the line.
+```
+5 + 12 * 2      // equals 29
+
+42 * 4 \
+   % 5          // equals 3
+```
+
 ### Loops
 ```
 while is_true
@@ -206,18 +217,18 @@ let rec: { i: Int, s: String, r: Real }
 
 ### Refs
 A ref is an indirect reference to some data.  It can be passed around as a
-value, and dereferenced to get or set the data inside of it.  The interal value
-of a reference is mutable
+value, and dereferenced to get or set the data inside of it.  The internal value
+of a reference is always mutable
 ```
 let r = ref 42
-println(str(!r))                // prints 42
-!r = 65
-println(str(!r))                // prints 65
+println(str(*r))                // prints 42
+*r = 65
+println(str(*r))                // prints 65
 
 fn foo(x: ref Int) { }          // ref types look similar to ref constructors
 
 let r = ref { a = 42, b = "The Answer" }
-println(!r.b)                   // prints "The Answer"
+println(*r.b)                   // prints "The Answer"
 ```
 
 ### Enums (Tagged Unions)

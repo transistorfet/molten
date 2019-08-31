@@ -7,8 +7,8 @@
 import lib.libcore
 
 let r1 = ref 56
-println(str(!r1 * 2))
+println(str(*r1 * 2))
 
 let r2 = ref { a = 6.2, b = 8 }
-println(str(!r2.a))
+println(str(*r2.a))
 

@@ -59,11 +59,10 @@ macro_rules! sp {
 #[macro_export]
 macro_rules! wscom {
     ($i:expr, $submac:ident!( $($args:tt)* )) => ({
-        use parser::multispace_comment;
-        //terminated!($i, $submac!($($args)*), multispace_comment)
-        //preceded!($i, multispace_comment, $submac!($($args)*))
-        //sep!($i, multispace_comment, $submac!($($args)*))
-        delimited!($i, multispace_comment, $submac!($($args)*), multispace_comment)
+        //terminated!($i, $submac!($($args)*), line_or_space_or_comment)
+        //preceded!($i, line_or_space_or_comment, $submac!($($args)*))
+        //sep!($i, line_or_space_or_comment, $submac!($($args)*))
+        delimited!($i, line_or_space_or_comment, $submac!($($args)*), line_or_space_or_comment)
     });
 
     ($i:expr, $f:expr) => (
@@ -74,17 +73,23 @@ macro_rules! wscom {
 #[macro_export]
 macro_rules! wscoml {
     ($i:expr, $submac:ident!( $($args:tt)* )) => ({
-        use parser::multispace_comment;
-        //terminated!($i, $submac!($($args)*), multispace_comment)
-        preceded!($i, multispace_comment, $submac!($($args)*))
-        //sep!($i, multispace_comment, $submac!($($args)*))
-        //delimited!($i, multispace_comment, $submac!($($args)*), multispace_comment)
+        //terminated!($i, $submac!($($args)*), line_or_space_or_comment)
+        preceded!($i, line_or_space_or_comment, $submac!($($args)*))
+        //sep!($i, line_or_space_or_comment, $submac!($($args)*))
+        //delimited!($i, line_or_space_or_comment, $submac!($($args)*), line_or_space_or_comment)
     });
 
     ($i:expr, $f:expr) => (
         wscoml!($i, call!($f));
     );
 }
+
+#[macro_export]
+macro_rules! cont (
+    ($i:expr, $f:expr) => {
+        delimited!($i, line_continuation, call!($f), line_continuation)
+    }
+);
 
 #[macro_export]
 macro_rules! tag_word (
@@ -142,13 +147,13 @@ fn add_terminator(mut list: Vec<AST>, term: Option<AST>) -> Vec<AST> {
 
 named!(terminator(Span) -> Option<AST>,
     do_parse!(
-        opt!(space_comment) >>
+        space_or_comment >>
         t: alt!(
             //map!(peek!(wscom!(tag!("}"))), |_| None) |
             map!(line_ending, |_| None) |
             map!(tag!(";"), |_| Some(AST::make_lit(Literal::Unit)))
         ) >>
-        opt!(multispace_comment) >>
+        line_or_space_or_comment >>
         (t)
     )
 );
@@ -210,7 +215,7 @@ named!(whileloop(Span) -> AST,
         pos: position!() >>
         wscom!(tag_word!("while")) >>
         c: expression >>
-        opt!(multispace_comment) >>
+        line_or_space_or_comment >>
         e: return_error!(ErrorKind::Custom(ERR_IN_WHILE), expression) >>
         (AST::make_while(Pos::new(pos), c, e))
     )
@@ -326,7 +331,8 @@ named!(trywith(Span) -> AST,
     do_parse!(
         pos: position!() >>
         wscom!(tag_word!("try")) >>
-        c: wscom!(expression) >>
+        c: expression >>
+        line_or_space_or_comment >>
         opt!(wscom!(tag_word!("catch"))) >>
         return_error!(ErrorKind::Custom(ERR_IN_TRY),
             tag!("{")
@@ -352,7 +358,8 @@ named!(matchcase(Span) -> AST,
     do_parse!(
         pos: position!() >>
         wscom!(tag_word!("match")) >>
-        c: wscom!(expression) >>
+        c: expression >>
+        line_or_space_or_comment >>
         //wscom!(tag_word!("with")) >>
         return_error!(ErrorKind::Custom(ERR_IN_MATCH),
             tag!("{")
@@ -384,7 +391,7 @@ named!(forloop(Span) -> AST,
         i: identifier >>
         wscom!(tag_word!("in")) >>
         l: expression >>
-        opt!(multispace_comment) >>
+        line_or_space_or_comment >>
         e: return_error!(ErrorKind::Custom(ERR_IN_FOR), expression) >>
         (AST::make_for(Pos::new(pos), i, l, e))
     )
@@ -560,7 +567,7 @@ impl AST {
 named!(infix(Span) -> AST,
     do_parse!(
         left: atomic >>
-        operations: many0!(tuple!(position!(), wscom!(infix_op), atomic)) >>
+        operations: many0!(tuple!(position!(), cont!(infix_op), atomic)) >>
         (AST::fold_op(left, operations))
     )
 );
@@ -574,7 +581,7 @@ named!(atomic(Span) -> AST,
 
 named!(prefix_op(Span) -> Ident,
     map_ident!(alt!(
-        ws!(tag_word!("not")) |
+        tag_word!("not") |
         tag!("~")
     ))
 );
@@ -583,6 +590,7 @@ named!(prefix(Span) -> AST,
     do_parse!(
         pos: position!() >>
         op: prefix_op >>
+        opt!(space) >>
         a: atomic >>
         //(AST::Prefix(op, r(a)))
         (AST::make_invoke(Pos::new(pos), AST::make_ident(Pos::new(pos), op), vec!(a)))
@@ -593,8 +601,8 @@ named!(subatomic_operation(Span) -> AST,
     do_parse!(
         left: subatomic >>
         operations: many0!(alt_complete!(
-            map!(delimited!(tag!("["), tuple!(position!(), expression), tag!("]")), |(p, e)| SubOP::Index(Pos::new(p), e)) |
-            map!(delimited!(tag!("("), tuple!(position!(), expression_list), tag!(")")), |(p, e)| SubOP::Invoke(Pos::new(p), e)) |
+            map!(delimited!(tag!("["), tuple!(position!(), wscom!(expression)), tag!("]")), |(p, e)| SubOP::Index(Pos::new(p), e)) |
+            map!(delimited!(tag!("("), tuple!(position!(), wscom!(expression_list)), tag!(")")), |(p, e)| SubOP::Invoke(Pos::new(p), e)) |
             map!(preceded!(tag!("."), tuple!(position!(), alt!(identifier | map!(digit, |s| Ident::from_span(s))))), |(p, s)| SubOP::Accessor(Pos::new(p), s)) |
             map!(preceded!(tag!("::"), tuple!(position!(), identifier)), |(p, s)| SubOP::Resolver(Pos::new(p), s))
         )) >>
@@ -652,7 +660,7 @@ named!(record_update(Span) -> AST,
 named!(dereference(Span) -> AST,
     do_parse!(
         pos: position!() >>
-        tag!("!") >>
+        tag!("*") >>
         a: subatomic >>
         (AST::make_deref(Pos::new(pos), a))
     )
@@ -730,7 +738,6 @@ named!(type_unit(Span) -> Type,
     map!(tag!("()"), |_| Type::Object(String::from("()"), UniqueID(0), vec!()))
 );
 
-
 named!(type_object(Span) -> Type,
     do_parse!(
         cs: class_spec >>
@@ -743,14 +750,14 @@ named!(type_variable(Span) -> Type,
 );
 
 named!(type_tuple(Span) -> Type,
-    wscom!(do_parse!(
+    do_parse!(
         types: delimited!(tag!("("), separated_list_complete!(wscom!(tag!(",")), type_description), tag!(")")) >>
         (Type::Tuple(types))
-    ))
+    )
 );
 
 named!(type_record(Span) -> Type,
-    wscom!(do_parse!(
+    do_parse!(
         types: delimited!(
             tag!("{"),
             wscom!(separated_list_complete!(wscom!(tag!(",")), do_parse!(
@@ -762,7 +769,7 @@ named!(type_record(Span) -> Type,
             tag!("}")
         ) >>
         (Type::Record(types))
-    ))
+    )
 );
 
 named!(type_function(Span) -> Type,
@@ -1017,30 +1024,6 @@ named!(pattern_resolve(Span) -> Pattern,
 
 
 
-
-named!(separator(Span) -> Span,
-    recognize!(many0!(
-        //alt!(take_while1!(is_ws) | comment)
-        //alt!(take_while1!(is_ws) | delimited!(tag!("//"), not_line_ending, line_ending))
-        //terminated!(sp!(alt!(line_comment | block_comment)), line_ending)
-        //delimited!(space_comment, alt!(line_ending | tag!(";")), multispace_comment)
-        delimited!(space_comment, line_ending, multispace_comment)
-    ))
-);
-
-
-
-named!(space_comment(Span) -> Span,
-    recognize!(many0!(alt!(line_comment | block_comment | space)))
-);
-
-named!(multispace_comment(Span) -> Span,
-//map!(
-    recognize!(many0!(alt!(line_comment | block_comment | multispace)))
-//    |s| { count_lines(s.fragment); s }
-//)
-);
-
 named!(line_comment(Span) -> Span,
     delimited!(tag!("//"), not_line_ending, peek!(line_ending))    //, |s| AST::Comment(String::from(str::from_utf8(s).unwrap())))
 );
@@ -1054,11 +1037,39 @@ named!(block_comment(Span) -> Span,
                 recognize!(many_till!(anychar, peek!(alt!(tag!("/*") | tag!("*/")))))
             )
         )),
-        //recognize!(dbg_dmp!(many_till!(anychar, peek!(tag!("*/"))))),
-        //take_until!("*/"),
         tag!("*/")
     )
 );
+
+
+/*
+named!(separator(Span) -> Span,
+    recognize!(many0!(
+        //alt!(take_while1!(is_ws) | comment)
+        //alt!(take_while1!(is_ws) | delimited!(tag!("//"), not_line_ending, line_ending))
+        //terminated!(sp!(alt!(line_comment | block_comment)), line_ending)
+        //delimited!(space_or_comment, alt!(line_ending | tag!(";")), line_or_space_or_comment)
+        delimited!(space_or_comment, line_ending, line_or_space_or_comment)
+    ))
+);
+*/
+
+named!(space_or_comment(Span) -> Span,
+    recognize!(many0!(alt!(line_comment | block_comment | space)))
+);
+
+named!(line_or_space_or_comment(Span) -> Span,
+    recognize!(many0!(alt!(line_comment | block_comment | multispace)))
+);
+
+named!(line_continuation(Span) -> Span,
+    recognize!(tuple!(
+        space_or_comment,
+        many0!(opt!(tuple!(tag!("\\"), line_ending, space_or_comment)))
+    ))
+);
+
+
 
 /*
 macro_rules! named_method {

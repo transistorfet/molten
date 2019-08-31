@@ -1,6 +1,7 @@
 
 //! 1
 //! 1.200000
+//! 30
 
 import lib.libcore
 
@@ -11,4 +12,13 @@ f(1)
 
 fn g(x: Real) => println(str(x))
 g(1.2)
+
+
+fn h(x: Int, y: Int) {
+    println(str(x * y))
+}
+h(
+    5,
+    6
+)
 

@@ -1,0 +1,13 @@
+
+import lib.libcore
+
+type newint = {
+    things: Int,
+    stuff: Int
+}
+
+type newreal = Real
+let ni: newint = { things = 1, stuff = 2 }
+println(str(ni.stuff))
+
+

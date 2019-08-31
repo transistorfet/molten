@@ -46,9 +46,9 @@ if y < 10 or y > 13 or y == 12 then println("True") else println("False")
 //(!x).a
 
 let x = ref { a = 2, b = 5 }
-println(str(!x.a))
-!x = { a = 5, b = 10 }
-println(str(!x.b))
+println(str(*x.a))
+*x = { a = 5, b = 10 }
+println(str(*x.b))
 
 
 
@@ -265,7 +265,7 @@ fn print_node(node) {
         Value::String(s) => println("So " + s)
         Value::Tree(t) => {
             println("Tree")
-            print_node(!t)
+            print_node(*t)
         }
         _ => println("Nothing")
     }
@@ -274,6 +274,9 @@ fn print_node(node) {
 let val2 = Value::Tree(ref Value::Tree(ref Value::Tree(ref Value::Tree(ref Value::String("Hey")))))
 print_node(val2)
 
+4 \
+* \
+6
 
 /*
 while true {
@@ -293,4 +296,7 @@ println(str(sizeof(tt)))
 
 1
 4
+
+println(str(42 * 4 \
+   % 5))
 
