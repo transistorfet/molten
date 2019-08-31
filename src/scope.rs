@@ -348,46 +348,6 @@ impl Scope {
         types.into_iter().map(|vtype| self.map_typevars(session, varmap, vtype)).collect()
     }
 
-    pub fn unmap_typevars(&self, session: &Session, varmap: &mut HashMap<UniqueID, Type>, ttype: Type) -> Type {
-        match ttype {
-            Type::Variable(name, id, existential) => {
-                for (oid, mtype) in varmap.iter() {
-                    match *mtype {
-                        Type::Variable(_, ref mid, _) if *mid == id => {
-                            debug!("UNMAPPING {:?} to {:?}", mtype, oid);
-                            if *mid == *oid {
-                                return mtype.clone();
-                            } else {
-                                //let otype = Type::Variable(mname.clone(), *oid, true);
-                                // TODO this is almost certainly wrong, but it stops the infinite loop
-                                //session.set_type(*oid, mtype.clone());
-                                //return otype;
-
-                                //let otype = session.get_type(*oid).unwrap();
-                                //session.set_type(*mid, otype.clone());
-                                //return otype;
-                            }
-                        },
-                        _ => { },
-                    };
-                }
-                Type::Variable(name, id, existential)
-            },
-            Type::Function(args, ret, abi) => Type::Function(r(self.unmap_typevars(session, varmap, *args)), r(self.unmap_typevars(session, varmap, *ret)), abi),
-            // TODO why did I do this?  Was it because of a bug or just to reduce typevars, because it caused another bug with constructors
-            //Type::Function(args, ret, abi) => Type::Function(r(self.map_typevars(session, varmap, *args)), ret, abi),
-            Type::Tuple(types) => Type::Tuple(self.unmap_typevars_vec(session, varmap, types)),
-            Type::Record(types) => Type::Record(types.into_iter().map(|(n, t)| (n, self.unmap_typevars(session, varmap, t))).collect()),
-            Type::Ambiguous(variants) => Type::Ambiguous(self.unmap_typevars_vec(session, varmap, variants)),
-            Type::Ref(ttype) => Type::Ref(r(self.unmap_typevars(session, varmap, *ttype))),
-            Type::Object(name, id, types) => Type::Object(name.clone(), id, self.unmap_typevars_vec(session, varmap, types)),
-        }
-    }
-
-    pub fn unmap_typevars_vec(&self, session: &Session, varmap: &mut HashMap<UniqueID, Type>, types: Vec<Type>) -> Vec<Type> {
-        types.into_iter().map(|vtype| self.unmap_typevars(session, varmap, vtype)).collect()
-    }
-
     pub fn new_typevar(&self, session: &Session, existential: bool) -> Type {
         let id = UniqueID::generate();
         //if id == UniqueID(903) { panic!("") }

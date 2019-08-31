@@ -1,6 +1,6 @@
 
 //!should_fail
-//!err .*TypeError: type mismatch, expected Int but found String
+//!err .*TypeError: type mismatch, expected String but found Int
 //!err .*
 
 import lib.libcore

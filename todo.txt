@@ -5,7 +5,7 @@
 
 * add an iterator type, (need to settle option type first)
 * add namespace of some kind, such that you can group functions?  like 'module' from ML?? like impl from rust?? or like namespace from C
-* should you make cstrings be ByteArray type and make vtabled String type
+* should you make cstrings be ByteArray (or ByteString) type and make vtabled String type
 
 * there is an issue with raise, in that it is considered to return unit () instead of somehow being marked as not returning...  Getting type errors in Option def
 
@@ -13,8 +13,6 @@
 * make definitions always require an initializer
 * there was an error where "let ni: newint" with no initializer was causing a type error with "expected class or concrete type", but that was actually because a definition without
   an initializer is the same as "let ni: newint = nil" and nil could not be cast to a Record, which newint is a typealias of a record
-* the unmapping function doesn't seem to do anything at the moment.  Mapping back causes object-typevar-params test to fail (possibly related to subclass checking?)  We could
-  possibly remove most of the unmapping code, or otherwise fix the failed testcase some other way
 * limit nested enums to only refs, otherwise it's a memory error; that or make all enums be allocated objects referenced by pointers
 
 

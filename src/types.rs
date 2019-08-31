@@ -362,7 +362,7 @@ fn is_subclass_of(session: &Session, scope: ScopeRef, adef: (&String, UniqueID, 
             } else {
                 vec!()
             };
-            let rtype = resolve_type(session, tscope.unmap_typevars(session, &mut names, Type::Object(adef.0, adef.1, ptypes)), false)?;
+            let rtype = Type::Object(adef.0, adef.1, ptypes);
             debug!("DONE SUBCLASS: {:?}", rtype);
             return Ok(rtype);
         }
