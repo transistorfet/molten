@@ -4,7 +4,7 @@ use abi::ABI;
 use types::Type;
 use session::{ Session, Error };
 use scope::{ ScopeRef, Context };
-use ast::{ Mutability, ClassSpec, Pattern, AST };
+use ast::{ NodeID, Mutability, ClassSpec, Pattern, AST };
 use misc::{ UniqueID, r };
 
 use defs::enums::EnumDef;
@@ -209,6 +209,7 @@ fn bind_names_node_or_error(session: &Session, scope: ScopeRef, node: &AST) -> R
                 // TODO this still requires mut
                 let mut variant = variant.clone();
                 bind_type_names(session, scope.clone(), variant.ttype.as_mut(), false)?;
+                check_recursive_type(&variant.ttype.as_ref(), *id)?;
                 enumdef.add_variant(session, scope.clone(), variant)?;
             }
         },
@@ -349,7 +350,6 @@ pub fn bind_type_names(session: &Session, scope: ScopeRef, ttype: Option<&mut Ty
     Ok(())
 }
 
-
 #[must_use]
 pub fn bind_classspec_type_names(session: &Session, scope: ScopeRef, classspec: &mut ClassSpec, always_new: bool) -> Result<(), Error> {
     let &mut ClassSpec { ref mut types, .. } = classspec;
@@ -382,3 +382,39 @@ pub fn bind_type_names(session: &Session, scope: ScopeRef, ttype: Type, always_n
     });
 */
 
+#[must_use]
+pub fn check_recursive_type(ttype: &Option<&Type>, forbidden_id: NodeID) -> Result<(), Error> {
+    match ttype {
+        Some(ttype) => match ttype {
+            Type::Object(ref name, ref id, ref types) => {
+                if *id == forbidden_id {
+                    return Err(Error::new(format!("TypeError: an enum cannot contain itself in {:?}", name)));
+                }
+
+                for ttype in types.iter() {
+                    check_recursive_type(&Some(ttype), forbidden_id)?;
+                }
+            },
+            Type::Tuple(ref types) => {
+                for ttype in types.iter() {
+                    check_recursive_type(&Some(ttype), forbidden_id)?;
+                }
+            },
+            Type::Record(ref types) => {
+                for (_, ttype) in types.iter() {
+                    check_recursive_type(&Some(ttype), forbidden_id)?;
+                }
+            },
+            Type::Variable(ref name, ref id, ref existential) => {
+                // TODO this might be an error?
+            },
+            Type::Ref(_) |
+            Type::Function(_, _, _) => {
+                // Any reference or function containing the type is ok
+            },
+            Type::Ambiguous(_) => { },
+        },
+        None => { },
+    }
+    Ok(())
+}

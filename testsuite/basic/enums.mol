@@ -3,6 +3,7 @@
 //! It's Variant 1
 //! It's soo Variant 2 with 987
 //! It's totally Variant 3 with Hey and Ho
+//! 1 \+ 2 \+ 3
 
 import lib.libcore
 
@@ -42,3 +43,25 @@ let t3 = TestThing::Variant3("Hey", "Ho")
 print_thing(t1)
 print_thing(t2)
 print_thing(t3)
+
+
+enum Expr =
+| Integer(Int)
+| Binary(ref Expr, ref Expr)
+
+fn print_expr(e) {
+    match e {
+        Expr::Integer(n) => print(str(n))
+        Expr::Binary(e1, e2) => {
+            print_expr(*e1)
+            print(" + ")
+            print_expr(*e2)
+        }
+    }
+}
+
+let e1 = Expr::Binary(ref Expr::Integer(1), ref Expr::Binary(ref Expr::Integer(2), ref Expr::Integer(3)))
+
+print_expr(e1)
+println("")
+

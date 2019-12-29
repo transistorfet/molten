@@ -1,0 +1,12 @@
+
+//!should_fail
+//!err .*TypeError: an enum cannot contain itself in "TestThing"
+//!err .*
+
+
+// Test enums with a direct value of itself
+enum TestThing =
+| Variant1
+| Variant2(Int)
+| Variant3(TestThing)
+
