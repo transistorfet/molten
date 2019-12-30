@@ -1,4 +1,5 @@
 
+* add literal char
 * need a way to import/compile directory of many files (libcore as many files)
 * add a module keyword which is automatically inserted into .dec files, which actually calls the run function, including the canonical name/path when the module was compiled
 * remove the forced visibility in refinery, when you decide on pub/priv semantics

@@ -181,18 +181,9 @@ impl<'sess> TypeChecker<'sess> {
                 expect_type(self.session, scope, Some(ttype), Some(ftype), Check::List)?
             },
 
-            AST::Try(_, _, ref cond, ref cases) |
             AST::Match(_, _, ref cond, ref cases) => {
-                let mut ctype = match node {
-                    AST::Match(_, _, _, _) => self.check_node(scope.clone(), cond, None),
-                    AST::Try(_, _, _, _) => {
-                        self.check_node(scope.clone(), cond, None);
-                        // TODO this is problematic.  If the value that's raised is not used, this var will be unresolved.  We aren't really checking the raised type anywhere though
-                        //scope.new_typevar(self.session, false)
-                        scope.make_obj(self.session, String::from("Exception"), vec!())?
-                    },
-                    _ => panic!(""),
-                };
+                let mut ctype = self.check_node(scope.clone(), cond, None);
+
                 let mut rtype = None;
                 for ref case in cases {
                     let lscope = self.session.map.get(&case.id);
@@ -200,6 +191,21 @@ impl<'sess> TypeChecker<'sess> {
                     rtype = Some(expect_type(self.session, lscope.clone(), rtype.clone(), Some(self.check_node(lscope.clone(), &case.body, rtype.clone())), Check::List)?);
                 }
 
+                rtype.unwrap()
+            },
+
+            AST::Try(_, _, ref cond, ref cases) => {
+                let btype = self.check_node(scope.clone(), cond, None);
+                let mut ctype = scope.make_obj(self.session, String::from("Exception"), vec!())?;
+
+                let mut rtype = None;
+                for ref case in cases {
+                    let lscope = self.session.map.get(&case.id);
+                    ctype = expect_type(self.session, lscope.clone(), Some(ctype.clone()), Some(self.check_pattern(lscope.clone(), &case.pat, Some(ctype.clone()))?), Check::List)?;
+                    rtype = Some(expect_type(self.session, lscope.clone(), rtype.clone(), Some(self.check_node(lscope.clone(), &case.body, rtype.clone())), Check::List)?);
+                }
+
+                expect_type(self.session, scope.clone(), Some(btype.clone()), rtype.clone(), Check::List)?;
                 rtype.unwrap()
             },
 

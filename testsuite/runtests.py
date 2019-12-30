@@ -154,10 +154,10 @@ class Test (object):
             self.print_name(short)
             print(RED + "FAIL" + CLEAR)
             if self.show_output:
-                print("StdOut:\n")
-                print(stdout.decode('utf-8'))
                 print("StdError:\n")
                 print(stderr.decode('utf-8'))
+                print("StdOut:\n")
+                print(stdout.decode('utf-8'))
             #if retcode == 0:
             #    print("Output:", " " * (64 - len("Output:")), "Expected:")
             #    if self.expected_out:
