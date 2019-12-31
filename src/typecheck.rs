@@ -390,14 +390,21 @@ impl<'sess> TypeChecker<'sess> {
                 expect_type(self.session, scope, Some(ttype), expected, Check::Def)
             },
             Pattern::EnumArgs(id, left, args) => {
-                let etype = self.check_pattern(scope.clone(), left, None)?;
+                self.check_pattern(scope.clone(), left, None)?;
                 let variant_id = self.session.get_ref(left.get_id())?;
                 self.session.set_ref(*id, variant_id);
                 let enumdef = self.session.get_def(self.session.get_ref(variant_id)?)?.as_enum()?;
                 match enumdef.get_variant_type_by_id(variant_id) {
                     None => return Err(Error::new(format!("TypeError: enum variant doesn't expect any arguments, but found {:?}", args))),
                     Some(ttype) => {
-                        let types = ttype.as_vec();
+                        // Map the typevars from the enum type params into the enum variant's types, in order to use type hint from 'expected'
+                        let tscope = Scope::new_ref(Some(scope.clone()));
+                        let mut typevars = Scope::map_new();
+                        let vtype = tscope.map_typevars(self.session, &mut typevars, enumdef.deftype.clone());
+                        let ctype = expect_type(self.session, tscope.clone(), Some(vtype), expected, Check::Def)?;
+                        let rtype = resolve_type(self.session, tscope.map_typevars(self.session, &mut typevars, ttype), false)?;
+                        let types = rtype.as_vec();
+
                         if types.len() != args.len() {
                             return Err(Error::new(format!("TypeError: number of enum arguments expected doesn't match. Expected {:?}, found {:?}", types.len(), args.len())));
                         }
@@ -407,11 +414,14 @@ impl<'sess> TypeChecker<'sess> {
                             argtypes.push(self.check_pattern(scope.clone(), &arg, Some(ttype.clone()))?);
                         }
 
-                        expect_type(self.session, scope.clone(), Some(ttype), Some(Type::Tuple(argtypes)), Check::Def)?;
+                        expect_type(self.session, scope.clone(), Some(rtype), Some(Type::Tuple(argtypes)), Check::Def)?;
                         Ok(enumdef.deftype.clone())
                     },
                 }
             },
+            // TODO finish implementing these, and in transform as well
+            //Pattern::Tuple(id, items) => { },
+            //Pattern::Record(id, items) => { },
             _ => panic!("Not Implemented: {:?}", pat),
         }
     }

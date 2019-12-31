@@ -988,6 +988,8 @@ named!(not_reserved(Span) -> (),
     ))
 );
 
+
+
 named!(pattern(Span) -> Pattern,
     do_parse!(
         p: pattern_atomic >>
@@ -1004,16 +1006,33 @@ named!(pattern_atomic(Span) -> Pattern,
         value!(Pattern::Wild, tag!("_")) |
         pattern_literal |
         pattern_enum_variant |
+        pattern_tuple |
+        pattern_record |
         pattern_binding
     )
 );
 
 named!(pattern_literal(Span) -> Pattern,
-    map!(literal, |l| Pattern::Literal(NodeID::generate(), l))
+    map!(alt_complete!(
+        unit |
+        nil |
+        boolean |
+        string |
+        character |
+        number
+    ), |l| Pattern::Literal(NodeID::generate(), l))
 );
 
 named!(pattern_binding(Span) -> Pattern,
     map!(identifier, |i| Pattern::Binding(NodeID::generate(), i))
+);
+
+named!(pattern_resolve(Span) -> Pattern,
+    do_parse!(
+        left: identifier >>
+        operations: many1!(preceded!(tag!("::"), identifier)) >>
+        (operations.into_iter().fold(Pattern::Identifier(NodeID::generate(), left), |acc, i| Pattern::Resolve(NodeID::generate(), r(acc), i, NodeID::generate())))
+    )
 );
 
 named!(pattern_enum_variant(Span) -> Pattern,
@@ -1021,7 +1040,7 @@ named!(pattern_enum_variant(Span) -> Pattern,
         p: pattern_resolve >>
         o: opt!(delimited!(
             tag!("("),
-            separated_list_complete!(wscom!(tag!(",")), alt_complete!(pattern_literal | pattern_binding)),
+            separated_list_complete!(wscom!(tag!(",")), pattern),
             tag!(")")
         )) >>
         (match o {
@@ -1031,12 +1050,35 @@ named!(pattern_enum_variant(Span) -> Pattern,
     )
 );
 
-named!(pattern_resolve(Span) -> Pattern,
+named!(pattern_tuple(Span) -> Pattern,
     do_parse!(
-        left: identifier >>
-        operations: many1!(preceded!(tag!("::"), identifier)) >>
-        (operations.into_iter().fold(Pattern::Identifier(NodeID::generate(), left), |acc, i| Pattern::Resolve(NodeID::generate(), r(acc), i, NodeID::generate())))
+        l: delimited!(
+            tag!("("),
+            wscom!(separated_list_complete!(wscom!(tag!(",")), pattern)),
+            tag!(")")
+        ) >>
+        (Pattern::Tuple(NodeID::generate(), l))
     )
+);
+
+named!(pattern_record(Span) -> Pattern,
+    do_parse!(
+        l: delimited!(
+            tag!("{"),
+            wscom!(pattern_record_field_assignments),
+            return_error!(ErrorKind::Custom(ERR_IN_LIST), tag!("}"))
+        ) >>
+        (Pattern::Record(NodeID::generate(), l))
+    )
+);
+
+named!(pattern_record_field_assignments(Span) -> Vec<(Ident, Pattern)>,
+    separated_list_complete!(wscom!(tag!(",")), do_parse!(
+        i: identifier >>
+        wscom!(tag!("=")) >>
+        p: pattern >>
+        ((i, p))
+    ))
 );
 
 

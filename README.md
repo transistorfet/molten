@@ -64,10 +64,11 @@ println(str(fac(10)))
 
 ### Types
 ```
-()                  // Unit Type
+()                  // unit type
 Nil
 Bool
 Byte
+Char                // UCS-4 character
 Int
 Real
 String

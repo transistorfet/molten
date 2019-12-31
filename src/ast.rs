@@ -83,6 +83,8 @@ pub enum Pattern {
     Identifier(NodeID, Ident),
     Resolve(NodeID, R<Pattern>, Ident, NodeID),
     EnumArgs(NodeID, R<Pattern>, Vec<Pattern>),
+    Tuple(NodeID, Vec<Pattern>),
+    Record(NodeID, Vec<(Ident, Pattern)>),
 }
 
 #[derive(Clone, Debug, PartialEq)]

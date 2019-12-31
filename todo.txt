@@ -1,12 +1,18 @@
 
-* add literal char
+* rename Buffer type to RawPointerArray
+* rename String type to ByteArray, or CString, or ZString, or NullString, or NullByteArray, or ZByteArray
+* rename SuperString type to String, will require a bunch of libcore changes
+* rename List to Array
+
+* possible bug in pattern matching with type annotations... undefined variable error when matching against an enum with a typeparam
+* typechecker should probably figure out that a matcharm pattern should match against the actual concrete type being matched against (OptionTest<Int>)
+
 * need a way to import/compile directory of many files (libcore as many files)
 * add a module keyword which is automatically inserted into .dec files, which actually calls the run function, including the canonical name/path when the module was compiled
 * remove the forced visibility in refinery, when you decide on pub/priv semantics
 
 * add an iterator type, (need to settle option type first)
 * add namespace of some kind, such that you can group functions?  like 'module' from ML?? like impl from rust?? or like namespace from C
-* should you make cstrings be ByteArray (or ByteString) type and make vtabled String type
 
 * there is an issue with raise, in that it is considered to return unit () instead of somehow being marked as not returning...  Getting type errors in Option def
 

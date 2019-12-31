@@ -4,6 +4,7 @@
 //! It's soo Variant 2 with 987
 //! It's totally Variant 3 with Hey and Ho
 //! 1 \+ 2 \+ 3
+//! 21
 
 import lib.libcore
 
@@ -64,4 +65,17 @@ let e1 = Expr::Binary(ref Expr::Integer(1), ref Expr::Binary(ref Expr::Integer(2
 
 print_expr(e1)
 println("")
+
+
+enum OptionTest<'a> =
+| None
+| Some('a)
+
+let a = OptionTest::Some(21)
+
+match a {
+    OptionTest::None => println("None")
+    OptionTest::Some(x) => println(str(x))
+}
+
 

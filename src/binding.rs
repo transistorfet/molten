@@ -281,7 +281,20 @@ pub fn bind_names_pattern(session: &Session, scope: ScopeRef, pat: &Pattern) -> 
                 bind_names_pattern(session, scope.clone(), arg);
             }
         },
-        _ => { }
+        Pattern::Tuple(id, items) => {
+            for item in items {
+                bind_names_pattern(session, scope.clone(), item);
+            }
+        },
+        Pattern::Record(id, items) => {
+            for (_, item) in items {
+                bind_names_pattern(session, scope.clone(), item);
+            }
+        },
+
+        Pattern::Wild |
+        Pattern::Literal(_, _) |
+        Pattern::Identifier(_, _) => { },
     }
     Ok(())
 }
