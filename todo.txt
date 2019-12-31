@@ -1,11 +1,8 @@
 
 * rename Buffer type to RawPointerArray
-* rename String type to ByteArray, or CString, or ZString, or NullString, or NullByteArray, or ZByteArray
+* rename String type to ByteArray, or CString, or ZString, or NullString, or NullByteArray, or ZByteArray, RawString
 * rename SuperString type to String, will require a bunch of libcore changes
 * rename List to Array
-
-* possible bug in pattern matching with type annotations... undefined variable error when matching against an enum with a typeparam
-* typechecker should probably figure out that a matcharm pattern should match against the actual concrete type being matched against (OptionTest<Int>)
 
 * need a way to import/compile directory of many files (libcore as many files)
 * add a module keyword which is automatically inserted into .dec files, which actually calls the run function, including the canonical name/path when the module was compiled
@@ -30,7 +27,6 @@
 
 
 BUGS:
-* cannot annotate a wildcard in a pattern, it inteprets it as an identifier which isn't defined
 * the overload check seems to fail in test.mol lines 94/111 with foo2 in Stuff because of the new overload code.  It's giving an overload error unless foo2 which takes a
   single Real is commented out.  It's because the types are added during the name binding phase.  This needs to be added as a test case
 * the infer-arg-as-typevar test fails because str() cannot be resolved to a concrete variant by the time it's typechecked (no backwards affect allowed)

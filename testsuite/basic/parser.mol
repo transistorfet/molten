@@ -7,3 +7,6 @@ let x = ref { a = 2, b = 5 }
 let y = ref { a = 2, b = 5 }
 *y.a
 
+// should the brackets be required around an if statement?
+let h = 5 + (if 5 > 4 then 5 else 10)
+

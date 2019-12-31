@@ -1,28 +1,58 @@
 
 
-/*
-class String {
-    fn [](self, index: Int) {
-        getindex(self, index)
+class Exception {
+    let mut msg = ""
+
+    pub fn new(self, msg) {
+        self.msg = msg
     }
 
-    fn push(self, s) {
-        let selflength = strlen(self)
-        let slength = strlen(s)
-        let buffer: String = molten_malloc(selflength + slength + 1)
-        sprintf(buffer, "%s%s", self, s)
-        buffer
+    pub fn print(self) {
+        println(self.msg)
+    }
+}
+
+
+
+class SuperString {
+    let mut len: Int = 0
+    let mut str: String = ""
+
+    pub fn new(self, s) {
+        self.str = s
+        self.len = strlen(self.str)
     }
 
+    pub fn length(self) -> Int {
+        self.len
+    }
+
+    pub fn [](self, index: Int) {
+        if index >= self.len then {
+            raise new Exception("Index Out Of Range")
+            // TODO this is here because raise returns unit instead of being marked as 'no return' somehow
+            0
+        } else {
+            getindex(self.str, index)
+        }
+    }
+
+    pub fn push(self, str: SuperString) {
+        let buffer: String = molten_malloc(self.len + str.len + 1)
+        sprintf(buffer, "%s%s", self.str, str.str)
+        new SuperString(buffer)
+    }
+
+    /*
     // TODO this doesn't handle UTF-8
-    fn substr(self, start: Int, length: Int) {
+    pub fn substr(self, start: Int, length: Int) {
         let newstr: String = molten_malloc(length + 1)
         // TODO this doesn't work because you can't get a pointer to an indexed position
         memcpy(newstr, self, length)
         //newstr[length] = 0
     }
+    */
 }
-*/
 
 pub fn ==(str1: String, str2: String) -> Bool / MF {
     if strcmp(str1, str2) == 0 then
@@ -59,6 +89,12 @@ pub fn str(num: Bool) -> String {
         "false"
 }
 
+pub fn str(num: Char) -> String {
+    let buffer: String = molten_malloc(22)
+    sprintf(buffer, "%c", num, ())
+    buffer
+}
+
 pub fn str(num: Int) -> String {
     let buffer: String = molten_malloc(22)
     sprintf(buffer, "%ld", num, ())
@@ -78,18 +114,6 @@ pub fn str(num: Real) -> String {
 }
 
 
-class Exception {
-    let mut msg = ""
-
-    fn new(self, msg) {
-        self.msg = msg
-    }
-
-    fn print(self) {
-        println(self.msg)
-    }
-}
-
 
 class Option<'item> {
     let mut has = false
@@ -97,21 +121,21 @@ class Option<'item> {
 
     fn new(self) { }
 
-    fn Some(item: 'item) {
+    pub fn Some(item: 'item) {
         let opt = new Option<'item>()
         opt.has = true
         opt.item = item
         opt
     }
 
-    fn None() {
+    pub fn None() {
         let opt = new Option<'item>()
         opt.has = false
         opt.item = nil
         opt
     }
 
-    fn unwrap(self) -> 'item {
+    pub fn unwrap(self) -> 'item {
         if not self.has then {
             raise new Exception("Panic: unwrap on none")
             // TODO this is here because raise returns unit instead of being marked as 'no return' somehow
@@ -121,28 +145,28 @@ class Option<'item> {
             self.item
     }
 
-    fn unwrap_or(self, item) {
+    pub fn unwrap_or(self, item) {
         if self.has then
             self.item
         else
             item
     }
 
-    fn is_some(self) {
+    pub fn is_some(self) {
         self.has
     }
 
-    fn is_none(self) {
+    pub fn is_none(self) {
         not self.has
     }
 }
 
 class Iterator<'item> {
-    fn next(self) -> Option<'item> {
+    pub fn next(self) -> Option<'item> {
         Option::None()
     }
 
-    fn reset(self) => ()
+    pub fn reset(self) => ()
 }
 
 class List<'item> {
@@ -150,37 +174,37 @@ class List<'item> {
     let mut length: Int
     let mut data: Buffer<'item> = nil
 
-    fn new(self) {
+    pub fn new(self) {
         self.length = 0
         self.capacity = 10
         //self.data = new Buffer<'item>(self.capacity)
         self.data = bufalloc(self.capacity)
     }
 
-    fn len(self) {
+    pub fn len(self) {
         self.length
     }
 
-    fn resize(self, capacity) {
+    pub fn resize(self, capacity) {
         self.capacity = capacity
         self.data = bufresize(self.data, self.capacity);
     }
 
-    fn push(self, item: 'item) {
+    pub fn push(self, item: 'item) {
         if self.length + 1 >= self.capacity then
             self.resize(self.capacity + 10)
         bufset(self.data, self.length, item)
         self.length = self.length + 1
     }
 
-    fn [](self, index: Int) -> 'item {
+    pub fn [](self, index: Int) -> 'item {
         if index >= self.length then
             nil //raise -1
         else
             bufget(self.data, index)
     }
 
-    fn [](self, index: Int, item: 'item) -> 'item {
+    pub fn [](self, index: Int, item: 'item) -> 'item {
         if index >= self.length then
             nil //raise "IndexError: array index is out of bounds"
         else {
@@ -189,16 +213,16 @@ class List<'item> {
         }
     }
 
-    fn get(self, index: Int) {
+    pub fn get(self, index: Int) {
         self[index]
     }
 
     /*
-    fn insert(self, index: Int, item: 'item) {
+    pub fn insert(self, index: Int, item: 'item) {
         self.move_right(index, item)
     }
 
-    fn move_right(self, index: Int, item: 'item) {
+    pub fn move_right(self, index: Int, item: 'item) {
         if index >= self.length then {
             self.push(item)
         } else {
@@ -209,7 +233,7 @@ class List<'item> {
     }
     */
 
-    fn insert(self, index: Int, item: 'item) {
+    pub fn insert(self, index: Int, item: 'item) {
         if index >= self.length then {
             self.push(item);
             // TODO this is here because of a bug during the type refactor that was creating invalid IR fur the return type
@@ -232,12 +256,12 @@ class ListIterator<'item> {
     let mut index = 0
     let mut list: List<'item> = nil
 
-    fn new(self, list) {
+    pub fn new(self, list) {
         self.index = 0
         self.list = list
     }
 
-    fn next(self) -> Option<'item> {
+    pub fn next(self) -> Option<'item> {
         if self.index < self.list.len() then {
             let item = self.list[self.index]
             self.index = self.index + 1
@@ -247,7 +271,7 @@ class ListIterator<'item> {
         }
     }
 
-    fn reset(self) {
+    pub fn reset(self) {
         self.index = 0;
     }
 }
@@ -258,7 +282,7 @@ class HashMapNode<'item> {
     let mut data: 'item
     let mut next: HashMapNode<'item>
 
-    fn new(self, key, data) {
+    pub fn new(self, key, data) {
         self.key = key
         self.data = data
         self.next = nil
@@ -269,23 +293,23 @@ class HashMap<'item> {
     let mut size = 0
     let mut data: Buffer<HashMapNode<'item>> = nil
 
-    fn new(self) {
+    pub fn new(self) {
         self.size = 10
         self.data = new Buffer<HashMapNode<'item>>(self.size)
     }
 
-    fn resize(self, size) {
+    pub fn resize(self, size) {
         self.size = size
         self.data = self.data.resize(self.size)
     }
 
-    fn insert(self, key: String, item: 'item) {
+    pub fn insert(self, key: String, item: 'item) {
 
     }
 
 
 
-    fn hash(key: String) -> Int {
+    pub fn hash(key: String) -> Int {
 
     }
 }
