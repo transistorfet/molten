@@ -299,7 +299,7 @@ impl<'sess> Transformer<'sess> {
                 self.transform_record_update(scope.clone(), *id, &record, &items)
             },
 
-            AST::TypeEnum(id, _, classspec, _) => {
+            AST::Enum(id, _, classspec, _) => {
                 self.transform_enum_def(scope.clone(), *id, &classspec.ident.name)
             },
 

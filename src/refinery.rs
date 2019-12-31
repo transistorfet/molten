@@ -342,7 +342,7 @@ impl<'sess> Refinery<'sess> {
             AST::Nil(_) => { node },
             AST::Identifier(_, _, _) => { node },
             AST::TypeAlias(_, _, _, _) => { node },
-            AST::TypeEnum(_, _, _, _) => { node },
+            AST::Enum(_, _, _, _) => { node },
 
             //node @ _ => { node }
         })

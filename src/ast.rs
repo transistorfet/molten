@@ -133,7 +133,7 @@ pub enum AST {
     New(NodeID, Pos, ClassSpec),
     Class(NodeID, Pos, ClassSpec, Option<ClassSpec>, Vec<AST>),
     TypeAlias(NodeID, Pos, ClassSpec, Type),
-    TypeEnum(NodeID, Pos, ClassSpec, Vec<EnumVariant>),
+    Enum(NodeID, Pos, ClassSpec, Vec<EnumVariant>),
 
     Import(NodeID, Pos, Ident, Vec<AST>),
     Definition(NodeID, Pos, Mutability, Ident, Option<Type>, R<AST>),
@@ -291,7 +291,7 @@ impl AST {
             AST::Assignment(_, ref pos, _, _, _) |
             AST::While(_, ref pos, _, _) |
             AST::TypeAlias(_, ref pos, _, _) |
-            AST::TypeEnum(_, ref pos, _, _) => { pos.clone() }
+            AST::Enum(_, ref pos, _, _) => { pos.clone() }
             _ => Pos::empty(),
         }
     }
@@ -327,7 +327,7 @@ impl AST {
             AST::Definition(ref id, _, _, _, _, _) |
             AST::Assignment(ref id, _, _, _, _) |
             AST::While(ref id, _, _, _) |
-            AST::TypeEnum(ref id, _, _, _) |
+            AST::Enum(ref id, _, _, _) |
             AST::TypeAlias(ref id, _, _, _) => { *id }
             _ => UniqueID(0),
         }
@@ -458,7 +458,7 @@ impl AST {
     }
 
     pub fn make_type_enum(pos: Pos, classspec: ClassSpec, variants: Vec<EnumVariant>) -> AST {
-        AST::TypeEnum(NodeID::generate(), pos, classspec, variants)
+        AST::Enum(NodeID::generate(), pos, classspec, variants)
     }
 
     /*

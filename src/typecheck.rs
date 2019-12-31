@@ -296,7 +296,7 @@ impl<'sess> TypeChecker<'sess> {
                 rtype
             },
 
-            AST::TypeEnum(_, _, _, _) |
+            AST::Enum(_, _, _, _) |
             AST::TypeAlias(_, _, _, _) => {
                 scope.make_obj(self.session, String::from("()"), vec!())?
             },

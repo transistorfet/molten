@@ -199,7 +199,7 @@ fn bind_names_node_or_error(session: &Session, scope: ScopeRef, node: &AST) -> R
             //session.set_type(*id, ttype.clone());
         },
 
-        AST::TypeEnum(ref id, _, ref classspec, ref variants) => {
+        AST::Enum(ref id, _, ref classspec, ref variants) => {
             let mut classspec = classspec.clone();
             bind_classspec_type_names(session, scope.clone(), &mut classspec, true)?;
             let deftype = Type::Object(classspec.ident.name, *id, classspec.types);
