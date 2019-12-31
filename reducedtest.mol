@@ -271,7 +271,7 @@ fn print_node(node) {
     }
 }
 
-let val2 = Value::Tree(ref Value::Tree(ref Value::Tree(ref Value::Tree(ref Value::String("Hey")))))
+let val2 = Value::Tree(ref Value::Tree(ref Value::Tree(ref Value::Tree(ref Value::String("Hey\n")))))
 print_node(val2)
 
 4 \
@@ -299,4 +299,13 @@ println(str(sizeof(tt)))
 
 println(str(42 * 4 \
    % 5))
+
+
+pub fn str(num: Char) -> String {
+    let buffer: String = molten_malloc(22)
+    sprintf(buffer, "%c", num, ())
+    buffer
+}
+
+println(str('\n'))
 

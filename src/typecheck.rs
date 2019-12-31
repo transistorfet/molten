@@ -54,6 +54,7 @@ impl<'sess> TypeChecker<'sess> {
                 match literal {
                     Literal::Unit => scope.make_obj(self.session, String::from("()"), vec!())?,
                     Literal::Boolean(_) => scope.make_obj(self.session, String::from("Bool"), vec!())?,
+                    Literal::Character(_) => scope.make_obj(self.session, String::from("Char"), vec!())?,
                     Literal::Integer(_) => scope.make_obj(self.session, String::from("Int"), vec!())?,
                     Literal::Real(_) => scope.make_obj(self.session, String::from("Real"), vec!())?,
                     Literal::String(_) => scope.make_obj(self.session, String::from("String"), vec!())?,

@@ -110,7 +110,8 @@ pub unsafe fn define_builtins_vec<'sess>(llvm: &LLVM<'sess>, transformer: &Trans
 pub unsafe fn define_builtins_node<'sess>(llvm: &LLVM<'sess>, transformer: &Transformer, objtype: LLVMTypeRef, scope: ScopeRef, node: &BuiltinDef<'sess>) {
     match *node {
         BuiltinDef::Func(ref id, ref sname, ref types, ref func) => {
-            let ftype = parse_type(types).unwrap();
+            let mut ftype = parse_type(types).unwrap();
+            bind_type_names(llvm.session, scope.clone(), Some(&mut ftype), false).unwrap();
             let (argtypes, rettype, abi) = ftype.get_function_types().unwrap();
             let name = abi.mangle_name(sname, argtypes, 2);
             let ltype = transformer.transform_func_def_type(abi, &argtypes.as_vec(), rettype);
@@ -264,6 +265,7 @@ pub fn get_builtins<'sess>() -> Vec<BuiltinDef<'sess>> {
         BuiltinDef::Class(id(), "Nil",    vec!(), vec!(), vec!()),
         BuiltinDef::Class(id(), "Bool",   vec!(), vec!(), vec!()),
         BuiltinDef::Class(id(), "Byte",   vec!(), vec!(), vec!()),
+        BuiltinDef::Class(id(), "Char",   vec!(), vec!(), vec!()),
         BuiltinDef::Class(id(), "Int",    vec!(), vec!(), vec!()),
         BuiltinDef::Class(id(), "Real",   vec!(), vec!(), vec!()),
         BuiltinDef::Class(id(), "String", vec!(), vec!(), vec!()),

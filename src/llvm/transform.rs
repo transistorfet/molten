@@ -52,20 +52,20 @@ impl<'sess> Transformer<'sess> {
     pub fn initialize(&self) {
         let global = self.session.map.get_global();
 
-        /*
-            "()" => LLType::Void,
-            "Nil" => LLType::Ptr(LLType::I8),
-            "Bool" => LLType::I1,
-            "Byte" => LLType::I8,
-            "Int" => LLType::I64,
-            "Real" => LLType::F64,
-            "String" => LLType::Ptr(LLType::I8),
-            "Buffer" => LLType::Ptr(LLType::Ptr(LLType::I8)),
-        */
+        self.set_type(global.get_type_def(&"()".to_string()).unwrap(), LLType::I32);
+        self.set_type(global.get_type_def(&"Nil".to_string()).unwrap(), LLType::Ptr(r(LLType::I8)));
+        self.set_type(global.get_type_def(&"Bool".to_string()).unwrap(), LLType::I1);
+        self.set_type(global.get_type_def(&"Byte".to_string()).unwrap(), LLType::I8);
+        self.set_type(global.get_type_def(&"Char".to_string()).unwrap(), LLType::I32);
+        self.set_type(global.get_type_def(&"Int".to_string()).unwrap(), LLType::I64);
+        self.set_type(global.get_type_def(&"Real".to_string()).unwrap(), LLType::F64);
+        self.set_type(global.get_type_def(&"String".to_string()).unwrap(), LLType::Ptr(r(LLType::I8)));
+        self.set_type(global.get_type_def(&"Buffer".to_string()).unwrap(), LLType::Ptr(r(LLType::Ptr(r(LLType::I8)))));
 
         let expoint_id = NodeID::generate();
         global.define_type(String::from(EXCEPTION_POINT_NAME), Some(expoint_id));
         self.session.set_type(expoint_id, Type::Object(String::from(EXCEPTION_POINT_NAME), expoint_id, vec!()));
+        self.set_type(expoint_id, LLType::Ptr(r(LLType::ExceptionPoint)));
     }
 
     fn set_type(&self, id: NodeID, ltype: LLType) {
@@ -365,6 +365,7 @@ impl<'sess> Transformer<'sess> {
         match lit {
             Literal::Unit => LLLit::I32(0),
             Literal::Boolean(num) => LLLit::I1(*num as bool),
+            Literal::Character(num) => LLLit::I32(*num as i32),
             Literal::Integer(num) => LLLit::I64(*num as i64),
             Literal::Real(num) => LLLit::F64(*num),
             // TODO not sure how you'll do strings yet.... maybe it shouldn't even be a literal here
@@ -1226,26 +1227,11 @@ impl<'sess> Transformer<'sess> {
 
     pub fn transform_value_type(&self, ttype: &Type) -> LLType {
         match &ttype {
-            Type::Object(name, id, _) => match name.as_str() {
-                // TODO void is not entirely correct, and it was causing issues with return values
-                //"()" => LLType::Void,
-                "()" => LLType::I32,
-                "Nil" => LLType::Ptr(r(LLType::I8)),
-                "Bool" => LLType::I1,
-                "Byte" => LLType::I8,
-                "Int" => LLType::I64,
-                "Real" => LLType::F64,
-                "String" => LLType::Ptr(r(LLType::I8)),
-                "Buffer" => LLType::Ptr(r(LLType::Ptr(r(LLType::I8)))),
-                t if t == EXCEPTION_POINT_NAME => LLType::Ptr(r(LLType::ExceptionPoint)),
-                _ => self.types.borrow().get(id).unwrap().clone(),
-            },
+            Type::Object(name, id, _) => self.types.borrow().get(id).unwrap().clone(),
             Type::Ref(ttype) => LLType::Ptr(r(self.transform_value_type(ttype))),
             Type::Tuple(items) => LLType::Struct(items.iter().map(|item| self.transform_value_type(&item)).collect()),
             Type::Record(items) => LLType::Struct(items.iter().map(|item| self.transform_value_type(&item.1)).collect()),
             // TODO how will you do generics
-            //Type::Variable(name, id, _) => { panic!("") },
-            //Type::Variable(name, id, _) => LLType::Ptr(r(LLType::I8)),
             Type::Variable(_, _, _) => LLType::Var,
             Type::Function(args, ret, abi) => {
                 match abi {

@@ -805,6 +805,7 @@ named!(literal(Span) -> AST,
         nil |
         boolean |
         string |
+        character |
         number |
         tuple |
         record |
@@ -827,17 +828,19 @@ named!(boolean(Span) -> AST,
     )
 );
 
+named!(escaped_character(Span) -> &[u8],
+    alt!(
+        tag!("\\") => { |_| &b"\\"[..] } |
+        tag!("\"") => { |_| &b"\""[..] } |
+        tag!("n")  => { |_| &b"\n"[..] } |
+        tag!("r")  => { |_| &b"\r"[..] } |
+        tag!("t")  => { |_| &b"\t"[..] }
+    )
+);
+
 named!(string_contents(Span) -> AST,
     map!(
-        escaped_transform!(is_not!("\"\\"), '\\',
-            alt!(
-                tag!("\\") => { |_| &b"\\"[..] } |
-                tag!("\"") => { |_| &b"\""[..] } |
-                tag!("n")  => { |_| &b"\n"[..] } |
-                tag!("r")  => { |_| &b"\r"[..] } |
-                tag!("t")  => { |_| &b"\t"[..] }
-            )
-        ),
+        escaped_transform!(is_not!("\"\\"), '\\', escaped_character),
         |s| AST::make_lit(Literal::String(String::from_utf8_lossy(&s).into_owned()))
     )
 );
@@ -850,6 +853,21 @@ named!(string(Span) -> AST,
             value!(AST::make_lit(Literal::String(String::new())), tag!(""))
         ),
         tag!("\"")
+    )
+);
+
+
+named!(character(Span) -> AST,
+    map!(
+        delimited!(
+            tag!("\'"),
+            alt!(
+                map!(preceded!(tag!("\\"), escaped_character), |c| c[0] as i32) |
+                map!(anychar, |c| c as i32)
+            ),
+            tag!("\'")
+        ),
+        |c| AST::make_lit(Literal::Character(c))
     )
 );
 

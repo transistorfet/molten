@@ -40,6 +40,7 @@ pub enum AssignType {
 pub enum Literal {
     Unit,
     Boolean(bool),
+    Character(i32),
     Integer(isize),
     Real(f64),
     String(String),
