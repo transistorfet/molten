@@ -163,7 +163,7 @@ fn bind_names_node_or_error(session: &Session, scope: ScopeRef, node: &AST) -> R
         },
 
         AST::Class(ref id, _, ref classspec, ref parentspec, ref body) => {
-            let tscope = ClassDef::create_class_scope(session, scope.clone(), *id);
+            let tscope = session.map.get_or_add(*id, Some(scope.clone()));
 
             // Check for typevars in the type params
             let mut classspec = classspec.clone();
@@ -182,7 +182,6 @@ fn bind_names_node_or_error(session: &Session, scope: ScopeRef, node: &AST) -> R
             //let parenttype = parentspec.clone().map(|p| Type::from_spec(p));
 
             ClassDef::define(session, scope, *id, classtype, parenttype)?;
-            let tscope = session.map.get(id);
 
             bind_names_vec(session, tscope, body);
         },

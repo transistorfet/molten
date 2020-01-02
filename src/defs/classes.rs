@@ -47,17 +47,11 @@ impl ClassDef {
         Rc::new(Self::new(id, classname, classtype, parenttype, vars, vtable))
     }
 
-    pub fn create_class_scope(session: &Session, scope: ScopeRef, id: NodeID) -> ScopeRef {
-        // Create a temporary invisible scope to name check the class body
-        let tscope = session.map.add(id, Some(scope.clone()));
-        tscope
-    }
-
     #[must_use]
     pub fn define(session: &Session, scope: ScopeRef, id: NodeID, classtype: Type, parenttype: Option<Type>) -> Result<ClassDefRef, Error> {
         debug!("DEF CLASS: {:?}", classtype);
         let name = classtype.get_name()?;
-        let tscope = session.map.get(&id);
+        let tscope = session.map.get_or_add(id, Some(scope.clone()));
         tscope.set_redirect(true);
         tscope.set_basename(name.clone());
 

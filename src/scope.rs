@@ -409,6 +409,14 @@ impl ScopeMapRef {
         ScopeMapRef(RefCell::new(HashMap::new()))
     }
 
+    pub fn get_or_add(&self, id: UniqueID, parent: Option<ScopeRef>) -> ScopeRef {
+        let tscope = self.0.borrow().get(&id).map(|s| s.clone());
+        match tscope {
+            Some(scope) => scope,
+            None => self.add(id, parent)
+        }
+    }
+
     pub fn add(&self, id: UniqueID, parent: Option<ScopeRef>) -> ScopeRef {
         let scope = Scope::new_ref(parent);
         self.0.borrow_mut().insert(id, scope.clone());
