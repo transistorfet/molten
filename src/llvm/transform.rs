@@ -63,7 +63,7 @@ impl<'sess> Transformer<'sess> {
         self.set_type(global.get_type_def(&"Buffer".to_string()).unwrap(), LLType::Ptr(r(LLType::Ptr(r(LLType::I8)))));
 
         let expoint_id = NodeID::generate();
-        global.define_type(String::from(EXCEPTION_POINT_NAME), Some(expoint_id));
+        global.define_type(String::from(EXCEPTION_POINT_NAME), Some(expoint_id)).unwrap();
         self.session.set_type(expoint_id, Type::Object(String::from(EXCEPTION_POINT_NAME), expoint_id, vec!()));
         self.set_type(expoint_id, LLType::Ptr(r(LLType::ExceptionPoint)));
     }
@@ -403,7 +403,6 @@ impl<'sess> Transformer<'sess> {
     }
 
     fn transform_enum_def(&self, scope: ScopeRef, id: NodeID, name: &String) -> Vec<LLExpr> {
-        let mut exprs = vec!();
         let selector = LLType::I8;
         let enumdef = self.session.get_def(id).unwrap().as_enum().unwrap();
 
@@ -420,7 +419,7 @@ impl<'sess> Transformer<'sess> {
         }
 
         self.add_global(LLGlobal::SetStructBody(id, vec!(selector.clone(), LLType::Largest(types)), false));
-        exprs
+        vec!()
     }
 
     fn transform_enum_variant(&self, id: NodeID, variant: i8, name: String, selector: LLType, ttype: Option<Type>) {
@@ -849,7 +848,7 @@ impl<'sess> Transformer<'sess> {
         //      Once I have generics that can operate on different sized data instead of only references, I can switch back
         //code.push(AST::Tuple(NodeID::generate(), Pos::empty(), vec!(AST::make_ident_from_str(Pos::empty(), real_fname.as_str()), AST::make_ident(Pos::empty(), Ident::new(cname.clone())))));
 
-        binding::bind_names(self.session, scope.clone(), &code);
+        binding::NameBinder::bind_names(self.session, scope.clone(), &code);
         typecheck::TypeChecker::check(self.session, scope.clone(), &code);
         let mut exprs = self.transform_vec(scope.clone(), &code);
         exprs.push(LLExpr::SetValue(id, r(LLExpr::GetLocal(did))));

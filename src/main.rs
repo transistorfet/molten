@@ -32,7 +32,6 @@ mod defs;
 mod export;
 mod llvm;
 
-use typecheck::TypeChecker;
 use config::{ Options, EmitAs };
 
 fn main() {
@@ -122,8 +121,8 @@ fn compile_file(input: &str, output: Option<&str>) {
         return;
     }
 
-    binding::bind_names(&session, session.map.get_global(), &code);
-    TypeChecker::check(&session, session.map.get_global(), &code);
+    binding::NameBinder::bind_names(&session, session.map.get_global(), &code);
+    typecheck::TypeChecker::check(&session, session.map.get_global(), &code);
 
     if Options::as_ref().debug {
         let global = session.map.get_global();
