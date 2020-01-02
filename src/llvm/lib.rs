@@ -83,7 +83,7 @@ pub fn declare_builtins_node<'sess>(session: &Session, scope: ScopeRef, node: &B
             };
         },
         BuiltinDef::Class(ref id, ref name, ref params, _, ref entries) => {
-            let tscope = ClassDef::create_class_scope(session, scope.clone(), *id);
+            let tscope = session.map.get_or_add(*id, Some(scope.clone()));
             let mut ttype = Type::Object(String::from(*name), *id, params.clone());
             bind_type_names(session, tscope.clone(), Some(&mut ttype), true).unwrap();
             ClassDef::define(session, scope.clone(), *id, ttype, None).unwrap();
