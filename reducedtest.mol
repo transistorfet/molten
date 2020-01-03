@@ -303,3 +303,9 @@ println(str(42 * 4 \
 
 println(str('\n'))
 
+
+println(hex(int('0')))
+println(str(char(0x30)))
+println(str(real(54)))
+println(str(int(12.25)))
+

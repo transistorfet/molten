@@ -31,17 +31,13 @@ class SuperString {
         if index >= self.len then {
             raise new Exception("Index Out Of Range")
             // TODO this is here because raise returns unit instead of being marked as 'no return' somehow
-            0
+            '\0'
         } else {
             getindex(self.str, index)
         }
     }
 
-    pub fn push(self, str: SuperString) {
-        let buffer: String = molten_malloc(self.len + str.len + 1)
-        sprintf(buffer, "%s%s", self.str, str.str)
-        new SuperString(buffer)
-    }
+
 
     /*
     // TODO this doesn't handle UTF-8
@@ -53,6 +49,19 @@ class SuperString {
     }
     */
 }
+
+pub fn +(str1: SuperString, str2: SuperString) -> SuperString {
+    let buffer: String = molten_malloc(str1.len + str2.len + 1)
+    sprintf(buffer, "%s%s", str1.str, str2.str)
+    new SuperString(buffer)
+}
+
+pub fn +(str: SuperString, ch: Char) -> SuperString {
+    let buffer: String = molten_malloc(str.len + 1)
+    sprintf(buffer, "%s%c", str.str, ch)
+    new SuperString(buffer)
+}
+
 
 pub fn ==(str1: String, str2: String) -> Bool / MF {
     if strcmp(str1, str2) == 0 then

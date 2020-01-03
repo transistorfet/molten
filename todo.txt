@@ -27,6 +27,7 @@
 
 
 BUGS:
+* when using an argument called 'self' in a non-method function, it causes an unwrap error
 * the overload check seems to fail in test.mol lines 94/111 with foo2 in Stuff because of the new overload code.  It's giving an overload error unless foo2 which takes a
   single Real is commented out.  It's because the types are added during the name binding phase.  This needs to be added as a test case
 * the infer-arg-as-typevar test fails because str() cannot be resolved to a concrete variant by the time it's typechecked (no backwards affect allowed)

@@ -295,7 +295,7 @@ pub fn get_builtins<'sess>() -> Vec<BuiltinDef<'sess>> {
 
         BuiltinDef::Class(id(), "Buffer",   vec!(Type::Variable(String::from("item"), UniqueID(0), true)), vec!(), vec!()),
 
-        BuiltinDef::Func(id(), "getindex",  "(String, Int) -> Int / C",                     FuncKind::Function(string_get)),
+        BuiltinDef::Func(id(), "getindex",  "(String, Int) -> Char / C",                    FuncKind::Function(string_get)),
         BuiltinDef::Func(id(), "bufalloc",  "(Int) -> Buffer<'item> / C",                   FuncKind::Function(buffer_alloc)),
         BuiltinDef::Func(id(), "bufresize", "(Buffer<'item>, Int) -> Buffer<'item> / C",    FuncKind::Function(buffer_resize)),
         BuiltinDef::Func(id(), "bufget",    "(Buffer<'item>, Int) -> 'item / C",            FuncKind::Function(buffer_get)),
@@ -311,6 +311,17 @@ pub fn get_builtins<'sess>() -> Vec<BuiltinDef<'sess>> {
             BuiltinDef::Func(id(), "[]",         "(Buffer<'item>, Int, 'item) -> 'item",     FuncKind::Method(buffer_set_method)),
         )),
         */
+
+        //// Unit Builtins ////
+        BuiltinDef::Func(id(), "==",  "((), ()) -> Bool / MF",   FuncKind::Function(always_true)),
+        BuiltinDef::Func(id(), "!=",  "((), ()) -> Bool / MF",   FuncKind::Function(always_false)),
+
+
+        //// Boolean Builtins ////
+        BuiltinDef::Func(id(), "==",  "(Bool, Bool) -> Bool / MF",   FuncKind::Function(eq_bool)),
+        BuiltinDef::Func(id(), "!=",  "(Bool, Bool) -> Bool / MF",   FuncKind::Function(ne_bool)),
+        BuiltinDef::Func(id(), "not", "(Bool) -> Bool / MF",         FuncKind::Function(not_bool)),
+
 
         //// Integer Builtins ////
         BuiltinDef::Func(id(), "+",   "(Int, Int) -> Int / MF",      FuncKind::Function(add_int)),
@@ -333,6 +344,15 @@ pub fn get_builtins<'sess>() -> Vec<BuiltinDef<'sess>> {
         BuiltinDef::Func(id(), "not", "(Int) -> Bool / MF",          FuncKind::Function(not_int)),
 
 
+        //// Character Builtins ////
+        BuiltinDef::Func(id(), "<",   "(Char, Char) -> Bool / MF",   FuncKind::Function(lt_char)),
+        BuiltinDef::Func(id(), ">",   "(Char, Char) -> Bool / MF",   FuncKind::Function(gt_char)),
+        BuiltinDef::Func(id(), "<=",  "(Char, Char) -> Bool / MF",   FuncKind::Function(lte_char)),
+        BuiltinDef::Func(id(), ">=",  "(Char, Char) -> Bool / MF",   FuncKind::Function(gte_char)),
+        BuiltinDef::Func(id(), "==",  "(Char, Char) -> Bool / MF",   FuncKind::Function(eq_char)),
+        BuiltinDef::Func(id(), "!=",  "(Char, Char) -> Bool / MF",   FuncKind::Function(ne_char)),
+
+
         //// Real Builtins ////
         BuiltinDef::Func(id(), "+",   "(Real, Real) -> Real / MF",   FuncKind::Function(add_real)),
         BuiltinDef::Func(id(), "-",   "(Real, Real) -> Real / MF",   FuncKind::Function(sub_real)),
@@ -348,17 +368,20 @@ pub fn get_builtins<'sess>() -> Vec<BuiltinDef<'sess>> {
         BuiltinDef::Func(id(), "!=",  "(Real, Real) -> Bool / MF",   FuncKind::Function(ne_real)),
 
 
-        //// Boolean Builtins ////
-        BuiltinDef::Func(id(), "==",  "(Bool, Bool) -> Bool / MF",   FuncKind::Function(eq_bool)),
-        BuiltinDef::Func(id(), "!=",  "(Bool, Bool) -> Bool / MF",   FuncKind::Function(ne_bool)),
-        BuiltinDef::Func(id(), "not", "(Bool) -> Bool / MF",         FuncKind::Function(not_bool)),
-
-        //// Unit Builtins ////
-        BuiltinDef::Func(id(), "==",  "((), ()) -> Bool / MF",   FuncKind::Function(always_true)),
-        BuiltinDef::Func(id(), "!=",  "((), ()) -> Bool / MF",   FuncKind::Function(always_false)),
+        BuiltinDef::Func(id(), "char", "(Int) -> Char / MF",        FuncKind::Function(char_int)),
+        BuiltinDef::Func(id(), "int", "(Char) -> Int / MF",         FuncKind::Function(int_char)),
+        BuiltinDef::Func(id(), "int", "(Real) -> Int / MF",         FuncKind::Function(int_real)),
+        BuiltinDef::Func(id(), "real", "(Int) -> Real / MF",        FuncKind::Function(real_int)),
     )
 }
 
+
+fn always_true(llvm: &LLVM, _args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { llvm.i1_const(true) } }
+fn always_false(llvm: &LLVM, _args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { llvm.i1_const(false) } }
+
+fn eq_bool(llvm: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildICmp(llvm.builder, llvm::LLVMIntPredicate::LLVMIntEQ, args[0], args[1], cstr("")) } }
+fn ne_bool(llvm: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildICmp(llvm.builder, llvm::LLVMIntPredicate::LLVMIntNE, args[0], args[1], cstr("")) } }
+fn not_bool(llvm: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildNot(llvm.builder, args[0], cstr("")) } }
 
 fn add_int(llvm: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildAdd(llvm.builder, args[0], args[1], cstr("")) } }
 fn sub_int(llvm: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildSub(llvm.builder, args[0], args[1], cstr("")) } }
@@ -376,6 +399,13 @@ fn gte_int(llvm: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVM
 fn com_int(llvm: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildXor(llvm.builder, args[0], llvm.u64_const(0xFFFFFFFFFFFFFFFF), cstr("")) } }
 fn not_int(llvm: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { llvm.build_cast(llvm.i1_type(), LLVMBuildNot(llvm.builder, args[0], cstr(""))) } }
 
+fn eq_char(llvm: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildICmp(llvm.builder, llvm::LLVMIntPredicate::LLVMIntEQ, args[0], args[1], cstr("")) } }
+fn ne_char(llvm: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildICmp(llvm.builder, llvm::LLVMIntPredicate::LLVMIntNE, args[0], args[1], cstr("")) } }
+fn lt_char(llvm: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildICmp(llvm.builder, llvm::LLVMIntPredicate::LLVMIntSLT, args[0], args[1], cstr("")) } }
+fn gt_char(llvm: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildICmp(llvm.builder, llvm::LLVMIntPredicate::LLVMIntSGT, args[0], args[1], cstr("")) } }
+fn lte_char(llvm: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildICmp(llvm.builder, llvm::LLVMIntPredicate::LLVMIntSLE, args[0], args[1], cstr("")) } }
+fn gte_char(llvm: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildICmp(llvm.builder, llvm::LLVMIntPredicate::LLVMIntSGE, args[0], args[1], cstr("")) } }
+
 fn add_real(llvm: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildFAdd(llvm.builder, args[0], args[1], cstr("")) } }
 fn sub_real(llvm: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildFSub(llvm.builder, args[0], args[1], cstr("")) } }
 fn mul_real(llvm: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildFMul(llvm.builder, args[0], args[1], cstr("")) } }
@@ -389,12 +419,11 @@ fn gt_real(llvm: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVM
 fn lte_real(llvm: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildFCmp(llvm.builder, llvm::LLVMRealPredicate::LLVMRealOLE, args[0], args[1], cstr("")) } }
 fn gte_real(llvm: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildFCmp(llvm.builder, llvm::LLVMRealPredicate::LLVMRealOGE, args[0], args[1], cstr("")) } }
 
-fn eq_bool(llvm: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildICmp(llvm.builder, llvm::LLVMIntPredicate::LLVMIntEQ, args[0], args[1], cstr("")) } }
-fn ne_bool(llvm: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildICmp(llvm.builder, llvm::LLVMIntPredicate::LLVMIntNE, args[0], args[1], cstr("")) } }
-fn not_bool(llvm: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildNot(llvm.builder, args[0], cstr("")) } }
 
-fn always_true(llvm: &LLVM, _args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { llvm.i1_const(true) } }
-fn always_false(llvm: &LLVM, _args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { llvm.i1_const(false) } }
+fn char_int(llvm: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildCast(llvm.builder, llvm::LLVMOpcode::LLVMZExt, args[0], llvm.i64_type(), cstr("")) } }
+fn int_char(llvm: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildCast(llvm.builder, llvm::LLVMOpcode::LLVMTrunc, args[0], llvm.i32_type(), cstr("")) } }
+fn int_real(llvm: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildFPToSI(llvm.builder, args[0], llvm.i64_type(), cstr("")) } }
+fn real_int(llvm: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildSIToFP(llvm.builder, args[0], llvm.f64_type(), cstr("")) } }
 
 
 /*
@@ -493,7 +522,7 @@ unsafe fn string_get(llvm: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef {
     let mut indices = vec!(args[1]);
     let pointer = LLVMBuildGEP(llvm.builder, args[0], indices.as_mut_ptr(), indices.len() as u32, cstr(""));
     let value = LLVMBuildLoad(llvm.builder, pointer, cstr(""));
-    LLVMBuildCast(llvm.builder, llvm::LLVMOpcode::LLVMZExt, value, llvm.i64_type(), cstr(""))
+    LLVMBuildCast(llvm.builder, llvm::LLVMOpcode::LLVMZExt, value, llvm.i32_type(), cstr(""))
 }
 
 
