@@ -73,7 +73,7 @@ impl<'sess> Transformer<'sess> {
     }
 
     fn get_type(&self, id: NodeID) -> Option<LLType> {
-        self.types.borrow_mut().get(&id).map(|ltype| ltype.clone())
+        self.types.borrow().get(&id).map(|ltype| ltype.clone())
     }
 
     fn add_global(&self, global: LLGlobal) {
@@ -978,22 +978,26 @@ impl<'sess> Transformer<'sess> {
         LLType::Struct(items)
     }
 
-    fn transform_vtable_init(&self, classdef: ClassDefRef) -> Vec<LLExpr> {
+    fn transform_class_vtable_init(&self, classdef: ClassDefRef) -> Vec<LLExpr> {
         if !classdef.has_vtable() {
             return vec!();
         }
 
-        let mut exprs = vec!();
         let tscope = self.session.map.get(&classdef.id);
+        self.transform_vtable_init(format!("__{}_vtable", tscope.get_basename()), &classdef.vtable)
+    }
 
-        self.add_global(LLGlobal::DefGlobal(classdef.vtable.id, LLLink::Once, format!("__{}_vtable", tscope.get_basename()), self.get_type(classdef.vtable.id).unwrap()));
+    fn transform_vtable_init(&self, name: String, vtable: &Vtable) -> Vec<LLExpr> {
+        let mut exprs = vec!();
+
+        self.add_global(LLGlobal::DefGlobal(vtable.id, LLLink::Once, name, self.get_type(vtable.id).unwrap()));
         // TODO should vtables be dynamically allocated, or should we add a LLType::ElementOf() type or something to GetElement an aliased type
-        exprs.push(LLExpr::SetGlobal(classdef.vtable.id, r(LLExpr::AllocRef(NodeID::generate(), self.get_type(classdef.vtable.id).unwrap(), None))));
-        classdef.vtable.foreach_enumerated(|i, id, _, ttype| {
+        exprs.push(LLExpr::SetGlobal(vtable.id, r(LLExpr::AllocRef(NodeID::generate(), self.get_type(vtable.id).unwrap(), None))));
+        vtable.foreach_enumerated(|i, id, _, ttype| {
             let ltype = self.transform_value_type(ttype);
-            let field = LLExpr::AccessRef(r(LLExpr::GetGlobal(classdef.vtable.id)), vec!(LLRef::Field(i)));
+            let field = LLExpr::AccessRef(r(LLExpr::GetGlobal(vtable.id)), vec!(LLRef::Field(i)));
             exprs.push(LLExpr::StoreRef(r(field), r(LLExpr::Cast(ltype, r(LLExpr::GetValue(id))))));
-            //exprs.push(LLExpr::SetItem(r(LLExpr::GetLocal(classdef.vtable.id)), i, r(LLExpr::Cast(ltype, r(LLExpr::GetValue(id))))));
+            //exprs.push(LLExpr::SetItem(r(LLExpr::GetLocal(vtable.id)), i, r(LLExpr::Cast(ltype, r(LLExpr::GetValue(id))))));
         });
 
         exprs
@@ -1021,7 +1025,7 @@ impl<'sess> Transformer<'sess> {
             }
         }
 
-        exprs.extend(self.transform_vtable_init(classdef));
+        exprs.extend(self.transform_class_vtable_init(classdef));
         exprs
     }
 
@@ -1226,7 +1230,7 @@ impl<'sess> Transformer<'sess> {
 
     pub fn transform_value_type(&self, ttype: &Type) -> LLType {
         match &ttype {
-            Type::Object(name, id, _) => self.types.borrow().get(id).unwrap().clone(),
+            Type::Object(name, id, _) => self.get_type(*id).unwrap(),
             Type::Ref(ttype) => LLType::Ptr(r(self.transform_value_type(ttype))),
             Type::Tuple(items) => LLType::Struct(items.iter().map(|item| self.transform_value_type(&item)).collect()),
             Type::Record(items) => LLType::Struct(items.iter().map(|item| self.transform_value_type(&item.1)).collect()),
