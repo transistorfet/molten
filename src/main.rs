@@ -31,6 +31,7 @@ mod binding;
 mod typecheck;
 mod defs;
 mod export;
+mod transform;
 mod llvm;
 
 use config::{ Options, EmitAs };
@@ -136,7 +137,7 @@ fn compile_file(input: &str, output: Option<&str>) {
 
     export::write_exports(&session, session.map.get_global(), format!("{}.dec", session.target).as_str(), &code);
 
-    let transformer = llvm::transform::Transformer::new(&session);
+    let transformer = transform::transform::Transformer::new(&session);
     transformer.initialize();
     transformer.transform_code(session.map.get_global(), &code);
     if Options::as_ref().debug {

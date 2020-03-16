@@ -18,7 +18,7 @@ use defs::functions::{ FuncDef, ClosureDefRef };
 use defs::classes::{ ClassDefRef, StructDefRef, Define, Vtable };
 
 use misc::{ r };
-use llvm::llcode::{ LLType, LLLit, LLRef, LLCmpType, LLLink, LLCC, LLExpr, LLGlobal };
+use transform::llcode::{ LLType, LLLit, LLRef, LLCmpType, LLLink, LLCC, LLExpr, LLGlobal };
 
 
 static EXCEPTION_POINT_NAME: &str = "__ExceptionPoint__";
