@@ -568,21 +568,7 @@ unsafe fn readline(llvm: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef {
 
 
 unsafe fn bool_to_str(llvm: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef {
-    let arg_id = id();
-
-    llvm.set_value(arg_id, args[0]);
-
-    let mut conds = vec!(
-        vec!(LLExpr::GetValue(arg_id)),
-        vec!(LLExpr::Literal(LLLit::I1(true)))
-    );
-
-    let mut blocks = vec!(
-        vec!(LLExpr::Literal(LLLit::ConstStr(String::from("true")))),
-        vec!(LLExpr::Literal(LLLit::ConstStr(String::from("false"))))
-    );
-
-    llvm.build_expr(&LLExpr::Phi(conds, blocks))
+    LLVMBuildSelect(llvm.builder, args[0], llvm.str_const("true"), llvm.str_const("false"), cstr(""))
 }
 
 unsafe fn char_to_str(llvm: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef {

@@ -12,8 +12,10 @@ fn str(num: Int) -> String {
 }
 */
 
+let boo = false
+
 println(str(true))
-println(str(false))
+println(str(boo))
 
 println(str(4))
 

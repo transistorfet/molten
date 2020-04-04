@@ -515,6 +515,28 @@ impl<'sess> LLVM<'sess> {
         reference
     }
 
+    pub unsafe fn build_if(&self, cond_body: &LLBlock, true_body: &LLBlock, false_body: &LLBlock) -> LLVMValueRef {
+        let true_block = LLVMAppendBasicBlockInContext(self.context, *self.curfunc.borrow(), cstr("if_true"));
+        let false_block = LLVMAppendBasicBlockInContext(self.context, *self.curfunc.borrow(), cstr("if_false"));
+        let end_block = LLVMAppendBasicBlockInContext(self.context, *self.curfunc.borrow(), cstr("if_end"));
+
+        let cond_val = self.build_expr_block(cond_body);
+        LLVMBuildCondBr(self.builder, cond_val, true_block, false_block);
+
+        LLVMPositionBuilderAtEnd(self.builder, true_block);
+        let true_val = self.build_expr_block(true_body);
+        LLVMBuildBr(self.builder, end_block);
+
+        LLVMPositionBuilderAtEnd(self.builder, false_block);
+        let false_val = self.build_expr_block(false_body);
+        LLVMBuildBr(self.builder, end_block);
+
+        LLVMPositionBuilderAtEnd(self.builder, end_block);
+        let phi = LLVMBuildPhi(self.builder, LLVMTypeOf(true_val), cstr("phi"));
+        LLVMAddIncoming(phi, (&mut [true_val, false_val]).as_mut_ptr(), (&mut [true_block, false_block]).as_mut_ptr(), 2);
+        phi
+    }
+
     pub unsafe fn build_basic_blocks(&self, label: &str, conds: &Vec<LLBlock>, blocks: &Vec<LLBlock>) -> (Vec<LLVMValueRef>, Vec<*mut LLVMBasicBlock>) {
         let mut cond_vals = vec!();
         let mut block_vals = vec!();
