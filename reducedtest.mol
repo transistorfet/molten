@@ -12,6 +12,9 @@ fn str(num: Int) -> String {
 }
 */
 
+println(str(true))
+println(str(false))
+
 println(str(4))
 
 //decl hex : (Int) -> String
@@ -284,8 +287,9 @@ while true {
 }
 */
 
-let aoeu = 1
-println(str(sizeof(tt)))
+// TODO sizeof was removed because it didn't make sense
+//let aoeu = 1
+//println(str(sizeof(tt)))
 
 //let teststr = "this is totally a string"
 //println(str(teststr[0]))

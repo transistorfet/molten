@@ -1,4 +1,17 @@
 
+* remove direct access to the allocator
+* you have to disallow the situation where a function returns a type variable that doesn't appear elsewhere in the definition, but that is then cast to a concrete type.  This
+  is a blind cast and is unsafe, but we're currently relying on it for memory allocations and such
+* iterators could be implemented as classes, traits implemented on something, or possibly closures?
+* going from an object type to a trait object type would require automatically inserting a conversion, which we sort of do for type variables/generics in a really hacky way, with
+  the codegen build_cast function which will automagically box any non-pointer types
+* we could possibly implement traits statically, so the object would always be typed (no trait objects, and thus no generics with traits unless you switch to monomorphizing... or
+  trait objects), but having static traits would allow the implementation to be separated from the class definition
+* non boxed types should be able to use static traits too. I suppose all traits can have a static reference to the trait vtable rather than searching through the object's vtable,
+  but we'd have to make function lookup a lot more complicated (search scope, then search for a trait impl for that type that contains that function?)
+* how would the need to restrict traits to non typevars affect things? Would that be hard to change, just for traits
+ 
+
 * just make transform functions for specific types in their own files, to break it up a bit.  Specifically, vtables could have their own impl Vtable {} functions transforming
   same for classes, and possibly functions as well, but they're a bit hairy
 

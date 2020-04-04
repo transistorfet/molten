@@ -382,8 +382,16 @@ impl<'sess> LLVM<'sess> {
         LLVMConstInt(self.i64_type(), num as u64, 0)
     }
 
+    pub unsafe fn f64_const(&self, num: f64) -> LLVMValueRef {
+        LLVMConstReal(self.f64_type(), num)
+    }
+
     pub unsafe fn null_const(&self, ltype: LLVMTypeRef) -> LLVMValueRef {
         LLVMConstNull(ltype)
+    }
+
+    pub unsafe fn str_const(&self, string: &str) -> LLVMValueRef {
+        LLVMBuildGlobalStringPtr(self.builder, cstr(string), cstr("__string"))
     }
 
     pub unsafe fn build_linkage(&self, val: LLVMValueRef, link: LLLink) {
@@ -404,13 +412,13 @@ impl<'sess> LLVM<'sess> {
 
     pub unsafe fn build_literal(&self, lit: &LLLit) -> LLVMValueRef {
         match lit {
-            LLLit::I1(num) => LLVMConstInt(self.i1_type(), *num as u64, 0),
-            LLLit::I8(num) => LLVMConstInt(self.i8_type(), *num as u64, 0),
-            LLLit::I32(num) => LLVMConstInt(self.i32_type(), *num as u64, 0),
-            LLLit::I64(num) => LLVMConstInt(self.i64_type(), *num as u64, 0),
-            LLLit::F64(num) => LLVMConstReal(self.f64_type(), *num),
+            LLLit::I1(num) => self.i1_const(*num),
+            LLLit::I8(num) => self.i8_const(*num),
+            LLLit::I32(num) => self.i32_const(*num),
+            LLLit::I64(num) => self.i64_const(*num),
+            LLLit::F64(num) => self.f64_const(*num),
             LLLit::Null(ltype) => self.null_const(self.build_type(ltype)),
-            LLLit::ConstStr(string) => LLVMBuildGlobalStringPtr(self.builder, cstr(string.as_str()), cstr("__string")),
+            LLLit::ConstStr(string) => self.str_const(string.as_str()),
         }
     }
 

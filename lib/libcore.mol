@@ -55,15 +55,11 @@ class SuperStringIterator {
 }
 
 pub fn +(str1: SuperString, str2: SuperString) -> SuperString {
-    let buffer: String = molten_malloc(str1.len + str2.len + 1)
-    sprintf(buffer, "%s%s", str1.str, str2.str)
-    new SuperString(buffer)
+    new SuperString(str1.str + str2.str)
 }
 
-pub fn +(str: SuperString, ch: Char) -> SuperString {
-    let buffer: String = molten_malloc(str.len + 1)
-    sprintf(buffer, "%s%c", str.str, ch)
-    new SuperString(buffer)
+pub fn +(str1: SuperString, ch: Char) -> SuperString {
+    new SuperString(str1.str + str(ch))
 }
 
 
@@ -79,51 +75,6 @@ pub fn !=(str1: String, str2: String) -> Bool / MF {
         true
     else
         false
-}
-
-pub fn +(s1: String, s2: String) -> String / MF {
-    //s1.push(s2)
-    let s1length = strlen(s1)
-    let s2length = strlen(s2)
-    let buffer: String = molten_malloc(s1length + s2length + 1)
-    sprintf(buffer, "%s%s", s1, s2)
-    buffer
-}
-
-
-pub fn str(unit: ()) -> String {
-    "()"
-}
-
-pub fn str(num: Bool) -> String {
-    if num then
-        "true"
-    else
-        "false"
-}
-
-pub fn str(num: Char) -> String {
-    let buffer: String = molten_malloc(22)
-    sprintf(buffer, "%c", num, ())
-    buffer
-}
-
-pub fn str(num: Int) -> String {
-    let buffer: String = molten_malloc(22)
-    sprintf(buffer, "%ld", num, ())
-    buffer
-}
-
-pub fn hex(num: Int) -> String {
-    let buffer: String = molten_malloc(22)
-    sprintf(buffer, "0x%lX", num, ())
-    buffer
-}
-
-pub fn str(num: Real) -> String {
-    let buffer: String = molten_malloc(22)
-    sprintf(buffer, "%f", num, ())
-    buffer
 }
 
 

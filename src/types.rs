@@ -280,6 +280,7 @@ pub fn check_type(session: &Session, scope: ScopeRef, odtype: Option<Type>, octy
         } else if let Type::Variable(_, ref cid, cex) = ctype {
             if update && !cex { session.update_type(scope.clone(), *cid, dtype.clone())?; }
             Ok(resolve_type(session, dtype.clone(), false)?)
+            //Err(Error::new(format!("TypeError: attempting to cast a type variable {} to a concrete {}", ctype, dtype)))
         } else {
             match (dtype.clone(), ctype.clone()) {
                 (Type::Function(ref aargs, ref aret, ref aabi), Type::Function(ref bargs, ref bret, ref babi)) => {
