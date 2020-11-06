@@ -1,5 +1,5 @@
 
-* remove direct access to the allocator
+* can you remove access to getindex, buffer, etc?
 * you have to disallow the situation where a function returns a type variable that doesn't appear elsewhere in the definition, but that is then cast to a concrete type.  This
   is a blind cast and is unsafe, but we're currently relying on it for memory allocations and such
 * iterators could be implemented as classes, traits implemented on something, or possibly closures?
@@ -15,10 +15,10 @@
 * just make transform functions for specific types in their own files, to break it up a bit.  Specifically, vtables could have their own impl Vtable {} functions transforming
   same for classes, and possibly functions as well, but they're a bit hairy
 
-* rename Buffer type to RawPointerArray
-* rename String type to ByteArray, or CString, or ZString, or NullString, or NullByteArray, or ZByteArray, RawString
+* rename Buffer type to RawPointerArray, or GenericsArray
+* rename String type to ByteString, ByteArray, or CString, or ZString, or NullString, or NullByteArray, or ZByteArray, RawString
 * rename SuperString type to String, will require a bunch of libcore changes
-* rename List to Array
+* rename List to Array or Vec
 
 * need a way to import/compile directory of many files (libcore as many files)
 * add a module keyword which is automatically inserted into .dec files, which actually calls the run function, including the canonical name/path when the module was compiled

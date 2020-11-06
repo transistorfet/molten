@@ -1,0 +1,22 @@
+
+//! \(\)
+//! true
+//! false
+//! -1
+//! 9999
+//! 123.000000
+//! 0.123000
+//! 0x30
+//! A
+
+
+println(str(()))
+println(str(true))
+println(str(false))
+println(str(-1))
+println(str(9999))
+println(str(123.0))
+println(str(0.123))
+println(hex(0x30))
+println(str('A'))
+

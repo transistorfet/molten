@@ -216,7 +216,7 @@ class List<'item> {
     // TODO add map, filter, reduce? Or should they go on the iterator parent class?
 }
 
-class ListIterator<'item> {
+class ListIterator<'item> extends Iterator<'item> {
     let mut index = 0
     let mut list: List<'item> = nil
 
