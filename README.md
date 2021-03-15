@@ -2,6 +2,8 @@
 Molten
 ======
 
+###### *Started November 06, 2017*
+
 Molten is a programming language which borrows from the ML family of languages,
 as well as from Rust and Python.  The compiler is written in Rust and uses
 LLVM to generate IR which can be compiled to machine code.
