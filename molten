@@ -8,15 +8,16 @@ import argparse
 import traceback
 import subprocess
 
+llvm_version = 11
 
 if shutil.which("lli") is not None:
     # MacOS
     EXT = ""
-elif shutil.which("lli-7") is not None:
+elif shutil.which("lli-{}".format(llvm_version)) is not None:
     # Debian
-    EXT = "-7"
+    EXT = "-{}".format(llvm_version)
 else:
-    print("Error: unable to locate LLVM command line program \"lli\".  Please ensure that the LLVM 7 tools are included in your $PATH")
+    print("Error: unable to locate LLVM command line program \"lli\".  Please ensure that the LLVM {} tools are included in your $PATH".format(llvm_version))
     sys.exit(-1)
 
 RM = "rm"

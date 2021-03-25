@@ -1,4 +1,6 @@
 
+* only when using llvm 11, and only with the match tt {} expr in reducedtest.mol, and optimizations enabled, the compiler hangs without ever completing
+
 * can you remove access to getindex, buffer, etc?
 * you have to disallow the situation where a function returns a type variable that doesn't appear elsewhere in the definition, but that is then cast to a concrete type.  This
   is a blind cast and is unsafe, but we're currently relying on it for memory allocations and such

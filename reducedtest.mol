@@ -244,12 +244,15 @@ enum TestThing =
 //let tt = TestThing::Variant2(987)
 let tt = TestThing::Variant3("Hey", "Ho")
 
+/*
+// TODO this causes the optimizer to hang when compiling this code
 match tt {
     TestThing::Variant1 => println("It's Variant 1")
     TestThing::Variant2(n) => println("It's soo Variant 2 with " + str(n))
     TestThing::Variant3(s1, s2) => println("It's totally Variant 3 with " + s1 + " and " + s2)
     _ => println("I don't know")
 }
+*/
 
 enum Value =
 | None

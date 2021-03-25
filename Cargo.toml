@@ -7,6 +7,6 @@ authors = ["transistor <trans@jabberwocky.ca>"]
 nom = { version = "^4.0", features = ["verbose-errors"] }
 nom_locate = { version = "^0.3", features = ["verbose-errors"] }
 clap = "^2"
-llvm-sys = "70"
+llvm-sys = "^110"
 rand = "^0.5"
 

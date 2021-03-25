@@ -162,9 +162,12 @@ impl<'sess> LLVM<'sess> {
             let builder = LLVMPassManagerBuilderCreate();
             // -O optimization level
             LLVMPassManagerBuilderSetOptLevel(builder, llvm_opt);
+            //LLVMPassManagerBuilderSetSizeLevel(builder, 1);
 
             let pass_manager = LLVMCreatePassManager();
+            LLVMPassManagerBuilderPopulateFunctionPassManager(builder, pass_manager);
             LLVMPassManagerBuilderPopulateModulePassManager(builder, pass_manager);
+            LLVMPassManagerBuilderPopulateLTOPassManager(builder, pass_manager, 1, 1);
             LLVMPassManagerBuilderDispose(builder);
 
             LLVMRunPassManager(pass_manager, self.module);
