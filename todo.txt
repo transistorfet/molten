@@ -1,5 +1,6 @@
 
 * only when using llvm 11, and only with the match tt {} expr in reducedtest.mol, and optimizations enabled, the compiler hangs without ever completing
+  In the test, the match is inside a function, but when moved to the top level, it hangs while compiling.  It happens regardless of mathc arm it seems
 
 * can you remove access to getindex, buffer, etc?
 * you have to disallow the situation where a function returns a type variable that doesn't appear elsewhere in the definition, but that is then cast to a concrete type.  This

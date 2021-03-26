@@ -21,7 +21,7 @@ mod abi;
 mod ast;
 mod misc;
 //mod htree;
-//mod visitor;
+mod visitor;
 mod scope;
 mod types;
 mod config;
