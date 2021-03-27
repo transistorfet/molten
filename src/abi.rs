@@ -8,10 +8,8 @@ use std::str;
 //use nom::types::CompleteByteSlice;
 //use parser;
 
-use ast::Ident;
+use hir::Ident;
 use types::Type;
-
-//pub struct ABI(i32)
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum ABI {

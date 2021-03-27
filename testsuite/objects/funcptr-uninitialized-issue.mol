@@ -1,4 +1,6 @@
 
+// If there is a problem with initializing class members, then the add method wont be initialized and will cause a segfault
+
 import lib.libcore
 
 class TestClass {

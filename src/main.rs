@@ -19,8 +19,8 @@ mod parser;
 
 mod abi;
 mod ast;
+mod hir;
 mod misc;
-//mod htree;
 mod visitor;
 mod scope;
 mod types;

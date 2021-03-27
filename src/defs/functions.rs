@@ -6,7 +6,7 @@ use types::*;
 use defs::Def;
 use scope::{ Scope, ScopeRef };
 use session::{ Session, Error };
-use ast::{ NodeID, Mutability, Visibility };
+use hir::{ NodeID, Mutability, Visibility };
 
 use defs::classes::{ Define, StructDef, StructDefRef };
 

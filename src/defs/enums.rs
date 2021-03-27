@@ -9,7 +9,7 @@ use defs::Def;
 use types::Type;
 use scope::{ Scope, ScopeRef };
 use session::{ Session, Error };
-use ast::{ NodeID, EnumVariant };
+use hir::{ NodeID, EnumVariant };
 
 
 #[derive(Clone, Debug, PartialEq)]

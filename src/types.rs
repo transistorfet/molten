@@ -2,7 +2,7 @@
 use std::fmt;
 
 use defs::Def;
-use ast::ClassSpec;
+use hir::ClassSpec;
 use misc::{ R, r, UniqueID };
 use session::{ Session, Error };
 use scope::{ Scope, ScopeRef };

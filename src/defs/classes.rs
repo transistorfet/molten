@@ -8,7 +8,7 @@ use types::Type;
 use scope::{ Scope, ScopeRef };
 use session::{ Session, Error };
 use types::{ check_type, Check };
-use ast::{ NodeID, Mutability, Ident, AST };
+use hir::{ NodeID, Mutability, Ident, Expr, ExprKind };
 
 use defs::variables::FieldDef;
 
@@ -102,7 +102,7 @@ impl ClassDef {
     }
 
 
-    pub fn build_vtable(&self, session: &Session, scope: ScopeRef, body: &Vec<AST>) {
+    pub fn build_vtable(&self, session: &Session, scope: ScopeRef, body: &Vec<Expr>) {
         let parentclass = match self.parenttype {
             // TODO this needs to be fixed
             Some(ref ptype) => Some(scope.find_type_def(session, &ptype.get_name().unwrap()).unwrap().as_class().unwrap()),
@@ -115,7 +115,7 @@ impl ClassDef {
         self.vtable.build_vtable(session, scope, body);
     }
 
-    pub fn build_structdef(&self, session: &Session, scope: ScopeRef, body: &Vec<AST>) {
+    pub fn build_structdef(&self, session: &Session, scope: ScopeRef, body: &Vec<Expr>) {
         let parentclass = match self.parenttype {
             Some(ref ptype) => Some(scope.find_type_def(session, &ptype.get_name().unwrap()).unwrap().as_class().unwrap()),
             None => None,
@@ -133,9 +133,9 @@ impl ClassDef {
             }
         }
         for ref node in body.iter() {
-            match **node {
-                AST::Definition(ref id, _, ref mutable, ref ident, _, _) => {
-                    self.structdef.add_field(session, *id, *mutable, ident.name.as_str(), session.get_type(*id).unwrap(), Define::IfNotExists);
+            match &node.kind {
+                ExprKind::Definition(ref mutable, ref ident, _, _) => {
+                    self.structdef.add_field(session, node.id, *mutable, ident.name.as_str(), session.get_type(node.id).unwrap(), Define::IfNotExists);
                 },
                 _ => { }
             }
@@ -285,19 +285,19 @@ impl Vtable {
         *self.table.borrow_mut() = inherit.table.borrow().clone();
     }
 
-    pub fn build_vtable(&self, session: &Session, scope: ScopeRef, body: &Vec<AST>) {
+    pub fn build_vtable(&self, session: &Session, scope: ScopeRef, body: &Vec<Expr>) {
         for ref node in body.iter() {
-            match **node {
-                AST::Function(ref id, _, _, ref ident, _, _, _, _) => {
+            match &node.kind {
+                ExprKind::Function(_, ref ident, _, _, _, _) => {
                     if let Some(Ident { ref name, .. }) = ident {
-                        self.add_entry(session, scope.clone(), *id, name.as_str(), session.get_type(*id).unwrap());
+                        self.add_entry(session, scope.clone(), node.id, name.as_str(), session.get_type(node.id).unwrap());
                     }
                 },
-                AST::Declare(ref id, _, _, ref ident, _) => {
-                    let ttype = session.get_type(*id).unwrap();
+                ExprKind::Declare(_, ref ident, _) => {
+                    let ttype = session.get_type(node.id).unwrap();
                     match ttype {
                         Type::Function(_, _, _) => {
-                            self.add_entry(session, scope.clone(), *id, ident.as_str(), ttype);
+                            self.add_entry(session, scope.clone(), node.id, ident.as_str(), ttype);
                         },
                         _ => { },
                     }

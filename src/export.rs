@@ -7,10 +7,10 @@ use misc::UniqueID;
 use config::Options;
 use session::Session;
 use scope::{ ScopeRef };
-use ast::{ AST, Mutability, Visibility, NodeID };
+use hir::{ NodeID, Visibility, Mutability, Expr, ExprKind };
 
 
-pub fn write_exports(session: &Session, scope: ScopeRef, filename: &str, code: &Vec<AST>) {
+pub fn write_exports(session: &Session, scope: ScopeRef, filename: &str, code: &Vec<Expr>) {
     let declarations_text = build_declarations(session, scope, code);
     let mut declarations_file = File::create(filename).expect("Error creating declarations file");
     declarations_file.write_all(declarations_text.as_bytes()).unwrap();
@@ -19,7 +19,7 @@ pub fn write_exports(session: &Session, scope: ScopeRef, filename: &str, code: &
     }
 }
 
-pub fn build_declarations(session: &Session, scope: ScopeRef, code: &Vec<AST>) -> String {
+pub fn build_declarations(session: &Session, scope: ScopeRef, code: &Vec<Expr>) -> String {
     let mut declarations = String::new();
     for node in code {
         build_declarations_node(&mut declarations, session, scope.clone(), node);
@@ -27,25 +27,25 @@ pub fn build_declarations(session: &Session, scope: ScopeRef, code: &Vec<AST>) -
     declarations
 }
 
-fn build_declarations_node(declarations: &mut String, session: &Session, scope: ScopeRef, node: &AST) {
-    match *node {
-        AST::Declare(ref id, _, ref vis, ref ident, _) => {
-            declarations.push_str(&emit_declaration(session, scope.clone(), *id, *vis, &ident.name));
+fn build_declarations_node(declarations: &mut String, session: &Session, scope: ScopeRef, node: &Expr) {
+    match &node.kind {
+        ExprKind::Declare(vis, ident, _) => {
+            declarations.push_str(&emit_declaration(session, scope.clone(), node.id, *vis, &ident.name));
         },
 
-        AST::Function(ref id, _, ref vis, ref ident, _, _, _, _) => {
+        ExprKind::Function(vis, ident, _, _, _, _) => {
             if let Some(ref ident) = *ident {
-                declarations.push_str(&emit_declaration(session, scope.clone(), *id, *vis, &ident.name));
+                declarations.push_str(&emit_declaration(session, scope.clone(), node.id, *vis, &ident.name));
             }
         },
 
-        AST::Definition(_, _, _, _, _, ref body) => match **body {
-            ref node @ AST::Class(_, _, _, _, _) => build_declarations_node(declarations, session, scope.clone(), node),
+        ExprKind::Definition(_, _, _, body) => match &body.kind {
+            ExprKind::Class(_, _, _) => build_declarations_node(declarations, session, scope.clone(), node),
             _ => { },
         },
 
-        AST::Class(ref id, _, ref classspec, ref parentspec, ref body) => {
-            let tscope = session.map.get(&id);
+        ExprKind::Class(classspec, parentspec, body) => {
+            let tscope = session.map.get(&node.id);
             let namespec = unparse_type(session, tscope.clone(), Type::from_spec(classspec.clone(), UniqueID(0)));
             let fullspec = if parentspec.is_some() {
                 format!("{} extends {}", namespec, unparse_type(session, tscope.clone(), Type::from_spec(parentspec.clone().unwrap(), UniqueID(0))))
@@ -57,19 +57,19 @@ fn build_declarations_node(declarations: &mut String, session: &Session, scope: 
             //declarations.push_str(format!("    decl __alloc__() -> {}\n", namespec).as_str());
             //declarations.push_str(format!("    decl __init__({}) -> Nil\n", namespec).as_str());
             for node in body {
-                match *node {
-                    AST::Definition(ref id, _, ref mutable, ref ident, _, _) => {
+                match &node.kind {
+                    ExprKind::Definition(mutable, ident, _, _) => {
                         declarations.push_str("    ");
-                        declarations.push_str(&emit_field(session, tscope.clone(), *id, *mutable, &ident.name));
+                        declarations.push_str(&emit_field(session, tscope.clone(), node.id, *mutable, &ident.name));
                     },
-                    AST::Declare(ref id, _, ref vis, ref ident, _) => {
+                    ExprKind::Declare(vis, ident, _) => {
                         declarations.push_str("    ");
-                        declarations.push_str(&emit_declaration(session, tscope.clone(), *id, *vis, &ident.name));
+                        declarations.push_str(&emit_declaration(session, tscope.clone(), node.id, *vis, &ident.name));
                     },
-                    AST::Function(ref id, _, ref vis, ref ident, _, _, _, _) => {
+                    ExprKind::Function(vis, ident, _, _, _, _) => {
                         if let Some(ref ident) = *ident {
                             declarations.push_str("    ");
-                            declarations.push_str(&emit_declaration(session, tscope.clone(), *id, *vis, &ident.name));
+                            declarations.push_str(&emit_declaration(session, tscope.clone(), node.id, *vis, &ident.name));
                         }
                     },
                     _ => {  },
@@ -103,7 +103,7 @@ pub fn unparse_type(session: &Session, scope: ScopeRef, ttype: Type) -> String {
             let params = if types.len() > 0 { format!("<{}>", types.iter().map(|p| unparse_type(session, scope.clone(), p.clone())).collect::<Vec<String>>().join(", ")) } else { String::from("") };
             name.clone() + &params
         },
-        Type::Variable(mut name, id, _) => {
+        Type::Variable(name, id, _) => {
             /*
             // TODO this doesn't work because if a name isnt' found, then all tyyevars with that id are made independent
             let var = scope.find_type(session, &name);

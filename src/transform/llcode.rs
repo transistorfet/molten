@@ -1,5 +1,5 @@
 
-use ast::NodeID;
+use hir::NodeID;
 use misc::{ R };
 
 

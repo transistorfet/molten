@@ -19,7 +19,7 @@ use self::llvm_sys::target_machine::*;
 use self::llvm_sys::transforms::pass_manager_builder::*;
 
 
-use ast::NodeID;
+use hir::NodeID;
 use config::Options;
 use session::Session;
 use misc::{ UniqueID, r };

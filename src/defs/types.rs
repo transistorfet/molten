@@ -5,7 +5,7 @@ use defs::Def;
 use types::Type;
 use scope::{ Scope, ScopeRef };
 use session::{ Session, Error };
-use ast::{ NodeID };
+use hir::{ NodeID };
 
 
 #[derive(Clone, Debug, PartialEq)]

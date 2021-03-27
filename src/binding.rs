@@ -5,7 +5,7 @@ use abi::ABI;
 use types::Type;
 use session::{ Session, Error };
 use scope::{ ScopeRef, Context };
-use ast::{ NodeID, AST, Mutability, Visibility, AssignType, Ident, ClassSpec, Argument, MatchCase, EnumVariant, Pattern, Literal };
+use hir::{ NodeID, Visibility, Mutability, AssignType, Literal, Ident, Argument, ClassSpec, MatchCase, EnumVariant, Pattern, PatKind, Expr, ExprKind };
 use misc::{ UniqueID, r };
 
 use defs::enums::EnumDef;
@@ -25,7 +25,7 @@ pub struct NameBinder<'sess> {
 
 
 impl<'sess> NameBinder<'sess> {
-    pub fn bind_names(session: &'sess Session, scope: ScopeRef, code: &Vec<AST>) {
+    pub fn bind_names(session: &'sess Session, scope: ScopeRef, code: &Vec<Expr>) {
         let mut namebinder = NameBinder {
             session: session,
             stack: ScopeStack::new(),
@@ -56,12 +56,12 @@ impl<'sess> Visitor for NameBinder<'sess> {
         self.session.map.get(&id)
     }
 
-    fn handle_error(&mut self, node: &AST, err: Error) -> Result<(), Error> {
+    fn handle_error(&mut self, node: &Expr, err: Error) -> Result<(), Error> {
         self.session.print_error(err.add_pos(&node.get_pos()));
         Ok(())
     }
 
-    fn visit_function(&mut self, id: NodeID, vis: Visibility, ident: &Option<Ident>, args: &Vec<Argument>, rettype: &Option<Type>, body: &AST, abi: ABI) -> Result<Self::Return, Error> {
+    fn visit_function(&mut self, id: NodeID, vis: Visibility, ident: &Option<Ident>, args: &Vec<Argument>, rettype: &Option<Type>, body: &Expr, abi: ABI) -> Result<Self::Return, Error> {
         let scope = self.stack.get_scope();
         let fscope = self.session.map.add(id, Some(scope.clone()));
         fscope.set_basename(ident.as_ref().map_or(format!("anon{}", id), |ident| ident.name.clone()));
@@ -89,7 +89,7 @@ impl<'sess> Visitor for NameBinder<'sess> {
         })
     }
 
-    fn visit_definition(&mut self, id: NodeID, mutable: Mutability, ident: &Ident, ttype: &Option<Type>, expr: &AST) -> Result<Self::Return, Error> {
+    fn visit_definition(&mut self, id: NodeID, mutable: Mutability, ident: &Ident, ttype: &Option<Type>, expr: &Expr) -> Result<Self::Return, Error> {
         let scope = self.stack.get_scope();
         let mut ttype = ttype.clone();
         bind_type_names(self.session, scope.clone(), ttype.as_mut(), false)?;
@@ -119,11 +119,11 @@ impl<'sess> Visitor for NameBinder<'sess> {
         Ok(())
     }
 
-    fn visit_try(&mut self, id: NodeID, cond: &AST, cases: &Vec<MatchCase>) -> Result<Self::Return, Error> {
+    fn visit_try(&mut self, id: NodeID, cond: &Expr, cases: &Vec<MatchCase>) -> Result<Self::Return, Error> {
         self.visit_match(id, cond, cases)
     }
 
-    fn visit_match(&mut self, id: NodeID, cond: &AST, cases: &Vec<MatchCase>) -> Result<Self::Return, Error> {
+    fn visit_match(&mut self, id: NodeID, cond: &Expr, cases: &Vec<MatchCase>) -> Result<Self::Return, Error> {
         let scope = self.stack.get_scope();
         self.visit_node(cond)?;
         // TODO check to make sure Pattern::Wild only occurs as the last case, if at all
@@ -136,7 +136,7 @@ impl<'sess> Visitor for NameBinder<'sess> {
     }
 
 
-    fn visit_ptr_cast(&mut self, id: NodeID, ttype: &Type, code: &AST) -> Result<Self::Return, Error> {
+    fn visit_ptr_cast(&mut self, id: NodeID, ttype: &Type, code: &Expr) -> Result<Self::Return, Error> {
         let scope = self.stack.get_scope();
         let mut ttype = ttype.clone();
         bind_type_names(self.session, scope.clone(), Some(&mut ttype), false)?;
@@ -157,7 +157,7 @@ impl<'sess> Visitor for NameBinder<'sess> {
         Ok(())
     }
 
-    fn visit_class(&mut self, id: NodeID, classspec: &ClassSpec, parentspec: &Option<ClassSpec>, body: &Vec<AST>) -> Result<Self::Return, Error> {
+    fn visit_class(&mut self, id: NodeID, classspec: &ClassSpec, parentspec: &Option<ClassSpec>, body: &Vec<Expr>) -> Result<Self::Return, Error> {
         let scope = self.stack.get_scope();
         let tscope = self.session.map.get_or_add(id, Some(scope.clone()));
 
@@ -215,12 +215,12 @@ impl<'sess> Visitor for NameBinder<'sess> {
         Ok(())
     }
 
-    fn visit_resolver(&mut self, id: NodeID, left: &AST, right: &Ident, oid: NodeID) -> Result<Self::Return, Error> {
+    fn visit_resolver(&mut self, id: NodeID, left: &Expr, right: &Ident, oid: NodeID) -> Result<Self::Return, Error> {
         let scope = self.stack.get_scope();
         // TODO should this always work on a type reference, or should classes be added as values as well as types?
         //self.visit_node(left);
-        match *left {
-            AST::Identifier(_, _, ref ident) => {
+        match left.kind {
+            ExprKind::Identifier(ref ident) => {
                 match scope.get_type_def(&ident.name) {
                     Some(defid) => self.session.set_ref(oid, defid),
                     None => return Err(Error::new(format!("NameError: undefined type {:?}", ident.name)))
@@ -248,8 +248,8 @@ impl<'sess> Visitor for NameBinder<'sess> {
 
     fn visit_pattern_resolve(&mut self, id: NodeID, left: &Pattern, ident: &Ident, oid: NodeID) -> Result<Self::Return, Error> {
         let scope = self.stack.get_scope();
-        match *left {
-            Pattern::Identifier(_, ref ident) => {
+        match &left.kind {
+            PatKind::Identifier(ref ident) => {
                 match scope.get_type_def(&ident.name) {
                     Some(defid) => self.session.set_ref(oid, defid),
                     None => return Err(Error::new(format!("NameError: undefined type {:?}", ident.name)))

@@ -12,7 +12,7 @@ use abi::ABI;
 use types::Type;
 use session::Session;
 use parser::{ parse_type };
-use ast::{ NodeID, Mutability, Visibility };
+use hir::{ NodeID, Mutability, Visibility };
 use scope::{ Scope, ScopeRef, ScopeMapRef, Context };
 use binding::{ bind_type_names };
 use config::Options;

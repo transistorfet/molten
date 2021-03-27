@@ -1,6 +1,6 @@
 
 use scope::ScopeRef;
-use ast::Mutability;
+use hir::Mutability;
 use session::{ Session, Error };
 
 //pub mod traits;

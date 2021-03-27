@@ -5,7 +5,7 @@ use abi::ABI;
 use types::Type;
 use session::Error;
 use scope::ScopeRef;
-use ast::{ NodeID, AST, Mutability, Visibility, AssignType, Ident, ClassSpec, Argument, MatchCase, EnumVariant, Pattern, Literal };
+use hir::{ NodeID, Visibility, Mutability, AssignType, Literal, Ident, Argument, ClassSpec, MatchCase, EnumVariant, Pattern, PatKind, Expr, ExprKind };
 
 
 #[derive(Clone, Debug, PartialEq)]
@@ -58,31 +58,27 @@ pub trait Visitor: Sized {
         Ok(self.default_return())
     }
 
-    fn visit_ptr_cast(&mut self, id: NodeID, ttype: &Type, code: &AST) -> Result<Self::Return, Error> {
+    fn visit_ptr_cast(&mut self, id: NodeID, ttype: &Type, code: &Expr) -> Result<Self::Return, Error> {
         self.visit_node(code)
     }
 
-    fn visit_ref(&mut self, id: NodeID, expr: &AST) -> Result<Self::Return, Error> {
+    fn visit_ref(&mut self, id: NodeID, expr: &Expr) -> Result<Self::Return, Error> {
         self.visit_node(expr)
     }
 
-    fn visit_deref(&mut self, id: NodeID, expr: &AST) -> Result<Self::Return, Error> {
+    fn visit_deref(&mut self, id: NodeID, expr: &Expr) -> Result<Self::Return, Error> {
         self.visit_node(expr)
     }
 
-    fn visit_list(&mut self, id: NodeID, items: &Vec<AST>) -> Result<Self::Return, Error> {
+    fn visit_tuple(&mut self, id: NodeID, items: &Vec<Expr>) -> Result<Self::Return, Error> {
         self.visit_vec(items)
     }
 
-    fn visit_tuple(&mut self, id: NodeID, items: &Vec<AST>) -> Result<Self::Return, Error> {
-        self.visit_vec(items)
-    }
-
-    fn visit_record(&mut self, id: NodeID, items: &Vec<(Ident, AST)>) -> Result<Self::Return, Error> {
+    fn visit_record(&mut self, id: NodeID, items: &Vec<(Ident, Expr)>) -> Result<Self::Return, Error> {
         walk_record(self, id, items)
     }
 
-    fn visit_record_update(&mut self, id: NodeID, record: &AST, items: &Vec<(Ident, AST)>) -> Result<Self::Return, Error> {
+    fn visit_record_update(&mut self, id: NodeID, record: &Expr, items: &Vec<(Ident, Expr)>) -> Result<Self::Return, Error> {
         walk_record_update(self, id, record, items)
     }
 
@@ -95,46 +91,46 @@ pub trait Visitor: Sized {
         Ok(self.default_return())
     }
 
-    fn visit_resolver(&mut self, id: NodeID, left: &AST, right: &Ident, oid: NodeID) -> Result<Self::Return, Error> {
+    fn visit_resolver(&mut self, id: NodeID, left: &Expr, right: &Ident, oid: NodeID) -> Result<Self::Return, Error> {
         self.visit_node(left)
     }
 
-    fn visit_accessor(&mut self, id: NodeID, left: &AST, right: &Ident, oid: NodeID) -> Result<Self::Return, Error> {
+    fn visit_accessor(&mut self, id: NodeID, left: &Expr, right: &Ident, oid: NodeID) -> Result<Self::Return, Error> {
         self.visit_node(left)
     }
 
 
-    fn visit_block(&mut self, id: NodeID, code: &Vec<AST>) -> Result<Self::Return, Error> {
+    fn visit_block(&mut self, id: NodeID, code: &Vec<Expr>) -> Result<Self::Return, Error> {
         self.visit_vec(code)
     }
 
-    fn visit_invoke(&mut self, id: NodeID, func: &AST, args: &Vec<AST>) -> Result<Self::Return, Error> {
+    fn visit_invoke(&mut self, id: NodeID, func: &Expr, args: &Vec<Expr>) -> Result<Self::Return, Error> {
         walk_invoke(self, id, func, args)
     }
 
 
-    fn visit_side_effect(&mut self, id: NodeID, op: &Ident, args: &Vec<AST>) -> Result<Self::Return, Error> {
+    fn visit_side_effect(&mut self, id: NodeID, op: &Ident, args: &Vec<Expr>) -> Result<Self::Return, Error> {
         self.visit_vec(args)
     }
 
 
-    fn visit_if(&mut self, id: NodeID, cond: &AST, texpr: &AST, fexpr: &AST) -> Result<Self::Return, Error> {
+    fn visit_if(&mut self, id: NodeID, cond: &Expr, texpr: &Expr, fexpr: &Expr) -> Result<Self::Return, Error> {
         walk_if(self, id, cond, texpr, fexpr)
     }
 
-    fn visit_raise(&mut self, id: NodeID, expr: &AST) -> Result<Self::Return, Error> {
+    fn visit_raise(&mut self, id: NodeID, expr: &Expr) -> Result<Self::Return, Error> {
         self.visit_node(expr)
     }
 
-    fn visit_try(&mut self, id: NodeID, cond: &AST, cases: &Vec<MatchCase>) -> Result<Self::Return, Error> {
+    fn visit_try(&mut self, id: NodeID, cond: &Expr, cases: &Vec<MatchCase>) -> Result<Self::Return, Error> {
         walk_try(self, id, cond, cases)
     }
 
-    fn visit_match(&mut self, id: NodeID, cond: &AST, cases: &Vec<MatchCase>) -> Result<Self::Return, Error> {
+    fn visit_match(&mut self, id: NodeID, cond: &Expr, cases: &Vec<MatchCase>) -> Result<Self::Return, Error> {
         walk_match(self, id, cond, cases)
     }
 
-    fn visit_while(&mut self, id: NodeID, cond: &AST, body: &AST) -> Result<Self::Return, Error> {
+    fn visit_while(&mut self, id: NodeID, cond: &Expr, body: &Expr) -> Result<Self::Return, Error> {
         walk_while(self, id, cond, body)
     }
 
@@ -143,7 +139,7 @@ pub trait Visitor: Sized {
         Ok(self.default_return())
     }
 
-    fn visit_function(&mut self, id: NodeID, vis: Visibility, ident: &Option<Ident>, args: &Vec<Argument>, rettype: &Option<Type>, body: &AST, abi: ABI) -> Result<Self::Return, Error> {
+    fn visit_function(&mut self, id: NodeID, vis: Visibility, ident: &Option<Ident>, args: &Vec<Argument>, rettype: &Option<Type>, body: &Expr, abi: ABI) -> Result<Self::Return, Error> {
         walk_function(self, id, vis, ident, args, rettype, body, abi)
     }
 
@@ -151,7 +147,7 @@ pub trait Visitor: Sized {
         Ok(self.default_return())
     }
 
-    fn visit_class(&mut self, id: NodeID, classspec: &ClassSpec, parentspec: &Option<ClassSpec>, body: &Vec<AST>) -> Result<Self::Return, Error> {
+    fn visit_class(&mut self, id: NodeID, classspec: &ClassSpec, parentspec: &Option<ClassSpec>, body: &Vec<Expr>) -> Result<Self::Return, Error> {
         walk_class(self, id, classspec, parentspec, body)
     }
 
@@ -164,15 +160,15 @@ pub trait Visitor: Sized {
     }
 
 
-    fn visit_import(&mut self, id: NodeID, ident: &Ident, decls: &Vec<AST>) -> Result<Self::Return, Error> {
+    fn visit_import(&mut self, id: NodeID, ident: &Ident, decls: &Vec<Expr>) -> Result<Self::Return, Error> {
         self.visit_vec(decls)
     }
 
-    fn visit_definition(&mut self, id: NodeID, mutable: Mutability, ident: &Ident, ttype: &Option<Type>, expr: &AST) -> Result<Self::Return, Error> {
+    fn visit_definition(&mut self, id: NodeID, mutable: Mutability, ident: &Ident, ttype: &Option<Type>, expr: &Expr) -> Result<Self::Return, Error> {
         self.visit_node(expr)
     }
 
-    fn visit_assignment(&mut self, id: NodeID, left: &AST, right: &AST, ty: AssignType) -> Result<Self::Return, Error> {
+    fn visit_assignment(&mut self, id: NodeID, left: &Expr, right: &Expr, ty: AssignType) -> Result<Self::Return, Error> {
         walk_assignment(self, id, left, right, ty)
     }
 
@@ -206,8 +202,8 @@ pub trait Visitor: Sized {
         Ok(self.default_return())
     }
 
-    fn visit_pattern_literal(&mut self, id: NodeID, lit: &AST) -> Result<Self::Return, Error> {
-        self.visit_node(lit)
+    fn visit_pattern_literal(&mut self, id: NodeID, lit: &Literal) -> Result<Self::Return, Error> {
+        self.visit_literal(id, lit)
     }
 
     fn visit_pattern_identifier(&mut self, id: NodeID, ident: &Ident) -> Result<Self::Return, Error> {
@@ -216,12 +212,12 @@ pub trait Visitor: Sized {
 
 
 
-    fn handle_error(&mut self, node: &AST, err: Error) -> Result<Self::Return, Error> {
+    fn handle_error(&mut self, node: &Expr, err: Error) -> Result<Self::Return, Error> {
         Err(err)
     }
 
 
-    fn visit_vec(&mut self, code: &Vec<AST>) -> Result<Self::Return, Error> {
+    fn visit_vec(&mut self, code: &Vec<Expr>) -> Result<Self::Return, Error> {
         let mut last: Self::Return = self.default_return();
         for node in code {
             last = match self.visit_node(node) {
@@ -232,197 +228,181 @@ pub trait Visitor: Sized {
         Ok(last)
     }
 
-    fn visit_node(&mut self, node: &AST) -> Result<Self::Return, Error> {
-        match *node {
-            AST::Literal(ref id, ref lit) => {
-                self.visit_literal(*id, lit)
+    fn visit_node(&mut self, node: &Expr) -> Result<Self::Return, Error> {
+        match &node.kind {
+            ExprKind::Literal(lit) => {
+                self.visit_literal(node.id, lit)
             },
 
-            AST::Nil(ref id) => {
-                self.visit_nil(*id)
+            ExprKind::Nil => {
+                self.visit_nil(node.id)
             },
 
-            AST::PtrCast(ref id, ref ttype, ref code) => {
-                self.visit_ptr_cast(*id, ttype, code)
+            ExprKind::PtrCast(ttype, code) => {
+                self.visit_ptr_cast(node.id, ttype, code)
             },
 
-            AST::Ref(ref id, _, ref expr) => {
-                self.visit_ref(*id, expr)
+            ExprKind::Ref(expr) => {
+                self.visit_ref(node.id, expr)
             },
 
-            AST::Deref(ref id, _, ref expr) => {
-                self.visit_deref(*id, expr)
+            ExprKind::Deref(expr) => {
+                self.visit_deref(node.id, expr)
             },
 
-            AST::List(ref id, _, ref items) => {
-                self.visit_list(*id, items)
+            ExprKind::Tuple(items) => {
+                self.visit_tuple(node.id, items)
             },
 
-            AST::Tuple(ref id, _, ref items) => {
-                self.visit_tuple(*id, items)
+            ExprKind::Record(items) => {
+                self.visit_record(node.id, items)
             },
 
-            AST::Record(ref id, _, ref items) => {
-                self.visit_record(*id, items)
-            },
-
-            AST::RecordUpdate(ref id, _, ref record, ref items) => {
-                self.visit_record_update(*id, record, items)
+            ExprKind::RecordUpdate(record, items) => {
+                self.visit_record_update(node.id, record, items)
             },
 
 
-            AST::GetValue(ref id) => {
-                self.visit_get_value(*id)
+            ExprKind::GetValue(id) => {
+                self.visit_get_value(node.id)
             },
 
-            AST::Identifier(ref id, _, ref ident) => {
-                self.visit_identifier(*id, ident)
+            ExprKind::Identifier(ident) => {
+                self.visit_identifier(node.id, ident)
             },
 
-            AST::Index(ref id, _, ref base, ref index) => {
-                // TODO commented out because it should be desugared
-                //self.visit_index(*id, base, index)
-                Ok(self.default_return())
+            ExprKind::Resolver(left, right, oid) => {
+                self.visit_resolver(node.id, left, right, *oid)
             },
 
-            AST::Resolver(ref id, _, ref left, ref right, ref oid) => {
-                self.visit_resolver(*id, left, right, *oid)
-            },
-
-            AST::Accessor(ref id, _, ref left, ref right, ref oid) => {
-                self.visit_accessor(*id, left, right, *oid)
+            ExprKind::Accessor(left, right, oid) => {
+                self.visit_accessor(node.id, left, right, *oid)
             },
 
 
-            AST::Block(ref id, _, ref code) => {
-                self.visit_block(*id, code)
+            ExprKind::Block(code) => {
+                self.visit_block(node.id, code)
             },
 
-            AST::Invoke(ref id, _, ref func, ref args) => {
-                self.visit_invoke(*id, func, args)
-            },
-
-
-            AST::SideEffect(ref id, _, ref op, ref args) => {
-                self.visit_side_effect(*id, op, args)
-            },
-
-            AST::If(ref id, _, ref cond, ref texpr, ref fexpr) => {
-                self.visit_if(*id, cond, texpr, fexpr)
-            },
-
-            AST::Raise(ref id, _, ref expr) => {
-                self.visit_raise(*id, expr)
-            },
-
-            AST::Try(ref id, _, ref cond, ref cases) => {
-                self.visit_try(*id, cond, cases)
-            },
-
-            AST::Match(ref id, _, ref cond, ref cases) => {
-                self.visit_match(*id, cond, cases)
-            },
-
-            AST::For(ref id, _, ref index, ref cond, ref body) => {
-                // TODO commented out because it should be desugared
-                //self.visit_for(*id, index, cond, body)
-                Ok(self.default_return())
-            },
-
-            AST::While(ref id, _, ref cond, ref body) => {
-                self.visit_while(*id, cond, body)
+            ExprKind::Invoke(func, args) => {
+                self.visit_invoke(node.id, func, args)
             },
 
 
-            AST::Declare(ref id, _, ref vis, ref ident, ref ttype) => {
-                self.visit_declare(*id, *vis, ident, ttype)
+            ExprKind::SideEffect(op, args) => {
+                self.visit_side_effect(node.id, op, args)
             },
 
-            AST::Function(ref id, _, ref vis, ref ident, ref args, ref rettype, ref body, ref abi) => {
-                self.visit_function(*id, *vis, ident, args, rettype, body, *abi)
+            ExprKind::If(cond, texpr, fexpr) => {
+                self.visit_if(node.id, cond, texpr, fexpr)
             },
 
-            AST::New(ref id, _, ref classspec) => {
-                self.visit_new(*id, classspec)
+            ExprKind::Raise(expr) => {
+                self.visit_raise(node.id, expr)
             },
 
-            AST::Class(ref id, _, ref classspec, ref parentspec, ref body) => {
-                self.visit_class(*id, classspec, parentspec, body)
+            ExprKind::Try(cond, cases) => {
+                self.visit_try(node.id, cond, cases)
             },
 
-            AST::TypeAlias(ref id, _, ref classspec, ref ttype) => {
-                self.visit_type_alias(*id, classspec, ttype)
+            ExprKind::Match(cond, cases) => {
+                self.visit_match(node.id, cond, cases)
             },
 
-            AST::Enum(ref id, _, ref classspec, ref variants) => {
-                self.visit_enum(*id, classspec, variants)
+            ExprKind::While(cond, body) => {
+                self.visit_while(node.id, cond, body)
             },
 
 
-            AST::Import(ref id, _, ref ident, ref decls) => {
-                self.visit_import(*id, ident, decls)
+            ExprKind::Declare(vis, ident, ttype) => {
+                self.visit_declare(node.id, *vis, ident, ttype)
             },
 
-            AST::Definition(ref id, _, ref mutable, ref ident, ref ttype, ref expr) => {
-                self.visit_definition(*id, *mutable, ident, ttype, expr)
+            ExprKind::Function(vis, ident, args, rettype, body, abi) => {
+                self.visit_function(node.id, *vis, ident, args, rettype, body, *abi)
             },
 
-            AST::Assignment(ref id, _, ref left, ref right, ref ty) => {
-                self.visit_assignment(*id, left, right, *ty)
+            ExprKind::New(classspec) => {
+                self.visit_new(node.id, classspec)
+            },
+
+            ExprKind::Class(classspec, parentspec, body) => {
+                self.visit_class(node.id, classspec, parentspec, body)
+            },
+
+            ExprKind::TypeAlias(classspec, ttype) => {
+                self.visit_type_alias(node.id, classspec, ttype)
+            },
+
+            ExprKind::Enum(classspec, variants) => {
+                self.visit_enum(node.id, classspec, variants)
+            },
+
+
+            ExprKind::Import(ident, decls) => {
+                self.visit_import(node.id, ident, decls)
+            },
+
+            ExprKind::Definition(mutable, ident, ttype, expr) => {
+                self.visit_definition(node.id, *mutable, ident, ttype, expr)
+            },
+
+            ExprKind::Assignment(left, right, ty) => {
+                self.visit_assignment(node.id, left, right, *ty)
             },
         }
     }
 
     fn visit_pattern(&mut self, pat: &Pattern) -> Result<Self::Return, Error> {
-        match pat {
-            Pattern::Binding(ref id, ref ident) => {
-                self.visit_pattern_binding(*id, ident)
+        match &pat.kind {
+            PatKind::Binding(ident) => {
+                self.visit_pattern_binding(pat.id, ident)
             },
 
-            Pattern::Annotation(ref id, ref ttype, ref pat) => {
-                self.visit_pattern_annotation(*id, ttype, pat)
+            PatKind::Annotation(ttype, pat) => {
+                self.visit_pattern_annotation(pat.id, ttype, pat)
             },
 
-            Pattern::Resolve(ref id, ref left, ref ident, ref oid) => {
-                self.visit_pattern_resolve(*id, left, ident, *oid)
+            PatKind::Resolve(left, ident, oid) => {
+                self.visit_pattern_resolve(pat.id, left, ident, *oid)
             },
 
-            Pattern::EnumArgs(ref id, ref left, ref args) => {
-                self.visit_pattern_enum_args(*id, left, args)
+            PatKind::EnumArgs(left, args) => {
+                self.visit_pattern_enum_args(pat.id, left, args)
             },
 
-            Pattern::Tuple(ref id, ref items) => {
-                self.visit_pattern_tuple(*id, items)
+            PatKind::Tuple(items) => {
+                self.visit_pattern_tuple(pat.id, items)
             },
 
-            Pattern::Record(ref id, ref items) => {
-                self.visit_pattern_record(*id, items)
+            PatKind::Record(items) => {
+                self.visit_pattern_record(pat.id, items)
             },
 
-            Pattern::Wild => {
+            PatKind::Wild => {
                 self.visit_pattern_wild()
             },
 
-            Pattern::Literal(ref id, ref lit) => {
-                self.visit_pattern_literal(*id, lit)
+            PatKind::Literal(lit) => {
+                self.visit_pattern_literal(pat.id, lit)
             },
 
-            Pattern::Identifier(ref id, ref ident) => {
-                self.visit_pattern_identifier(*id, ident)
+            PatKind::Identifier(ident) => {
+                self.visit_pattern_identifier(pat.id, ident)
             },
         }
     }
 
 }
 
-pub fn walk_record<R, V: Visitor<Return = R>>(visitor: &mut V, id: NodeID, items: &Vec<(Ident, AST)>) -> Result<R, Error> {
+pub fn walk_record<R, V: Visitor<Return = R>>(visitor: &mut V, id: NodeID, items: &Vec<(Ident, Expr)>) -> Result<R, Error> {
     for item in items {
         visitor.visit_node(&item.1)?;
     }
     Ok(visitor.default_return())
 }
 
-pub fn walk_record_update<R, V: Visitor<Return = R>>(visitor: &mut V, id: NodeID, record: &AST, items: &Vec<(Ident, AST)>) -> Result<R, Error> {
+pub fn walk_record_update<R, V: Visitor<Return = R>>(visitor: &mut V, id: NodeID, record: &Expr, items: &Vec<(Ident, Expr)>) -> Result<R, Error> {
     visitor.visit_node(record)?;
     for item in items {
         visitor.visit_node(&item.1)?;
@@ -430,19 +410,19 @@ pub fn walk_record_update<R, V: Visitor<Return = R>>(visitor: &mut V, id: NodeID
     Ok(visitor.default_return())
 }
 
-pub fn walk_invoke<R, V: Visitor<Return = R>>(visitor: &mut V, id: NodeID, func: &AST, args: &Vec<AST>) -> Result<R, Error> {
+pub fn walk_invoke<R, V: Visitor<Return = R>>(visitor: &mut V, id: NodeID, func: &Expr, args: &Vec<Expr>) -> Result<R, Error> {
     visitor.visit_node(func)?;
     visitor.visit_vec(args)
 }
 
-pub fn walk_if<R, V: Visitor<Return = R>>(visitor: &mut V, id: NodeID, cond: &AST, texpr: &AST, fexpr: &AST) -> Result<R, Error> {
+pub fn walk_if<R, V: Visitor<Return = R>>(visitor: &mut V, id: NodeID, cond: &Expr, texpr: &Expr, fexpr: &Expr) -> Result<R, Error> {
     visitor.visit_node(cond)?;
     visitor.visit_node(texpr)?;
     visitor.visit_node(fexpr)?;
     Ok(visitor.default_return())
 }
 
-pub fn walk_try<R, V: Visitor<Return = R>>(visitor: &mut V, id: NodeID, cond: &AST, cases: &Vec<MatchCase>) -> Result<R, Error> {
+pub fn walk_try<R, V: Visitor<Return = R>>(visitor: &mut V, id: NodeID, cond: &Expr, cases: &Vec<MatchCase>) -> Result<R, Error> {
     visitor.visit_node(cond)?;
     for case in cases {
         let lscope = visitor.get_scope_by_id(case.id);
@@ -451,7 +431,7 @@ pub fn walk_try<R, V: Visitor<Return = R>>(visitor: &mut V, id: NodeID, cond: &A
     Ok(visitor.default_return())
 }
 
-pub fn walk_match<R, V: Visitor<Return = R>>(visitor: &mut V, id: NodeID, cond: &AST, cases: &Vec<MatchCase>) -> Result<R, Error> {
+pub fn walk_match<R, V: Visitor<Return = R>>(visitor: &mut V, id: NodeID, cond: &Expr, cases: &Vec<MatchCase>) -> Result<R, Error> {
     visitor.visit_node(cond)?;
     for case in cases {
         let lscope = visitor.get_scope_by_id(case.id);
@@ -468,13 +448,13 @@ pub fn walk_match_case<R, V: Visitor<Return = R>>(visitor: &mut V, lscope: Scope
     })
 }
 
-pub fn walk_while<R, V: Visitor<Return = R>>(visitor: &mut V, id: NodeID, cond: &AST, body: &AST) -> Result<R, Error> {
+pub fn walk_while<R, V: Visitor<Return = R>>(visitor: &mut V, id: NodeID, cond: &Expr, body: &Expr) -> Result<R, Error> {
     visitor.visit_node(cond)?;
     visitor.visit_node(body)?;
     Ok(visitor.default_return())
 }
 
-pub fn walk_function<R, V: Visitor<Return = R>>(visitor: &mut V, id: NodeID, vis: Visibility, ident: &Option<Ident>, args: &Vec<Argument>, rettype: &Option<Type>, body: &AST, abi: ABI) -> Result<R, Error> {
+pub fn walk_function<R, V: Visitor<Return = R>>(visitor: &mut V, id: NodeID, vis: Visibility, ident: &Option<Ident>, args: &Vec<Argument>, rettype: &Option<Type>, body: &Expr, abi: ABI) -> Result<R, Error> {
     let fscope = visitor.get_scope_by_id(id);
     // TODO visit arguments
     visitor.with_scope(fscope, |visitor| {
@@ -483,14 +463,14 @@ pub fn walk_function<R, V: Visitor<Return = R>>(visitor: &mut V, id: NodeID, vis
     Ok(visitor.default_return())
 }
 
-pub fn walk_class<R, V: Visitor<Return = R>>(visitor: &mut V, id: NodeID, classspec: &ClassSpec, parentspec: &Option<ClassSpec>, body: &Vec<AST>) -> Result<R, Error> {
+pub fn walk_class<R, V: Visitor<Return = R>>(visitor: &mut V, id: NodeID, classspec: &ClassSpec, parentspec: &Option<ClassSpec>, body: &Vec<Expr>) -> Result<R, Error> {
     let tscope = visitor.get_scope_by_id(id);
     visitor.with_scope(tscope, |visitor| {
         visitor.visit_vec(body)
     })
 }
 
-pub fn walk_assignment<R, V: Visitor<Return = R>>(visitor: &mut V, id: NodeID, left: &AST, right: &AST, ty: AssignType) -> Result<R, Error> {
+pub fn walk_assignment<R, V: Visitor<Return = R>>(visitor: &mut V, id: NodeID, left: &Expr, right: &Expr, ty: AssignType) -> Result<R, Error> {
     visitor.visit_node(left)?;
     visitor.visit_node(right)?;
     Ok(visitor.default_return())

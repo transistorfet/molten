@@ -32,7 +32,8 @@ use std::str::FromStr;
 use abi::ABI;
 use types::Type;
 use misc::{ r, UniqueID };
-use ast::{ Pos, NodeID, Mutability, Visibility, AssignType, Literal, Ident, Argument, ClassSpec, MatchCase, Pattern, EnumVariant, AST };
+use ast::{ Pos, AST };
+use hir::{ NodeID, Mutability, Visibility, AssignType, Literal, Ident, Argument, ClassSpec, Pattern, PatKind, EnumVariant, Expr };
 
 
 ///// Parsing Macros /////
@@ -105,7 +106,7 @@ macro_rules! tag_word (
 #[macro_export]
 macro_rules! map_ident (
     ($i:expr, $($args:tt)*) => {
-        map!($i, $($args)*, |s| Ident::from_span(s))
+        map!($i, $($args)*, |s| ident_from_span(&s))
     }
 );
 
@@ -151,7 +152,7 @@ named!(terminator(Span) -> Option<AST>,
         t: alt!(
             //map!(peek!(wscom!(tag!("}"))), |_| None) |
             map!(line_ending, |_| None) |
-            map!(tag!(";"), |_| Some(AST::make_lit(Literal::Unit)))
+            map!(tag!(";"), |_| Some(AST::Literal(Literal::Unit)))
         ) >>
         line_or_space_or_comment >>
         (t)
@@ -176,7 +177,7 @@ named!(import(Span) -> AST,
         pos: position!() >>
         wscom!(tag_word!("import")) >>
         e: recognize!(separated_list_complete!(tag!("."), identifier)) >>
-        (AST::make_import(Pos::new(pos), Ident::from_span(e), vec!()))
+        (AST::Import(Pos::new(pos), ident_from_span(&e), vec!()))
     )
 );
 
@@ -190,12 +191,12 @@ named!(definition(Span) -> AST,
             wscom!(tag!("=")),
             expression
         )) >>
-        (AST::make_def(
+        (AST::Definition(
             Pos::new(pos),
             if m.is_some() { Mutability::Mutable } else { Mutability::Immutable },
             i.1,
             i.2,
-            if e.is_some() { e.unwrap() } else { AST::make_nil() }
+            r(if e.is_some() { e.unwrap() } else { AST::Nil })
         ))
     )
 );
@@ -206,7 +207,7 @@ named!(assignment(Span) -> AST,
         o: subatomic_operation >>
         wscom!(tag!("=")) >>
         e: expression >>
-        (AST::make_assign(Pos::new(pos), o, e, AssignType::Update))
+        (AST::Assignment(Pos::new(pos), r(o), r(e), AssignType::Update))
     )
 );
 
@@ -217,7 +218,7 @@ named!(whileloop(Span) -> AST,
         c: expression >>
         line_or_space_or_comment >>
         e: return_error!(ErrorKind::Custom(ERR_IN_WHILE), expression) >>
-        (AST::make_while(Pos::new(pos), c, e))
+        (AST::While(Pos::new(pos), r(c), r(e)))
     )
 );
 
@@ -235,7 +236,7 @@ named!(class(Span) -> AST,
             function
         ))) >>
         return_error!(ErrorKind::Custom(ERR_IN_CLASS), tag!("}")) >>
-        (AST::make_class(Pos::new(pos), i, p, s))
+        (AST::Class(Pos::new(pos), i, p, s))
         )
     );
 
@@ -246,7 +247,7 @@ named!(typealias(Span) -> AST,
         c: class_spec >>
         wscom!(tag!("=")) >>
         ts: type_description >>
-        (AST::make_type_alias(Pos::new(pos), c, ts))
+        (AST::TypeAlias(Pos::new(pos), c, ts))
     )
 );
 
@@ -258,7 +259,7 @@ named!(typeenum(Span) -> AST,
         wscom!(tag!("=")) >>
         wscom!(opt!(tag!("|"))) >>
         ev: separated_list_complete!(wscom!(tag!("|")), enum_variant) >>
-        (AST::make_type_enum(Pos::new(pos), c, ev))
+        (AST::Enum(Pos::new(pos), c, ev))
     )
 );
 
@@ -306,7 +307,7 @@ named!(block(Span) -> AST,
         do_parse!(
             pos: position!() >>
             s: wscom!(statement_list) >>
-            (AST::make_block(Pos::new(pos), s))
+            (AST::Block(Pos::new(pos), s))
         ),
         alt!(tag_word!("end") | tag!("}"))
     )
@@ -323,7 +324,7 @@ named!(ifexpr(Span) -> AST,
             wscom!(tag_word!("else")),
             expression
         )) >>
-        (AST::make_if(Pos::new(pos), c, t, if f.is_some() { f.unwrap() } else { AST::make_lit(Literal::Unit) }))
+        (AST::If(Pos::new(pos), r(c), r(t), r(if f.is_some() { f.unwrap() } else { AST::Literal(Literal::Unit) })))
     )
 );
 
@@ -341,7 +342,7 @@ named!(trywith(Span) -> AST,
         return_error!(ErrorKind::Custom(ERR_IN_TRY),
             tag!("}")
         ) >>
-        (AST::make_try(Pos::new(pos), c, l))
+        (AST::Try(Pos::new(pos), r(c), l))
     )
 );
 
@@ -350,7 +351,7 @@ named!(raise(Span) -> AST,
         pos: position!() >>
         wscom!(tag_word!("raise")) >>
         e: expression >>
-        (AST::make_raise(Pos::new(pos), e))
+        (AST::Raise(Pos::new(pos), r(e)))
     )
 );
 
@@ -368,11 +369,11 @@ named!(matchcase(Span) -> AST,
         return_error!(ErrorKind::Custom(ERR_IN_MATCH),
             tag!("}")
         ) >>
-        (AST::make_match(Pos::new(pos), c, l))
+        (AST::Match(Pos::new(pos), r(c), l))
     )
 );
 
-named!(caselist(Span) -> Vec<MatchCase>,
+named!(caselist(Span) -> Vec<(Pattern, AST)>,
     //separated_list_complete!(wscom!(tag!("|")), do_parse!(
     dbg_dmp!(many1!(wscom!(do_parse!(
         //wscom!(tag!("|")) >>
@@ -380,7 +381,7 @@ named!(caselist(Span) -> Vec<MatchCase>,
         wscom!(tag!("=>")) >>
         e: expression >>
         //wscom!(tag!(",")) >>
-        (MatchCase::new(c, e))
+        ((c, e))
     ))))
 );
 
@@ -393,7 +394,7 @@ named!(forloop(Span) -> AST,
         l: expression >>
         line_or_space_or_comment >>
         e: return_error!(ErrorKind::Custom(ERR_IN_FOR), expression) >>
-        (AST::make_for(Pos::new(pos), i, l, e))
+        (AST::For(Pos::new(pos), i, r(l), r(e)))
     )
 );
 
@@ -404,11 +405,11 @@ named!(newclass(Span) -> AST,
         cs: class_spec >>
         a: map!(
             delimited!(tag!("("), expression_list, tag!(")")),
-            |mut a| { a.insert(0, AST::make_new(Pos::new(pos), cs.clone())); a }
+            |mut a| { a.insert(0, AST::New(Pos::new(pos), cs.clone())); a }
         ) >>
-        (AST::make_ptr_cast(
+        (AST::PtrCast(
             Type::Object(cs.ident.name.clone(), UniqueID(0), cs.types.clone()),
-            AST::make_invoke(Pos::new(pos), AST::make_resolve(Pos::new(pos), AST::make_ident(Pos::new(pos), cs.ident.clone()), Ident::from_str("new")), a)))
+            r(AST::Invoke(Pos::new(pos), r(AST::Resolver(Pos::new(pos), r(AST::Identifier(Pos::new(pos), cs.ident.clone())), Ident::from_str("new"))), a))))
     )
 );
 
@@ -419,7 +420,7 @@ named!(declare(Span) -> AST,
         wscom!(tag_word!("decl")) >>
         n: alt_complete!(identifier | any_op) >>
         t: type_function >>
-        (AST::make_decl(Pos::new(pos), if vis.is_some() { Visibility::Public } else { Visibility::Private }, n, t))
+        (AST::Declare(Pos::new(pos), if vis.is_some() { Visibility::Public } else { Visibility::Private }, n, t))
     )
 );
 
@@ -438,13 +439,13 @@ named!(function(Span) -> AST,
             ) |
             map!(argument_list, |l| (None, l))
         ) >>
-        r: opt!(preceded!(wscom!(tag!("->")), type_description)) >>
+        rt: opt!(preceded!(wscom!(tag!("->")), type_description)) >>
         a: abi_specifier >>
         e: alt_complete!(
             preceded!(wscom!(tag!("=>")), return_error!(ErrorKind::Custom(ERR_IN_FUNC), expression)) |
             return_error!(ErrorKind::Custom(ERR_IN_FUNC), wscoml!(block))
         ) >>
-        (AST::make_func(Pos::new(pos), if vis.is_some() { Visibility::Public } else { Visibility::Private }, l.0, l.1, r, e, a))
+        (AST::Function(Pos::new(pos), if vis.is_some() { Visibility::Public } else { Visibility::Private }, l.0, l.1, rt, r(e), a))
     )
 );
 
@@ -453,7 +454,7 @@ named!(reference(Span) -> AST,
         pos: position!() >>
         wscom!(tag_word!("ref")) >>
         e: expression >>
-        (AST::make_ref(Pos::new(pos), e))
+        (AST::Ref(Pos::new(pos), r(e)))
     )
 );
 
@@ -462,7 +463,7 @@ named!(annotation(Span) -> AST,
         e: atomic >>
         wscom!(tag!(":")) >>
         t: type_description >>
-        (AST::make_ptr_cast(t, e))
+        (AST::PtrCast(t, r(e)))
     )
 );
 
@@ -470,8 +471,9 @@ named!(argument_list(Span) -> Vec<Argument>,
     separated_list_complete!(wscom!(tag!(",")),
         do_parse!(
             i: identifier_typed >>
-            d: opt!(preceded!(wscom!(tag!("=")), expression)) >>
-            (Argument::new(i.0, i.1, i.2, d))
+            // TODO this needs an Expr instead of AST, so probably needs an intermediate struct, but default args aren't supported yet anyways
+            //d: opt!(preceded!(wscom!(tag!("=")), expression)) >>
+            (Argument::new(i.0, i.1, i.2, None))
         )
     )
 );
@@ -554,11 +556,11 @@ impl AST {
 
     fn make_op(pos: Pos, op: Ident, r1: AST, r2: AST) -> AST {
         match op.as_str() {
-            "and" | "or" => AST::make_side_effect(pos, op, vec!(r1, r2)),
+            "and" | "or" => AST::SideEffect(pos, op, vec!(r1, r2)),
             _ =>
             //AST::Infix(pos, op, r(r1), r(r2))
-            AST::make_invoke(pos.clone(), AST::make_ident(pos, op), vec!(r1, r2))
-            //AST::make_invoke(pos, AST::make_access(pos, r1, op), vec!(r2))
+            AST::Invoke(pos.clone(), r(AST::Identifier(pos, op)), vec!(r1, r2))
+            //AST::Invoke(pos, AST::Access(pos, r1, op), vec!(r2))
         }
     }
 }
@@ -593,7 +595,7 @@ named!(prefix(Span) -> AST,
         opt!(space) >>
         a: atomic >>
         //(AST::Prefix(op, r(a)))
-        (AST::make_invoke(Pos::new(pos), AST::make_ident(Pos::new(pos), op), vec!(a)))
+        (AST::Invoke(Pos::new(pos), r(AST::Identifier(Pos::new(pos), op)), vec!(a)))
     )
 );
 
@@ -603,7 +605,7 @@ named!(subatomic_operation(Span) -> AST,
         operations: many0!(alt_complete!(
             map!(delimited!(tag!("["), tuple!(position!(), wscom!(expression)), tag!("]")), |(p, e)| SubOP::Index(Pos::new(p), e)) |
             map!(delimited!(tag!("("), tuple!(position!(), wscom!(expression_list)), tag!(")")), |(p, e)| SubOP::Invoke(Pos::new(p), e)) |
-            map!(preceded!(tag!("."), tuple!(position!(), alt!(identifier | map!(digit, |s| Ident::from_span(s))))), |(p, s)| SubOP::Accessor(Pos::new(p), s)) |
+            map!(preceded!(tag!("."), tuple!(position!(), alt!(identifier | map!(digit, |s| ident_from_span(&s))))), |(p, s)| SubOP::Accessor(Pos::new(p), s)) |
             map!(preceded!(tag!("::"), tuple!(position!(), identifier)), |(p, s)| SubOP::Resolver(Pos::new(p), s))
         )) >>
         (AST::fold_access(left, operations))
@@ -622,10 +624,10 @@ impl AST {
         let mut ret = left;
         for op in operations {
             match op {
-                SubOP::Index(p, e) => ret = AST::make_index(p, ret, e),
-                SubOP::Invoke(p, e) => ret = AST::make_invoke(p, ret, e),
-                SubOP::Accessor(p, name) => ret = AST::make_access(p, ret, name.clone()),
-                SubOP::Resolver(p, name) => ret = AST::make_resolve(p, ret, name.clone()),
+                SubOP::Index(p, e) => ret = AST::Index(p, r(ret), r(e)),
+                SubOP::Invoke(p, e) => ret = AST::Invoke(p, r(ret), e),
+                SubOP::Accessor(p, name) => ret = AST::Accessor(p, r(ret), name.clone()),
+                SubOP::Resolver(p, name) => ret = AST::Resolver(p, r(ret), name.clone()),
             }
         }
         ret
@@ -651,7 +653,7 @@ named!(record_update(Span) -> AST,
             i: wscom!(identifier_node) >>
             wscom!(tag_word!("with")) >>
             l: wscom!(record_field_assignments) >>
-            (AST::make_record_update(Pos::new(pos), i, l))
+            (AST::RecordUpdate(Pos::new(pos), r(i), l))
         ),
         return_error!(ErrorKind::Custom(ERR_IN_LIST), tag!("}"))
     )
@@ -662,7 +664,7 @@ named!(dereference(Span) -> AST,
         pos: position!() >>
         tag!("*") >>
         a: subatomic >>
-        (AST::make_deref(Pos::new(pos), a))
+        (AST::Deref(Pos::new(pos), r(a)))
     )
 );
 
@@ -670,7 +672,7 @@ named!(identifier_node(Span) -> AST,
     do_parse!(
         pos: position!() >>
         i: identifier >>
-        (AST::make_ident(Pos::new(pos), i))
+        (AST::Identifier(Pos::new(pos), i))
     )
 );
 
@@ -681,7 +683,7 @@ named!(identifier(Span) -> Ident,
             take_while1!(is_alpha_underscore),
             take_while!(is_alphanumeric_underscore)
         )) >>
-        (Ident::from_span(s))
+        (ident_from_span(&s))
     )
 );
 
@@ -814,17 +816,17 @@ named!(literal(Span) -> AST,
 );
 
 named!(unit(Span) -> AST,
-    value!(AST::make_lit(Literal::Unit), tag_word!("()"))
+    value!(AST::Literal(Literal::Unit), tag_word!("()"))
 );
 
 named!(nil(Span) -> AST,
-    value!(AST::make_nil(), tag_word!("nil"))
+    value!(AST::Nil, tag_word!("nil"))
 );
 
 named!(boolean(Span) -> AST,
     alt!(
-        value!(AST::make_lit(Literal::Boolean(true)), tag_word!("true")) |
-        value!(AST::make_lit(Literal::Boolean(false)), tag_word!("false"))
+        value!(AST::Literal(Literal::Boolean(true)), tag_word!("true")) |
+        value!(AST::Literal(Literal::Boolean(false)), tag_word!("false"))
     )
 );
 
@@ -842,7 +844,7 @@ named!(escaped_character(Span) -> &[u8],
 named!(string_contents(Span) -> AST,
     map!(
         escaped_transform!(is_not!("\"\\"), '\\', escaped_character),
-        |s| AST::make_lit(Literal::String(String::from_utf8_lossy(&s).into_owned()))
+        |s| AST::Literal(Literal::String(String::from_utf8_lossy(&s).into_owned()))
     )
 );
 
@@ -851,7 +853,7 @@ named!(string(Span) -> AST,
         tag!("\""),
         alt!(
             string_contents |
-            value!(AST::make_lit(Literal::String(String::new())), tag!(""))
+            value!(AST::Literal(Literal::String(String::new())), tag!(""))
         ),
         tag!("\"")
     )
@@ -868,16 +870,16 @@ named!(character(Span) -> AST,
             ),
             tag!("\'")
         ),
-        |c| AST::make_lit(Literal::Character(c))
+        |c| AST::Literal(Literal::Character(c))
     )
 );
 
 
 named!(number(Span) -> AST,
     alt_complete!(
-        value!(AST::make_lit(Literal::Real(std::f64::NEG_INFINITY)), tag_word!("-Inf")) |
-        value!(AST::make_lit(Literal::Real(std::f64::INFINITY)), tag_word!("Inf")) |
-        value!(AST::make_lit(Literal::Real(std::f64::NAN)), tag_word!("NaN")) |
+        value!(AST::Literal(Literal::Real(std::f64::NEG_INFINITY)), tag_word!("-Inf")) |
+        value!(AST::Literal(Literal::Real(std::f64::INFINITY)), tag_word!("Inf")) |
+        value!(AST::Literal(Literal::Real(std::f64::NAN)), tag_word!("NaN")) |
         oct_number |
         hex_number |
         int_or_float_number
@@ -887,14 +889,14 @@ named!(number(Span) -> AST,
 named!(hex_number(Span) -> AST,
     map!(
         preceded!(tag!("0x"), hex_digit),
-        |s| AST::make_lit(Literal::Integer(isize::from_str_radix(str::from_utf8(&s.fragment).unwrap(), 16).unwrap()))
+        |s| AST::Literal(Literal::Integer(isize::from_str_radix(str::from_utf8(&s.fragment).unwrap(), 16).unwrap()))
     )
 );
 
 named!(oct_number(Span) -> AST,
     map!(
         preceded!(tag!("0"), oct_digit),
-        |s| AST::make_lit(Literal::Integer(isize::from_str_radix(str::from_utf8(&s.fragment).unwrap(), 8).unwrap()))
+        |s| AST::Literal(Literal::Integer(isize::from_str_radix(str::from_utf8(&s.fragment).unwrap(), 8).unwrap()))
     )
 );
 
@@ -916,9 +918,9 @@ impl AST {
     fn number_from_utf8(s : &[u8]) -> Self {
         let n = str::from_utf8(s).unwrap();
         if let Ok(i) = isize::from_str_radix(n, 10) {
-            AST::make_lit(Literal::Integer(i))
+            AST::Literal(Literal::Integer(i))
         } else {
-            AST::make_lit(Literal::Real(f64::from_str(n).unwrap()))
+            AST::Literal(Literal::Real(f64::from_str(n).unwrap()))
         }
     }
 }
@@ -931,7 +933,7 @@ named!(tuple(Span) -> AST,
             wscom!(separated_list_complete!(wscom!(tag!(",")), expression)),
             tag!(")")
         ) >>
-        (AST::make_tuple(Pos::new(pos), l))
+        (AST::Tuple(Pos::new(pos), l))
     )
 );
 
@@ -943,7 +945,7 @@ named!(record(Span) -> AST,
             wscom!(record_field_assignments),
             return_error!(ErrorKind::Custom(ERR_IN_LIST), tag!("}"))
         ) >>
-        (AST::make_record(Pos::new(pos), l))
+        (AST::Record(Pos::new(pos), l))
     )
 );
 
@@ -964,7 +966,7 @@ named!(list(Span) -> AST,
             wscom!(separated_list_complete!(wscom!(tag!(",")), expression)),
             tag!("]")
         ) >>
-        (AST::make_list(Pos::new(pos), l))
+        (AST::List(Pos::new(pos), l))
     )
 );
 
@@ -993,10 +995,11 @@ named!(not_reserved(Span) -> (),
 
 named!(pattern(Span) -> Pattern,
     do_parse!(
+        pos: position!() >>
         p: pattern_atomic >>
         a: opt!(preceded!(wscom!(tag!(":")), type_description)) >>
         (match a {
-            Some(ty) => Pattern::Annotation(NodeID::generate(), ty, r(p)),
+            Some(ty) => Pattern::new(Pos::new(pos), PatKind::Annotation(ty, r(p))),
             None => p,
         })
     )
@@ -1004,7 +1007,7 @@ named!(pattern(Span) -> Pattern,
 
 named!(pattern_atomic(Span) -> Pattern,
     alt_complete!(
-        value!(Pattern::Wild, tag!("_")) |
+        value!(Pattern::new(Pos::empty(), PatKind::Wild), tag!("_")) |
         pattern_literal |
         pattern_enum_variant |
         pattern_tuple |
@@ -1021,23 +1024,25 @@ named!(pattern_literal(Span) -> Pattern,
         string |
         character |
         number
-    ), |l| Pattern::Literal(NodeID::generate(), l))
+    ), |l| Pattern::new(Pos::empty(), PatKind::Literal(l.get_literal())))
 );
 
 named!(pattern_binding(Span) -> Pattern,
-    map!(identifier, |i| Pattern::Binding(NodeID::generate(), i))
+    map!(identifier, |i| Pattern::new(Pos::empty(), PatKind::Binding(i)))
 );
 
 named!(pattern_resolve(Span) -> Pattern,
     do_parse!(
+        pos: position!() >>
         left: identifier >>
         operations: many1!(preceded!(tag!("::"), identifier)) >>
-        (operations.into_iter().fold(Pattern::Identifier(NodeID::generate(), left), |acc, i| Pattern::Resolve(NodeID::generate(), r(acc), i, NodeID::generate())))
+        (operations.into_iter().fold(Pattern::new(Pos::new(pos), PatKind::Identifier(left)), |acc, i| Pattern::new(Pos::new(pos), PatKind::Resolve(r(acc), i, NodeID::generate()))))
     )
 );
 
 named!(pattern_enum_variant(Span) -> Pattern,
     do_parse!(
+        pos: position!() >>
         p: pattern_resolve >>
         o: opt!(delimited!(
             tag!("("),
@@ -1046,30 +1051,32 @@ named!(pattern_enum_variant(Span) -> Pattern,
         )) >>
         (match o {
             None => p,
-            Some(l) => Pattern::EnumArgs(NodeID::generate(), r(p), l)
+            Some(l) => Pattern::new(Pos::new(pos), PatKind::EnumArgs(r(p), l))
         })
     )
 );
 
 named!(pattern_tuple(Span) -> Pattern,
     do_parse!(
+        pos: position!() >>
         l: delimited!(
             tag!("("),
             wscom!(separated_list_complete!(wscom!(tag!(",")), pattern)),
             tag!(")")
         ) >>
-        (Pattern::Tuple(NodeID::generate(), l))
+        (Pattern::new(Pos::new(pos), PatKind::Tuple(l)))
     )
 );
 
 named!(pattern_record(Span) -> Pattern,
     do_parse!(
+        pos: position!() >>
         l: delimited!(
             tag!("{"),
             wscom!(pattern_record_field_assignments),
             return_error!(ErrorKind::Custom(ERR_IN_LIST), tag!("}"))
         ) >>
-        (Pattern::Record(NodeID::generate(), l))
+        (Pattern::new(Pos::new(pos), PatKind::Record(l)))
     )
 );
 
@@ -1164,6 +1171,12 @@ pub fn is_alpha_underscore(ch: u8) -> bool {
 
 pub fn is_alphanumeric_underscore(ch: u8) -> bool {
     ch == b'_' || is_alphanumeric(ch)
+}
+
+pub fn ident_from_span(span: &Span) -> Ident {
+    Ident {
+        name: String::from(str::from_utf8(&span.fragment).unwrap()),
+    }
 }
 
 

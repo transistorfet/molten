@@ -3,7 +3,7 @@ use std::rc::Rc;
 
 use defs::Def;
 use types::Type;
-use ast::{ NodeID, Mutability };
+use hir::{ NodeID, Mutability };
 use scope::{ Scope, ScopeRef };
 use session::{ Session, Error };
 

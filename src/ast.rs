@@ -6,9 +6,8 @@ use abi::ABI;
 use types::Type;
 use parser::Span;
 use misc::{ R, r, UniqueID };
+use hir::{ Visibility, Mutability, AssignType, Literal, Ident, Argument, ClassSpec, MatchCase, EnumVariant, Pattern, PatKind, Expr, ExprKind };
 
-
-pub type NodeID = UniqueID;
 
 #[derive(Clone, PartialEq)]
 pub struct Pos {
@@ -18,128 +17,48 @@ pub struct Pos {
     pub filenum: u16,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub enum Visibility {
-    Private,
-    Public,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub enum Mutability {
-    Immutable,
-    Mutable,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub enum AssignType {
-    Initialize,
-    Update,
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub enum Literal {
-    Unit,
-    Boolean(bool),
-    Character(i32),
-    Integer(isize),
-    Real(f64),
-    String(String),
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub struct Ident {
-    pub name: String,
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub struct Argument {
-    pub id: NodeID,
-    pub pos: Pos,
-    pub ident: Ident,
-    pub ttype: Option<Type>,
-    pub default: Option<AST>
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub struct ClassSpec {
-    pub pos: Pos,
-    pub ident: Ident,
-    pub types: Vec<Type>,
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub struct MatchCase {
-    pub id: NodeID,
-    pub pat: Pattern,
-    pub body: AST,
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub enum Pattern {
-    Wild,
-    Literal(NodeID, AST),
-    Binding(NodeID, Ident),
-    Annotation(NodeID, Type, R<Pattern>),
-    Identifier(NodeID, Ident),
-    Resolve(NodeID, R<Pattern>, Ident, NodeID),
-    EnumArgs(NodeID, R<Pattern>, Vec<Pattern>),
-    Tuple(NodeID, Vec<Pattern>),
-    Record(NodeID, Vec<(Ident, Pattern)>),
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub struct EnumVariant {
-    pub id: NodeID,
-    pub pos: Pos,
-    pub ident: Ident,
-    pub ttype: Option<Type>,
-}
-
-
 #[derive(Clone, Debug, PartialEq)]
 pub enum AST {
-    Literal(NodeID, Literal),
-    Nil(NodeID),
-    PtrCast(NodeID, Type, R<AST>),
-    Ref(NodeID, Pos, R<AST>),
-    Deref(NodeID, Pos, R<AST>),
+    Literal(Literal),
+    Nil,
+    PtrCast(Type, R<AST>),
+    Ref(Pos, R<AST>),
+    Deref(Pos, R<AST>),
 
-    List(NodeID, Pos, Vec<AST>),
-    Tuple(NodeID, Pos, Vec<AST>),
-    Record(NodeID, Pos, Vec<(Ident, AST)>),
-    RecordUpdate(NodeID, Pos, R<AST>, Vec<(Ident, AST)>),
+    List(Pos, Vec<AST>),
+    Tuple(Pos, Vec<AST>),
+    Record(Pos, Vec<(Ident, AST)>),
+    RecordUpdate(Pos, R<AST>, Vec<(Ident, AST)>),
 
-    GetValue(NodeID),
-    Identifier(NodeID, Pos, Ident),
-    Index(NodeID, Pos, R<AST>, R<AST>),
-    Resolver(NodeID, Pos, R<AST>, Ident, NodeID),
-    Accessor(NodeID, Pos, R<AST>, Ident, NodeID),
+    Identifier(Pos, Ident),
+    Index(Pos, R<AST>, R<AST>),
+    Resolver(Pos, R<AST>, Ident),
+    Accessor(Pos, R<AST>, Ident),
 
-    Block(NodeID, Pos, Vec<AST>),
-    Invoke(NodeID, Pos, R<AST>, Vec<AST>),
-    //Prefix(NodeID, Pos, Ident, R<AST>),
-    //Infix(NodeID, Pos, Ident, R<AST>, R<AST>),
+    Block(Pos, Vec<AST>),
+    Invoke(Pos, R<AST>, Vec<AST>),
+    //Prefix(Pos, Ident, R<AST>),
+    //Infix(Pos, Ident, R<AST>, R<AST>),
 
-    SideEffect(NodeID, Pos, Ident, Vec<AST>),
-    If(NodeID, Pos, R<AST>, R<AST>, R<AST>),
-    Raise(NodeID, Pos, R<AST>),
-    Try(NodeID, Pos, R<AST>, Vec<MatchCase>),
-    Match(NodeID, Pos, R<AST>, Vec<MatchCase>),
-    For(NodeID, Pos, Ident, R<AST>, R<AST>),
-    While(NodeID, Pos, R<AST>, R<AST>),
+    SideEffect(Pos, Ident, Vec<AST>),
+    If(Pos, R<AST>, R<AST>, R<AST>),
+    Raise(Pos, R<AST>),
+    Try(Pos, R<AST>, Vec<(Pattern, AST)>),
+    Match(Pos, R<AST>, Vec<(Pattern, AST)>),
+    For(Pos, Ident, R<AST>, R<AST>),
+    While(Pos, R<AST>, R<AST>),
 
-    Declare(NodeID, Pos, Visibility, Ident, Type),
-    Function(NodeID, Pos, Visibility, Option<Ident>, Vec<Argument>, Option<Type>, R<AST>, ABI),
-    New(NodeID, Pos, ClassSpec),
-    Class(NodeID, Pos, ClassSpec, Option<ClassSpec>, Vec<AST>),
-    TypeAlias(NodeID, Pos, ClassSpec, Type),
-    Enum(NodeID, Pos, ClassSpec, Vec<EnumVariant>),
+    Declare(Pos, Visibility, Ident, Type),
+    Function(Pos, Visibility, Option<Ident>, Vec<Argument>, Option<Type>, R<AST>, ABI),
+    New(Pos, ClassSpec),
+    Class(Pos, ClassSpec, Option<ClassSpec>, Vec<AST>),
+    TypeAlias(Pos, ClassSpec, Type),
+    Enum(Pos, ClassSpec, Vec<EnumVariant>),
 
-    Import(NodeID, Pos, Ident, Vec<AST>),
-    Definition(NodeID, Pos, Mutability, Ident, Option<Type>, R<AST>),
-    Assignment(NodeID, Pos, R<AST>, R<AST>, AssignType),
+    Import(Pos, Ident, Vec<AST>),
+    Definition(Pos, Mutability, Ident, Option<Type>, R<AST>),
+    Assignment(Pos, R<AST>, R<AST>, AssignType),
 }
-
 
 
 impl Pos {
@@ -175,316 +94,54 @@ impl fmt::Debug for Pos {
 }
 
 
-impl Ident {
-    pub fn new(name: String) -> Self {
-        Ident {
-            name: name
-        }
-    }
-
-    pub fn from_str(name: &str) -> Ident {
-        Ident {
-            name: String::from(name),
-        }
-    }
-
-    pub fn from_span(span: Span) -> Ident {
-        Ident {
-            name: String::from(str::from_utf8(&span.fragment).unwrap()),
-        }
-    }
-
-    pub fn as_str(&self) -> &str {
-        self.name.as_str()
-    }
-}
-
-impl Argument {
-    pub fn new(pos: Pos, ident: Ident, ttype: Option<Type>, default: Option<AST>) -> Self {
-        Argument {
-            id: NodeID::generate(),
-            pos: pos,
-            ident: ident,
-            ttype: ttype,
-            default: default
-        }
-    }
-}
-
-impl ClassSpec {
-    pub fn new(pos: Pos, ident: Ident, types: Vec<Type>) -> Self {
-        ClassSpec {
-            pos: pos,
-            ident: ident,
-            types: types
-        }
-    }
-
-    pub fn from_str(name: &str) -> Self {
-        Self::new(Pos::empty(), Ident::from_str(name), vec!())
-    }
-}
-
-impl MatchCase {
-    pub fn new(pat: Pattern, body: AST) -> Self {
-        Self {
-            id: NodeID::generate(),
-            pat: pat,
-            body: body,
-        }
-    }
-}
-
-impl Pattern {
-    pub fn get_id(&self) -> NodeID {
-        match *self {
-            Pattern::Literal(id, _) |
-            Pattern::Binding(id, _) |
-            Pattern::Annotation(id, _, _) |
-            Pattern::Identifier(id, _) |
-            Pattern::Resolve(id, _, _, _) |
-            Pattern::EnumArgs(id, _, _) => id,
-            _ => UniqueID(0),
-        }
-    }
-}
-
-impl EnumVariant {
-    pub fn new(pos: Pos, ident: Ident, ttype: Option<Type>) -> Self {
-        Self {
-            id: NodeID::generate(),
-            pos: pos,
-            ident: ident,
-            ttype: ttype,
-        }
-    }
-}
-
-
 impl AST {
     pub fn get_pos(&self) -> Pos {
         match *self {
-            AST::Ref(_, ref pos, _) |
-            AST::Deref(_, ref pos, _) |
-            AST::List(_, ref pos, _) |
-            AST::Tuple(_, ref pos, _) |
-            AST::Record(_, ref pos, _) |
-            AST::RecordUpdate(_, ref pos, _, _) |
-            AST::Identifier(_, ref pos, _) |
-            AST::Index(_, ref pos, _, _) |
-            AST::Resolver(_, ref pos, _, _, _) |
-            AST::Accessor(_, ref pos, _, _, _) |
-            AST::Invoke(_, ref pos, _, _) |
-            AST::SideEffect(_, ref pos, _, _) |
-            AST::Block(_, ref pos, _) |
-            AST::If(_, ref pos, _, _, _) |
-            AST::Raise(_, ref pos, _) |
-            AST::Try(_, ref pos, _, _) |
-            AST::Match(_, ref pos, _, _) |
-            AST::For(_, ref pos, _, _, _) |
-            AST::Declare(_, ref pos, _, _, _) |
-            AST::Function(_, ref pos, _, _, _, _, _, _) |
-            AST::New(_, ref pos, _) |
-            AST::Class(_, ref pos, _, _, _) |
-            AST::Import(_, ref pos, _, _) |
-            AST::Definition(_, ref pos, _, _, _, _) |
-            AST::Assignment(_, ref pos, _, _, _) |
-            AST::While(_, ref pos, _, _) |
-            AST::TypeAlias(_, ref pos, _, _) |
-            AST::Enum(_, ref pos, _, _) => { pos.clone() }
+            AST::Ref(ref pos, _) |
+            AST::Deref(ref pos, _) |
+            AST::List(ref pos, _) |
+            AST::Tuple(ref pos, _) |
+            AST::Record(ref pos, _) |
+            AST::RecordUpdate(ref pos, _, _) |
+            AST::Identifier(ref pos, _) |
+            AST::Index(ref pos, _, _) |
+            AST::Resolver(ref pos, _, _) |
+            AST::Accessor(ref pos, _, _) |
+            AST::Invoke(ref pos, _, _) |
+            AST::SideEffect(ref pos, _, _) |
+            AST::Block(ref pos, _) |
+            AST::If(ref pos, _, _, _) |
+            AST::Raise(ref pos, _) |
+            AST::Try(ref pos, _, _) |
+            AST::Match(ref pos, _, _) |
+            AST::For(ref pos, _, _, _) |
+            AST::Declare(ref pos, _, _, _) |
+            AST::Function(ref pos, _, _, _, _, _, _) |
+            AST::New(ref pos, _) |
+            AST::Class(ref pos, _, _, _) |
+            AST::Import(ref pos, _, _) |
+            AST::Definition(ref pos, _, _, _, _) |
+            AST::Assignment(ref pos, _, _, _) |
+            AST::While(ref pos, _, _) |
+            AST::TypeAlias(ref pos, _, _) |
+            AST::Enum(ref pos, _, _) => { pos.clone() }
             _ => Pos::empty(),
         }
     }
 
-    pub fn get_id(&self) -> NodeID {
-        match *self {
-            AST::Literal(ref id, _) |
-            AST::Nil(ref id) |
-            AST::PtrCast(ref id, _, _) |
-            AST::Ref(ref id, _, _) |
-            AST::Deref(ref id, _, _) |
-            AST::List(ref id, _, _) |
-            AST::Tuple(ref id, _, _) |
-            AST::Record(ref id, _, _) |
-            AST::RecordUpdate(ref id, _, _, _) |
-            AST::Identifier(ref id, _, _) |
-            AST::Index(ref id, _, _, _) |
-            AST::Resolver(ref id, _, _, _, _) |
-            AST::Accessor(ref id, _, _, _, _) |
-            AST::Invoke(ref id, _, _, _) |
-            AST::SideEffect(ref id, _, _, _) |
-            AST::Block(ref id, _, _) |
-            AST::If(ref id, _, _, _, _) |
-            AST::Raise(ref id, _, _) |
-            AST::Try(ref id, _, _, _) |
-            AST::Match(ref id, _, _, _) |
-            AST::For(ref id, _, _, _, _) |
-            AST::Declare(ref id, _, _, _, _) |
-            AST::Function(ref id, _, _, _, _, _, _, _) |
-            AST::New(ref id, _, _) |
-            AST::Class(ref id, _, _, _, _) |
-            AST::Import(ref id, _, _, _) |
-            AST::Definition(ref id, _, _, _, _, _) |
-            AST::Assignment(ref id, _, _, _, _) |
-            AST::While(ref id, _, _, _) |
-            AST::Enum(ref id, _, _, _) |
-            AST::TypeAlias(ref id, _, _, _) => { *id }
-            _ => UniqueID(0),
+    pub fn get_literal(self) -> Literal {
+        match self {
+            AST::Literal(lit) => lit,
+            _ => panic!("Expected AST::Literal\n"),
         }
-    }
-
-    pub fn make_ptr_cast(ttype: Type, expr: AST) -> AST {
-        AST::PtrCast(NodeID::generate(), ttype, r(expr))
-    }
-
-    pub fn make_ref(pos: Pos, expr: AST) -> AST {
-        AST::Ref(NodeID::generate(), pos, r(expr))
-    }
-
-    pub fn make_deref(pos: Pos, expr: AST) -> AST {
-        AST::Deref(NodeID::generate(), pos, r(expr))
-    }
-
-    pub fn make_lit(literal: Literal) -> AST {
-        AST::Literal(NodeID::generate(), literal)
-    }
-
-    pub fn make_nil() -> AST {
-        AST::Nil(NodeID::generate())
-    }
-
-    pub fn make_list(pos: Pos, items: Vec<AST>) -> AST {
-        AST::List(NodeID::generate(), pos, items)
-    }
-
-    pub fn make_tuple(pos: Pos, items: Vec<AST>) -> AST {
-        AST::Tuple(NodeID::generate(), pos, items)
-    }
-
-    pub fn make_record(pos: Pos, items: Vec<(Ident, AST)>) -> AST {
-        AST::Record(NodeID::generate(), pos, items)
-    }
-
-    pub fn make_record_update(pos: Pos, record: AST, items: Vec<(Ident, AST)>) -> AST {
-        AST::RecordUpdate(NodeID::generate(), pos, r(record), items)
-    }
-
-    pub fn make_ident(pos: Pos, ident: Ident) -> AST {
-        AST::Identifier(NodeID::generate(), pos, ident)
     }
 
     pub fn make_ident_from_str(pos: Pos, name: &str) -> AST {
-        AST::Identifier(NodeID::generate(), pos, Ident::from_str(name))
+        AST::Identifier(pos, Ident::from_str(name))
     }
 
-    pub fn make_index(pos: Pos, list: AST, index: AST) -> AST {
-        AST::Index(NodeID::generate(), pos, r(list), r(index))
+    pub fn make_resolve_ident(pos: Pos, ident: Ident, field: &str) -> AST {
+        AST::Resolver(pos.clone(), r(AST::Identifier(pos, ident)), Ident::from_str(field))
     }
-
-    pub fn make_resolve(pos: Pos, object: AST, ident: Ident) -> AST {
-        AST::Resolver(NodeID::generate(), pos, r(object), ident, NodeID::generate())
-    }
-
-    pub fn make_access(pos: Pos, object: AST, ident: Ident) -> AST {
-        AST::Accessor(NodeID::generate(), pos, r(object), ident, NodeID::generate())
-    }
-
-    pub fn make_invoke(pos: Pos, fexpr: AST, args: Vec<AST>) -> AST {
-        AST::Invoke(NodeID::generate(), pos, r(fexpr), args)
-    }
-
-    pub fn make_side_effect(pos: Pos, ident: Ident, args: Vec<AST>) -> AST {
-        AST::SideEffect(NodeID::generate(), pos, ident, args)
-    }
-
-    pub fn make_block(pos: Pos, body: Vec<AST>) -> AST {
-        AST::Block(NodeID::generate(), pos, body)
-    }
-
-    pub fn make_if(pos: Pos, cond: AST, texpr: AST, fexpr: AST) -> AST {
-        AST::If(NodeID::generate(), pos, r(cond), r(texpr), r(fexpr))
-    }
-
-    pub fn make_raise(pos: Pos, expr: AST) -> AST {
-        AST::Raise(NodeID::generate(), pos, r(expr))
-    }
-
-    pub fn make_try(pos: Pos, cond: AST, cases: Vec<MatchCase>) -> AST {
-        AST::Try(NodeID::generate(), pos, r(cond), cases)
-    }
-
-    pub fn make_match(pos: Pos, cond: AST, cases: Vec<MatchCase>) -> AST {
-        AST::Match(NodeID::generate(), pos, r(cond), cases)
-    }
-
-    pub fn make_for(pos: Pos, ident: Ident, list: AST, body: AST) -> AST {
-        AST::For(NodeID::generate(), pos, ident, r(list), r(body))
-    }
-
-    pub fn make_decl(pos: Pos, vis: Visibility, ident: Ident, ttype: Type) -> AST {
-        AST::Declare(NodeID::generate(), pos, vis, ident, ttype)
-    }
-
-    pub fn make_func(pos: Pos, vis: Visibility, ident: Option<Ident>, args: Vec<Argument>, rtype: Option<Type>, body: AST, abi: ABI) -> AST {
-        AST::Function(NodeID::generate(), pos, vis, ident, args, rtype, r(body), abi)
-    }
-
-    pub fn make_new(pos: Pos, classspec: ClassSpec) -> AST {
-        AST::New(NodeID::generate(), pos, classspec)
-    }
-
-    pub fn make_class(pos: Pos, classspec: ClassSpec, parentspec: Option<ClassSpec>, body: Vec<AST>) -> AST {
-        AST::Class(NodeID::generate(), pos, classspec, parentspec, body)
-    }
-
-    pub fn make_import(pos: Pos, ident: Ident, decls: Vec<AST>) -> AST {
-        AST::Import(NodeID::generate(), pos, ident, decls)
-    }
-
-    pub fn make_def(pos: Pos, mutable: Mutability, ident: Ident, ttype: Option<Type>, value: AST) -> AST {
-        AST::Definition(NodeID::generate(), pos, mutable, ident, ttype, r(value))
-    }
-
-    pub fn make_assign(pos: Pos, left: AST, right: AST, ty: AssignType) -> AST {
-        AST::Assignment(NodeID::generate(), pos, r(left), r(right), ty)
-    }
-
-    pub fn make_while(pos: Pos, cond: AST, body: AST) -> AST {
-        AST::While(NodeID::generate(), pos, r(cond), r(body))
-    }
-
-    pub fn make_type_alias(pos: Pos, classspec: ClassSpec, ttype: Type) -> AST {
-        AST::TypeAlias(NodeID::generate(), pos, classspec, ttype)
-    }
-
-    pub fn make_type_enum(pos: Pos, classspec: ClassSpec, variants: Vec<EnumVariant>) -> AST {
-        AST::Enum(NodeID::generate(), pos, classspec, variants)
-    }
-
-    /*
-    pub fn set_id(self, id: NodeID) -> Self {
-        self.id = id;
-        self
-    }
-
-    pub fn set_pos(self, pos: Pos) -> Self {
-        self.pos = pos;
-        self
-    }
-
-    pub fn set_span(self, span: Span) -> Self {
-        self.pos = Pos::new(span);
-        self
-    }
-
-    pub fn mk_ident(ident: Ident) -> Self {
-        AST::Identifier(Pos::empty(), ident);
-        AST {
-            id: UniqueID::generate(),
-            pos: Pos::empty(),
-            kind: ASTKind::Ident(ident),
-        }
-    }
-    */
 }
 
