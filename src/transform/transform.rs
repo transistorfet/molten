@@ -266,10 +266,6 @@ impl<'sess> Transformer<'sess> {
                 self.transform_def_local(scope.clone(), node.id, &ident.name, value)
             },
 
-            ExprKind::GetValue(id) => {
-                vec!(LLExpr::GetValue(*id))
-            },
-
             ExprKind::Identifier(ident) => {
                 let defid = self.session.get_ref(node.id).unwrap();
                 self.transform_reference(scope.clone(), defid, &ident.name)
@@ -459,11 +455,15 @@ impl<'sess> Transformer<'sess> {
         self.set_type(id, LLType::Alias(id));
     }
 
+    fn create_def_local(&self, id: NodeID, name: &String, valexpr: LLExpr) -> Vec<LLExpr> {
+        let ltype = self.transform_value_type(&self.session.get_type(id).unwrap());
+        vec!(LLExpr::DefLocal(id, name.clone(), ltype, r(valexpr)))
+    }
+
     fn transform_def_local(&self, scope: ScopeRef, id: NodeID, name: &String, value: &Expr) -> Vec<LLExpr> {
         let mut exprs = vec!();
         let valexpr = self.transform_as_result(&mut exprs, scope.clone(), value).unwrap();
-        let ltype = self.transform_value_type(&self.session.get_type(id).unwrap());
-        exprs.push(LLExpr::DefLocal(id, name.clone(), ltype, r(valexpr)));
+        exprs.extend(self.create_def_local(id, name, valexpr));
         exprs
     }
 
@@ -493,7 +493,7 @@ impl<'sess> Transformer<'sess> {
 
         let exret_id = NodeID::generate();
         exprs.push(LLExpr::SetValue(exret_id, r(LLExpr::GetItem(r(LLExpr::GetLocal(exp_id)), 1))));
-        let matchblock = self.transform_match(scope.clone(), &Expr::new_with_id(exret_id, Pos::empty(), ExprKind::GetValue(exret_id)), cases);
+        let matchblock = self.create_match(scope.clone(), LLExpr::GetValue(exret_id), cases);
 
         exprs.extend(self.create_exception_block(LLExpr::GetValue(expoint_id), tryblock, matchblock));
         exprs
@@ -1130,13 +1130,12 @@ impl<'sess> Transformer<'sess> {
         vec!(LLExpr::Phi(conds, blocks))
     }
 
-    fn transform_match(&self, scope: ScopeRef, cond: &Expr, cases: &Vec<MatchCase>) -> Vec<LLExpr> {
+    fn create_match(&self, scope: ScopeRef, condval: LLExpr, cases: &Vec<MatchCase>) -> Vec<LLExpr> {
         let mut exprs = vec!();
         let mut conds = vec!();
         let mut blocks = vec!();
 
         let condid = NodeID::generate();
-        let condval = self.transform_as_result(&mut exprs, scope.clone(), cond).unwrap();
         exprs.push(LLExpr::SetValue(condid, r(condval)));
 
         for case in cases {
@@ -1146,6 +1145,13 @@ impl<'sess> Transformer<'sess> {
         }
 
         exprs.push(LLExpr::Phi(conds, blocks));
+        exprs
+    }
+
+    fn transform_match(&self, scope: ScopeRef, cond: &Expr, cases: &Vec<MatchCase>) -> Vec<LLExpr> {
+        let mut exprs = vec!();
+        let condval = self.transform_as_result(&mut exprs, scope.clone(), cond).unwrap();
+        exprs.extend(self.create_match(scope, condval, cases));
         exprs
     }
 
@@ -1161,7 +1167,7 @@ impl<'sess> Transformer<'sess> {
                 exprs.extend(self.create_func_invoke(compabi, compfunc, vec!(LLExpr::GetValue(value_id), result)));
             },
             PatKind::Binding(ident) => {
-                exprs.extend(self.transform_def_local(scope.clone(), pat.id, &ident.name, &Expr::new_with_id(value_id, Pos::empty(), ExprKind::GetValue(value_id))));
+                exprs.extend(self.create_def_local(pat.id, &ident.name, LLExpr::GetValue(value_id)));
                 exprs.push(LLExpr::Literal(LLLit::I1(true)));
             },
             PatKind::Annotation(_, pat) => {

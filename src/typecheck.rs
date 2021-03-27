@@ -344,8 +344,6 @@ impl<'sess> TypeChecker<'sess> {
                 self.check_vec(scope.clone(), decls);
                 scope.make_obj(self.session, String::from("()"), vec!())?
             },
-
-            ExprKind::GetValue(_) => { panic!("InternalError: ast element shouldn't appear at this late phase: {:?}", node) }
         };
 
         debug!("CHECK: {:?} {:?}", rtype, node);

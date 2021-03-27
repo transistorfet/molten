@@ -112,7 +112,6 @@ pub enum ExprKind {
     Record(Vec<(Ident, Expr)>),
     RecordUpdate(R<Expr>, Vec<(Ident, Expr)>),
 
-    GetValue(NodeID),
     Identifier(Ident),
     Resolver(R<Expr>, Ident, NodeID),
     Accessor(R<Expr>, Ident, NodeID),

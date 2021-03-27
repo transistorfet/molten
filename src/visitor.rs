@@ -87,11 +87,6 @@ pub trait Visitor: Sized {
         walk_record_update(self, id, record, items)
     }
 
-
-    fn visit_get_value(&mut self, _id: NodeID) -> Result<Self::Return, Error> {
-        Ok(self.default_return())
-    }
-
     fn visit_identifier(&mut self, _id: NodeID, _ident: &Ident) -> Result<Self::Return, Error> {
         Ok(self.default_return())
     }
@@ -384,10 +379,6 @@ pub fn walk_node<R, V: Visitor<Return = R>>(visitor: &mut V, node: &Expr) -> Res
             visitor.visit_record_update(node.id, record, items)
         },
 
-
-        ExprKind::GetValue(id) => {
-            visitor.visit_get_value(*id)
-        },
 
         ExprKind::Identifier(ident) => {
             visitor.visit_identifier(node.id, ident)
