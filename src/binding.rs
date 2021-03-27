@@ -30,7 +30,7 @@ impl<'sess> NameBinder<'sess> {
         };
 
         namebinder.stack.push_scope(scope);
-        namebinder.visit_vec(code).unwrap();
+        namebinder.visit(code).unwrap();
         if session.errors.get() > 0 {
             panic!("Exiting due to previous errors");
         }

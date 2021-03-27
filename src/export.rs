@@ -2,83 +2,121 @@
 use std::fs::File;
 use std::io::prelude::*;
 
+use abi::ABI;
 use types::Type;
 use misc::UniqueID;
 use config::Options;
-use session::Session;
 use scope::{ ScopeRef };
-use hir::{ NodeID, Visibility, Mutability, Expr, ExprKind };
+use session::{ Session, Error };
+use visitor::{ self, Visitor, ScopeStack };
+use hir::{ NodeID, Visibility, Mutability, Ident, ClassSpec, Argument, Expr, ExprKind };
 
 
 pub fn write_exports(session: &Session, scope: ScopeRef, filename: &str, code: &Vec<Expr>) {
-    let declarations_text = build_declarations(session, scope, code);
+    let mut collector = ExportsCollector::new(session, scope);
+    collector.visit(code).unwrap();
     let mut declarations_file = File::create(filename).expect("Error creating declarations file");
-    declarations_file.write_all(declarations_text.as_bytes()).unwrap();
+    declarations_file.write_all(collector.declarations.as_bytes()).unwrap();
     if Options::as_ref().debug {
-        println!("{}", declarations_text);
+        println!("{}", collector.declarations);
     }
 }
 
-pub fn build_declarations(session: &Session, scope: ScopeRef, code: &Vec<Expr>) -> String {
-    let mut declarations = String::new();
-    for node in code {
-        build_declarations_node(&mut declarations, session, scope.clone(), node);
-    }
-    declarations
+#[derive(Clone, Debug, PartialEq)]
+pub struct ExportsCollector<'sess> {
+    pub session: &'sess Session,
+    pub stack: ScopeStack,
+    pub declarations: String,
 }
 
-fn build_declarations_node(declarations: &mut String, session: &Session, scope: ScopeRef, node: &Expr) {
-    match &node.kind {
-        ExprKind::Declare(vis, ident, _) => {
-            declarations.push_str(&emit_declaration(session, scope.clone(), node.id, *vis, &ident.name));
-        },
+impl<'sess> ExportsCollector<'sess> {
+    pub fn new(session: &'sess Session, scope: ScopeRef) -> Self {
+        let collector = ExportsCollector {
+            session: session,
+            stack: ScopeStack::new(),
+            declarations: String::new(),
+        };
 
-        ExprKind::Function(vis, ident, _, _, _, _) => {
-            if let Some(ref ident) = *ident {
-                declarations.push_str(&emit_declaration(session, scope.clone(), node.id, *vis, &ident.name));
-            }
-        },
-
-        ExprKind::Definition(_, _, _, body) => match &body.kind {
-            ExprKind::Class(_, _, _) => build_declarations_node(declarations, session, scope.clone(), node),
-            _ => { },
-        },
-
-        ExprKind::Class(classspec, parentspec, body) => {
-            let tscope = session.map.get(&node.id);
-            let namespec = unparse_type(session, tscope.clone(), Type::from_spec(classspec.clone(), UniqueID(0)));
-            let fullspec = if parentspec.is_some() {
-                format!("{} extends {}", namespec, unparse_type(session, tscope.clone(), Type::from_spec(parentspec.clone().unwrap(), UniqueID(0))))
-            } else {
-                namespec.clone()
-            };
-
-            declarations.push_str(format!("class {} {{\n", fullspec).as_str());
-            //declarations.push_str(format!("    decl __alloc__() -> {}\n", namespec).as_str());
-            //declarations.push_str(format!("    decl __init__({}) -> Nil\n", namespec).as_str());
-            for node in body {
-                match &node.kind {
-                    ExprKind::Definition(mutable, ident, _, _) => {
-                        declarations.push_str("    ");
-                        declarations.push_str(&emit_field(session, tscope.clone(), node.id, *mutable, &ident.name));
-                    },
-                    ExprKind::Declare(vis, ident, _) => {
-                        declarations.push_str("    ");
-                        declarations.push_str(&emit_declaration(session, tscope.clone(), node.id, *vis, &ident.name));
-                    },
-                    ExprKind::Function(vis, ident, _, _, _, _) => {
-                        if let Some(ref ident) = *ident {
-                            declarations.push_str("    ");
-                            declarations.push_str(&emit_declaration(session, tscope.clone(), node.id, *vis, &ident.name));
-                        }
-                    },
-                    _ => {  },
-                }
-            }
-            declarations.push_str(format!("}}\n").as_str());
-        },
-        _ => { },
+        collector.stack.push_scope(scope);
+        collector
     }
+}
+
+impl<'sess> Visitor for ExportsCollector<'sess> {
+    type Return = ();
+
+    fn default_return(&self) -> () {
+        ()
+    }
+
+    fn get_scope_stack<'a>(&'a self) -> &'a ScopeStack {
+        &self.stack
+    }
+
+    fn get_scope_by_id(&self, id: NodeID) -> ScopeRef {
+        self.session.map.get(&id)
+    }
+
+    fn handle_error(&mut self, node: &Expr, err: Error) -> Result<(), Error> {
+        self.session.print_error(err.add_pos(&node.get_pos()));
+        Ok(())
+    }
+
+    fn visit_import(&mut self, _id: NodeID, _ident: &Ident, _decls: &Vec<Expr>) -> Result<Self::Return, Error> {
+        // Don't traverse imports
+        Ok(())
+    }
+
+    fn visit_declare(&mut self, id: NodeID, vis: Visibility, ident: &Ident, _ttype: &Type) -> Result<Self::Return, Error> {
+        let scope = self.stack.get_scope();
+        self.declarations.push_str(&emit_declaration(self.session, scope.clone(), id, vis, &ident.name));
+        Ok(())
+    }
+
+    fn visit_function(&mut self, id: NodeID, vis: Visibility, ident: &Option<Ident>, _args: &Vec<Argument>, _rettype: &Option<Type>, _body: &Expr, _abi: ABI) -> Result<Self::Return, Error> {
+        if let Some(ref ident) = *ident {
+            let scope = self.stack.get_scope();
+            self.declarations.push_str(&emit_declaration(self.session, scope.clone(), id, vis, &ident.name));
+        }
+        // TODO we would walk the body here to search everything that's publically visable, but currently only top level functions are exported
+        Ok(())
+    }
+
+    fn visit_class(&mut self, id: NodeID, classspec: &ClassSpec, parentspec: &Option<ClassSpec>, body: &Vec<Expr>) -> Result<Self::Return, Error> {
+        let tscope = self.session.map.get(&id);
+        let namespec = unparse_type(self.session, tscope.clone(), Type::from_spec(classspec.clone(), UniqueID(0)));
+        let fullspec = if parentspec.is_some() {
+            format!("{} extends {}", namespec, unparse_type(self.session, tscope.clone(), Type::from_spec(parentspec.clone().unwrap(), UniqueID(0))))
+        } else {
+            namespec.clone()
+        };
+
+        self.declarations.push_str(format!("class {} {{\n", fullspec).as_str());
+        //self.declarations.push_str(format!("    decl __alloc__() -> {}\n", namespec).as_str());
+        //self.declarations.push_str(format!("    decl __init__({}) -> Nil\n", namespec).as_str());
+        for node in body {
+            match &node.kind {
+                ExprKind::Definition(mutable, ident, _, _) => {
+                    self.declarations.push_str("    ");
+                    self.declarations.push_str(&emit_field(self.session, tscope.clone(), node.id, *mutable, &ident.name));
+                },
+                ExprKind::Declare(vis, ident, _) => {
+                    self.declarations.push_str("    ");
+                    self.declarations.push_str(&emit_declaration(self.session, tscope.clone(), node.id, *vis, &ident.name));
+                },
+                ExprKind::Function(vis, ident, _, _, _, _) => {
+                    if let Some(ref ident) = *ident {
+                        self.declarations.push_str("    ");
+                        self.declarations.push_str(&emit_declaration(self.session, tscope.clone(), node.id, *vis, &ident.name));
+                    }
+                },
+                _ => {  },
+            }
+        }
+        self.declarations.push_str(format!("}}\n").as_str());
+        Ok(())
+    }
+
 }
 
 fn emit_declaration(session: &Session, scope: ScopeRef, id: NodeID, vis: Visibility, name: &String) -> String {
