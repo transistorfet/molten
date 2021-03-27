@@ -95,20 +95,20 @@ pub fn declare_builtins_node<'sess>(session: &Session, scope: ScopeRef, node: &B
 }
 
 
-pub fn initialize_builtins<'sess>(llvm: &LLVM<'sess>, transformer: &Transformer, scope: ScopeRef, entries: &Vec<BuiltinDef<'sess>>) {
+pub fn initialize_builtins<'sess>(llvm: &LLVM<'sess>, transformer: &mut Transformer, scope: ScopeRef, entries: &Vec<BuiltinDef<'sess>>) {
     unsafe {
         declare_irregular_functions(llvm);
         define_builtins_vec(llvm, transformer, ptr::null_mut(), scope.clone(), entries);
     }
 }
 
-pub unsafe fn define_builtins_vec<'sess>(llvm: &LLVM<'sess>, transformer: &Transformer, objtype: LLVMTypeRef, scope: ScopeRef, entries: &Vec<BuiltinDef<'sess>>) {
+pub unsafe fn define_builtins_vec<'sess>(llvm: &LLVM<'sess>, transformer: &mut Transformer, objtype: LLVMTypeRef, scope: ScopeRef, entries: &Vec<BuiltinDef<'sess>>) {
     for node in entries {
         define_builtins_node(llvm, transformer, objtype, scope.clone(), node);
     }
 }
 
-pub unsafe fn define_builtins_node<'sess>(llvm: &LLVM<'sess>, transformer: &Transformer, objtype: LLVMTypeRef, _scope: ScopeRef, node: &BuiltinDef<'sess>) {
+pub unsafe fn define_builtins_node<'sess>(llvm: &LLVM<'sess>, transformer: &mut Transformer, objtype: LLVMTypeRef, _scope: ScopeRef, node: &BuiltinDef<'sess>) {
     match node {
         BuiltinDef::Func(id, sname, _, func) => {
             let ftype = llvm.session.get_type(*id).unwrap();

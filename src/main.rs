@@ -137,19 +137,19 @@ fn compile_file(input: &str, output: Option<&str>) {
 
     export::write_exports(&session, session.map.get_global(), format!("{}.dec", session.target).as_str(), &code);
 
-    let transformer = transform::transform::Transformer::new(&session);
+    let mut transformer = transform::transform::Transformer::new(&session);
     transformer.initialize();
     transformer.transform_code(session.map.get_global(), &code);
     if Options::as_ref().debug {
         println!("===================");
-        println!("{:#?}", &transformer.globals.borrow());
+        println!("{:#?}", &transformer.globals);
         println!("===================");
     }
 
     let llvm = llvm::codegen::LLVM::new(&session);
     llvm.initialize();
-    llvm::lib::initialize_builtins(&llvm, &transformer, session.map.get_global(), &builtins);
-    llvm.build_module(&transformer.globals.borrow());
+    llvm::lib::initialize_builtins(&llvm, &mut transformer, session.map.get_global(), &builtins);
+    llvm.build_module(&transformer.globals);
     llvm.optimize(Options::as_ref().optlevel);
     llvm.print_module();
 
