@@ -22,7 +22,7 @@ use self::llvm_sys::transforms::pass_manager_builder::*;
 use hir::NodeID;
 use config::Options;
 use session::Session;
-use misc::{ UniqueID, r };
+use misc::{ UniqueID };
 
 use transform::llcode::{ LLType, LLLit, LLRef, LLCmpType, LLLink, LLCC, LLExpr, LLGlobal, LLBlock };
 

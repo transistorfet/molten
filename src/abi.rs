@@ -98,11 +98,11 @@ pub fn molten_mangle_name(name: &str, argtypes: &Type, funcdefs: i32) -> String 
 }
 
 pub fn molten_mangle_type(ttype: &Type) -> String {
-    match *ttype {
+    match ttype {
         // TODO add type paramaters into name
         Type::Variable(_, _, _) => format!("V"),
-        Type::Object(ref name, _, ref types) => format!("N{}{}", name.len(), name),
-        Type::Tuple(ref types) => {
+        Type::Object(name, _, _types) => format!("N{}{}", name.len(), name),
+        Type::Tuple(types) => {
             let mut tuple = String::from("");
             for ttype in types {
                 tuple = tuple + &molten_mangle_type(ttype);

@@ -381,7 +381,7 @@ impl<'sess> TypeChecker<'sess> {
                 let etype = self.check_pattern(scope.clone(), pat, ttype.clone())?;
                 expect_type(self.session, scope, ttype, Some(etype), Check::Def)
             },
-            PatKind::Resolve(left, field, oid) => {
+            PatKind::Resolve(_left, field, oid) => {
                 let ltype = self.session.get_type_from_ref(*oid).unwrap();
 
                 let vars = self.session.get_def(ltype.get_id()?)?.get_vars()?;

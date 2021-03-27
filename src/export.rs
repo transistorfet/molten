@@ -103,7 +103,7 @@ pub fn unparse_type(session: &Session, scope: ScopeRef, ttype: Type) -> String {
             let params = if types.len() > 0 { format!("<{}>", types.iter().map(|p| unparse_type(session, scope.clone(), p.clone())).collect::<Vec<String>>().join(", ")) } else { String::from("") };
             name.clone() + &params
         },
-        Type::Variable(name, id, _) => {
+        Type::Variable(name, _id, _) => {
             /*
             // TODO this doesn't work because if a name isnt' found, then all tyyevars with that id are made independent
             let var = scope.find_type(session, &name);

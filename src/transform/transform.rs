@@ -13,7 +13,7 @@ use config::Options;
 use session::Session;
 use scope::{ Scope, ScopeRef };
 use ast::{ Pos };
-use hir::{ NodeID, Visibility, Mutability, AssignType, Literal, Ident, Argument, ClassSpec, MatchCase, Pattern, PatKind, Expr, ExprKind };
+use hir::{ NodeID, Visibility, Mutability, Literal, Ident, Argument, MatchCase, Pattern, PatKind, Expr, ExprKind };
 
 use defs::functions::{ FuncDef, ClosureDefRef };
 use defs::classes::{ ClassDefRef, StructDefRef, Define, Vtable };
@@ -176,7 +176,7 @@ impl<'sess> Transformer<'sess> {
         run_id
     }
 
-    pub fn build_main_func(&self, scope: ScopeRef, run_id: NodeID) {
+    pub fn build_main_func(&self, _scope: ScopeRef, run_id: NodeID) {
         let main_id = NodeID::generate();
         let main_ltype = LLType::Function(vec!(), r(LLType::I64));
         let mut main_body = vec!();
@@ -357,8 +357,6 @@ impl<'sess> Transformer<'sess> {
 
 
             ExprKind::TypeAlias(_, _) => { /* Nothing Needs To Be Done */ vec!() }
-
-            _ => panic!("Not Implemented: {:?}", node),
         }
     }
 
@@ -403,7 +401,7 @@ impl<'sess> Transformer<'sess> {
         exprs
     }
 
-    fn transform_enum_def(&self, scope: ScopeRef, id: NodeID, name: &String) -> Vec<LLExpr> {
+    fn transform_enum_def(&self, _scope: ScopeRef, id: NodeID, name: &String) -> Vec<LLExpr> {
         let selector = LLType::I8;
         let enumdef = self.session.get_def(id).unwrap().as_enum().unwrap();
 
@@ -435,13 +433,12 @@ impl<'sess> Transformer<'sess> {
 
             let mut params = vec!();
             let mut tuple_items = vec!();
-            for (i, arg) in argtypes.as_vec().iter().enumerate() {
+            for (i, _) in argtypes.as_vec().iter().enumerate() {
                 let arg_id = NodeID::generate();
                 tuple_items.push(LLExpr::GetValue(arg_id));
                 params.push((arg_id, format!("value{}", i)));
             }
 
-            let tuple_id = NodeID::generate();
             let body = vec!(LLExpr::DefStruct(NodeID::generate(), self.get_type(struct_id).unwrap(), vec!(
                 LLExpr::Literal(LLLit::I8(variant as i8)),
                 LLExpr::DefStruct(NodeID::generate(), self.transform_value_type(argtypes), tuple_items)
@@ -517,7 +514,7 @@ impl<'sess> Transformer<'sess> {
         exprs
     }
 
-    fn transform_raise(&self, scope: ScopeRef, id: NodeID, valexpr: &Expr) -> Vec<LLExpr> {
+    fn transform_raise(&self, scope: ScopeRef, _id: NodeID, valexpr: &Expr) -> Vec<LLExpr> {
         let mut exprs = vec!();
         let exp_id = self.get_exception().unwrap();
         let value = self.transform_as_result(&mut exprs, scope.clone(), valexpr).unwrap();
@@ -622,7 +619,7 @@ impl<'sess> Transformer<'sess> {
         LLType::Function(argtypes, r(rettype))
     }
 
-    fn transform_cfunc_decl(&self, scope: ScopeRef, id: NodeID, vis: Visibility, name: &String, ttype: &Type) -> Vec<LLExpr> {
+    fn transform_cfunc_decl(&self, scope: ScopeRef, id: NodeID, _vis: Visibility, name: &String, _ttype: &Type) -> Vec<LLExpr> {
         let fname = self.transform_func_name(scope.clone(), Some(name), id);
         let ftype = self.session.get_type(id).unwrap();
         let (argtypes, rettype, _) = ftype.get_function_types().unwrap();
@@ -652,7 +649,7 @@ impl<'sess> Transformer<'sess> {
         vec!(LLExpr::GetValue(id))
     }
 
-    fn transform_cfunc_invoke(&self, scope: ScopeRef, id: NodeID, func: &Expr, args: &Vec<Expr>) -> Vec<LLExpr> {
+    fn transform_cfunc_invoke(&self, scope: ScopeRef, _id: NodeID, func: &Expr, args: &Vec<Expr>) -> Vec<LLExpr> {
         let mut exprs = vec!();
 
         let mut fargs = self.transform_as_args(&mut exprs, scope.clone(), args);
@@ -698,7 +695,7 @@ impl<'sess> Transformer<'sess> {
         }
     }
 
-    fn convert_mfunc_def_args(&self, fscope: ScopeRef, exp_id: NodeID, fargs: &mut Vec<(NodeID, String)>) {
+    fn convert_mfunc_def_args(&self, _fscope: ScopeRef, exp_id: NodeID, fargs: &mut Vec<(NodeID, String)>) {
         fargs.push((exp_id, String::from("__exception__")));
     }
 
@@ -723,7 +720,7 @@ impl<'sess> Transformer<'sess> {
         vec!(LLExpr::GetValue(id))
     }
 
-    fn transform_mfunc_invoke(&self, scope: ScopeRef, id: NodeID, func: &Expr, args: &Vec<Expr>) -> Vec<LLExpr> {
+    fn transform_mfunc_invoke(&self, scope: ScopeRef, _id: NodeID, func: &Expr, args: &Vec<Expr>) -> Vec<LLExpr> {
         let mut exprs = vec!();
 
         let mut fargs = self.transform_as_args(&mut exprs, scope.clone(), args);
@@ -770,7 +767,7 @@ impl<'sess> Transformer<'sess> {
 
     fn convert_closure_molten_type(&self, scope: ScopeRef, ttype: Type) -> Type {
         match ttype {
-            Type::Function(mut argtypes, rettype, _) => {
+            Type::Function(argtypes, rettype, _) => {
                 let mut argtypes = argtypes.as_vec();
                 argtypes.push(scope.find_type(self.session, &String::from("String")).unwrap());
                 self.convert_mfunc_molten_type(scope.clone(), Type::Function(r(Type::Tuple(argtypes)), rettype, ABI::C))
@@ -779,7 +776,7 @@ impl<'sess> Transformer<'sess> {
         }
     }
 
-    fn transform_closure_raw_func_data(&self, scope: ScopeRef, id: NodeID, fname: &String) -> (NodeID, String, LLType) {
+    fn transform_closure_raw_func_data(&self, _scope: ScopeRef, id: NodeID, fname: &String) -> (NodeID, String, LLType) {
         let ftype = self.session.get_type(id).unwrap();
         let (argtypes, rettype, _) = ftype.get_function_types().unwrap();
         let cftype = self.transform_closure_def_type(&argtypes.as_vec(), rettype);
@@ -789,7 +786,7 @@ impl<'sess> Transformer<'sess> {
         (cfid, cfname, cftype)
     }
 
-    fn transform_closure_decl(&self, scope: ScopeRef, id: NodeID, vis: Visibility, name: &String, ttype: &Type) -> Vec<LLExpr> {
+    fn transform_closure_decl(&self, scope: ScopeRef, id: NodeID, _vis: Visibility, name: &String, ttype: &Type) -> Vec<LLExpr> {
         let fname = self.transform_func_name(scope.clone(), Some(name), id);
 
         let did = NodeID::generate();
@@ -864,7 +861,7 @@ impl<'sess> Transformer<'sess> {
         exprs
     }
 
-    fn transform_closure_invoke(&self, scope: ScopeRef, id: NodeID, func: &Expr, args: &Vec<Expr>) -> Vec<LLExpr> {
+    fn transform_closure_invoke(&self, scope: ScopeRef, _id: NodeID, func: &Expr, args: &Vec<Expr>) -> Vec<LLExpr> {
         let mut exprs = vec!();
 
         let mut fargs = self.transform_as_args(&mut exprs, scope.clone(), args);
@@ -1074,7 +1071,7 @@ impl<'sess> Transformer<'sess> {
         exprs
     }
 
-    fn transform_resolve(&self, id: NodeID, path: &Expr, field: &String, otype: Type) -> Vec<LLExpr> {
+    fn transform_resolve(&self, id: NodeID, _path: &Expr, _field: &String, otype: Type) -> Vec<LLExpr> {
         let defid = self.session.get_ref(id).unwrap();
         match self.session.get_def(otype.get_id().unwrap()).unwrap() {
             Def::Class(classdef) => {
@@ -1094,7 +1091,7 @@ impl<'sess> Transformer<'sess> {
         }
     }
 
-    fn transform_assignment(&self, scope: ScopeRef, id: NodeID, left: &Expr, right: &Expr) -> Vec<LLExpr> {
+    fn transform_assignment(&self, scope: ScopeRef, _id: NodeID, left: &Expr, right: &Expr) -> Vec<LLExpr> {
         let mut exprs = vec!();
 
         let value = self.transform_as_result(&mut exprs, scope.clone(), right).unwrap();
@@ -1172,7 +1169,7 @@ impl<'sess> Transformer<'sess> {
                 exprs.push(LLExpr::SetValue(pat.id, r(LLExpr::Cast(self.transform_value_type(&ttype), r(LLExpr::GetValue(value_id))))));
                 exprs.extend(self.transform_pattern(scope.clone(), pat, pat.id));
             },
-            PatKind::Resolve(left, field, oid) => {
+            PatKind::Resolve(_left, _field, oid) => {
                 let defid = self.session.get_ref(pat.id).unwrap();
                 let enumdef = self.session.get_def_from_ref(*oid).unwrap().as_enum().unwrap();
                 let variant = enumdef.get_variant_by_id(defid).unwrap();
@@ -1231,7 +1228,7 @@ impl<'sess> Transformer<'sess> {
 
     pub fn transform_value_type(&self, ttype: &Type) -> LLType {
         match &ttype {
-            Type::Object(name, id, _) => self.get_type(*id).unwrap(),
+            Type::Object(_, id, _) => self.get_type(*id).unwrap(),
             Type::Ref(ttype) => LLType::Ptr(r(self.transform_value_type(ttype))),
             Type::Tuple(items) => LLType::Struct(items.iter().map(|item| self.transform_value_type(&item)).collect()),
             Type::Record(items) => LLType::Struct(items.iter().map(|item| self.transform_value_type(&item.1)).collect()),

@@ -150,32 +150,9 @@ impl ClassDef {
         self.get_struct_index("__vtable__")
     }
 
-    pub fn get_struct_type(&self, index: usize) -> Type {
-        self.structdef.get_type(index)
-    }
-
-    pub fn get_vtable_index(&self, session: &Session, scope: ScopeRef, field: &str, ftype: &Type) -> Option<usize> {
-        self.vtable.get_index(session, scope, field, ftype)
-    }
-
-    pub fn get_vtable_type(&self, index: usize) -> Type {
-        self.vtable.get_type(index)
-    }
-
     pub fn has_vtable(&self) -> bool {
         self.vtable.len() > 0
     }
-}
-
-
-pub mod llvm {
-    //use llvm::compiler::*;
-
-    /*
-    impl Compilable for ClassDef {
-
-    }
-    */
 }
 
 
@@ -205,18 +182,6 @@ impl StructDef {
         Rc::new(Self::new(vars))
     }
 
-    #[must_use]
-    pub fn define(session: &Session, scope: ScopeRef, id: NodeID, ttype: Type) -> Result<StructDefRef, Error> {
-        let vars = Scope::new_ref(None);
-        vars.set_basename(ttype.get_name()?);
-
-        let structdef = StructDef::new_ref(vars);
-        scope.define_type(ttype.get_name()?, Some(id))?;
-        session.set_def(id, Def::Struct(structdef.clone()));
-        session.set_type(id, ttype);
-        Ok(structdef)
-    }
-
     pub fn inherit(&self, inherit: &StructDef) {
         *self.fields.borrow_mut() = inherit.fields.borrow().clone();
     }
@@ -229,17 +194,8 @@ impl StructDef {
         self.fields.borrow_mut().push((id, sname, ttype));
     }
 
-    pub fn find_field(&self, field: &str) -> Option<(usize, Type)> {
-        let index = self.get_index(field)?;
-        Some((index, self.fields.borrow()[index].2.clone()))
-    }
-
     pub fn get_index(&self, field: &str) -> Option<usize> {
         self.fields.borrow().iter().position(|ref r| r.1.as_str() == field)
-    }
-
-    pub fn get_type(&self, index: usize) -> Type {
-        self.fields.borrow()[index].2.clone()
     }
 
     pub fn find_field_by_id(&self, id: NodeID) -> Option<(usize, Type)> {
@@ -320,10 +276,6 @@ impl Vtable {
         self.table.borrow().iter().position(|(_, ref ename, ref etype)| {
             ename.as_str() == name && check_type(session, scope.clone(), Some(etype.clone()), Some(ftype.clone()), Check::Def, false).is_ok()
         })
-    }
-
-    pub fn get_type(&self, index: usize) -> Type {
-        self.table.borrow()[index].2.clone()
     }
 
     pub fn get_index_by_id(&self, id: NodeID) -> Option<usize> {

@@ -8,7 +8,7 @@ use types::Type;
 use ast::{ Pos, AST };
 use misc::{ r, UniqueID };
 use session::{ Session, Error };
-use hir::{ NodeID, Visibility, Mutability, AssignType, Literal, Ident, Argument, ClassSpec, MatchCase, Pattern, PatKind, Expr, ExprKind };
+use hir::{ NodeID, Visibility, Mutability, AssignType, Literal, Ident, Argument, ClassSpec, MatchCase, EnumVariant, Pattern, Expr, ExprKind };
 
 
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -166,6 +166,11 @@ impl<'sess> Refinery<'sess> {
                 Expr::new(pos, ExprKind::RecordUpdate(r(self.refine_node(*record)?), refined))
             },
 
+            AST::Enum(pos, classspec, variants) => {
+                let variants = variants.into_iter().map(|(pos, ident, ttype)| EnumVariant::new(pos, ident, ttype)).collect();
+                Expr::new(pos, ExprKind::Enum(classspec, variants))
+            },
+
             AST::List(pos, items) => {
                 self.desugar_list(pos, items)?
             },
@@ -226,7 +231,6 @@ impl<'sess> Refinery<'sess> {
             AST::Nil => { Expr::new(Pos::empty(), ExprKind::Nil) },
             AST::Identifier(pos, ident) => { Expr::new(pos, ExprKind::Identifier(ident)) },
             AST::TypeAlias(pos, classspec, ttype) => { Expr::new(pos, ExprKind::TypeAlias(classspec, ttype)) },
-            AST::Enum(pos, classspec, variants) => { Expr::new(pos, ExprKind::Enum(classspec, variants)) },
         })
     }
 

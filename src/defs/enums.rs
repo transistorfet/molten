@@ -1,6 +1,5 @@
 
 use std::rc::Rc;
-use std::cell::Cell;
 use std::cell::RefCell;
 
 use misc::r;
@@ -52,7 +51,7 @@ impl EnumDef {
     }
 
     #[must_use]
-    pub fn add_variant(&self, session: &Session, scope: ScopeRef, variant: EnumVariant) -> Result<(), Error> {
+    pub fn add_variant(&self, session: &Session, variant: EnumVariant) -> Result<(), Error> {
         self.vars.define(variant.ident.name.clone(), Some(variant.id))?;
         session.set_ref(variant.id, self.id);
         match variant.ttype {

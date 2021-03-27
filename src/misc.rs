@@ -25,10 +25,6 @@ impl UniqueID {
             UniqueID(_NEXT_ID)
         }
     }
-
-    pub fn to_string(&self) -> String {
-        (self.0 as u64).to_string()
-    }
 }
 
 impl fmt::Display for UniqueID {

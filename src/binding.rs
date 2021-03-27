@@ -1,11 +1,9 @@
 
-use std::cell::RefCell;
-
 use abi::ABI;
 use types::Type;
 use session::{ Session, Error };
 use scope::{ ScopeRef, Context };
-use hir::{ NodeID, Visibility, Mutability, AssignType, Literal, Ident, Argument, ClassSpec, MatchCase, EnumVariant, Pattern, PatKind, Expr, ExprKind };
+use hir::{ NodeID, Visibility, Mutability, Ident, Argument, ClassSpec, MatchCase, EnumVariant, Pattern, PatKind, Expr, ExprKind };
 use misc::{ UniqueID, r };
 
 use defs::enums::EnumDef;
@@ -32,7 +30,7 @@ impl<'sess> NameBinder<'sess> {
         };
 
         namebinder.stack.push_scope(scope);
-        let ttype = namebinder.visit_vec(code);
+        namebinder.visit_vec(code).unwrap();
         if session.errors.get() > 0 {
             panic!("Exiting due to previous errors");
         }
@@ -123,7 +121,7 @@ impl<'sess> Visitor for NameBinder<'sess> {
         self.visit_match(id, cond, cases)
     }
 
-    fn visit_match(&mut self, id: NodeID, cond: &Expr, cases: &Vec<MatchCase>) -> Result<Self::Return, Error> {
+    fn visit_match(&mut self, _id: NodeID, cond: &Expr, cases: &Vec<MatchCase>) -> Result<Self::Return, Error> {
         let scope = self.stack.get_scope();
         self.visit_node(cond)?;
         // TODO check to make sure Pattern::Wild only occurs as the last case, if at all
@@ -210,12 +208,12 @@ impl<'sess> Visitor for NameBinder<'sess> {
             let mut variant = variant.clone();
             bind_type_names(self.session, scope.clone(), variant.ttype.as_mut(), false)?;
             check_recursive_type(&variant.ttype.as_ref(), id)?;
-            enumdef.add_variant(self.session, scope.clone(), variant)?;
+            enumdef.add_variant(self.session, variant)?;
         }
         Ok(())
     }
 
-    fn visit_resolver(&mut self, id: NodeID, left: &Expr, right: &Ident, oid: NodeID) -> Result<Self::Return, Error> {
+    fn visit_resolver(&mut self, _id: NodeID, left: &Expr, _right: &Ident, oid: NodeID) -> Result<Self::Return, Error> {
         let scope = self.stack.get_scope();
         // TODO should this always work on a type reference, or should classes be added as values as well as types?
         //self.visit_node(left);
@@ -246,7 +244,7 @@ impl<'sess> Visitor for NameBinder<'sess> {
         self.visit_pattern(pat)
     }
 
-    fn visit_pattern_resolve(&mut self, id: NodeID, left: &Pattern, ident: &Ident, oid: NodeID) -> Result<Self::Return, Error> {
+    fn visit_pattern_resolve(&mut self, _id: NodeID, left: &Pattern, _ident: &Ident, oid: NodeID) -> Result<Self::Return, Error> {
         let scope = self.stack.get_scope();
         match &left.kind {
             PatKind::Identifier(ref ident) => {
@@ -380,7 +378,7 @@ pub fn check_recursive_type(ttype: &Option<&Type>, forbidden_id: NodeID) -> Resu
                     check_recursive_type(&Some(ttype), forbidden_id)?;
                 }
             },
-            Type::Variable(ref name, ref id, ref existential) => {
+            Type::Variable(ref _name, ref _id, ref _existential) => {
                 // TODO this might be an error?
             },
             Type::Ref(_) |

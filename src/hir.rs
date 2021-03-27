@@ -24,7 +24,6 @@ pub enum AssignType {
     Update,
 }
 
-// could move to types.rs
 #[derive(Clone, Debug, PartialEq)]
 pub enum Literal {
     Unit,
@@ -154,14 +153,6 @@ impl Ident {
         }
     }
 
-    /*
-    pub fn from_span(span: Span) -> Ident {
-        Ident {
-            name: String::from(str::from_utf8(&span.fragment).unwrap()),
-        }
-    }
-    */
-
     pub fn as_str(&self) -> &str {
         self.name.as_str()
     }
@@ -187,10 +178,6 @@ impl ClassSpec {
             ident: ident,
             types: types
         }
-    }
-
-    pub fn from_str(name: &str) -> Self {
-        Self::new(Pos::empty(), Ident::from_str(name), vec!())
     }
 }
 
@@ -248,154 +235,171 @@ impl Expr {
         }
     }
 
+    #[allow(dead_code)]
     pub fn get_id(&self) -> NodeID {
         self.id
     }
 
-    pub fn get_pos(&self) -> Pos {
-        self.pos.clone()
-    }
-
+    #[allow(dead_code)]
     pub fn set_id(mut self, id: NodeID) -> Self {
         self.id = id;
         self
     }
 
+    #[allow(dead_code)]
+    pub fn get_pos(&self) -> Pos {
+        self.pos.clone()
+    }
+
+    #[allow(dead_code)]
     pub fn set_pos(mut self, pos: Pos) -> Self {
         self.pos = pos;
         self
     }
 
+    #[allow(dead_code)]
     pub fn make_ptr_cast(ttype: Type, expr: Expr) -> Expr {
         Expr { id: NodeID::generate(), pos: Pos::empty(), kind: ExprKind::PtrCast(ttype, r(expr)) }
     }
 
+    #[allow(dead_code)]
     pub fn make_ref(pos: Pos, expr: Expr) -> Expr {
         Expr { id: NodeID::generate(), pos: pos, kind: ExprKind::Ref(r(expr)) }
     }
 
+    #[allow(dead_code)]
     pub fn make_deref(pos: Pos, expr: Expr) -> Expr {
         Expr { id: NodeID::generate(), pos: pos, kind: ExprKind::Deref(r(expr)) }
     }
 
+    #[allow(dead_code)]
     pub fn make_lit(literal: Literal) -> Expr {
         Expr { id: NodeID::generate(), pos: Pos::empty(), kind: ExprKind::Literal(literal) }
     }
 
+    #[allow(dead_code)]
     pub fn make_nil() -> Expr {
         Expr { id: NodeID::generate(), pos: Pos::empty(), kind: ExprKind::Nil }
     }
 
+    #[allow(dead_code)]
     pub fn make_tuple(pos: Pos, items: Vec<Expr>) -> Expr {
         Expr { id: NodeID::generate(), pos: pos, kind: ExprKind::Tuple(items) }
     }
 
+    #[allow(dead_code)]
     pub fn make_record(pos: Pos, items: Vec<(Ident, Expr)>) -> Expr {
         Expr { id: NodeID::generate(), pos: pos, kind: ExprKind::Record(items) }
     }
 
+    #[allow(dead_code)]
     pub fn make_record_update(pos: Pos, record: Expr, items: Vec<(Ident, Expr)>) -> Expr {
         Expr { id: NodeID::generate(), pos: pos, kind: ExprKind::RecordUpdate(r(record), items) }
     }
 
+    #[allow(dead_code)]
     pub fn make_ident(pos: Pos, ident: Ident) -> Expr {
         Expr { id: NodeID::generate(), pos: pos, kind: ExprKind::Identifier(ident) }
     }
 
+    #[allow(dead_code)]
     pub fn make_ident_from_str(pos: Pos, name: &str) -> Expr {
         Expr { id: NodeID::generate(), pos: pos, kind: ExprKind::Identifier(Ident::from_str(name)) }
     }
 
+    #[allow(dead_code)]
     pub fn make_resolve(pos: Pos, object: Expr, ident: Ident) -> Expr {
         Expr { id: NodeID::generate(), pos: pos, kind: ExprKind::Resolver(r(object), ident, NodeID::generate()) }
     }
 
+    #[allow(dead_code)]
     pub fn make_access(pos: Pos, object: Expr, ident: Ident) -> Expr {
         Expr { id: NodeID::generate(), pos: pos, kind: ExprKind::Accessor(r(object), ident, NodeID::generate()) }
     }
 
+    #[allow(dead_code)]
     pub fn make_invoke(pos: Pos, fexpr: Expr, args: Vec<Expr>) -> Expr {
         Expr { id: NodeID::generate(), pos: pos, kind: ExprKind::Invoke(r(fexpr), args) }
     }
 
+    #[allow(dead_code)]
     pub fn make_side_effect(pos: Pos, ident: Ident, args: Vec<Expr>) -> Expr {
         Expr { id: NodeID::generate(), pos: pos, kind: ExprKind::SideEffect(ident, args) }
     }
 
+    #[allow(dead_code)]
     pub fn make_block(pos: Pos, body: Vec<Expr>) -> Expr {
         Expr { id: NodeID::generate(), pos: pos, kind: ExprKind::Block(body) }
     }
 
+    #[allow(dead_code)]
     pub fn make_if(pos: Pos, cond: Expr, texpr: Expr, fexpr: Expr) -> Expr {
         Expr { id: NodeID::generate(), pos: pos, kind: ExprKind::If(r(cond), r(texpr), r(fexpr)) }
     }
 
+    #[allow(dead_code)]
     pub fn make_raise(pos: Pos, expr: Expr) -> Expr {
         Expr { id: NodeID::generate(), pos: pos, kind: ExprKind::Raise(r(expr)) }
     }
 
+    #[allow(dead_code)]
     pub fn make_try(pos: Pos, cond: Expr, cases: Vec<MatchCase>) -> Expr {
         Expr { id: NodeID::generate(), pos: pos, kind: ExprKind::Try(r(cond), cases) }
     }
 
+    #[allow(dead_code)]
     pub fn make_match(pos: Pos, cond: Expr, cases: Vec<MatchCase>) -> Expr {
         Expr { id: NodeID::generate(), pos: pos, kind: ExprKind::Match(r(cond), cases) }
     }
 
+    #[allow(dead_code)]
     pub fn make_decl(pos: Pos, vis: Visibility, ident: Ident, ttype: Type) -> Expr {
         Expr { id: NodeID::generate(), pos: pos, kind: ExprKind::Declare(vis, ident, ttype) }
     }
 
+    #[allow(dead_code)]
     pub fn make_func(pos: Pos, vis: Visibility, ident: Option<Ident>, args: Vec<Argument>, rtype: Option<Type>, body: Expr, abi: ABI) -> Expr {
         Expr { id: NodeID::generate(), pos: pos, kind: ExprKind::Function(vis, ident, args, rtype, r(body), abi) }
     }
 
+    #[allow(dead_code)]
     pub fn make_new(pos: Pos, classspec: ClassSpec) -> Expr {
         Expr { id: NodeID::generate(), pos: pos, kind: ExprKind::New(classspec) }
     }
 
+    #[allow(dead_code)]
     pub fn make_class(pos: Pos, classspec: ClassSpec, parentspec: Option<ClassSpec>, body: Vec<Expr>) -> Expr {
         Expr { id: NodeID::generate(), pos: pos, kind: ExprKind::Class(classspec, parentspec, body) }
     }
 
+    #[allow(dead_code)]
     pub fn make_import(pos: Pos, ident: Ident, decls: Vec<Expr>) -> Expr {
         Expr { id: NodeID::generate(), pos: pos, kind: ExprKind::Import(ident, decls) }
     }
 
+    #[allow(dead_code)]
     pub fn make_def(pos: Pos, mutable: Mutability, ident: Ident, ttype: Option<Type>, value: Expr) -> Expr {
         Expr { id: NodeID::generate(), pos: pos, kind: ExprKind::Definition(mutable, ident, ttype, r(value)) }
     }
 
+    #[allow(dead_code)]
     pub fn make_assign(pos: Pos, left: Expr, right: Expr, ty: AssignType) -> Expr {
         Expr { id: NodeID::generate(), pos: pos, kind: ExprKind::Assignment(r(left), r(right), ty) }
     }
 
+    #[allow(dead_code)]
     pub fn make_while(pos: Pos, cond: Expr, body: Expr) -> Expr {
         Expr { id: NodeID::generate(), pos: pos, kind: ExprKind::While(r(cond), r(body)) }
     }
 
+    #[allow(dead_code)]
     pub fn make_type_alias(pos: Pos, classspec: ClassSpec, ttype: Type) -> Expr {
         Expr { id: NodeID::generate(), pos: pos, kind: ExprKind::TypeAlias(classspec, ttype) }
     }
 
+    #[allow(dead_code)]
     pub fn make_type_enum(pos: Pos, classspec: ClassSpec, variants: Vec<EnumVariant>) -> Expr {
         Expr { id: NodeID::generate(), pos: pos, kind: ExprKind::Enum(classspec, variants) }
     }
-
-    /*
-    pub fn set_span(self, span: Span) -> Self {
-        self.pos = Pos::new(span);
-        self
-    }
-
-    pub fn mk_ident(ident: Ident) -> Self {
-        AST::Identifier(Pos::empty(), ident);
-        AST {
-            id: UniqueID::generate(),
-            pos: Pos::empty(),
-            kind: ASTKind::Ident(ident),
-        }
-    }
-    */
 }
 

@@ -44,6 +44,7 @@ impl Options<'static> {
         }
     }
 
+    #[allow(dead_code)]
     pub fn add_lib_path(&mut self, path: &'static str) {
         self.libpath.push(path);
     }

@@ -5,8 +5,8 @@ use std::str;
 use abi::ABI;
 use types::Type;
 use parser::Span;
-use misc::{ R, r, UniqueID };
-use hir::{ Visibility, Mutability, AssignType, Literal, Ident, Argument, ClassSpec, MatchCase, EnumVariant, Pattern, PatKind, Expr, ExprKind };
+use misc::{ R, r };
+use hir::{ Visibility, Mutability, AssignType, Literal, Ident, Argument, ClassSpec, Pattern };
 
 
 #[derive(Clone, PartialEq)]
@@ -53,7 +53,7 @@ pub enum AST {
     New(Pos, ClassSpec),
     Class(Pos, ClassSpec, Option<ClassSpec>, Vec<AST>),
     TypeAlias(Pos, ClassSpec, Type),
-    Enum(Pos, ClassSpec, Vec<EnumVariant>),
+    Enum(Pos, ClassSpec, Vec<(Pos, Ident, Option<Type>)>),
 
     Import(Pos, Ident, Vec<AST>),
     Definition(Pos, Mutability, Ident, Option<Type>, R<AST>),

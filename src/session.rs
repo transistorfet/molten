@@ -104,6 +104,7 @@ impl Session {
         }
     }
 
+    #[allow(dead_code)]
     pub fn raise_error(&self, pos: &Pos, msg: String) -> Error {
         let err = Error::new_pos(pos, msg);
         self.print_error(err.clone());

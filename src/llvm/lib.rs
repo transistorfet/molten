@@ -21,7 +21,7 @@ use misc::{ r, UniqueID };
 use defs::classes::{ ClassDef, Define };
 use defs::functions::{ AnyFunc, FuncDef };
 
-use transform::llcode::{ LLType, LLLit, LLExpr };
+use transform::llcode::{ LLType };
 use transform::transform::Transformer;
 
 use llvm::codegen::{ LLVM, cstr, cstring };
@@ -50,7 +50,7 @@ pub fn make_global<'sess>(session: &Session, builtins: &Vec<BuiltinDef<'sess>>) 
 
     declare_builtins_vec(session, primatives.clone(), builtins);
 
-    let global = session.map.add(ScopeMapRef::GLOBAL, Some(primatives));
+    let _global = session.map.add(ScopeMapRef::GLOBAL, Some(primatives));
     // NOTE disabling this allows the identifier closure convertor to convert references to variables inside the main function
     //global.set_context(Context::Global);
 }
@@ -62,8 +62,8 @@ pub fn declare_builtins_vec<'sess>(session: &Session, scope: ScopeRef, entries: 
 }
 
 pub fn declare_builtins_node<'sess>(session: &Session, scope: ScopeRef, node: &BuiltinDef<'sess>) {
-    match *node {
-        BuiltinDef::Func(ref id, ref name, ref ftype, ref func) => {
+    match node {
+        BuiltinDef::Func(id, name, ftype, func) => {
             let tscope = if scope.is_primative() {
                 Scope::new_ref(Some(scope.clone()))
             } else {
@@ -83,7 +83,7 @@ pub fn declare_builtins_node<'sess>(session: &Session, scope: ScopeRef, node: &B
                 },
             };
         },
-        BuiltinDef::Class(ref id, ref name, ref params, _, ref entries) => {
+        BuiltinDef::Class(id, name, params, _, entries) => {
             let tscope = session.map.get_or_add(*id, Some(scope.clone()));
             let mut ttype = Type::Object(String::from(*name), *id, params.clone());
             bind_type_names(session, tscope.clone(), Some(&mut ttype), true).unwrap();
@@ -108,9 +108,9 @@ pub unsafe fn define_builtins_vec<'sess>(llvm: &LLVM<'sess>, transformer: &Trans
     }
 }
 
-pub unsafe fn define_builtins_node<'sess>(llvm: &LLVM<'sess>, transformer: &Transformer, objtype: LLVMTypeRef, scope: ScopeRef, node: &BuiltinDef<'sess>) {
-    match *node {
-        BuiltinDef::Func(ref id, ref sname, ref types, ref func) => {
+pub unsafe fn define_builtins_node<'sess>(llvm: &LLVM<'sess>, transformer: &Transformer, objtype: LLVMTypeRef, _scope: ScopeRef, node: &BuiltinDef<'sess>) {
+    match node {
+        BuiltinDef::Func(id, sname, _, func) => {
             let ftype = llvm.session.get_type(*id).unwrap();
             let (argtypes, rettype, abi) = ftype.get_function_types().unwrap();
             let name = abi.mangle_name(sname, argtypes, 2);
@@ -133,9 +133,9 @@ pub unsafe fn define_builtins_node<'sess>(llvm: &LLVM<'sess>, transformer: &Tran
                 },
             }
         },
-        BuiltinDef::Class(ref id, ref name, _, ref structdef, ref entries) => {
+        BuiltinDef::Class(id, name, _, structdef, entries) => {
             let tscope = llvm.session.map.get(id);
-            let cname = String::from(*name);
+            //let cname = String::from(*name);
             let classdef = llvm.session.get_def(*id).unwrap().as_class().unwrap();
             if entries.len() <= 0 {
                 classdef.set_primative();
@@ -453,7 +453,7 @@ fn int_to_char(llvm: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { 
 fn real_to_int(llvm: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildFPToSI(llvm.builder, args[0], llvm.i64_type(), cstr("")) } }
 fn int_to_real(llvm: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { LLVMBuildSIToFP(llvm.builder, args[0], llvm.f64_type(), cstr("")) } }
 
-fn unit_to_str(llvm: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { llvm.str_const("()") } }
+fn unit_to_str(llvm: &LLVM, _args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { llvm.str_const("()") } }
 
 
 
@@ -466,7 +466,7 @@ fn sprintf(llvm: &LLVM, mut args: Vec<LLVMValueRef>) -> LLVMValueRef {
 */
 
 
-unsafe fn molten_init(llvm: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef {
+unsafe fn molten_init(llvm: &LLVM, _args: Vec<LLVMValueRef>) -> LLVMValueRef {
     if !Options::as_ref().no_gc {
         llvm.build_call_by_name("GC_init", &mut vec!());
     }
@@ -557,7 +557,7 @@ unsafe fn println(llvm: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef {
 }
 
 
-unsafe fn readline(llvm: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef {
+unsafe fn readline(llvm: &LLVM, _args: Vec<LLVMValueRef>) -> LLVMValueRef {
     let buffer = llvm.build_cast(llvm.str_type(), llvm.build_call_by_name("molten_malloc", &mut vec!(llvm.i64_const(2048))));
 
     let ret = llvm.build_call_by_name("fgets", &mut vec!(buffer, llvm.i64_const(2048), llvm.build_load(LLVMGetNamedGlobal(llvm.module, cstr("stdin")))));

@@ -33,7 +33,7 @@ use abi::ABI;
 use types::Type;
 use misc::{ r, UniqueID };
 use ast::{ Pos, AST };
-use hir::{ NodeID, Mutability, Visibility, AssignType, Literal, Ident, Argument, ClassSpec, Pattern, PatKind, EnumVariant, Expr };
+use hir::{ NodeID, Mutability, Visibility, AssignType, Literal, Ident, Argument, ClassSpec, Pattern, PatKind };
 
 
 ///// Parsing Macros /////
@@ -263,12 +263,12 @@ named!(typeenum(Span) -> AST,
     )
 );
 
-named!(enum_variant(Span) -> EnumVariant,
+named!(enum_variant(Span) -> (Pos, Ident, Option<Type>),
     do_parse!(
         pos: position!() >>
         i: identifier >>
         t: opt!(delimited!(tag!("("), separated_list_complete!(wscom!(tag!(",")), type_description), tag!(")"))) >>
-        (EnumVariant::new(Pos::new(pos), i, t.map(|t| Type::Tuple(t))))
+        ((Pos::new(pos), i, t.map(|t| Type::Tuple(t))))
     )
 );
 

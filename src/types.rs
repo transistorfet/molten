@@ -41,6 +41,7 @@ impl Type {
         }
     }
 
+    #[allow(dead_code)]
     pub fn is_tuple(&self) -> bool {
         match *self {
             Type::Tuple(_) => true,
@@ -48,6 +49,7 @@ impl Type {
         }
     }
 
+    #[allow(dead_code)]
     pub fn as_vec(&self) -> Vec<Type> {
         match self {
             &Type::Tuple(ref types) => types.clone(),
@@ -56,6 +58,7 @@ impl Type {
     }
 
 
+    #[allow(dead_code)]
     pub fn is_record(&self) -> bool {
         match *self {
             Type::Record(_) => true,
@@ -85,6 +88,7 @@ impl Type {
     }
 
 
+    #[allow(dead_code)]
     pub fn is_function(&self) -> bool {
         match *self {
             Type::Function(_, _, _) => true,
@@ -122,6 +126,7 @@ impl Type {
     }
 
 
+    #[allow(dead_code)]
     pub fn is_variable(&self) -> bool {
         match *self {
             Type::Variable(_, _, _) => true,
@@ -129,6 +134,7 @@ impl Type {
         }
     }
 
+    #[allow(dead_code)]
     pub fn get_varname(&self) -> Result<String, Error> {
         match self {
             &Type::Variable(ref name, _, _) => Ok(name.clone()),
@@ -144,6 +150,7 @@ impl Type {
         }
     }
 
+    #[allow(dead_code)]
     pub fn is_ambiguous(&self) -> bool {
         match *self {
             Type::Ambiguous(_) => true,

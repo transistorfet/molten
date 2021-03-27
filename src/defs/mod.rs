@@ -1,7 +1,7 @@
 
 use scope::ScopeRef;
 use hir::Mutability;
-use session::{ Session, Error };
+use session::{ Error };
 
 //pub mod traits;
 pub mod enums;
@@ -104,15 +104,6 @@ impl Def {
             Def::Arg(def) if def.mutable == Mutability::Mutable => true,
             Def::Field(def) if def.mutable == Mutability::Mutable => true,
             _ => false,
-        }
-    }
-
-    pub fn num_variants(&self, session: &Session) -> i32 {
-        match *self {
-            Def::Func(_) |
-            Def::Method(_) => 1,
-            Def::Overload(ref def) => def.get_variants(session).len() as i32,
-            _ => 0
         }
     }
 }

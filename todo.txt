@@ -1,4 +1,6 @@
 
+* for Expr resolve and accessor, the id's could maybe be integrated into the ident?
+
 * only when using llvm 11, and only with the match tt {} expr in reducedtest.mol, and optimizations enabled, the compiler hangs without ever completing
   In the test, the match is inside a function, but when moved to the top level, it hangs while compiling.  It happens regardless of mathc arm it seems
 
