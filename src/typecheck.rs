@@ -374,9 +374,9 @@ impl<'sess> TypeChecker<'sess> {
                 self.session.update_type(scope.clone(), pat.id, btype.clone())?;
                 Ok(btype)
             },
-            PatKind::Annotation(_, pat) => {
+            PatKind::Annotation(_, subpat) => {
                 let ttype = self.session.get_type(pat.id);
-                let etype = self.check_pattern(scope.clone(), pat, ttype.clone())?;
+                let etype = self.check_pattern(scope.clone(), subpat, ttype.clone())?;
                 expect_type(self.session, scope, ttype, Some(etype), Check::Def)
             },
             PatKind::Resolve(_left, field, oid) => {

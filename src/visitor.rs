@@ -472,8 +472,8 @@ pub fn walk_pattern<R, V: Visitor<Return = R>>(visitor: &mut V, pat: &Pattern) -
             visitor.visit_pattern_binding(pat.id, ident)
         },
 
-        PatKind::Annotation(ttype, pat) => {
-            visitor.visit_pattern_annotation(pat.id, ttype, pat)
+        PatKind::Annotation(ttype, subpat) => {
+            visitor.visit_pattern_annotation(pat.id, ttype, subpat)
         },
 
         PatKind::Resolve(left, ident, oid) => {

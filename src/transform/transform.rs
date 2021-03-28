@@ -1212,10 +1212,10 @@ impl<'sess> Transformer<'sess> {
                 exprs.extend(self.create_def_local(pat.id, &ident.name, LLExpr::GetValue(value_id)));
                 exprs.push(LLExpr::Literal(LLLit::I1(true)));
             },
-            PatKind::Annotation(_, pat) => {
+            PatKind::Annotation(_, subpat) => {
                 let ttype = self.session.get_type(pat.id).unwrap();
                 exprs.push(LLExpr::SetValue(pat.id, r(LLExpr::Cast(self.transform_value_type(&ttype), r(LLExpr::GetValue(value_id))))));
-                exprs.extend(self.transform_pattern(pat, pat.id));
+                exprs.extend(self.transform_pattern(subpat, pat.id));
             },
             PatKind::Resolve(_left, _field, oid) => {
                 let defid = self.session.get_ref(pat.id).unwrap();
