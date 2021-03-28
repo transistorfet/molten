@@ -100,11 +100,15 @@ impl<'sess> Refinery<'sess> {
                 })?
             },
 
-            AST::Invoke(pos, fexpr, mut args) => {
-                if let AST::Accessor(_, ref expr, _) = *fexpr {
+            AST::Invoke(pos, fexpr, args) => {
+                let fexpr = self.refine_node(*fexpr)?;
+                let mut args = self.refine_vec(args);
+
+                // We refine fexpr before cloning here, so that the IDs will be identical (otherwise typechecking wont unify the accessed object and first argument)
+                if let ExprKind::Accessor(ref expr, _, _) = fexpr.kind {
                     args.insert(0, *expr.clone());
                 }
-                Expr::new(pos, ExprKind::Invoke(r(self.refine_node(*fexpr)?), self.refine_vec(args)))
+                Expr::new(pos, ExprKind::Invoke(r(fexpr), args))
             },
 
             AST::SideEffect(pos, op, args) => {
