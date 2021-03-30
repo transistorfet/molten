@@ -122,13 +122,13 @@ fn compile_file(input: &str, output: Option<&str>) {
     if Options::as_ref().linkfile_only {
         return;
     }
+    debug!("PARSED: {:#?}", code);
 
     binding::NameBinder::bind_names(&session, session.map.get_global(), &code);
     typecheck::TypeChecker::check(&session, session.map.get_global(), &code);
 
     if Options::as_ref().debug {
         let global = session.map.get_global();
-        println!("\n{:#?}\n", code);
         debug::print_types(&session, global.clone(), &code);
         debug::print_types_scope(&session, global);
     }

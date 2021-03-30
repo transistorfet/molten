@@ -34,7 +34,6 @@ impl<'sess> NameBinder<'sess> {
         if session.errors.get() > 0 {
             panic!("Exiting due to previous errors");
         }
-        debug!("POST-BINDING: {:?}", code);
     }
 }
 

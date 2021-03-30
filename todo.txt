@@ -1,6 +1,10 @@
 
-* for Expr resolve and accessor, the id's could maybe be integrated into the ident?
+* for Expr resolve and accessor, the oid's could maybe be integrated into the ident?
 
+* the lists.mol test is failing when indexing a literal list because it gets turned into a method call, which duplicates the list creation block,
+  which causes a duplicate definition error.  Before the HIR change, the object ast was copied to the first argument, which duplicated all the IDs so
+  that the type checking would unify them, but the duplicated AST was then refined separated after, which created two different variable names for the
+  AST blocks, which is why it used to work.
 * only when using llvm 11, and only with the match tt {} expr in reducedtest.mol, and optimizations enabled, the compiler hangs without ever completing
   In the test, the match is inside a function, but when moved to the top level, it hangs while compiling.  It happens regardless of mathc arm it seems
 
@@ -40,7 +44,6 @@
   an initializer is the same as "let ni: newint = nil" and nil could not be cast to a Record, which newint is a typealias of a record
 
 
-* make an HIR
 * make visitor
 * add typeclasses
 

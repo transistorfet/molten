@@ -61,9 +61,6 @@ impl Session {
         self.files.borrow_mut().push((String::from(name), contents));
         let ast = parser::parse_or_error(name, self.files.borrow().last().unwrap().1.as_bytes());
         let hir = Refinery::refine(self, ast);
-        if Options::as_ref().debug {
-            println!("\n{:?}\n", hir);
-        }
         hir
     }
 
