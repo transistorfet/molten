@@ -162,12 +162,13 @@ named!(terminator(Span) -> Option<AST>,
 named!(statement(Span) -> AST,
     alt_complete!(
         import |
-        definition |
-        assignment |
-        whileloop |
         class |
         typealias |
         typeenum |
+        declare |
+        raise |
+        definition |
+        assignment |
         expression
     )
 );
@@ -283,11 +284,10 @@ named!(expression(Span) -> AST,
         //underscore |
         ifexpr |
         trywith |
-        raise |
         matchcase |
+        whileloop |
         forloop |
         newclass |
-        declare |
         function |
         reference |
         annotation |

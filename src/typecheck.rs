@@ -148,7 +148,7 @@ impl<'sess> TypeChecker<'sess> {
             },
 
             ExprKind::Declare(_, _, _) => {
-                self.session.get_type(node.id).unwrap()
+                scope.make_obj(self.session, String::from("()"), vec!())?
             },
 
             ExprKind::Identifier(ident) => {
