@@ -68,22 +68,25 @@ impl<'sess> Visitor for ExportsCollector<'sess> {
     }
 
     fn visit_declare(&mut self, id: NodeID, vis: Visibility, ident: &Ident, _ttype: &Type) -> Result<Self::Return, Error> {
+        let defid = self.session.get_ref(id)?;
         let scope = self.stack.get_scope();
-        self.declarations.push_str(&emit_declaration(self.session, scope.clone(), id, vis, &ident.name));
+        self.declarations.push_str(&emit_declaration(self.session, scope.clone(), defid, vis, &ident.name));
         Ok(())
     }
 
     fn visit_function(&mut self, id: NodeID, vis: Visibility, ident: &Option<Ident>, _args: &Vec<Argument>, _rettype: &Option<Type>, _body: &Expr, _abi: ABI) -> Result<Self::Return, Error> {
         if let Some(ref ident) = *ident {
+            let defid = self.session.get_ref(id)?;
             let scope = self.stack.get_scope();
-            self.declarations.push_str(&emit_declaration(self.session, scope.clone(), id, vis, &ident.name));
+            self.declarations.push_str(&emit_declaration(self.session, scope.clone(), defid, vis, &ident.name));
         }
         // TODO we would walk the body here to search everything that's publically visable, but currently only top level functions are exported
         Ok(())
     }
 
     fn visit_class(&mut self, id: NodeID, classspec: &ClassSpec, parentspec: &Option<ClassSpec>, body: &Vec<Expr>) -> Result<Self::Return, Error> {
-        let tscope = self.session.map.get(&id);
+        let defid = self.session.get_ref(id)?;
+        let tscope = self.session.map.get(&defid);
         let namespec = unparse_type(self.session, tscope.clone(), Type::from_spec(classspec.clone(), UniqueID(0)));
         let fullspec = if parentspec.is_some() {
             format!("{} extends {}", namespec, unparse_type(self.session, tscope.clone(), Type::from_spec(parentspec.clone().unwrap(), UniqueID(0))))
@@ -97,17 +100,20 @@ impl<'sess> Visitor for ExportsCollector<'sess> {
         for node in body {
             match &node.kind {
                 ExprKind::Definition(mutable, ident, _, _) => {
+                    let defid = self.session.get_ref(node.id)?;
                     self.declarations.push_str("    ");
-                    self.declarations.push_str(&emit_field(self.session, tscope.clone(), node.id, *mutable, &ident.name));
+                    self.declarations.push_str(&emit_field(self.session, tscope.clone(), defid, *mutable, &ident.name));
                 },
                 ExprKind::Declare(vis, ident, _) => {
+                    let defid = self.session.get_ref(node.id)?;
                     self.declarations.push_str("    ");
-                    self.declarations.push_str(&emit_declaration(self.session, tscope.clone(), node.id, *vis, &ident.name));
+                    self.declarations.push_str(&emit_declaration(self.session, tscope.clone(), defid, *vis, &ident.name));
                 },
                 ExprKind::Function(vis, ident, _, _, _, _) => {
                     if let Some(ref ident) = *ident {
+                        let defid = self.session.get_ref(node.id)?;
                         self.declarations.push_str("    ");
-                        self.declarations.push_str(&emit_declaration(self.session, tscope.clone(), node.id, *vis, &ident.name));
+                        self.declarations.push_str(&emit_declaration(self.session, tscope.clone(), defid, *vis, &ident.name));
                     }
                 },
                 _ => {  },

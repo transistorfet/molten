@@ -117,7 +117,7 @@ pub enum ExprKind {
     Accessor(R<Expr>, Ident, NodeID),
 
     Block(Vec<Expr>),
-    Invoke(R<Expr>, Vec<Expr>),
+    Invoke(R<Expr>, Vec<Expr>, NodeID),
 
     SideEffect(Ident, Vec<Expr>),
     If(R<Expr>, R<Expr>, R<Expr>),
@@ -318,7 +318,7 @@ impl Expr {
 
     #[allow(dead_code)]
     pub fn make_invoke(pos: Pos, fexpr: Expr, args: Vec<Expr>) -> Expr {
-        Expr { id: NodeID::generate(), pos: pos, kind: ExprKind::Invoke(r(fexpr), args) }
+        Expr { id: NodeID::generate(), pos: pos, kind: ExprKind::Invoke(r(fexpr), args, NodeID::generate()) }
     }
 
     #[allow(dead_code)]

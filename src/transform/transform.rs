@@ -269,13 +269,13 @@ impl<'sess> Transformer<'sess> {
             },
 
             ExprKind::Declare(vis, ident, _) => {
-                let ttype = self.session.get_type(node.id).unwrap();
+                let ttype = self.session.get_type_from_ref(node.id).unwrap();
                 let abi = ttype.get_abi().unwrap();
                 self.transform_func_decl(abi, node.id, *vis, &ident.name, &ttype)
             },
 
-            ExprKind::Invoke(func, args) => {
-                let abi = self.session.get_type(node.id).unwrap().get_abi().unwrap();
+            ExprKind::Invoke(func, args, fid) => {
+                let abi = self.session.get_type(*fid).unwrap().get_abi().unwrap();
                 self.transform_func_invoke(abi, node.id, func, args)
             },
 
@@ -415,11 +415,12 @@ impl<'sess> Transformer<'sess> {
     }
 
     fn transform_enum_def(&mut self, id: NodeID, name: &String) -> Vec<LLExpr> {
+        let defid = self.session.get_ref(id).unwrap();
         let selector = LLType::I8;
-        let enumdef = self.session.get_def(id).unwrap().as_enum().unwrap();
+        let enumdef = self.session.get_def(defid).unwrap().as_enum().unwrap();
 
-        self.add_global(LLGlobal::DefNamedStruct(id, name.clone(), false));
-        self.set_type(id, LLType::Alias(id));
+        self.add_global(LLGlobal::DefNamedStruct(defid, name.clone(), false));
+        self.set_type(defid, LLType::Alias(defid));
 
         let mut types = vec!();
         for (i, variant) in enumdef.variants.borrow().iter().enumerate() {
@@ -430,7 +431,7 @@ impl<'sess> Transformer<'sess> {
             }
         }
 
-        self.add_global(LLGlobal::SetStructBody(id, vec!(selector.clone(), LLType::Largest(types)), false));
+        self.add_global(LLGlobal::SetStructBody(defid, vec!(selector.clone(), LLType::Largest(types)), false));
         vec!()
     }
 
@@ -479,9 +480,10 @@ impl<'sess> Transformer<'sess> {
     }
 
     fn transform_def_local(&mut self, id: NodeID, name: &String, value: &Expr) -> Vec<LLExpr> {
+        let defid = self.session.get_ref(id).unwrap();
         let mut exprs = vec!();
         let valexpr = self.transform_as_result(&mut exprs, value).unwrap();
-        exprs.extend(self.create_def_local(id, name, valexpr));
+        exprs.extend(self.create_def_local(defid, name, valexpr));
         exprs
     }
 
@@ -563,17 +565,19 @@ impl<'sess> Transformer<'sess> {
     }
 
     fn transform_func_decl(&mut self, abi: ABI, id: NodeID, vis: Visibility, name: &String, ttype: &Type) -> Vec<LLExpr> {
+        let defid = self.session.get_ref(id).unwrap();
         match abi {
-            ABI::C | ABI::MoltenFunc => self.transform_cfunc_decl(id, vis, name, ttype),
-            ABI::Molten | ABI::Unknown => self.transform_closure_decl(id, vis, name, ttype),
+            ABI::C | ABI::MoltenFunc => self.transform_cfunc_decl(defid, vis, name, ttype),
+            ABI::Molten | ABI::Unknown => self.transform_closure_decl(defid, vis, name, ttype),
             _ => panic!("Not Implemented: {:?}", abi),
         }
     }
 
     pub fn transform_func_def(&mut self, abi: ABI, id: NodeID, vis: Visibility, name: Option<&String>, args: &Vec<Argument>, body: &Expr) -> Vec<LLExpr> {
+        let defid = self.session.get_ref(id).unwrap();
         match abi {
-            ABI::C | ABI::MoltenFunc => self.transform_cfunc_def(id, vis, name, args, body),
-            ABI::Molten | ABI::Unknown => self.transform_closure_def(id, vis, name, args, body),
+            ABI::C | ABI::MoltenFunc => self.transform_cfunc_def(defid, vis, name, args, body),
+            ABI::Molten | ABI::Unknown => self.transform_closure_def(defid, vis, name, args, body),
             _ => panic!("Not Implemented: {:?}", abi),
         }
     }
@@ -638,38 +642,38 @@ impl<'sess> Transformer<'sess> {
         LLType::Function(argtypes, r(rettype))
     }
 
-    fn transform_cfunc_decl(&mut self, id: NodeID, _vis: Visibility, name: &String, _ttype: &Type) -> Vec<LLExpr> {
-        let fname = self.transform_func_name(Some(name), id);
-        let ftype = self.session.get_type(id).unwrap();
+    fn transform_cfunc_decl(&mut self, defid: NodeID, _vis: Visibility, name: &String, _ttype: &Type) -> Vec<LLExpr> {
+        let fname = self.transform_func_name(Some(name), defid);
+        let ftype = self.session.get_type(defid).unwrap();
         let (argtypes, rettype, _) = ftype.get_function_types().unwrap();
         let lftype = self.transform_cfunc_def_type(&argtypes.as_vec(), rettype);
-        self.add_global(LLGlobal::DeclCFunc(id, fname, lftype, LLCC::CCC));
-        vec!(LLExpr::GetValue(id))
+        self.add_global(LLGlobal::DeclCFunc(defid, fname, lftype, LLCC::CCC));
+        vec!(LLExpr::GetValue(defid))
     }
 
     fn transform_cfunc_def_args(&mut self, args: &Vec<Argument>) -> Vec<(NodeID, String)> {
-        args.iter().map(|arg| (arg.id, arg.ident.name.clone())).collect()
+        args.iter().map(|arg| (self.session.get_ref(arg.id).unwrap(), arg.ident.name.clone())).collect()
     }
 
-    fn transform_cfunc_def(&mut self, id: NodeID, vis: Visibility, name: Option<&String>, args: &Vec<Argument>, body: &Expr) -> Vec<LLExpr> {
-        let fscope = self.session.map.get(&id);
-        let fname = self.transform_func_name(name, id);
+    fn transform_cfunc_def(&mut self, defid: NodeID, vis: Visibility, name: Option<&String>, args: &Vec<Argument>, body: &Expr) -> Vec<LLExpr> {
+        let fscope = self.session.map.get(&defid);
+        let fname = self.transform_func_name(name, defid);
 
-        let ftype = self.session.get_type(id).unwrap();
+        let ftype = self.session.get_type(defid).unwrap();
         let (argtypes, rettype, _) = ftype.get_function_types().unwrap();
         let lftype = self.transform_cfunc_def_type(&argtypes.as_vec(), rettype);
-        self.set_type(id, lftype.clone());
+        self.set_type(defid, lftype.clone());
 
         let fargs = self.transform_cfunc_def_args(args);
 
         self.stack.push_scope(fscope.clone());
-        self.with_context(CodeContext::Func(ABI::C, id), |transform| {
+        self.with_context(CodeContext::Func(ABI::C, defid), |transform| {
             let llvis = transform.transform_vis(vis);
             let llbody = transform.transform_node(body);
-            transform.add_global(LLGlobal::DefCFunc(id, llvis, fname, lftype, fargs, llbody, LLCC::CCC));
+            transform.add_global(LLGlobal::DefCFunc(defid, llvis, fname, lftype, fargs, llbody, LLCC::CCC));
         });
         self.stack.pop_scope();
-        vec!(LLExpr::GetValue(id))
+        vec!(LLExpr::GetValue(defid))
     }
 
     fn transform_cfunc_invoke(&mut self, _id: NodeID, func: &Expr, args: &Vec<Expr>) -> Vec<LLExpr> {
@@ -723,29 +727,29 @@ impl<'sess> Transformer<'sess> {
         fargs.push((exp_id, String::from("__exception__")));
     }
 
-    fn transform_mfunc_def(&mut self, id: NodeID, vis: Visibility, name: Option<&String>, args: &Vec<Argument>, body: &Expr) -> Vec<LLExpr> {
-        let fscope = self.session.map.get(&id);
-        let fname = self.transform_func_name(name, id);
+    fn transform_mfunc_def(&mut self, defid: NodeID, vis: Visibility, name: Option<&String>, args: &Vec<Argument>, body: &Expr) -> Vec<LLExpr> {
+        let fscope = self.session.map.get(&defid);
+        let fname = self.transform_func_name(name, defid);
 
-        let ftype = self.session.get_type(id).unwrap();
+        let ftype = self.session.get_type(defid).unwrap();
         let (argtypes, rettype, _) = ftype.get_function_types().unwrap();
         let lftype = self.transform_mfunc_def_type(&argtypes.as_vec(), rettype);
-        self.set_type(id, lftype.clone());
+        self.set_type(defid, lftype.clone());
 
         let exp_id = NodeID::generate();
         let mut fargs = self.transform_cfunc_def_args(args);
         self.convert_mfunc_def_args(exp_id, &mut fargs);
 
-        self.with_context(CodeContext::Func(ABI::MoltenFunc, id), |transform| {
+        self.with_context(CodeContext::Func(ABI::MoltenFunc, defid), |transform| {
             transform.with_exception(exp_id, |transform| {
                 transform.with_scope(fscope, |transform| {
                     let llvis = transform.transform_vis(vis);
                     let llbody = transform.transform_node(body);
-                    transform.add_global(LLGlobal::DefCFunc(id, llvis, fname, lftype, fargs, llbody, LLCC::FastCC));
+                    transform.add_global(LLGlobal::DefCFunc(defid, llvis, fname, lftype, fargs, llbody, LLCC::FastCC));
                 });
             });
         });
-        vec!(LLExpr::GetValue(id))
+        vec!(LLExpr::GetValue(defid))
     }
 
     fn transform_mfunc_invoke(&mut self, _id: NodeID, func: &Expr, args: &Vec<Expr>) -> Vec<LLExpr> {
@@ -815,13 +819,13 @@ impl<'sess> Transformer<'sess> {
         (cfid, cfname, cftype)
     }
 
-    fn transform_closure_decl(&mut self, id: NodeID, _vis: Visibility, name: &String, ttype: &Type) -> Vec<LLExpr> {
-        let fname = self.transform_func_name(Some(name), id);
+    fn transform_closure_decl(&mut self, defid: NodeID, _vis: Visibility, name: &String, ttype: &Type) -> Vec<LLExpr> {
+        let fname = self.transform_func_name(Some(name), defid);
         let ftype = self.transform_value_type(ttype);
 
         let did = NodeID::generate();
         self.add_global(LLGlobal::DefGlobal(did, LLLink::Once, fname, ftype));
-        vec!(LLExpr::SetValue(id, r(LLExpr::GetLocal(did))))
+        vec!(LLExpr::SetValue(defid, r(LLExpr::GetLocal(did))))
     }
 
     fn convert_closure_def_args(&mut self, cl: ClosureDefRef, exp_id: NodeID, fargs: &mut Vec<(NodeID, String)>) {
@@ -829,13 +833,13 @@ impl<'sess> Transformer<'sess> {
         self.convert_mfunc_def_args(exp_id, fargs);
     }
 
-    fn transform_closure_def(&mut self, id: NodeID, vis: Visibility, name: Option<&String>, args: &Vec<Argument>, body: &Expr) -> Vec<LLExpr> {
+    fn transform_closure_def(&mut self, defid: NodeID, vis: Visibility, name: Option<&String>, args: &Vec<Argument>, body: &Expr) -> Vec<LLExpr> {
         let scope = self.stack.get_scope();
-        let fscope = self.session.map.get(&id);
-        let fname = self.transform_func_name(name, id);
-        let (cfid, cfname, cftype) = self.transform_closure_raw_func_data(id, &fname);
+        let fscope = self.session.map.get(&defid);
+        let fname = self.transform_func_name(name, defid);
+        let (cfid, cfname, cftype) = self.transform_closure_raw_func_data(defid, &fname);
 
-        let cl = self.session.get_def(id).unwrap().as_closure().unwrap();
+        let cl = self.session.get_def(defid).unwrap().as_closure().unwrap();
 
         // Add context argument to transformed arguments list
         let exp_id = NodeID::generate();
@@ -844,12 +848,12 @@ impl<'sess> Transformer<'sess> {
             transform.convert_closure_def_args(cl.clone(), exp_id, &mut fargs);
         });
 
-        let ptype = self.convert_closure_molten_type(self.session.get_type(id).unwrap());
+        let ptype = self.convert_closure_molten_type(self.session.get_type(defid).unwrap());
         cl.add_field(self.session, cfid, "__func__", ptype.clone(), Define::Never);
 
         // Transforms body and create C function definition
         let index = self.globals.len();
-        let body = self.with_context(CodeContext::Func(ABI::Molten, id), |transform| {
+        let body = self.with_context(CodeContext::Func(ABI::Molten, defid), |transform| {
             transform.with_exception(exp_id, |transform| {
                 transform.with_scope(fscope, |transform| {
                     transform.transform_node(body)
@@ -885,13 +889,15 @@ impl<'sess> Transformer<'sess> {
         binding::NameBinder::bind_names(self.session, scope.clone(), &code);
         typecheck::TypeChecker::check(self.session, scope.clone(), &code);
         let mut exprs = self.transform_vec(&code);
-        exprs.push(LLExpr::SetValue(id, r(LLExpr::GetLocal(did))));
-        exprs.push(LLExpr::GetValue(id));
+        let did_defid = self.session.get_ref(did).unwrap();
+
+        exprs.push(LLExpr::SetValue(defid, r(LLExpr::GetLocal(did_defid))));
+        exprs.push(LLExpr::GetValue(defid));
 
         if vis == Visibility::Public {
             let gid = NodeID::generate();
             self.add_global(LLGlobal::DefGlobal(gid, LLLink::Once, fname.clone(), structtype));
-            exprs.push(LLExpr::SetGlobal(gid, r(LLExpr::GetLocal(did))));
+            exprs.push(LLExpr::SetGlobal(gid, r(LLExpr::GetLocal(did_defid))));
         }
 
         exprs
@@ -1040,9 +1046,10 @@ impl<'sess> Transformer<'sess> {
     }
 
     fn transform_class_body(&mut self, id: NodeID, body: &Vec<Expr>) -> Vec<LLExpr> {
+        let defid = self.session.get_ref(id).unwrap();
         let mut exprs = vec!();
-        let tscope = self.session.map.get(&id);
-        let classdef = self.session.get_def(id).unwrap().as_class().unwrap();
+        let tscope = self.session.map.get(&defid);
+        let classdef = self.session.get_def(defid).unwrap().as_class().unwrap();
 
         self.transform_class_type_data(classdef.clone(), body);
 
@@ -1054,7 +1061,7 @@ impl<'sess> Transformer<'sess> {
                         exprs.extend(transform.transform_func_def(*abi, node.id, *vis, ident.as_ref().map(|ident| &ident.name), args, body));
                     },
                     ExprKind::Declare(vis, ident, _) => {
-                        let ttype = transform.session.get_type(node.id).unwrap();
+                        let ttype = transform.session.get_type_from_ref(node.id).unwrap();
                         exprs.extend(transform.transform_func_decl(ttype.get_abi().unwrap(), node.id, *vis, &ident.name, &ttype));
                     },
                     ExprKind::Definition(_, _, _, _) => { },
@@ -1209,7 +1216,8 @@ impl<'sess> Transformer<'sess> {
                 exprs.extend(self.create_func_invoke(compabi, compfunc, vec!(LLExpr::GetValue(value_id), result)));
             },
             PatKind::Binding(ident) => {
-                exprs.extend(self.create_def_local(pat.id, &ident.name, LLExpr::GetValue(value_id)));
+                let defid = self.session.get_ref(pat.id).unwrap();
+                exprs.extend(self.create_def_local(defid, &ident.name, LLExpr::GetValue(value_id)));
                 exprs.push(LLExpr::Literal(LLLit::I1(true)));
             },
             PatKind::Annotation(_, subpat) => {

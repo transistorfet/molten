@@ -1,5 +1,11 @@
 
-* for Expr resolve and accessor, the oid's could maybe be integrated into the ident?
+* all the def ids are now separate from the AST ids, but there are still some types that are taken from the ast id and not the ref->defid
+
+* when a class has a member that is a closure function pointer, and that class is instantiated, then the compiler will segfault during optimization.
+  It only happens if when trying to zero the allocated memory after calling molten_malloc to allocate a new object, but it happens either with a
+  "store zeroinitialize" instruction, or attempting to call memset(), and only if I use LLVMGetElementType(rtype).  If I zeroinitialize another
+  type or pass a const for size to memset(), it compiles without segfaulting.  It works without the zeroing even though molten_malloc() is passed
+  the same LLVMGetElementType(rtype) size determiner...
 
 * the lists.mol test is failing when indexing a literal list because it gets turned into a method call, which duplicates the list creation block,
   which causes a duplicate definition error.  Before the HIR change, the object ast was copied to the first argument, which duplicated all the IDs so
@@ -7,6 +13,11 @@
   AST blocks, which is why it used to work.
 * only when using llvm 11, and only with the match tt {} expr in reducedtest.mol, and optimizations enabled, the compiler hangs without ever completing
   In the test, the match is inside a function, but when moved to the top level, it hangs while compiling.  It happens regardless of mathc arm it seems
+
+* the mangle function doesn't convert dashes (-) in filenames into underscores
+* for Expr resolve and accessor, the oid's could maybe be integrated into the ident?
+
+
 
 * can you remove access to getindex, buffer, etc?
 * you have to disallow the situation where a function returns a type variable that doesn't appear elsewhere in the definition, but that is then cast to a concrete type.  This

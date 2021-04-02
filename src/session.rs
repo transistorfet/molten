@@ -108,8 +108,18 @@ impl Session {
         err
     }
 
+    pub fn new_def_id(&self, refid: NodeID) -> NodeID {
+        let defid = NodeID::generate();
+        self.set_ref(refid, defid);
+        debug!("NEW DEF: {:?} created from ref {:?}", defid, refid);
+        defid
+    }
+
     pub fn set_def(&self, id: NodeID, def: Def) {
 debug!("SET DEF: {:?} = {:?}", id, def);
+        //if let Some(existing) = self.defs.borrow().get(&id) {
+        //    panic!("Definition {} already set to {:#?} but trying to set it to {:#?}", id, existing, def);
+        //}
         self.defs.borrow_mut().insert(id, def);
     }
 
@@ -123,6 +133,11 @@ debug!("SET DEF: {:?} = {:?}", id, def);
 
     pub fn set_ref(&self, id: NodeID, defid: NodeID) {
 debug!("SET REF: {:?} -> {:?}", id, defid);
+        //if let Some(existing) = self.refs.borrow().get(&id) {
+        //    if defid != *existing {
+        //        panic!("Ref {} already set to {} but trying to set it to {}", id, existing, defid);
+        //    }
+        //}
         self.refs.borrow_mut().insert(id, defid);
     }
 
@@ -160,7 +175,7 @@ debug!("SET REF: {:?} -> {:?}", id, defid);
         use types;
 
         let etype = self.get_type(id);
-        let ntype = match etype {
+        let ntype = match etype.clone() {
             // NOTE don't update a variable with itself or it will cause infinite recursion due to the update call in check_type
             Some(Type::Variable(_, eid, _)) if eid == id => ttype,
             etype @ Some(_) => {
@@ -168,6 +183,7 @@ debug!("SET REF: {:?} -> {:?}", id, defid);
             },
             None => ttype,
         };
+        debug!("Updating type id {:?} from {:?} -> {:?}", id, etype, ntype);
         self.set_type(id, ntype);
         Ok(())
     }
@@ -180,7 +196,7 @@ debug!("SET REF: {:?} -> {:?}", id, defid);
             let ttype = self.get_type(key).unwrap();
             match types::resolve_type(self, ttype.clone(), true) {
                 Ok(ntype) => {
-                    debug!("$$$$$$$: {:?} {:?} {:?}", key, ttype, ntype);
+                    debug!("Resolving type for id {:?} from {:?} to {:?}", key, ttype, ntype);
                     self.set_type(key, ntype);
                 },
                 Err(err) => self.print_error(err),

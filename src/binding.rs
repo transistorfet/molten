@@ -59,17 +59,20 @@ impl<'sess> Visitor for NameBinder<'sess> {
     }
 
     fn visit_function(&mut self, id: NodeID, vis: Visibility, ident: &Option<Ident>, args: &Vec<Argument>, rettype: &Option<Type>, body: &Expr, abi: ABI) -> Result<Self::Return, Error> {
+        let defid = self.session.new_def_id(id);
+
         let scope = self.stack.get_scope();
-        let fscope = self.session.map.add(id, Some(scope.clone()));
-        fscope.set_basename(ident.as_ref().map_or(format!("anon{}", id), |ident| ident.name.clone()));
+        let fscope = self.session.map.add(defid, Some(scope.clone()));
+        fscope.set_basename(ident.as_ref().map_or(format!("anon{}", defid), |ident| ident.name.clone()));
 
         // Check for typevars in the type params
         let mut argtypes = vec!();
         for ref arg in args.iter() {
+            let arg_defid = self.session.new_def_id(arg.id);
             let mut ttype = arg.ttype.clone();
             bind_type_names(self.session, fscope.clone(), ttype.as_mut(), false)?;
             // TODO this is assumed to be always immutable, but maybe shouldn't be
-            ArgDef::define(self.session, fscope.clone(), arg.id, Mutability::Immutable, &arg.ident.name, ttype.clone())?;
+            ArgDef::define(self.session, fscope.clone(), arg_defid, Mutability::Immutable, &arg.ident.name, ttype.clone())?;
             argtypes.push(ttype.unwrap_or_else(|| scope.new_typevar(self.session, false)));
         }
         let mut rettype = rettype.clone();
@@ -79,7 +82,7 @@ impl<'sess> Visitor for NameBinder<'sess> {
         let nftype = Type::Function(r(Type::Tuple(argtypes)), r(rettype.unwrap_or_else(|| scope.new_typevar(self.session, false))), abi);
 
         // Define the function variable and it's arguments variables
-        AnyFunc::define(self.session, scope.clone(), id, vis, &ident.as_ref().map(|ref ident| String::from(ident.as_str())), abi, Some(nftype))?;
+        AnyFunc::define(self.session, scope.clone(), defid, vis, &ident.as_ref().map(|ref ident| String::from(ident.as_str())), abi, Some(nftype))?;
 
         self.with_scope(fscope, |visitor| {
             visitor.visit_node(body)
@@ -87,19 +90,23 @@ impl<'sess> Visitor for NameBinder<'sess> {
     }
 
     fn visit_definition(&mut self, id: NodeID, mutable: Mutability, ident: &Ident, ttype: &Option<Type>, expr: &Expr) -> Result<Self::Return, Error> {
+        let defid = self.session.new_def_id(id);
+
         let scope = self.stack.get_scope();
         let mut ttype = ttype.clone();
         bind_type_names(self.session, scope.clone(), ttype.as_mut(), false)?;
-        AnyVar::define(self.session, scope.clone(), id, mutable, &ident.name, ttype)?;
+        AnyVar::define(self.session, scope.clone(), defid, mutable, &ident.name, ttype)?;
         self.visit_node(expr)
     }
 
     fn visit_declare(&mut self, id: NodeID, vis: Visibility, ident: &Ident, ttype: &Type) -> Result<Self::Return, Error> {
+        let defid = self.session.new_def_id(id);
+
         let scope = self.stack.get_scope();
         let mut ttype = ttype.clone();
         bind_type_names(self.session, scope.clone(), Some(&mut ttype), false)?;
         let abi = ttype.get_abi().unwrap_or(ABI::Molten);
-        AnyFunc::define(self.session, scope.clone(), id, vis, &Some(ident.name.clone()), abi, Some(ttype))?;
+        AnyFunc::define(self.session, scope.clone(), defid, vis, &Some(ident.name.clone()), abi, Some(ttype))?;
         Ok(())
     }
 
@@ -155,8 +162,10 @@ impl<'sess> Visitor for NameBinder<'sess> {
     }
 
     fn visit_class(&mut self, id: NodeID, classspec: &ClassSpec, parentspec: &Option<ClassSpec>, body: &Vec<Expr>) -> Result<Self::Return, Error> {
+        let defid = self.session.new_def_id(id);
+
         let scope = self.stack.get_scope();
-        let tscope = self.session.map.get_or_add(id, Some(scope.clone()));
+        let tscope = self.session.map.get_or_add(defid, Some(scope.clone()));
 
         // Check for typevars in the type params
         let mut classspec = classspec.clone();
@@ -166,7 +175,7 @@ impl<'sess> Visitor for NameBinder<'sess> {
             bind_classspec_type_names(self.session, tscope.clone(), pspec, false)?;
         }
 
-        let classtype = Type::Object(classspec.ident.name, id, classspec.types);
+        let classtype = Type::Object(classspec.ident.name, defid, classspec.types);
         let parenttype = match parentspec {
             Some(p) => Some(scope.make_obj(self.session, p.ident.name.clone(), p.types.clone())?),
             None => None
@@ -174,7 +183,7 @@ impl<'sess> Visitor for NameBinder<'sess> {
         //let classtype = Type::from_spec(classspec.clone());
         //let parenttype = parentspec.clone().map(|p| Type::from_spec(p));
 
-        ClassDef::define(self.session, scope, id, classtype, parenttype)?;
+        ClassDef::define(self.session, scope, defid, classtype, parenttype)?;
 
         self.with_scope(tscope, |visitor| {
             visitor.visit_vec(body)
@@ -182,31 +191,35 @@ impl<'sess> Visitor for NameBinder<'sess> {
     }
 
     fn visit_type_alias(&mut self, id: NodeID, classspec: &ClassSpec, ttype: &Type) -> Result<Self::Return, Error> {
+        let defid = self.session.new_def_id(id);
+
         let scope = self.stack.get_scope();
         let mut ttype = ttype.clone();
         let mut classspec = classspec.clone();
         bind_classspec_type_names(self.session, scope.clone(), &mut classspec, true)?;
         bind_type_names(self.session, scope.clone(), Some(&mut ttype), false)?;
 
-        let deftype = Type::Object(classspec.ident.name, id, classspec.types);
-        TypeAliasDef::define(self.session, scope.clone(), id, deftype, ttype)?;
-        //scope.define_type(classspec.ident.name.clone(), Some(id));
-        //self.session.set_type(id, ttype.clone());
+        let deftype = Type::Object(classspec.ident.name, defid, classspec.types);
+        TypeAliasDef::define(self.session, scope.clone(), defid, deftype, ttype)?;
+        //scope.define_type(classspec.ident.name.clone(), Some(defid));
+        //self.session.set_type(defid, ttype.clone());
         Ok(())
     }
 
     fn visit_enum(&mut self, id: NodeID, classspec: &ClassSpec, variants: &Vec<EnumVariant>) -> Result<Self::Return, Error> {
+        let defid = self.session.new_def_id(id);
+
         let scope = self.stack.get_scope();
         let mut classspec = classspec.clone();
         bind_classspec_type_names(self.session, scope.clone(), &mut classspec, true)?;
-        let deftype = Type::Object(classspec.ident.name, id, classspec.types);
-        let enumdef = EnumDef::define(self.session, scope.clone(), id, deftype)?;
+        let deftype = Type::Object(classspec.ident.name, defid, classspec.types);
+        let enumdef = EnumDef::define(self.session, scope.clone(), defid, deftype)?;
 
         for variant in variants.iter() {
             // TODO this still requires mut
             let mut variant = variant.clone();
             bind_type_names(self.session, scope.clone(), variant.ttype.as_mut(), false)?;
-            check_recursive_type(&variant.ttype.as_ref(), id)?;
+            check_recursive_type(&variant.ttype.as_ref(), defid)?;
             enumdef.add_variant(self.session, variant)?;
         }
         Ok(())
@@ -230,8 +243,10 @@ impl<'sess> Visitor for NameBinder<'sess> {
 
 
     fn visit_pattern_binding(&mut self, id: NodeID, ident: &Ident) -> Result<Self::Return, Error> {
+        let defid = self.session.new_def_id(id);
+
         let scope = self.stack.get_scope();
-        VarDef::define(self.session, scope.clone(), id, Mutability::Immutable, &ident.name, None)?;
+        VarDef::define(self.session, scope.clone(), defid, Mutability::Immutable, &ident.name, None)?;
         Ok(())
     }
 
@@ -293,19 +308,16 @@ pub fn bind_type_names(session: &Session, scope: ScopeRef, ttype: Option<&mut Ty
                 bind_type_names(session, scope, Some(ret.as_mut()), always_new)?;
             },
             &mut Type::Variable(ref name, ref mut id, existential) => {
-                debug!("DECLARING TYPEVAR: {:?} {:?}", name, id);
                 let vtype = match always_new {
                     true => scope.find_type_local(session, name),
                     false => scope.find_type(session, name),
                 };
                 match vtype {
                     Some(Type::Variable(_, ref eid, _)) => {
-                        debug!("FOUND VAR {:?}", eid);
                         *id = *eid
                     },
                     _ => {
                         *id = UniqueID::generate();
-                        debug!("SETTING {:?} TO {:?}", name, id);
                         let ttype = Type::Variable(name.clone(), *id, existential);
                         scope.define_type(name.clone(), Some(*id))?;
                         session.set_type(*id, ttype);

@@ -397,7 +397,7 @@ pub fn walk_node<R, V: Visitor<Return = R>>(visitor: &mut V, node: &Expr) -> Res
             visitor.visit_block(node.id, code)
         },
 
-        ExprKind::Invoke(func, args) => {
+        ExprKind::Invoke(func, args, fid) => {
             visitor.visit_invoke(node.id, func, args)
         },
 

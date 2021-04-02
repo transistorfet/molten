@@ -135,7 +135,8 @@ impl ClassDef {
         for ref node in body.iter() {
             match &node.kind {
                 ExprKind::Definition(ref mutable, ref ident, _, _) => {
-                    self.structdef.add_field(session, node.id, *mutable, ident.name.as_str(), session.get_type(node.id).unwrap(), Define::IfNotExists);
+                    let defid = session.get_ref(node.id).unwrap();
+                    self.structdef.add_field(session, defid, *mutable, ident.name.as_str(), session.get_type(defid).unwrap(), Define::IfNotExists);
                 },
                 _ => { }
             }
@@ -246,14 +247,16 @@ impl Vtable {
             match &node.kind {
                 ExprKind::Function(_, ref ident, _, _, _, _) => {
                     if let Some(Ident { ref name, .. }) = ident {
-                        self.add_entry(session, scope.clone(), node.id, name.as_str(), session.get_type(node.id).unwrap());
+                        let defid = session.get_ref(node.id).unwrap();
+                        self.add_entry(session, scope.clone(), defid, name.as_str(), session.get_type(defid).unwrap());
                     }
                 },
                 ExprKind::Declare(_, ref ident, _) => {
-                    let ttype = session.get_type(node.id).unwrap();
+                    let defid = session.get_ref(node.id).unwrap();
+                    let ttype = session.get_type(defid).unwrap();
                     match ttype {
                         Type::Function(_, _, _) => {
-                            self.add_entry(session, scope.clone(), node.id, ident.as_str(), ttype);
+                            self.add_entry(session, scope.clone(), defid, ident.as_str(), ttype);
                         },
                         _ => { },
                     }

@@ -24,7 +24,8 @@ pub fn print_types_node(session: &Session, scope: ScopeRef, node: &Expr) {
     match &node.kind {
         ExprKind::Block(body) => print_types(session, scope, body),
         ExprKind::Function(_, _, _, _, body, _) => {
-            let fscope = session.map.get(&node.id);
+            let defid = session.get_ref(node.id).unwrap();
+            let fscope = session.map.get(&defid);
             print_types_scope(session, fscope.clone());
             print_types_node(session, fscope, body);
         },

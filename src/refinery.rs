@@ -108,7 +108,7 @@ impl<'sess> Refinery<'sess> {
                 if let ExprKind::Accessor(ref expr, _, _) = fexpr.kind {
                     args.insert(0, *expr.clone());
                 }
-                Expr::new(pos, ExprKind::Invoke(r(fexpr), args))
+                Expr::new(pos, ExprKind::Invoke(r(fexpr), args, NodeID::generate()))
             },
 
             AST::SideEffect(pos, op, args) => {
