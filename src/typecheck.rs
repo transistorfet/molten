@@ -6,11 +6,13 @@ use scope::{ Scope, ScopeRef };
 use hir::{ NodeID, AssignType, Literal, Pattern, PatKind, Expr, ExprKind };
 use types::{ Type, Check, ABI, expect_type, resolve_type, check_type_params };
 use misc::{ r };
+use visitor::{ self, Visitor, ScopeStack };
 
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct TypeChecker<'sess> {
     pub session: &'sess Session,
+    pub stack: ScopeStack,
     //pub context: RefCell<Vec<CodeContext>>,
 }
 
@@ -19,32 +21,43 @@ impl<'sess> TypeChecker<'sess> {
     pub fn check(session: &'sess Session, scope: ScopeRef, code: &Vec<Expr>) -> Type {
         let typechecker = TypeChecker {
             session: session,
+            stack: ScopeStack::new(),
             //context: RefCell::new(vec!()),
         };
 
-        let ttype = typechecker.check_vec(scope, code);
+        typechecker.stack.push_scope(scope);
+        let ttype = typechecker.check_vec(code);
         if session.errors.get() > 0 {
             panic!("Exiting due to previous errors");
         }
         ttype
     }
 
-    pub fn check_vec(&self, scope: ScopeRef, code: &Vec<Expr>) -> Type {
+    fn with_scope<F, R>(&self, scope: ScopeRef, f: F) -> Result<R, Error> where F: FnOnce(&Self) -> Result<R, Error> {
+        self.stack.push_scope(scope);
+        let ret = f(self);
+        self.stack.pop_scope();
+        ret
+    }
+
+    pub fn check_vec(&self, code: &Vec<Expr>) -> Type {
+        let scope = self.stack.get_scope();
         let mut last: Type = scope.make_obj(self.session, String::from("()"), vec!()).unwrap();
         for node in code {
-            last = self.check_node(scope.clone(), node, None);
+            last = self.check_node(node, None);
         }
         last
     }
 
-    pub fn check_node(&self, scope: ScopeRef, node: &Expr, expected: Option<Type>) -> Type {
+    pub fn check_node(&self, node: &Expr, expected: Option<Type>) -> Type {
+        let scope = self.stack.get_scope();
         if let Some(ttype) = expected {
             if let Err(err) = self.session.update_type(scope.clone(), node.id, ttype) {
                 self.session.print_error(err.add_pos(&node.get_pos()));
             }
         }
 
-        let ttype = match self.check_node_or_error(scope.clone(), node) {
+        let ttype = match self.check_node_or_error(node) {
             Ok(ttype) => ttype,
             Err(err) => {
                 self.session.print_error(err.add_pos(&node.get_pos()));
@@ -65,13 +78,14 @@ impl<'sess> TypeChecker<'sess> {
         ttype
     }
 
-    pub fn check_node_or_error(&self, scope: ScopeRef, node: &Expr) -> Result<Type, Error> {
+    pub fn check_node_or_error(&self, node: &Expr) -> Result<Type, Error> {
         let rtype = match &node.kind {
             ExprKind::Literal(literal) => {
-                self.check_literal(scope.clone(), literal)?
+                self.check_literal(literal)?
             },
 
             ExprKind::Function(_, ident, args, _, body, abi) => {
+                let scope = self.stack.get_scope();
                 let defid = self.session.get_ref(node.id)?;
                 let fscope = self.session.map.get(&defid);
                 let dftype = self.session.get_type(defid).unwrap();
@@ -81,7 +95,7 @@ impl<'sess> TypeChecker<'sess> {
                 for arg in args.iter() {
                     let arg_defid = self.session.get_ref(arg.id)?;
                     let ttype = self.session.get_type(arg_defid);
-                    let vtype = arg.default.clone().map(|ref vexpr| self.check_node(scope.clone(), vexpr, ttype.clone()));
+                    let vtype = arg.default.clone().map(|ref vexpr| self.check_node(vexpr, ttype.clone()));
                     let mut atype = expect_type(self.session, fscope.clone(), ttype, vtype, Check::Def)?;
                     if &arg.ident.name[..] == "self" {
                         let stype = fscope.find_type(self.session, &String::from("Self")).unwrap();
@@ -91,7 +105,9 @@ impl<'sess> TypeChecker<'sess> {
                     argtypes.push(atype);
                 }
 
-                let rettype = expect_type(self.session, fscope.clone(), Some(rtype.clone()), Some(self.check_node(fscope.clone(), body, Some(rtype.clone()))), Check::Def)?;
+                let rettype = self.with_scope(fscope.clone(), |visitor| {
+                    expect_type(visitor.session, fscope.clone(), Some(rtype.clone()), Some(self.check_node(body, Some(rtype.clone()))), Check::Def)
+                })?;
 
                 // Resolve type variables that can be
                 for i in 0 .. argtypes.len() {
@@ -117,9 +133,10 @@ impl<'sess> TypeChecker<'sess> {
             },
 
             ExprKind::Invoke(fexpr, args, fid) => {
+                let scope = self.stack.get_scope();
                 let mut atypes = vec!();
                 for ref mut value in args {
-                    atypes.push(self.check_node(scope.clone(), value, None));
+                    atypes.push(self.check_node(value, None));
                 }
                 let atypes = Type::Tuple(atypes);
 
@@ -156,27 +173,31 @@ impl<'sess> TypeChecker<'sess> {
             },
 
             ExprKind::SideEffect(_, args) => {
+                let scope = self.stack.get_scope();
                 let mut ltype = None;
                 for ref expr in args {
-                    ltype = Some(expect_type(self.session, scope.clone(), ltype.clone(), Some(self.check_node(scope.clone(), expr, ltype.clone())), Check::List)?);
+                    ltype = Some(expect_type(self.session, scope.clone(), ltype.clone(), Some(self.check_node(expr, ltype.clone())), Check::List)?);
                 }
                 ltype.unwrap()
             },
 
             ExprKind::Definition(_, _, _, body) => {
+                let scope = self.stack.get_scope();
                 let defid = self.session.get_ref(node.id)?;
                 let dtype = self.session.get_type(defid);
-                let btype = expect_type(self.session, scope.clone(), dtype.clone(), Some(self.check_node(scope.clone(), body, dtype)), Check::Def)?;
+                let btype = expect_type(self.session, scope.clone(), dtype.clone(), Some(self.check_node(body, dtype)), Check::Def)?;
                 self.session.update_type(scope.clone(), defid, btype.clone())?;
                 self.session.update_type(scope.clone(), node.id, btype.clone())?;
                 btype
             },
 
             ExprKind::Declare(_, _, _) => {
+                let scope = self.stack.get_scope();
                 scope.make_obj(self.session, String::from("()"), vec!())?
             },
 
             ExprKind::Identifier(ident) => {
+                let scope = self.stack.get_scope();
                 if let Ok(ttype) = self.session.get_type_from_ref(node.id) {
                     ttype
                 } else {
@@ -190,38 +211,47 @@ impl<'sess> TypeChecker<'sess> {
                 }
             },
 
-            ExprKind::Block(body) => self.check_vec(scope, body),
+            ExprKind::Block(body) => self.check_vec(body),
 
             ExprKind::If(cond, texpr, fexpr) => {
+                let scope = self.stack.get_scope();
                 // TODO should this require the cond type to be Bool?
-                self.check_node(scope.clone(), cond, None);
-                let ttype = self.check_node(scope.clone(), texpr, None);
-                let ftype = self.check_node(scope.clone(), fexpr, Some(ttype.clone()));
+                self.check_node(cond, None);
+                let ttype = self.check_node(texpr, None);
+                let ftype = self.check_node(fexpr, Some(ttype.clone()));
                 expect_type(self.session, scope, Some(ttype), Some(ftype), Check::List)?
             },
 
             ExprKind::Match(cond, cases) => {
-                let mut ctype = self.check_node(scope.clone(), cond, None);
+                let scope = self.stack.get_scope();
+                let mut ctype = self.check_node(cond, None);
 
                 let mut rtype = None;
                 for ref case in cases {
                     let lscope = self.session.map.get(&case.id);
-                    ctype = expect_type(self.session, lscope.clone(), Some(ctype.clone()), Some(self.check_pattern_expected(lscope.clone(), &case.pat, Some(ctype.clone()))?), Check::List)?;
-                    rtype = Some(expect_type(self.session, lscope.clone(), rtype.clone(), Some(self.check_node(lscope.clone(), &case.body, rtype.clone())), Check::List)?);
+                    self.with_scope(lscope.clone(), |visitor| {
+                        ctype = expect_type(self.session, lscope.clone(), Some(ctype.clone()), Some(self.check_pattern_expected(&case.pat, Some(ctype.clone()))?), Check::List)?;
+                        rtype = Some(expect_type(self.session, lscope.clone(), rtype.clone(), Some(self.check_node(&case.body, rtype.clone())), Check::List)?);
+                        Ok(())
+                    })?;
                 }
 
                 rtype.unwrap()
             },
 
             ExprKind::Try(cond, cases) => {
-                let btype = self.check_node(scope.clone(), cond, None);
+                let scope = self.stack.get_scope();
+                let btype = self.check_node(cond, None);
                 let mut ctype = scope.make_obj(self.session, String::from("Exception"), vec!())?;
 
                 let mut rtype = None;
                 for ref case in cases {
                     let lscope = self.session.map.get(&case.id);
-                    ctype = expect_type(self.session, lscope.clone(), Some(ctype.clone()), Some(self.check_pattern_expected(lscope.clone(), &case.pat, Some(ctype.clone()))?), Check::List)?;
-                    rtype = Some(expect_type(self.session, lscope.clone(), rtype.clone(), Some(self.check_node(lscope.clone(), &case.body, rtype.clone())), Check::List)?);
+                    self.with_scope(lscope.clone(), |visitor| {
+                        ctype = expect_type(self.session, lscope.clone(), Some(ctype.clone()), Some(self.check_pattern_expected(&case.pat, Some(ctype.clone()))?), Check::List)?;
+                        rtype = Some(expect_type(self.session, lscope.clone(), rtype.clone(), Some(self.check_node(&case.body, rtype.clone())), Check::List)?);
+                        Ok(())
+                    })?;
                 }
 
                 expect_type(self.session, scope.clone(), Some(btype.clone()), rtype.clone(), Check::List)?;
@@ -229,27 +259,31 @@ impl<'sess> TypeChecker<'sess> {
             },
 
             ExprKind::Raise(expr) => {
+                let scope = self.stack.get_scope();
                 // TODO should you check for a special error/exception type?
                 let extype = scope.make_obj(self.session, String::from("Exception"), vec!())?;
-                expect_type(self.session, scope.clone(), Some(extype.clone()), Some(self.check_node(scope.clone(), expr, Some(extype))), Check::Def)?;
+                expect_type(self.session, scope.clone(), Some(extype.clone()), Some(self.check_node(expr, Some(extype))), Check::Def)?;
                 scope.make_obj(self.session, String::from("()"), vec!())?
             },
 
             ExprKind::While(cond, body) => {
+                let scope = self.stack.get_scope();
                 // TODO should this require the cond type to be Bool?
-                self.check_node(scope.clone(), cond, None);
-                self.check_node(scope.clone(), body, None);
+                self.check_node(cond, None);
+                self.check_node(body, None);
                 scope.make_obj(self.session, String::from("()"), vec!())?
             },
 
             ExprKind::Nil => {
+                let scope = self.stack.get_scope();
                 let ttype = self.session.get_type(node.id).unwrap_or_else(|| scope.new_typevar(self.session, false));
                 self.session.set_type(node.id, ttype.clone());
                 ttype
             },
 
             ExprKind::Ref(expr) => {
-                let ttype = self.check_node(scope.clone(), expr, None);
+                let scope = self.stack.get_scope();
+                let ttype = self.check_node(expr, None);
                 let rtype = Type::Ref(r(ttype));
                 let rtype = expect_type(self.session, scope.clone(), self.session.get_type(node.id), Some(rtype), Check::Def)?;
                 self.session.set_type(node.id, rtype.clone());
@@ -257,7 +291,8 @@ impl<'sess> TypeChecker<'sess> {
             },
 
             ExprKind::Deref(expr) => {
-                match self.check_node(scope.clone(), expr, None) {
+                let scope = self.stack.get_scope();
+                match self.check_node(expr, None) {
                     Type::Ref(etype) => {
                         let etype = expect_type(self.session, scope.clone(), self.session.get_type(node.id), Some(*etype), Check::Def)?;
                         self.session.set_type(node.id, etype.clone());
@@ -274,6 +309,7 @@ impl<'sess> TypeChecker<'sess> {
             },
 
             ExprKind::Tuple(items) => {
+                let scope = self.stack.get_scope();
                 // TODO would this not be a bug if the expected type was for some reason a variable?
                 //let etypes = match self.session.get_type(node.id) {
                 //    Some(ref e) => e.get_types()?.iter().map(|i| Some(i.clone())).collect(),
@@ -287,7 +323,7 @@ impl<'sess> TypeChecker<'sess> {
 
                 let mut types = vec!();
                 for (ref expr, etype) in items.iter().zip(etypes.iter()) {
-                    types.push(expect_type(self.session, scope.clone(), etype.clone(), Some(self.check_node(scope.clone(), expr, etype.clone())), Check::List)?);
+                    types.push(expect_type(self.session, scope.clone(), etype.clone(), Some(self.check_node(expr, etype.clone())), Check::List)?);
                 }
                 self.session.set_type(node.id, Type::Tuple(types.clone()));
                 Type::Tuple(types)
@@ -296,18 +332,19 @@ impl<'sess> TypeChecker<'sess> {
             ExprKind::Record(items) => {
                 let mut types = vec!();
                 for (ref ident, ref expr) in items {
-                    types.push((ident.name.clone(), self.check_node(scope.clone(), expr, None)));
+                    types.push((ident.name.clone(), self.check_node(expr, None)));
                 }
                 self.session.set_type(node.id, Type::Record(types.clone()));
                 Type::Record(types)
             },
 
             ExprKind::RecordUpdate(record, items) => {
-                let rtype = self.check_node(scope.clone(), record, None);
+                let scope = self.stack.get_scope();
+                let rtype = self.check_node(record, None);
 
                 for (ref ident, ref expr) in items {
                     let ftype = rtype.get_record_field(ident.name.as_str())?;
-                    let itype = self.check_node(scope.clone(), expr, None);
+                    let itype = self.check_node(expr, None);
                     expect_type(self.session, scope.clone(), Some(ftype.clone()), Some(itype), Check::Def)?;
                 }
                 self.session.set_type(node.id, rtype.clone());
@@ -316,18 +353,21 @@ impl<'sess> TypeChecker<'sess> {
 
             ExprKind::Enum(_, _) |
             ExprKind::TypeAlias(_, _) => {
+                let scope = self.stack.get_scope();
                 scope.make_obj(self.session, String::from("()"), vec!())?
             },
 
             ExprKind::PtrCast(_, code) => {
+                let scope = self.stack.get_scope();
                 let ttype = self.session.get_type(node.id);
-                let ctype = self.check_node(scope.clone(), code, ttype.clone());
+                let ctype = self.check_node(code, ttype.clone());
                 debug!("PTRCAST: {:?} <- {:?}", ttype, ctype);
                 expect_type(self.session, scope, ttype.clone(), Some(ctype), Check::List)?;
                 ttype.unwrap()
             },
 
             ExprKind::New(_) => {
+                let scope = self.stack.get_scope();
                 let classtype = self.session.get_type(node.id).unwrap();
                 let dtype = self.session.get_type_from_ref(node.id)?;
                 let tscope = Scope::new_ref(Some(scope.clone()));
@@ -337,20 +377,25 @@ impl<'sess> TypeChecker<'sess> {
             },
 
             ExprKind::Class(_, _, body) => {
+                let scope = self.stack.get_scope();
                 let defid = self.session.get_ref(node.id)?;
                 let tscope = self.session.map.get(&defid);
-                self.check_vec(tscope.clone(), body);
+                self.with_scope(tscope.clone(), |visitor| {
+                    Ok(self.check_vec(body))
+                })?;
                 scope.make_obj(self.session, String::from("()"), vec!())?
             },
 
             ExprKind::Resolver(_, _, _) |
             ExprKind::Accessor(_, _, _) => {
+                let scope = self.stack.get_scope();
                 let (refid, defid) = self.get_access_ids(scope.clone(), node)?.unwrap();
                 self.session.set_ref(refid, defid);
                 self.get_type_or_new_typevar(scope, defid, self.session.get_type(node.id))
             },
 
             ExprKind::Assignment(left, right, ty) => {
+                let scope = self.stack.get_scope();
                 // TODO this is duplicated in check_types_node(left)... can we avoid that
                 match self.get_access_ids(scope.clone(), left)? {
                     Some((_refid, defid)) => {
@@ -361,13 +406,14 @@ impl<'sess> TypeChecker<'sess> {
                     None => { }
                 }
 
-                let ltype = self.check_node(scope.clone(), left, None);
-                let rtype = self.check_node(scope.clone(), right, Some(ltype.clone()));
+                let ltype = self.check_node(left, None);
+                let rtype = self.check_node(right, Some(ltype.clone()));
                 expect_type(self.session, scope, Some(ltype), Some(rtype), Check::Def)?
             },
 
             ExprKind::Import(_, decls) => {
-                self.check_vec(scope.clone(), decls);
+                let scope = self.stack.get_scope();
+                self.check_vec(decls);
                 scope.make_obj(self.session, String::from("()"), vec!())?
             },
         };
@@ -376,7 +422,8 @@ impl<'sess> TypeChecker<'sess> {
         Ok(rtype)
     }
 
-    pub fn check_literal(&self, scope: ScopeRef, literal: &Literal) -> Result<Type, Error> {
+    pub fn check_literal(&self, literal: &Literal) -> Result<Type, Error> {
+        let scope = self.stack.get_scope();
         match literal {
             Literal::Unit => scope.make_obj(self.session, String::from("()"), vec!()),
             Literal::Boolean(_) => scope.make_obj(self.session, String::from("Bool"), vec!()),
@@ -387,22 +434,28 @@ impl<'sess> TypeChecker<'sess> {
         }
     }
 
-    pub fn check_pattern_expected(&self, scope: ScopeRef, pat: &Pattern, expected: Option<Type>) -> Result<Type, Error> {
+    pub fn check_pattern_expected(&self, pat: &Pattern, expected: Option<Type>) -> Result<Type, Error> {
+        let scope = self.stack.get_scope();
         if let Some(ttype) = expected {
             self.session.update_type(scope.clone(), pat.id, ttype)?;
         }
-        self.check_pattern(scope, pat)
+        self.check_pattern(pat)
     }
 
-    pub fn check_pattern(&self, scope: ScopeRef, pat: &Pattern) -> Result<Type, Error> {
+    pub fn check_pattern(&self, pat: &Pattern) -> Result<Type, Error> {
         match &pat.kind {
-            PatKind::Wild => Ok(self.session.get_type(pat.id).unwrap_or_else(|| scope.new_typevar(self.session, false))),
+            PatKind::Wild => {
+                let scope = self.stack.get_scope();
+                Ok(self.session.get_type(pat.id).unwrap_or_else(|| scope.new_typevar(self.session, false)))
+            },
             PatKind::Literal(lit) => {
-                let ltype = self.check_literal(scope.clone(), lit)?;
+                let scope = self.stack.get_scope();
+                let ltype = self.check_literal(lit)?;
                 self.link_comparison_func(scope.clone(), pat.id, &ltype)?;
                 Ok(ltype)
             },
             PatKind::Binding(_) => {
+                let scope = self.stack.get_scope();
                 let defid = self.session.get_ref(pat.id)?;
                 let btype = self.session.get_type(defid).unwrap_or_else(|| scope.new_typevar(self.session, false));
                 self.session.update_type(scope.clone(), defid, btype.clone())?;
@@ -410,11 +463,13 @@ impl<'sess> TypeChecker<'sess> {
                 Ok(btype)
             },
             PatKind::Annotation(_, subpat) => {
+                let scope = self.stack.get_scope();
                 let ttype = self.session.get_type(pat.id);
-                let etype = self.check_pattern_expected(scope.clone(), subpat, ttype.clone())?;
+                let etype = self.check_pattern_expected(subpat, ttype.clone())?;
                 expect_type(self.session, scope, ttype, Some(etype), Check::Def)
             },
             PatKind::Resolve(_left, field, oid) => {
+                let scope = self.stack.get_scope();
                 let ltype = self.session.get_type_from_ref(*oid).unwrap();
 
                 let vars = self.session.get_def(ltype.get_id()?)?.get_vars()?;
@@ -424,7 +479,8 @@ impl<'sess> TypeChecker<'sess> {
                 expect_type(self.session, scope, Some(ttype), self.session.get_type(pat.id), Check::Def)
             },
             PatKind::EnumArgs(left, args) => {
-                self.check_pattern(scope.clone(), left)?;
+                let scope = self.stack.get_scope();
+                self.check_pattern(left)?;
                 let variant_id = self.session.get_ref(left.get_id())?;
                 self.session.set_ref(pat.id, variant_id);
                 let enumdef = self.session.get_def(self.session.get_ref(variant_id)?)?.as_enum()?;
@@ -445,7 +501,7 @@ impl<'sess> TypeChecker<'sess> {
 
                         let mut argtypes = vec!();
                         for (arg, ttype) in args.iter().zip(types.iter()) {
-                            argtypes.push(self.check_pattern_expected(scope.clone(), &arg, Some(ttype.clone()))?);
+                            argtypes.push(self.check_pattern_expected(&arg, Some(ttype.clone()))?);
                         }
 
                         expect_type(self.session, scope.clone(), Some(rtype), Some(Type::Tuple(argtypes)), Check::Def)?;
@@ -486,7 +542,7 @@ impl<'sess> TypeChecker<'sess> {
                 Ok(Some((node.id, vars.get_var_def(&field.name).ok_or(Error::new(format!("VarError: definition not set for {:?}", field.name)))?)))
             },
             ExprKind::Accessor(left, field, oid) => {
-                let ltype = resolve_type(self.session, self.check_node(scope.clone(), left, None), false)?;
+                let ltype = resolve_type(self.session, self.check_node(left, None), false)?;
                 self.session.set_type(*oid, ltype.clone());
 
                 match ltype {
@@ -516,7 +572,7 @@ impl<'sess> TypeChecker<'sess> {
     pub fn session_find_variant(&self, scope: ScopeRef, invid: NodeID, fexpr: &Expr, argtypes: &Type) -> Result<Type, Error> {
         let (refid, defid) = match self.get_access_ids(scope.clone(), fexpr)? {
             Some(ids) => ids,
-            None => { return self.check_node_or_error(scope.clone(), fexpr); },
+            None => { return self.check_node_or_error(fexpr); },
         };
 
 
