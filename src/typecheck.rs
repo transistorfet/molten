@@ -129,7 +129,7 @@ impl<'sess> Visitor for TypeChecker<'sess> {
             //atype = expect_type(self.session, scope.clone(), atype, vtype, Check::Def)?;
 
             if &arg.ident.name[..] == "self" {
-                let stype = fscope.find_type(self.session, &String::from("Self")).unwrap();
+                let stype = fscope.find_type(self.session, &String::from("Self")).ok_or(Error::new(format!("NameError: undefined type \"Self\" in the current scope\n")))?;
                 atype = expect_type(self.session, Some(atype), Some(stype), Check::Def)?;
             }
             self.session.update_type(arg_defid, atype.clone())?;

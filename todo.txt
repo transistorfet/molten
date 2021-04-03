@@ -1,7 +1,6 @@
 
 * should you make all visitor functions take a reference to the node itself (since typecheck accessor/resolver needs to send the node onward)
 * all the def ids are now separate from the AST ids, but there are still some types that are taken from the ast id and not the ref->defid
-* the mangle function doesn't convert dashes (-) in filenames into underscores
 * in transform invoke, is there a better way to get the abi than to use an extra id to store the type?
 
 * convert transform to use visitor??
@@ -67,13 +66,11 @@
 
 
 BUGS:
-* when using an argument called 'self' in a non-method function, it causes an unwrap error
 * the overload check seems to fail in test.mol lines 94/111 with foo2 in Stuff because of the new overload code.  It's giving an overload error unless foo2 which takes a
   single Real is commented out.  It's because the types are added during the name binding phase.  This needs to be added as a test case
 * the infer-arg-as-typevar test fails because str() cannot be resolved to a concrete variant by the time it's typechecked (no backwards affect allowed)
 * there is still a bug with the Phi statement, in that it will return null if you don't cover all cases. there is no check for coverage
 * issue with calling function references store in structs or tuples... it converts them to methods incorrectly
-* sizeof can only calculate the size of a pointer.  I think it has to be an AST element in order to work
 * unwrap error when recursively calling in `let recfoo = fn x =>` because the actual DefLocal is inserted after the initializer code is transformed, but if this was fixed,
   would it be possible to access recfoo before it's been initialized, such as in `let something: Int = { something; 0 }`
 * parse error for if statements in an expression, they require brackets around them: let h = 5 + if r > 4 then 5 else 10
@@ -92,12 +89,9 @@ Error Messages:
 
 
 Refactoring:
-* make a visitor for all the ast stuff, and possibly make an HIR
 * improve storing of file info in the Pos structs (maybe rename to Span?)
 * change parser to take session argument or something so it can record the file info, and maybe do other advanced things
 * there must be a way to fix the 'scope exceptions' (Scope::target) that we're doing to make class bodies work... pass in an argument to all scoped functions?  or use scopemap and scope ids?
-* add the .set_id() functions to simplify ast builders
-* try making a simple trait for function transforms, for the 3 types (might be more trouble than the current approach)
 
 
 
