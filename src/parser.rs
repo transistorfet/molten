@@ -862,8 +862,8 @@ named!(character(Span) -> AST,
         delimited!(
             tag!("\'"),
             alt!(
-                map!(preceded!(tag!("\\"), escaped_character), |c| c[0] as i32) |
-                map!(anychar, |c| c as i32)
+                map!(preceded!(tag!("\\"), escaped_character), |c| c[0] as char) |
+                map!(anychar, |c| c as char)
             ),
             tag!("\'")
         ),
