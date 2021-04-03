@@ -116,7 +116,7 @@ impl Session {
     }
 
     pub fn set_def(&self, id: NodeID, def: Def) {
-debug!("SET DEF: {:?} = {:?}", id, def);
+        debug!("SET DEF: {:?} = {:?}", id, def);
         //if let Some(existing) = self.defs.borrow().get(&id) {
         //    panic!("Definition {} already set to {:#?} but trying to set it to {:#?}", id, existing, def);
         //}
@@ -132,7 +132,7 @@ debug!("SET DEF: {:?} = {:?}", id, def);
 
 
     pub fn set_ref(&self, id: NodeID, defid: NodeID) {
-debug!("SET REF: {:?} -> {:?}", id, defid);
+        debug!("SET REF: {:?} -> {:?}", id, defid);
         //if let Some(existing) = self.refs.borrow().get(&id) {
         //    if defid != *existing {
         //        panic!("Ref {} already set to {} but trying to set it to {}", id, existing, defid);
@@ -168,6 +168,14 @@ debug!("SET REF: {:?} -> {:?}", id, defid);
 
     pub fn get_type(&self, id: NodeID) -> Option<Type> {
         self.types.borrow().get(&id).map(|ttype| ttype.clone())
+    }
+
+    pub fn new_typevar(&self) -> Type {
+        let id = NodeID::generate();
+        let ttype = Type::Variable(format!("{}", id), id, false);
+        self.set_type(id, ttype.clone());
+        debug!("NEW TYPEVAR: {:?}", ttype);
+        ttype
     }
 
     #[must_use]

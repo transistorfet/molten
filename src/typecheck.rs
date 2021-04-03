@@ -3,7 +3,7 @@
 use defs::Def;
 use session::{ Session, Error };
 use scope::{ Scope, ScopeRef };
-use hir::{ NodeID, Visibility, Mutability, AssignType, Literal, Ident, Argument, ClassSpec, MatchCase, EnumVariant, Pattern, PatKind, Expr, ExprKind };
+use hir::{ NodeID, Visibility, Mutability, AssignType, Literal, Ident, Argument, ClassSpec, MatchCase, EnumVariant, Pattern, Expr, ExprKind };
 use types::{ Type, Check, ABI, expect_type, resolve_type, check_type_params };
 use misc::{ r };
 use visitor::{ self, Visitor, ScopeStack };
@@ -68,8 +68,7 @@ impl<'sess> Visitor for TypeChecker<'sess> {
     type Return = Type;
 
     fn default_return(&self) -> Type {
-        let scope = self.stack.get_scope();
-        scope.new_typevar(self.session, false)
+        self.session.new_typevar()
     }
 
     fn get_scope_stack<'a>(&'a self) -> &'a ScopeStack {
@@ -116,7 +115,7 @@ impl<'sess> Visitor for TypeChecker<'sess> {
         }
     }
 
-    fn visit_function(&mut self, refid: NodeID, vis: Visibility, ident: &Option<Ident>, args: &Vec<Argument>, rettype: &Option<Type>, body: &Expr, abi: ABI) -> Result<Self::Return, Error> {
+    fn visit_function(&mut self, refid: NodeID, _vis: Visibility, ident: &Option<Ident>, args: &Vec<Argument>, rettype: &Option<Type>, body: &Expr, abi: ABI) -> Result<Self::Return, Error> {
         let scope = self.stack.get_scope();
         let defid = self.session.get_ref(refid)?;
         let fscope = self.session.map.get(&defid);
@@ -126,7 +125,7 @@ impl<'sess> Visitor for TypeChecker<'sess> {
         let mut argtypes = vec!();
         for ref arg in args.iter() {
             let arg_defid = self.session.get_ref(arg.id)?;
-            let mut atype = self.session.get_type(arg_defid).unwrap_or_else(|| fscope.new_typevar(self.session, false));
+            let mut atype = self.session.get_type(arg_defid).unwrap_or_else(|| self.session.new_typevar());
 
             // TODO default args aren't used yet
             //let vtype = arg.default.clone().map(|ref vexpr| self.visit_node_expected(vexpr, ttype.clone()));
@@ -135,7 +134,6 @@ impl<'sess> Visitor for TypeChecker<'sess> {
             if &arg.ident.name[..] == "self" {
                 let stype = fscope.find_type(self.session, &String::from("Self")).unwrap();
                 atype = expect_type(self.session, fscope.clone(), Some(atype), Some(stype), Check::Def)?;
-                println!(">>> {:?} {:?} self {:?}", arg.id, arg_defid, atype);
             }
             self.session.update_type(fscope.clone(), arg_defid, atype.clone())?;
             argtypes.push(atype);
@@ -181,12 +179,12 @@ impl<'sess> Visitor for TypeChecker<'sess> {
         debug!("INVOKE TYPE: {:?} has type {:?}", refid, dtype);
         let etype = match dtype {
             Type::Variable(_, _, _) => dtype.clone(),
-            _ => tscope.map_all_typevars(self.session, dtype.clone()),
+            _ => Type::map_all_typevars(self.session, dtype.clone()),
         };
 
         let ftype = match etype {
             Type::Function(args, rettype, abi) => {
-                //let ftype = expect_type(self.session, tscope.clone(), Some(etype.clone()), Some(Type::Function(r(atypes), r(self.session.get_type(refid).unwrap_or_else(|| tscope.new_typevar(self.session, false))), abi)), Check::Update)?;
+                //let ftype = expect_type(self.session, tscope.clone(), Some(etype.clone()), Some(Type::Function(r(atypes), r(self.session.get_type(refid).unwrap_or_else(|| self.session.new_typevar())), abi)), Check::Update)?;
                 let ftype = expect_type(self.session, tscope.clone(), Some(Type::Function(args, rettype.clone(), abi)), Some(Type::Function(r(atypes), r(*rettype), abi)), Check::Def)?;
                 // TODO should this actually be another expect, so type resolutions that occur in later args affect earlier args?  Might not be needed unless you add typevar constraints
                 let ftype = resolve_type(self.session, ftype, false)?;        // NOTE This ensures the early arguments are resolved despite typevars not being assigned until later in the signature
@@ -194,7 +192,7 @@ impl<'sess> Visitor for TypeChecker<'sess> {
                 ftype
             },
             Type::Variable(_, vid, _) => {
-                let ftype = Type::Function(r(atypes), r(self.session.get_type(refid).unwrap_or_else(|| tscope.new_typevar(self.session, false))), ABI::Unknown);
+                let ftype = Type::Function(r(atypes), r(self.session.get_type(refid).unwrap_or_else(|| self.session.new_typevar())), ABI::Unknown);
                 self.session.update_type(tscope, vid, ftype.clone())?;
                 ftype
             },
@@ -227,7 +225,7 @@ impl<'sess> Visitor for TypeChecker<'sess> {
         Ok(btype)
     }
 
-    fn visit_declare(&mut self, refid: NodeID, _vis: Visibility, _ident: &Ident, _ttype: &Type) -> Result<Self::Return, Error> {
+    fn visit_declare(&mut self, _refid: NodeID, _vis: Visibility, _ident: &Ident, _ttype: &Type) -> Result<Self::Return, Error> {
         let scope = self.stack.get_scope();
         scope.make_obj(self.session, String::from("()"), vec!())
     }
@@ -235,10 +233,8 @@ impl<'sess> Visitor for TypeChecker<'sess> {
     fn visit_identifier(&mut self, refid: NodeID, ident: &Ident) -> Result<Self::Return, Error> {
         let scope = self.stack.get_scope();
         if let Ok(ttype) = self.session.get_type_from_ref(refid) {
-            debug!("&&&&& {:?} {:?}", self.session.get_def(refid), ttype);
             Ok(ttype)
         } else {
-            debug!("&&&&& {:?} {:?} NO TYPE {:?}", refid, self.session.get_ref(refid), &ident.name);
             match scope.get_var_def(&ident.name) {
                 Some(defid) => match self.session.get_type(defid) {
                     Some(ttype) => Ok(ttype),
@@ -259,7 +255,6 @@ impl<'sess> Visitor for TypeChecker<'sess> {
     }
 
     fn visit_match(&mut self, _id: NodeID, cond: &Expr, cases: &Vec<MatchCase>) -> Result<Self::Return, Error> {
-        let scope = self.stack.get_scope();
         let mut ctype = self.visit_node_expected(cond, None);
 
         let mut rtype = None;
@@ -311,8 +306,7 @@ impl<'sess> Visitor for TypeChecker<'sess> {
     }
 
     fn visit_nil(&mut self, refid: NodeID) -> Result<Self::Return, Error> {
-        let scope = self.stack.get_scope();
-        let ttype = self.session.get_type(refid).unwrap_or_else(|| scope.new_typevar(self.session, false));
+        let ttype = self.session.get_type(refid).unwrap_or_else(|| self.session.new_typevar());
         self.session.set_type(refid, ttype.clone());
         Ok(ttype)
     }
@@ -410,13 +404,12 @@ impl<'sess> Visitor for TypeChecker<'sess> {
         let scope = self.stack.get_scope();
         let classtype = self.session.get_type(refid).unwrap();
         let dtype = self.session.get_type_from_ref(refid)?;
-        let tscope = Scope::new_ref(Some(scope.clone()));
-        let mtype = tscope.map_all_typevars(self.session, dtype.clone());
+        let mtype = Type::map_all_typevars(self.session, dtype.clone());
         check_type_params(self.session, scope.clone(), &mtype.get_params()?, &classtype.get_params()?, Check::Def, true)?;
         Ok(classtype)
     }
 
-    fn visit_class(&mut self, refid: NodeID, classspec: &ClassSpec, _parentspec: &Option<ClassSpec>, body: &Vec<Expr>) -> Result<Self::Return, Error> {
+    fn visit_class(&mut self, refid: NodeID, _classspec: &ClassSpec, _parentspec: &Option<ClassSpec>, body: &Vec<Expr>) -> Result<Self::Return, Error> {
         let scope = self.stack.get_scope();
         let defid = self.session.get_ref(refid)?;
         let tscope = self.session.map.get(&defid);
@@ -431,16 +424,15 @@ impl<'sess> Visitor for TypeChecker<'sess> {
     }
 
     fn visit_accessor(&mut self, node: &Expr, _left: &Expr, _right: &Ident, _oid: NodeID) -> Result<Self::Return, Error> {
-        let scope = self.stack.get_scope();
-        let (refid, defid) = self.get_access_ids(scope.clone(), node)?.unwrap();
+        let (refid, defid) = self.get_access_ids(node)?.unwrap();
         self.session.set_ref(refid, defid);
-        Ok(self.get_type_or_new_typevar(scope, defid, self.session.get_type(refid)))
+        Ok(self.get_type_or_new_typevar(defid, self.session.get_type(refid)))
     }
 
     fn visit_assignment(&mut self, _id: NodeID, left: &Expr, right: &Expr, ty: AssignType) -> Result<Self::Return, Error> {
         let scope = self.stack.get_scope();
         // TODO this is duplicated in check_types_node(left)... can we avoid that
-        match self.get_access_ids(scope.clone(), left)? {
+        match self.get_access_ids(left)? {
             Some((_refid, defid)) => {
                 if ty == AssignType::Update && !self.session.get_def(defid).map(|d| d.is_mutable()).unwrap_or(false) {
                     return Err(Error::new(format!("MutableError: attempting to assign to an immutable variable")));
@@ -461,8 +453,7 @@ impl<'sess> Visitor for TypeChecker<'sess> {
     }
 
     fn visit_pattern_wild(&mut self, id: NodeID) -> Result<Self::Return, Error> {
-        let scope = self.stack.get_scope();
-        Ok(self.session.get_type(id).unwrap_or_else(|| scope.new_typevar(self.session, false)))
+        Ok(self.session.get_type(id).unwrap_or_else(|| self.session.new_typevar()))
     }
 
     fn visit_pattern_literal(&mut self, id: NodeID, lit: &Literal) -> Result<Self::Return, Error> {
@@ -475,7 +466,7 @@ impl<'sess> Visitor for TypeChecker<'sess> {
     fn visit_pattern_binding(&mut self, id: NodeID, _ident: &Ident) -> Result<Self::Return, Error> {
         let scope = self.stack.get_scope();
         let defid = self.session.get_ref(id)?;
-        let btype = self.session.get_type(defid).unwrap_or_else(|| scope.new_typevar(self.session, false));
+        let btype = self.session.get_type(defid).unwrap_or_else(|| self.session.new_typevar());
         self.session.update_type(scope.clone(), defid, btype.clone())?;
         self.session.update_type(scope.clone(), id, btype.clone())?;
         Ok(btype)
@@ -488,7 +479,7 @@ impl<'sess> Visitor for TypeChecker<'sess> {
         expect_type(self.session, scope, ttype, Some(etype), Check::Def)
     }
 
-    fn visit_pattern_resolve(&mut self, id: NodeID, left: &Pattern, field: &Ident, oid: NodeID) -> Result<Self::Return, Error> {
+    fn visit_pattern_resolve(&mut self, id: NodeID, _left: &Pattern, field: &Ident, oid: NodeID) -> Result<Self::Return, Error> {
         let scope = self.stack.get_scope();
         let ltype = self.session.get_type_from_ref(oid).unwrap();
 
@@ -510,10 +501,10 @@ impl<'sess> Visitor for TypeChecker<'sess> {
             Some(ttype) => {
                 // Map the typevars from the enum type params into the enum variant's types, in order to use type hint from 'expected'
                 let tscope = Scope::new_ref(Some(scope.clone()));
-                let mut typevars = Scope::map_new();
-                let vtype = tscope.map_typevars(self.session, &mut typevars, enumdef.deftype.clone());
+                let mut typevars = Type::map_new();
+                let vtype = Type::map_typevars(self.session, &mut typevars, enumdef.deftype.clone());
                 let ctype = expect_type(self.session, tscope.clone(), Some(vtype), self.session.get_type(id), Check::Def)?;
-                let rtype = resolve_type(self.session, tscope.map_typevars(self.session, &mut typevars, ttype), false)?;
+                let rtype = resolve_type(self.session, Type::map_typevars(self.session, &mut typevars, ttype), false)?;
                 let types = rtype.as_vec();
 
                 if types.len() != args.len() {
@@ -550,7 +541,7 @@ impl<'sess> TypeChecker<'sess> {
     }
 
 
-    pub fn get_access_ids(&mut self, scope: ScopeRef, node: &Expr) -> Result<Option<(NodeID, NodeID)>, Error> {
+    pub fn get_access_ids(&mut self, node: &Expr) -> Result<Option<(NodeID, NodeID)>, Error> {
         match &node.kind {
             ExprKind::Identifier(_) => {
                 Ok(Some((node.id, self.session.get_ref(node.id)?)))
@@ -590,7 +581,7 @@ impl<'sess> TypeChecker<'sess> {
     }
 
     pub fn session_find_variant(&mut self, scope: ScopeRef, invid: NodeID, fexpr: &Expr, argtypes: &Type) -> Result<Type, Error> {
-        let (refid, defid) = match self.get_access_ids(scope.clone(), fexpr)? {
+        let (refid, defid) = match self.get_access_ids(fexpr)? {
             Some(ids) => ids,
             None => { return self.visit_node(fexpr); },
         };
@@ -607,15 +598,15 @@ impl<'sess> TypeChecker<'sess> {
     pub fn session_find_variant_id(&self, scope: ScopeRef, defid: NodeID, argtypes: &Type) -> Result<(NodeID, Type), Error> {
         match self.session.get_def(defid) {
             Ok(Def::Overload(ol)) => ol.find_variant(self.session, scope.clone(), argtypes.clone()),
-            _ => Ok((defid, self.get_type_or_new_typevar(scope, defid, None)))
+            _ => Ok((defid, self.get_type_or_new_typevar(defid, None)))
         }
     }
 
-    pub fn get_type_or_new_typevar(&self, scope: ScopeRef, defid: NodeID, expected: Option<Type>) -> Type {
+    pub fn get_type_or_new_typevar(&self, defid: NodeID, expected: Option<Type>) -> Type {
         match self.session.get_type(defid) {
             Some(ttype) => ttype,
             None => {
-                let ttype = expected.unwrap_or_else(|| scope.new_typevar(self.session, false));
+                let ttype = expected.unwrap_or_else(|| self.session.new_typevar());
                 self.session.set_type(defid, ttype.clone());
                 ttype
             }

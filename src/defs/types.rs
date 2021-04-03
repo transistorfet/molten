@@ -3,7 +3,7 @@ use std::rc::Rc;
 
 use defs::Def;
 use types::Type;
-use scope::{ Scope, ScopeRef };
+use scope::ScopeRef;
 use session::{ Session, Error };
 use hir::{ NodeID };
 
@@ -47,15 +47,14 @@ impl TypeAliasDef {
             return Err(Error::new(format!("TypeError: expected {} type parameters to {} but got {}", defparams.len(), self.deftype.get_name()?, params.len())));
         }
 
-        let tscope = Scope::new_ref(None);
-        let mut map = Scope::map_new();
+        let mut map = Type::map_new();
         for (def, param) in defparams.iter().zip(params) {
             match def {
                 Type::Variable(_, ref id, _) => { map.insert(*id, param); },
                 _ => return Err(Error::new(format!("UnsupportedError: currently only typevars are supported as type parameters in type aliases"))),
             }
         }
-        Ok(tscope.map_typevars(session, &mut map, etype))
+        Ok(Type::map_typevars(session, &mut map, etype))
     }
 }
 

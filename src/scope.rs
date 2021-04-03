@@ -8,7 +8,7 @@ use std::collections::hash_map::Entry;
 use types::Type;
 use hir::{ NodeID };
 use session::{ Session, Error };
-use misc::{ r, UniqueID };
+use misc::{ UniqueID };
 use defs::Def;
 
 
@@ -74,20 +74,8 @@ impl Scope {
         self.context.get() == Context::Global || self.context.get() == Context::Primative
     }
 
-    pub fn is_local(&self) -> bool {
-        self.context.get() == Context::Local
-    }
-
     pub fn is_redirect(&self) -> bool {
         self.context.get() == Context::Object
-    }
-
-    //pub fn set_parent(&mut self, parent: ScopeRef) {
-    //    self.parent = Some(parent);
-    //}
-
-    pub fn get_parent(&self) -> Option<ScopeRef> {
-        self.parent.clone()
     }
 
     pub fn target(session: &Session, scope: ScopeRef) -> ScopeRef {
@@ -182,10 +170,6 @@ impl Scope {
         })
     }
 
-    pub fn find_var_def(&self, session: &Session, name: &String) -> Result<Def, Error> {
-        session.get_def(self.get_var_def(name).ok_or(Error::new(format!("VarError: definition not set for {:?}", name)))?)
-    }
-
 
     ///// Type Functions /////
 
@@ -208,10 +192,6 @@ impl Scope {
             Some(true) => true,
             _ => false,
         }
-    }
-
-    pub fn contains_type_local(&self, name: &String) -> bool {
-        self.types.borrow().contains_key(name)
     }
 
     pub fn _modify_type<F>(&self, name: &String, f: F) where F: Fn(&mut BindInfo) -> () {
@@ -250,12 +230,6 @@ impl Scope {
         }
     }
 
-    pub fn set_type_def(&self, name: &String, defid: NodeID) {
-        self._modify_type(name, move |info| {
-            info.defid = Some(defid.clone());
-        })
-    }
-
     pub fn get_type_def(&self, name: &String) -> Option<NodeID> {
         self._search_type(name, |info| {
             match info.defid.as_ref() {
@@ -291,86 +265,6 @@ impl Scope {
         } else {
             Scope::global(scope.parent.clone().unwrap())
         }
-    }
-
-
-    ////// Type Variable Functions //////
-
-    pub fn map_all_typevars(&self, session: &Session, ttype: Type) -> Type {
-        let mut varmap = Scope::map_new();
-        debug!("MAPPING ALL: {:?}", ttype);
-        self.map_typevars(session, &mut varmap, ttype)
-    }
-
-    pub fn map_new() -> HashMap<UniqueID, Type> {
-        HashMap::new()
-    }
-
-    pub fn map_typevars(&self, session: &Session, varmap: &mut HashMap<UniqueID, Type>, ttype: Type) -> Type {
-        match ttype {
-            Type::Variable(name, id, existential) => {
-                match varmap.get(&id).map(|x| x.clone()) {
-                    Some(ptype) => ptype,
-                    None => {
-                        let etype = self.find_type(session, &name);
-                        debug!("EXISTING TYPEVAR for {:?}: {:?} vs {:?}", name, etype, id);
-                        match etype {
-                            Some(Type::Variable(_, ref eid, _)) if *eid == id && !existential => etype.clone().unwrap(),
-                            None | Some(Type::Variable(_, _, _)) => {
-                                let orgtype = Type::Variable(name.clone(), id, existential);
-                                if existential {
-                                    let maptype = self.new_typevar(session, false);
-                                    varmap.insert(id, maptype.clone());
-                                    debug!("MAPPED from {:?} to {:?}", orgtype, maptype);
-                                    maptype
-                                } else {
-                                    debug!("NOT MAPPED: {:?}", orgtype);
-                                    orgtype.clone()
-                                }
-                            },
-                            _ => etype.clone().unwrap(),
-                        }
-                    }
-                }
-            },
-            Type::Function(args, ret, abi) => Type::Function(r(self.map_typevars(session, varmap, *args)), r(self.map_typevars(session, varmap, *ret)), abi),
-            // TODO why did I do this?  Was it because of a bug or just to reduce typevars, because it caused another bug with constructors
-            //Type::Function(args, ret, abi) => Type::Function(r(self.map_typevars(session, varmap, *args)), ret, abi),
-            Type::Tuple(types) => Type::Tuple(self.map_typevars_vec(session, varmap, types)),
-            Type::Record(types) => Type::Record(types.into_iter().map(|(n, t)| (n, self.map_typevars(session, varmap, t))).collect()),
-            Type::Ambiguous(variants) => Type::Ambiguous(self.map_typevars_vec(session, varmap, variants)),
-            Type::Ref(ttype) => Type::Ref(r(self.map_typevars(session, varmap, *ttype))),
-            Type::Object(name, id, types) => Type::Object(name.clone(), id, self.map_typevars_vec(session, varmap, types)),
-        }
-    }
-
-    pub fn map_typevars_vec(&self, session: &Session, varmap: &mut HashMap<UniqueID, Type>, types: Vec<Type>) -> Vec<Type> {
-        types.into_iter().map(|vtype| self.map_typevars(session, varmap, vtype)).collect()
-    }
-
-    pub fn new_typevar(&self, session: &Session, existential: bool) -> Type {
-        let id = UniqueID::generate();
-        //if id == UniqueID(903) { panic!("") }
-        let name = self.new_typevar_name();
-        let ttype = Type::Variable(name.clone(), id, existential);
-
-        //self.define_type(name, ttype.clone()).unwrap();
-        session.set_type(id, ttype.clone());
-        debug!("NEW TYPEVAR: {:?} {:?}", self.get_basename(), ttype);
-        ttype
-    }
-
-    pub fn new_typevar_name(&self) -> String {
-        for ch1 in b'`' .. b'z' {
-            let name = if ch1 == b'`' { String::from("") } else { (ch1 as char).to_string() };
-            for ch2 in b'a' .. b'z' + 1 {
-                let name = name.clone() + &(ch2 as char).to_string();
-                if !self.contains_type(&name) {
-                    return name;
-                }
-            }
-        }
-        panic!("SillyError: ran out of type variable names");
     }
 
     ///// Name Functions /////
@@ -423,9 +317,9 @@ impl ScopeMapRef {
         scope
     }
 
-    pub fn set(&self, id: UniqueID, scope: ScopeRef) {
-        self.0.borrow_mut().insert(id, scope);
-    }
+    //pub fn set(&self, id: UniqueID, scope: ScopeRef) {
+    //    self.0.borrow_mut().insert(id, scope);
+    //}
 
     pub fn get(&self, id: &UniqueID) -> ScopeRef {
         self.0.borrow().get(id).unwrap().clone()

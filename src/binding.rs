@@ -73,13 +73,13 @@ impl<'sess> Visitor for NameBinder<'sess> {
             bind_type_names(self.session, fscope.clone(), ttype.as_mut(), false)?;
             // TODO this is assumed to be always immutable, but maybe shouldn't be
             ArgDef::define(self.session, fscope.clone(), arg_defid, Mutability::Immutable, &arg.ident.name, ttype.clone())?;
-            argtypes.push(ttype.unwrap_or_else(|| scope.new_typevar(self.session, false)));
+            argtypes.push(ttype.unwrap_or_else(|| self.session.new_typevar()));
         }
         let mut rettype = rettype.clone();
         bind_type_names(self.session, fscope.clone(), rettype.as_mut(), false)?;
 
         // Build type according to the definition, using typevars for missing types
-        let nftype = Type::Function(r(Type::Tuple(argtypes)), r(rettype.unwrap_or_else(|| scope.new_typevar(self.session, false))), abi);
+        let nftype = Type::Function(r(Type::Tuple(argtypes)), r(rettype.unwrap_or_else(|| self.session.new_typevar())), abi);
 
         // Define the function variable and it's arguments variables
         AnyFunc::define(self.session, scope.clone(), defid, vis, &ident.as_ref().map(|ref ident| String::from(ident.as_str())), abi, Some(nftype))?;
@@ -225,7 +225,7 @@ impl<'sess> Visitor for NameBinder<'sess> {
         Ok(())
     }
 
-    fn visit_resolver(&mut self, node: &Expr, left: &Expr, _right: &Ident, oid: NodeID) -> Result<Self::Return, Error> {
+    fn visit_resolver(&mut self, _node: &Expr, left: &Expr, _right: &Ident, oid: NodeID) -> Result<Self::Return, Error> {
         let scope = self.stack.get_scope();
         // TODO should this always work on a type reference, or should classes be added as values as well as types?
         //self.visit_node(left);

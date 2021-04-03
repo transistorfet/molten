@@ -100,7 +100,7 @@ impl OverloadDef {
     }
 
     #[must_use]
-    pub fn define(session: &Session, scope: ScopeRef, name: &String, id: NodeID, previd: NodeID, ttype: Option<Type>) -> Result<(), Error> {
+    pub fn define(session: &Session, scope: ScopeRef, name: &String, id: NodeID, previd: NodeID, _ttype: Option<Type>) -> Result<(), Error> {
         let dscope = Scope::target(session, scope.clone());
 
         if dscope.contains_local(&name) {
@@ -175,7 +175,7 @@ impl OverloadDef {
                 Some(vtype @ Type::Variable(_, _, _)) => vtype,
                 Some(ttype) => ttype, //tscope.map_all_typevars(session, ttype),
                 None => {
-                    let vtype = tscope.new_typevar(session, false);
+                    let vtype = session.new_typevar();
                     session.set_type(id, vtype.clone());
                     vtype
                 }

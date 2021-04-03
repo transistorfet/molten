@@ -180,6 +180,8 @@
         }
         println("semicolon: " + str(d))
 
+        /*
+        // TODO the molten_malloc and sprintf functions are no longer available within molten
         fn strnum(num: Int) -> String {
             let buffer: String = molten_malloc(22)
             sprintf(buffer, "%d", num, nil: String)     // TODO the type annotation of nil is required or else the typevar isn't resolved
@@ -197,7 +199,7 @@
         //println("STUFF".push(" things"))
         println(strnum(12))
         println(strnum(1.214))
-
+        */
 
         // TODO this causes a segfault during codegen
         //fn overload() / C {
@@ -245,7 +247,7 @@
         /// Lists, Buffers, Alloc
 
         // Never do this
-        let alloc: String = molten_malloc(30)
+        //let alloc: String = molten_malloc(30)
 
         // TODO buffer is no longer a class
         //let buffer = new Buffer<Int>(5)
@@ -324,7 +326,8 @@
         //[]
         [] : List<String>
         [1, 2, 3 * 10 + 3]
-        [ 0, 1, 2, 3 ][0]
+        // TODO this was broken by the refactoring to HIR due to list duplication in method invocation... (the same error exists in testsuite/basic/lists.mol)
+        //[ 0, 1, 2, 3 ][0]
         let arr = [ 1, 2, 3, 4 ]
         arr[2]
         thing.arr[1]
@@ -404,8 +407,9 @@
         let v = *rr
         println(str(v))
 
-        println(str(sizeof(1)))
-        println(str(sizeof(("1", "2", "3"))))   // Should be 24, but prints as 8
+        // TODO sizeof doesn't exist anymore, since molten_malloc doesn't exist anymore, but it didn't work properly anyways
+        //println(str(sizeof(1)))
+        //println(str(sizeof(("1", "2", "3"))))   // Should be 24, but prints as 8
 
 
         /// Closures

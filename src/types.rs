@@ -1,5 +1,6 @@
 
 use std::fmt;
+use std::collections::HashMap;
 
 use defs::Def;
 use hir::ClassSpec;
@@ -241,6 +242,60 @@ impl fmt::Display for Type {
 //}
 
 
+impl Type {
+    pub fn map_all_typevars(session: &Session, ttype: Type) -> Type {
+        let mut varmap = Type::map_new();
+        debug!("MAPPING ALL: {:?}", ttype);
+        Type::map_typevars(session, &mut varmap, ttype)
+    }
+
+    pub fn map_new() -> HashMap<UniqueID, Type> {
+        HashMap::new()
+    }
+
+    pub fn map_typevars(session: &Session, varmap: &mut HashMap<UniqueID, Type>, ttype: Type) -> Type {
+        match ttype.clone() {
+            Type::Variable(name, id, existential) => {
+                match varmap.get(&id).map(|x| x.clone()) {
+                    Some(ptype) => ptype,
+                    None => {
+                        //let etype = self.find_type(session, &name);
+                        let etype = session.get_type(id);
+                        debug!("EXISTING TYPEVAR for {:?}: {:?} vs {:?}", name, etype, id);
+                        match Some(ttype) {
+                            Some(Type::Variable(_, ref eid, _)) if *eid == id && !existential => etype.clone().unwrap(),
+                            None | Some(Type::Variable(_, _, _)) => {
+                                let orgtype = Type::Variable(name.clone(), id, existential);
+                                if existential {
+                                    let maptype = session.new_typevar();
+                                    varmap.insert(id, maptype.clone());
+                                    debug!("MAPPED from {:?} to {:?}", orgtype, maptype);
+                                    maptype
+                                } else {
+                                    debug!("NOT MAPPED: {:?}", orgtype);
+                                    orgtype.clone()
+                                }
+                            },
+                            _ => etype.clone().unwrap(),
+                        }
+                    }
+                }
+            },
+            Type::Function(args, ret, abi) => Type::Function(r(Type::map_typevars(session, varmap, *args)), r(Type::map_typevars(session, varmap, *ret)), abi),
+            Type::Tuple(types) => Type::Tuple(Type::map_typevars_vec(session, varmap, types)),
+            Type::Record(types) => Type::Record(types.into_iter().map(|(n, t)| (n, Type::map_typevars(session, varmap, t))).collect()),
+            Type::Ambiguous(variants) => Type::Ambiguous(Type::map_typevars_vec(session, varmap, variants)),
+            Type::Ref(ttype) => Type::Ref(r(Type::map_typevars(session, varmap, *ttype))),
+            Type::Object(name, id, types) => Type::Object(name.clone(), id, Type::map_typevars_vec(session, varmap, types)),
+        }
+    }
+
+    pub fn map_typevars_vec(session: &Session, varmap: &mut HashMap<UniqueID, Type>, types: Vec<Type>) -> Vec<Type> {
+        types.into_iter().map(|vtype| Type::map_typevars(session, varmap, vtype)).collect()
+    }
+}
+
+
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum Check {
     Def,
@@ -261,7 +316,7 @@ pub fn check_type(session: &Session, scope: ScopeRef, odtype: Option<Type>, octy
         // TODO should the else case just be Nil...
         match octype {
             Some(ctype) => Ok(resolve_type(session, ctype, false)?),
-            None => Ok(scope.new_typevar(session, false)),
+            None => Ok(session.new_typevar()),
         }
     } else if octype.is_none() {
         Ok(odtype.unwrap())
@@ -355,13 +410,13 @@ pub fn check_type(session: &Session, scope: ScopeRef, odtype: Option<Type>, octy
 fn is_subclass_of(session: &Session, scope: ScopeRef, adef: (&String, UniqueID, &Vec<Type>), bdef: (&String, UniqueID, &Vec<Type>), mode: Check) -> Result<Type, Error> {
     debug!("IS SUBCLASS: {:?} of {:?}", adef, bdef);
     let tscope = Scope::new_ref(Some(scope.clone()));
-    let mut names = Scope::map_new();
+    let mut names = Type::map_new();
     let mut adef = (adef.0.clone(), adef.1, adef.2.clone());
     //let mut deftype = session.get_type(adef.1)?.get_params()?;
 
     loop {
         let mut class = session.get_type(adef.1).unwrap();
-        class = tscope.map_typevars(session, &mut names, class);
+        class = Type::map_typevars(session, &mut names, class);
         adef.2 = check_type_params(session, tscope.clone(), &class.get_params()?, &adef.2, mode, true)?;
 
         if *bdef.0 == adef.0 {
@@ -379,7 +434,7 @@ fn is_subclass_of(session: &Session, scope: ScopeRef, adef: (&String, UniqueID, 
         if classdef.parenttype.is_none() {
             return Err(Error::new(format!("TypeError: type mismatch, expected {} but found {}", Type::Object(bdef.0.clone(), bdef.1, bdef.2.clone()), Type::Object(adef.0.clone(), adef.1, adef.2))));
         }
-        let parent = tscope.map_typevars(session, &mut names, classdef.parenttype.clone().unwrap());
+        let parent = Type::map_typevars(session, &mut names, classdef.parenttype.clone().unwrap());
         match resolve_type(session, parent, false)? {
             Type::Object(name, id, params) => adef = (name, id, params),
             ttype @ _ => return Err(Error::new(format!("TypeError: expected Object but found {}", ttype))),

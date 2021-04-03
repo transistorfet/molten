@@ -12,9 +12,6 @@ use nom::{
     multispace,
     is_alphanumeric,
     is_alphabetic,
-    is_space,
-    Needed,
-    IResult,
     Context,
     ErrorKind,
     error_to_list

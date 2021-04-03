@@ -1,5 +1,4 @@
 
-use std::cell::RefCell;
 use std::collections::HashMap;
 
 
@@ -21,7 +20,7 @@ use defs::classes::{ ClassDefRef, StructDefRef, Define, Vtable };
 use misc::{ r };
 use transform::llcode::{ LLType, LLLit, LLRef, LLCmpType, LLLink, LLCC, LLExpr, LLGlobal };
 
-use visitor::{ self, Visitor, ScopeStack };
+use visitor::{ Visitor, ScopeStack };
 
 
 static EXCEPTION_POINT_NAME: &str = "__ExceptionPoint__";

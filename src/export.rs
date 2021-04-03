@@ -8,7 +8,7 @@ use misc::UniqueID;
 use config::Options;
 use scope::{ ScopeRef };
 use session::{ Session, Error };
-use visitor::{ self, Visitor, ScopeStack };
+use visitor::{ Visitor, ScopeStack };
 use hir::{ NodeID, Visibility, Mutability, Ident, ClassSpec, Argument, Expr, ExprKind };
 
 

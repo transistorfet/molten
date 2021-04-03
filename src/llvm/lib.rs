@@ -133,7 +133,7 @@ pub unsafe fn define_builtins_node<'sess>(llvm: &LLVM<'sess>, transformer: &mut 
                 },
             }
         },
-        BuiltinDef::Class(id, name, _, structdef, entries) => {
+        BuiltinDef::Class(id, _name, _, structdef, entries) => {
             let tscope = llvm.session.map.get(id);
             //let cname = String::from(*name);
             let classdef = llvm.session.get_def(*id).unwrap().as_class().unwrap();

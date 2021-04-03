@@ -91,11 +91,11 @@ pub trait Visitor: Sized {
         Ok(self.default_return())
     }
 
-    fn visit_resolver(&mut self, node: &Expr, left: &Expr, _right: &Ident, _oid: NodeID) -> Result<Self::Return, Error> {
+    fn visit_resolver(&mut self, _node: &Expr, left: &Expr, _right: &Ident, _oid: NodeID) -> Result<Self::Return, Error> {
         self.visit_node(left)
     }
 
-    fn visit_accessor(&mut self, node: &Expr, left: &Expr, _right: &Ident, _oid: NodeID) -> Result<Self::Return, Error> {
+    fn visit_accessor(&mut self, _node: &Expr, left: &Expr, _right: &Ident, _oid: NodeID) -> Result<Self::Return, Error> {
         self.visit_node(left)
     }
 
@@ -104,7 +104,7 @@ pub trait Visitor: Sized {
         self.visit_vec(code)
     }
 
-    fn visit_invoke(&mut self, id: NodeID, func: &Expr, args: &Vec<Expr>, fid: NodeID) -> Result<Self::Return, Error> {
+    fn visit_invoke(&mut self, id: NodeID, func: &Expr, args: &Vec<Expr>, _fid: NodeID) -> Result<Self::Return, Error> {
         walk_invoke(self, id, func, args)
     }
 
