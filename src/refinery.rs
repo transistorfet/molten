@@ -104,17 +104,8 @@ impl<'sess> Refinery<'sess> {
                 let fexpr = self.refine_node(*fexpr)?;
                 let mut args = self.refine_vec(args);
 
-                /*
-                // We refine fexpr before cloning here, so that the IDs will be identical (otherwise typechecking wont unify the accessed object and first argument)
-                if let ExprKind::Accessor(ref expr, _, _) = fexpr.kind {
-                    args.insert(0, *expr.clone());
-                }
-                Expr::new(pos, ExprKind::Invoke(r(fexpr), args, NodeID::generate()))
-                */
-
                 // We refine fexpr before cloning here, so that the IDs will be identical (otherwise typechecking wont unify the accessed object and first argument)
                 if let ExprKind::Accessor(expr, field, oid) = fexpr.kind {
-                    //args.insert(0, *expr.clone());
                     let tmpname = format!("{}", UniqueID::generate());
                     args.insert(0, Expr::make_ident_from_str(pos.clone(), &tmpname));
 

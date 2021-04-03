@@ -4,7 +4,7 @@ version = "0.1.0"
 authors = ["transistor <trans@jabberwocky.ca>"]
 
 [dependencies]
-nom = { version = "^4.0", features = ["verbose-errors"] }
+nom = { version = "^4.2", features = ["verbose-errors"] }
 nom_locate = { version = "^0.3", features = ["verbose-errors"] }
 clap = "^2"
 llvm-sys = "^110"

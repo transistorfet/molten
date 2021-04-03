@@ -1,47 +1,29 @@
 
 * should you make all visitor functions take a reference to the node itself (since typecheck accessor/resolver needs to send the node onward)
-* all the def ids are now separate from the AST ids, but there are still some types that are taken from the ast id and not the ref->defid
-* in transform invoke, is there a better way to get the abi than to use an extra id to store the type?
-
 * convert transform to use visitor??
 * refactor transform to separate into multiple files
-* upgrade the parser to nom 6 (code in stash, but with the changes, the parser is totally broken, no idea why)
+* separate vtables and other objects out transform.rs
+
 
 * when a class has a member that is a closure function pointer, and that class is instantiated, then the compiler will segfault during optimization.
   It only happens if when trying to zero the allocated memory after calling molten_malloc to allocate a new object, but it happens either with a
   "store zeroinitialize" instruction, or attempting to call memset(), and only if I use LLVMGetElementType(rtype).  If I zeroinitialize another
   type or pass a const for size to memset(), it compiles without segfaulting.  It works without the zeroing even though molten_malloc() is passed
   the same LLVMGetElementType(rtype) size determiner...
-* the lists.mol test is failing when indexing a literal list because it gets turned into a method call, which duplicates the list creation block,
-  which causes a duplicate definition error.  Before the HIR change, the object ast was copied to the first argument, which duplicated all the IDs so
-  that the type checking would unify them, but the duplicated AST was then refined separated after, which created two different variable names for the
-  AST blocks, which is why it used to work.
 * only when using llvm 11, and only with the match tt {} expr in reducedtest.mol, and optimizations enabled, the compiler hangs without ever completing
   In the test, the match is inside a function, but when moved to the top level, it hangs while compiling.  It happens regardless of mathc arm it seems
 
 
-* for Expr resolve and accessor, the oid's could maybe be integrated into the ident?
+* upgrade the parser to nom 6 (code in stash, but with the changes, the parser is totally broken, no idea why)
 
 
+* make it possible to implement methods on enums
 
 * can you remove access to getindex, buffer, etc?
 * you have to disallow the situation where a function returns a type variable that doesn't appear elsewhere in the definition, but that is then cast to a concrete type.  This
   is a blind cast and is unsafe, but we're currently relying on it for memory allocations and such
-* iterators could be implemented as classes, traits implemented on something, or possibly closures?
-* going from an object type to a trait object type would require automatically inserting a conversion, which we sort of do for type variables/generics in a really hacky way, with
-  the codegen build_cast function which will automagically box any non-pointer types
-* we could possibly implement traits statically, so the object would always be typed (no trait objects, and thus no generics with traits unless you switch to monomorphizing... or
-  trait objects), but having static traits would allow the implementation to be separated from the class definition
-* non boxed types should be able to use static traits too. I suppose all traits can have a static reference to the trait vtable rather than searching through the object's vtable,
-  but we'd have to make function lookup a lot more complicated (search scope, then search for a trait impl for that type that contains that function?)
-* how would the need to restrict traits to non typevars affect things? Would that be hard to change, just for traits
- 
-
-* just make transform functions for specific types in their own files, to break it up a bit.  Specifically, vtables could have their own impl Vtable {} functions transforming
-  same for classes, and possibly functions as well, but they're a bit hairy
-
-* rename Buffer type to RawPointerArray, or GenericsArray
-* rename String type to ByteString, ByteArray, or CString, or ZString, or NullString, or NullByteArray, or ZByteArray, RawString
+* rename Buffer type to RawPointerArray, or GenericsArray, or BoxArray
+* rename String type to ByteString, ByteArray, or CString, or ZString, or NullString, or NullByteArray, or ZByteArray, RawString;  I'm leaning ZByteArray or ByteString
 * rename SuperString type to String, will require a bunch of libcore changes
 * rename List to Array or Vec
 
@@ -49,18 +31,28 @@
 * add a module keyword which is automatically inserted into .dec files, which actually calls the run function, including the canonical name/path when the module was compiled
 * remove the forced visibility in refinery, when you decide on pub/priv semantics
 
-* add an iterator type, (need to settle option type first)
-* add namespace of some kind, such that you can group functions?  like 'module' from ML?? like impl from rust?? or like namespace from C
-
-* there is an issue with raise, in that it is considered to return unit () instead of somehow being marked as not returning...  Getting type errors in Option def
-
 * classes shouldn't require a new function if all data has initializers...
 * make definitions always require an initializer
 * there was an error where "let ni: newint" with no initializer was causing a type error with "expected class or concrete type", but that was actually because a definition without
   an initializer is the same as "let ni: newint = nil" and nil could not be cast to a Record, which newint is a typealias of a record
 
+* iterators could be implemented as classes, traits implemented on something, or possibly closures?
+* add namespace of some kind, such that you can group functions?  like 'module' from ML?? like impl from rust?? or like namespace from C
+* there is an issue with raise, in that it is considered to return unit () instead of somehow being marked as not returning...  Getting type errors in Option def
+* for Expr resolve and accessor, the oid's could maybe be integrated into the ident? same for invoke now
+
+
+TRAITS/TYPECLASSES:
 
 * add typeclasses
+* going from an object type to a trait object type would require automatically inserting a conversion, which we sort of do for type variables/generics in a really hacky way, with
+  the codegen build_cast function which will automagically box any non-pointer types
+* we could possibly implement traits statically, so the object would always be typed (no trait objects, and thus no generics with traits unless you switch to monomorphizing... or
+  trait objects), but having static traits would allow the implementation to be separated from the class definition
+* non boxed types should be able to use static traits too. I suppose all traits can have a static reference to the trait vtable rather than searching through the object's vtable,
+  but we'd have to make function lookup a lot more complicated (search scope, then search for a trait impl for that type that contains that function?)
+* how would the need to restrict traits to non typevars affect things? Would that be hard to change, just for traits
+
 
 
 
