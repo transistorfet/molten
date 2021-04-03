@@ -69,27 +69,23 @@ impl<'sess> Visitor for ExportsCollector<'sess> {
 
     fn visit_declare(&mut self, id: NodeID, vis: Visibility, ident: &Ident, _ttype: &Type) -> Result<Self::Return, Error> {
         let defid = self.session.get_ref(id)?;
-        let scope = self.stack.get_scope();
-        self.declarations.push_str(&emit_declaration(self.session, scope.clone(), defid, vis, &ident.name));
+        self.declarations.push_str(&emit_declaration(self.session, defid, vis, &ident.name));
         Ok(())
     }
 
     fn visit_function(&mut self, id: NodeID, vis: Visibility, ident: &Option<Ident>, _args: &Vec<Argument>, _rettype: &Option<Type>, _body: &Expr, _abi: ABI) -> Result<Self::Return, Error> {
         if let Some(ref ident) = *ident {
             let defid = self.session.get_ref(id)?;
-            let scope = self.stack.get_scope();
-            self.declarations.push_str(&emit_declaration(self.session, scope.clone(), defid, vis, &ident.name));
+            self.declarations.push_str(&emit_declaration(self.session, defid, vis, &ident.name));
         }
         // TODO we would walk the body here to search everything that's publically visable, but currently only top level functions are exported
         Ok(())
     }
 
-    fn visit_class(&mut self, id: NodeID, classspec: &ClassSpec, parentspec: &Option<ClassSpec>, body: &Vec<Expr>) -> Result<Self::Return, Error> {
-        let defid = self.session.get_ref(id)?;
-        let tscope = self.session.map.get(&defid);
-        let namespec = unparse_type(self.session, tscope.clone(), Type::from_spec(classspec.clone(), UniqueID(0)));
+    fn visit_class(&mut self, _id: NodeID, classspec: &ClassSpec, parentspec: &Option<ClassSpec>, body: &Vec<Expr>) -> Result<Self::Return, Error> {
+        let namespec = unparse_type(self.session, Type::from_spec(classspec.clone(), UniqueID(0)));
         let fullspec = if parentspec.is_some() {
-            format!("{} extends {}", namespec, unparse_type(self.session, tscope.clone(), Type::from_spec(parentspec.clone().unwrap(), UniqueID(0))))
+            format!("{} extends {}", namespec, unparse_type(self.session, Type::from_spec(parentspec.clone().unwrap(), UniqueID(0))))
         } else {
             namespec.clone()
         };
@@ -102,18 +98,18 @@ impl<'sess> Visitor for ExportsCollector<'sess> {
                 ExprKind::Definition(mutable, ident, _, _) => {
                     let defid = self.session.get_ref(node.id)?;
                     self.declarations.push_str("    ");
-                    self.declarations.push_str(&emit_field(self.session, tscope.clone(), defid, *mutable, &ident.name));
+                    self.declarations.push_str(&emit_field(self.session, defid, *mutable, &ident.name));
                 },
                 ExprKind::Declare(vis, ident, _) => {
                     let defid = self.session.get_ref(node.id)?;
                     self.declarations.push_str("    ");
-                    self.declarations.push_str(&emit_declaration(self.session, tscope.clone(), defid, *vis, &ident.name));
+                    self.declarations.push_str(&emit_declaration(self.session, defid, *vis, &ident.name));
                 },
                 ExprKind::Function(vis, ident, _, _, _, _) => {
                     if let Some(ref ident) = *ident {
                         let defid = self.session.get_ref(node.id)?;
                         self.declarations.push_str("    ");
-                        self.declarations.push_str(&emit_declaration(self.session, tscope.clone(), defid, *vis, &ident.name));
+                        self.declarations.push_str(&emit_declaration(self.session, defid, *vis, &ident.name));
                     }
                 },
                 _ => {  },
@@ -125,59 +121,48 @@ impl<'sess> Visitor for ExportsCollector<'sess> {
 
 }
 
-fn emit_declaration(session: &Session, scope: ScopeRef, id: NodeID, vis: Visibility, name: &String) -> String {
+fn emit_declaration(session: &Session, id: NodeID, vis: Visibility, name: &String) -> String {
     if vis == Visibility::Public {
-        //let name = get_mangled_name(session, tscope.clone(), &ident.name, *id);
+        //let name = get_mangled_name(session, &ident.name, *id);
         let ttype = session.get_type(id).unwrap();
-        format!("decl {}{}\n", name, unparse_type(session, scope.clone(), ttype))
+        format!("decl {}{}\n", name, unparse_type(session, ttype))
     } else {
         String::from("")
     }
 }
 
-fn emit_field(session: &Session, scope: ScopeRef, id: NodeID, mutable: Mutability, name: &String) -> String {
+fn emit_field(session: &Session, id: NodeID, mutable: Mutability, name: &String) -> String {
     let ttype = session.get_type(id).unwrap();
     let mutable_str = if let Mutability::Mutable = mutable { "mut " } else { "" };
-    format!("let {}{}: {}\n", mutable_str, name, unparse_type(session, scope.clone(), ttype))
+    format!("let {}{}: {}\n", mutable_str, name, unparse_type(session, ttype))
 }
 
-pub fn unparse_type(session: &Session, scope: ScopeRef, ttype: Type) -> String {
+pub fn unparse_type(session: &Session, ttype: Type) -> String {
     match ttype {
         Type::Object(name, _, types) => {
-            let params = if types.len() > 0 { format!("<{}>", types.iter().map(|p| unparse_type(session, scope.clone(), p.clone())).collect::<Vec<String>>().join(", ")) } else { String::from("") };
+            let params = if types.len() > 0 { format!("<{}>", types.iter().map(|p| unparse_type(session, p.clone())).collect::<Vec<String>>().join(", ")) } else { String::from("") };
             name.clone() + &params
         },
         Type::Variable(name, _id, _) => {
-            /*
-            // TODO this doesn't work because if a name isnt' found, then all tyyevars with that id are made independent
-            let var = scope.find_type(session, &name);
-            if var.is_none() || var.unwrap().get_id().unwrap_or(UniqueID(0)) != id {
-                let gscope = Scope::global(scope.clone());
-                name = gscope.new_typevar_name();
-                // TODO there is no def tied to the defid, but is it needed?
-                gscope.define_type(name.clone(), Some(id)).unwrap();
-                session.set_type(id, Type::Variable(name.clone(), id));
-            }
-            */
             //format!("'v{}", id)
             format!("'{}", name)
         },
         Type::Tuple(types) => {
-            let tuple: Vec<String> = types.iter().map(|t| unparse_type(session, scope.clone(), t.clone())).collect();
+            let tuple: Vec<String> = types.iter().map(|t| unparse_type(session, t.clone())).collect();
             format!("({})", tuple.join(", "))
         },
         Type::Record(types) => {
-            let tuple: Vec<String> = types.iter().map(|(n, t)| format!("{}: {}", n, unparse_type(session, scope.clone(), t.clone()))).collect();
+            let tuple: Vec<String> = types.iter().map(|(n, t)| format!("{}: {}", n, unparse_type(session, t.clone()))).collect();
             format!("{{ {} }}", tuple.join(", "))
         },
         Type::Function(args, ret, abi) => {
-            format!("{} -> {}{}", unparse_type(session, scope.clone(), *args), unparse_type(session, scope.clone(), *ret), abi)
+            format!("{} -> {}{}", unparse_type(session, *args), unparse_type(session, *ret), abi)
         },
         Type::Ref(ttype) => {
-            format!("ref {}", unparse_type(session, scope.clone(), *ttype))
+            format!("ref {}", unparse_type(session, *ttype))
         },
         Type::Ambiguous(variants) => {
-            let varstr: Vec<String> = variants.iter().map(|v| unparse_type(session, scope.clone(), v.clone())).collect();
+            let varstr: Vec<String> = variants.iter().map(|v| unparse_type(session, v.clone())).collect();
             format!("Ambiguous[{}]", varstr.join(", "))
         },
     }

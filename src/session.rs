@@ -15,7 +15,7 @@ use refinery::Refinery;
 use ast::{ Pos };
 use hir::{ NodeID, Expr };
 use defs::{ Def };
-use scope::{ ScopeRef, ScopeMapRef };
+use scope::{ ScopeMapRef };
 
 
 #[derive(Clone, Debug, PartialEq)]
@@ -179,7 +179,7 @@ impl Session {
     }
 
     #[must_use]
-    pub fn update_type(&self, scope: ScopeRef, id: NodeID, ttype: Type) -> Result<(), Error> {
+    pub fn update_type(&self, id: NodeID, ttype: Type) -> Result<(), Error> {
         use types;
 
         let etype = self.get_type(id);
@@ -187,7 +187,7 @@ impl Session {
             // NOTE don't update a variable with itself or it will cause infinite recursion due to the update call in check_type
             Some(Type::Variable(_, eid, _)) if eid == id => ttype,
             etype @ Some(_) => {
-                types::check_type(self, scope.clone(), etype, Some(ttype.clone()), types::Check::Def, true)?
+                types::check_type(self, etype, Some(ttype.clone()), types::Check::Def, true)?
             },
             None => ttype,
         };

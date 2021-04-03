@@ -187,13 +187,6 @@ impl Scope {
         }
     }
 
-    pub fn contains_type(&self, name: &String) -> bool {
-        match self._search_type(name, |_info| Some(true)) {
-            Some(true) => true,
-            _ => false,
-        }
-    }
-
     pub fn _modify_type<F>(&self, name: &String, f: F) where F: Fn(&mut BindInfo) -> () {
         match self.types.borrow_mut().entry(name.clone()) {
             Entry::Occupied(mut entry) => f(entry.get_mut()),

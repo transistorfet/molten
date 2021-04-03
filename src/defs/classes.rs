@@ -102,24 +102,25 @@ impl ClassDef {
     }
 
 
-    pub fn build_vtable(&self, session: &Session, scope: ScopeRef, body: &Vec<Expr>) {
-        let parentclass = match self.parenttype {
-            // TODO this needs to be fixed
-            Some(ref ptype) => Some(scope.find_type_def(session, &ptype.get_name().unwrap()).unwrap().as_class().unwrap()),
+    fn get_parent_class(&self, session: &Session) -> Option<ClassDefRef> {
+        match self.parenttype {
+            Some(Type::Object(_, ref id, _)) => Some(session.get_def(*id).unwrap().as_class().unwrap()),
             None => None,
-        };
+            _ => panic!("UnexpectedError: parent class type should be Type:Object()"),
+        }
+    }
 
+    pub fn build_vtable(&self, session: &Session, body: &Vec<Expr>) {
+        let parentclass = self.get_parent_class(session);
         if let Some(parentclass) = parentclass {
             self.vtable.inherit(&parentclass.vtable);
         }
-        self.vtable.build_vtable(session, scope, body);
+
+        self.vtable.build_vtable(session, body);
     }
 
-    pub fn build_structdef(&self, session: &Session, scope: ScopeRef, body: &Vec<Expr>) {
-        let parentclass = match self.parenttype {
-            Some(ref ptype) => Some(scope.find_type_def(session, &ptype.get_name().unwrap()).unwrap().as_class().unwrap()),
-            None => None,
-        };
+    pub fn build_structdef(&self, session: &Session, body: &Vec<Expr>) {
+        let parentclass = self.get_parent_class(session);
         if let Some(cls) = parentclass {
             self.structdef.inherit(&cls.structdef);
         }
@@ -242,13 +243,13 @@ impl Vtable {
         *self.table.borrow_mut() = inherit.table.borrow().clone();
     }
 
-    pub fn build_vtable(&self, session: &Session, scope: ScopeRef, body: &Vec<Expr>) {
+    pub fn build_vtable(&self, session: &Session, body: &Vec<Expr>) {
         for ref node in body.iter() {
             match &node.kind {
                 ExprKind::Function(_, ref ident, _, _, _, _) => {
                     if let Some(Ident { ref name, .. }) = ident {
                         let defid = session.get_ref(node.id).unwrap();
-                        self.add_entry(session, scope.clone(), defid, name.as_str(), session.get_type(defid).unwrap());
+                        self.add_entry(session, defid, name.as_str(), session.get_type(defid).unwrap());
                     }
                 },
                 ExprKind::Declare(_, ref ident, _) => {
@@ -256,7 +257,7 @@ impl Vtable {
                     let ttype = session.get_type(defid).unwrap();
                     match ttype {
                         Type::Function(_, _, _) => {
-                            self.add_entry(session, scope.clone(), defid, ident.as_str(), ttype);
+                            self.add_entry(session, defid, ident.as_str(), ttype);
                         },
                         _ => { },
                     }
@@ -266,18 +267,18 @@ impl Vtable {
         }
     }
 
-    pub fn add_entry(&self, session: &Session, scope: ScopeRef, id: NodeID, name: &str, ftype: Type) {
+    pub fn add_entry(&self, session: &Session, id: NodeID, name: &str, ftype: Type) {
         debug!("ADDING VTABLE ENTRY: {:?} {:?}", name, ftype);
-        if let Some(index) = self.get_index(session, scope, name, &ftype) {
+        if let Some(index) = self.get_index(session, name, &ftype) {
             self.table.borrow_mut()[index].0 = id;
         } else {
             self.table.borrow_mut().push((id, String::from(name), ftype));
         }
     }
 
-    pub fn get_index(&self, session: &Session, scope: ScopeRef, name: &str, ftype: &Type) -> Option<usize> {
+    pub fn get_index(&self, session: &Session, name: &str, ftype: &Type) -> Option<usize> {
         self.table.borrow().iter().position(|(_, ref ename, ref etype)| {
-            ename.as_str() == name && check_type(session, scope.clone(), Some(etype.clone()), Some(ftype.clone()), Check::Def, false).is_ok()
+            ename.as_str() == name && check_type(session, Some(etype.clone()), Some(ftype.clone()), Check::Def, false).is_ok()
         })
     }
 

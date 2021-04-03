@@ -995,9 +995,8 @@ impl<'sess> Transformer<'sess> {
     }
 
     fn transform_class_type_data(&mut self, classdef: ClassDefRef, body: &Vec<Expr>) {
-        let scope = self.stack.get_scope();
-        classdef.build_vtable(self.session, scope.clone(), body);
-        classdef.build_structdef(self.session, scope.clone(), body);
+        classdef.build_vtable(self.session, body);
+        classdef.build_structdef(self.session, body);
 
         self.add_global(LLGlobal::DefNamedStruct(classdef.id, classdef.classname.clone(), true));
         self.set_type(classdef.id, LLType::Alias(classdef.id));

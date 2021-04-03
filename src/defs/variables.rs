@@ -50,7 +50,7 @@ impl VarDef {
         dscope.define(name.clone(), Some(id))?;
         session.set_def(id, def.clone());
         if let Some(ttype) = ttype {
-            session.update_type(scope.clone(), id, ttype)?;
+            session.update_type(id, ttype)?;
         }
 
         Ok(())

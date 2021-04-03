@@ -6,7 +6,6 @@ use defs::Def;
 use hir::ClassSpec;
 use misc::{ R, r, UniqueID };
 use session::{ Session, Error };
-use scope::{ Scope, ScopeRef };
 
 pub use abi::ABI;
 
@@ -302,15 +301,15 @@ pub enum Check {
     List,
 }
 
-pub fn expect_type(session: &Session, scope: ScopeRef, odtype: Option<Type>, octype: Option<Type>, mode: Check) -> Result<Type, Error> {
-    check_type(session, scope, odtype, octype, mode, true)
+pub fn expect_type(session: &Session, odtype: Option<Type>, octype: Option<Type>, mode: Check) -> Result<Type, Error> {
+    check_type(session, odtype, octype, mode, true)
 }
 
 //
 // Compare the defined type to the calculated type and return the common type, or error if they do not match
 // dtype < ctype: ie. ctype will be downcast to match dtype, but not the inverse
 //
-pub fn check_type(session: &Session, scope: ScopeRef, odtype: Option<Type>, octype: Option<Type>, mode: Check, update: bool) -> Result<Type, Error> {
+pub fn check_type(session: &Session, odtype: Option<Type>, octype: Option<Type>, mode: Check, update: bool) -> Result<Type, Error> {
     //debug!("TYPECHECK: {:?} {:?}", odtype, octype);
     if odtype.is_none() {
         // TODO should the else case just be Nil...
@@ -327,8 +326,8 @@ pub fn check_type(session: &Session, scope: ScopeRef, odtype: Option<Type>, octy
         debug!("CHECK TYPE {:?} {:?} {:?}", dtype, ctype, update);
         if let Type::Variable(ref _dname, ref did, dex) = dtype {
 
-            if let Type::Variable(ref cname, ref cid, cex) = ctype {
-                if scope.contains_type(cname) {
+            if let Type::Variable(ref _cname, ref cid, cex) = ctype {
+                if cex {
                     if update && !dex { session.set_type(*did, ctype.clone()); }
                     Ok(resolve_type(session, ctype.clone(), false)?)
                 } else {
@@ -336,11 +335,11 @@ pub fn check_type(session: &Session, scope: ScopeRef, odtype: Option<Type>, octy
                     Ok(resolve_type(session, dtype.clone(), false)?)
                 }
             } else {
-                if update && !dex { session.update_type(scope.clone(), *did, ctype.clone())?; }
+                if update && !dex { session.update_type(*did, ctype.clone())?; }
                 Ok(resolve_type(session, ctype.clone(), false)?)
             }
         } else if let Type::Variable(_, ref cid, cex) = ctype {
-            if update && !cex { session.update_type(scope.clone(), *cid, dtype.clone())?; }
+            if update && !cex { session.update_type(*cid, dtype.clone())?; }
             Ok(resolve_type(session, dtype.clone(), false)?)
             //Err(Error::new(format!("TypeError: attempting to cast a type variable {} to a concrete {}", ctype, dtype)))
         } else {
@@ -348,8 +347,8 @@ pub fn check_type(session: &Session, scope: ScopeRef, odtype: Option<Type>, octy
                 (Type::Function(ref aargs, ref aret, ref aabi), Type::Function(ref bargs, ref bret, ref babi)) => {
                     let oabi = aabi.compare(babi);
                     if oabi.is_some() {
-                        let argtypes = check_type(session, scope.clone(), Some(*aargs.clone()), Some(*bargs.clone()), mode, update)?;
-                        Ok(Type::Function(r(argtypes), r(check_type(session, scope, Some(*aret.clone()), Some(*bret.clone()), mode, update)?), oabi.unwrap()))
+                        let argtypes = check_type(session, Some(*aargs.clone()), Some(*bargs.clone()), mode, update)?;
+                        Ok(Type::Function(r(argtypes), r(check_type(session, Some(*aret.clone()), Some(*bret.clone()), mode, update)?), oabi.unwrap()))
                     } else {
                         Err(Error::new(format!("TypeError: type mismatch, expected {} but found {}", dtype, ctype)))
                     }
@@ -358,7 +357,7 @@ pub fn check_type(session: &Session, scope: ScopeRef, odtype: Option<Type>, octy
                     let mut types = vec!();
                     if atypes.len() == btypes.len() {
                         for (atype, btype) in atypes.iter().zip(btypes.iter()) {
-                            types.push(check_type(session, scope.clone(), Some(atype.clone()), Some(btype.clone()), mode, update)?);
+                            types.push(check_type(session, Some(atype.clone()), Some(btype.clone()), mode, update)?);
                         }
                         Ok(Type::Tuple(types))
                     } else {
@@ -372,7 +371,7 @@ pub fn check_type(session: &Session, scope: ScopeRef, odtype: Option<Type>, octy
                             if aname != bname {
                                 return Err(Error::new(format!("TypeError: type mismatch, expected {} but found {}", dtype, ctype)));
                             }
-                            types.push((aname.clone(), check_type(session, scope.clone(), Some(atype.clone()), Some(btype.clone()), mode, update)?));
+                            types.push((aname.clone(), check_type(session, Some(atype.clone()), Some(btype.clone()), mode, update)?));
                         }
                         Ok(Type::Record(types))
                     } else {
@@ -380,16 +379,16 @@ pub fn check_type(session: &Session, scope: ScopeRef, odtype: Option<Type>, octy
                     }
                 },
                 (Type::Object(ref aname, ref aid, ref atypes), Type::Object(ref bname, ref bid, ref btypes)) => {
-                    match is_subclass_of(session, scope.clone(), (bname, *bid, btypes), (aname, *aid, atypes), mode) {
+                    match is_subclass_of(session, (bname, *bid, btypes), (aname, *aid, atypes), mode) {
                         ok @ Ok(_) => ok,
                         err @ Err(_) => match mode {
-                            Check::List => is_subclass_of(session, scope, (aname, *aid, atypes), (bname, *bid, btypes), mode),
+                            Check::List => is_subclass_of(session, (aname, *aid, atypes), (bname, *bid, btypes), mode),
                             _ => err,
                         }
                     }
                 },
                 (Type::Ref(ref atype), Type::Ref(ref btype)) => {
-                    let ttype = check_type(session, scope.clone(), Some(*atype.clone()), Some(*btype.clone()), mode, update)?;
+                    let ttype = check_type(session, Some(*atype.clone()), Some(*btype.clone()), mode, update)?;
                     Ok(Type::Ref(r(ttype)))
                 },
                 (_, Type::Ambiguous(_)) |
@@ -407,9 +406,8 @@ pub fn check_type(session: &Session, scope: ScopeRef, odtype: Option<Type>, octy
 }
 
 
-fn is_subclass_of(session: &Session, scope: ScopeRef, adef: (&String, UniqueID, &Vec<Type>), bdef: (&String, UniqueID, &Vec<Type>), mode: Check) -> Result<Type, Error> {
+fn is_subclass_of(session: &Session, adef: (&String, UniqueID, &Vec<Type>), bdef: (&String, UniqueID, &Vec<Type>), mode: Check) -> Result<Type, Error> {
     debug!("IS SUBCLASS: {:?} of {:?}", adef, bdef);
-    let tscope = Scope::new_ref(Some(scope.clone()));
     let mut names = Type::map_new();
     let mut adef = (adef.0.clone(), adef.1, adef.2.clone());
     //let mut deftype = session.get_type(adef.1)?.get_params()?;
@@ -417,11 +415,11 @@ fn is_subclass_of(session: &Session, scope: ScopeRef, adef: (&String, UniqueID, 
     loop {
         let mut class = session.get_type(adef.1).unwrap();
         class = Type::map_typevars(session, &mut names, class);
-        adef.2 = check_type_params(session, tscope.clone(), &class.get_params()?, &adef.2, mode, true)?;
+        adef.2 = check_type_params(session, &class.get_params()?, &adef.2, mode, true)?;
 
         if *bdef.0 == adef.0 {
             let ptypes = if bdef.2.len() > 0 || adef.2.len() > 0 {
-                check_type_params(session, tscope.clone(), &adef.2, bdef.2, mode, true)?
+                check_type_params(session, &adef.2, bdef.2, mode, true)?
             } else {
                 vec!()
             };
@@ -442,13 +440,13 @@ fn is_subclass_of(session: &Session, scope: ScopeRef, adef: (&String, UniqueID, 
     }
 }
 
-pub fn check_type_params(session: &Session, scope: ScopeRef, dtypes: &Vec<Type>, ctypes: &Vec<Type>, mode: Check, update: bool) -> Result<Vec<Type>, Error> {
+pub fn check_type_params(session: &Session, dtypes: &Vec<Type>, ctypes: &Vec<Type>, mode: Check, update: bool) -> Result<Vec<Type>, Error> {
     if dtypes.len() != ctypes.len() {
         Err(Error::new(format!("TypeError: number of type parameters don't match: expected {} but found {}", Type::display_vec(dtypes), Type::display_vec(ctypes))))
     } else {
         let mut ptypes = vec!();
         for (dtype, ctype) in dtypes.iter().zip(ctypes.iter()) {
-            ptypes.push(check_type(session, scope.clone(), Some(dtype.clone()), Some(ctype.clone()), mode, update)?);
+            ptypes.push(check_type(session, Some(dtype.clone()), Some(ctype.clone()), mode, update)?);
         }
         Ok(ptypes)
     }
