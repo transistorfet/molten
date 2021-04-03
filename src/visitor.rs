@@ -91,11 +91,11 @@ pub trait Visitor: Sized {
         Ok(self.default_return())
     }
 
-    fn visit_resolver(&mut self, _id: NodeID, left: &Expr, _right: &Ident, _oid: NodeID) -> Result<Self::Return, Error> {
+    fn visit_resolver(&mut self, node: &Expr, left: &Expr, _right: &Ident, _oid: NodeID) -> Result<Self::Return, Error> {
         self.visit_node(left)
     }
 
-    fn visit_accessor(&mut self, _id: NodeID, left: &Expr, _right: &Ident, _oid: NodeID) -> Result<Self::Return, Error> {
+    fn visit_accessor(&mut self, node: &Expr, left: &Expr, _right: &Ident, _oid: NodeID) -> Result<Self::Return, Error> {
         self.visit_node(left)
     }
 
@@ -104,7 +104,7 @@ pub trait Visitor: Sized {
         self.visit_vec(code)
     }
 
-    fn visit_invoke(&mut self, id: NodeID, func: &Expr, args: &Vec<Expr>) -> Result<Self::Return, Error> {
+    fn visit_invoke(&mut self, id: NodeID, func: &Expr, args: &Vec<Expr>, fid: NodeID) -> Result<Self::Return, Error> {
         walk_invoke(self, id, func, args)
     }
 
@@ -178,11 +178,11 @@ pub trait Visitor: Sized {
         Ok(self.default_return())
     }
 
-    fn visit_pattern_annotation(&mut self, _id: NodeID, _ttype: &Type, pat: &Pattern) -> Result<Self::Return, Error> {
-        self.visit_pattern(pat)
+    fn visit_pattern_annotation(&mut self, _id: NodeID, _ttype: &Type, subpat: &Pattern) -> Result<Self::Return, Error> {
+        self.visit_pattern(subpat)
     }
 
-    fn visit_pattern_resolve(&mut self, _id: NodeID, left: &Pattern, _ident: &Ident, _oid: NodeID) -> Result<Self::Return, Error> {
+    fn visit_pattern_resolve(&mut self, _id: NodeID, left: &Pattern, _field: &Ident, _oid: NodeID) -> Result<Self::Return, Error> {
         self.visit_pattern(left)
     }
 
@@ -198,7 +198,7 @@ pub trait Visitor: Sized {
         walk_pattern_record(self, id, items)
     }
 
-    fn visit_pattern_wild(&mut self) -> Result<Self::Return, Error> {
+    fn visit_pattern_wild(&mut self, _id: NodeID) -> Result<Self::Return, Error> {
         Ok(self.default_return())
     }
 
@@ -385,11 +385,11 @@ pub fn walk_node<R, V: Visitor<Return = R>>(visitor: &mut V, node: &Expr) -> Res
         },
 
         ExprKind::Resolver(left, right, oid) => {
-            visitor.visit_resolver(node.id, left, right, *oid)
+            visitor.visit_resolver(node, left, right, *oid)
         },
 
         ExprKind::Accessor(left, right, oid) => {
-            visitor.visit_accessor(node.id, left, right, *oid)
+            visitor.visit_accessor(node, left, right, *oid)
         },
 
 
@@ -398,7 +398,7 @@ pub fn walk_node<R, V: Visitor<Return = R>>(visitor: &mut V, node: &Expr) -> Res
         },
 
         ExprKind::Invoke(func, args, fid) => {
-            visitor.visit_invoke(node.id, func, args)
+            visitor.visit_invoke(node.id, func, args, *fid)
         },
 
 
@@ -493,7 +493,7 @@ pub fn walk_pattern<R, V: Visitor<Return = R>>(visitor: &mut V, pat: &Pattern) -
         },
 
         PatKind::Wild => {
-            visitor.visit_pattern_wild()
+            visitor.visit_pattern_wild(pat.id)
         },
 
         PatKind::Literal(lit) => {

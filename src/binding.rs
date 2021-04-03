@@ -225,7 +225,7 @@ impl<'sess> Visitor for NameBinder<'sess> {
         Ok(())
     }
 
-    fn visit_resolver(&mut self, _id: NodeID, left: &Expr, _right: &Ident, oid: NodeID) -> Result<Self::Return, Error> {
+    fn visit_resolver(&mut self, node: &Expr, left: &Expr, _right: &Ident, oid: NodeID) -> Result<Self::Return, Error> {
         let scope = self.stack.get_scope();
         // TODO should this always work on a type reference, or should classes be added as values as well as types?
         //self.visit_node(left);
