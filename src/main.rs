@@ -2,14 +2,12 @@
 use std::str;
 
 extern crate rand;
+extern crate regex;
 extern crate clap;
-use clap::{ App, Arg, ArgMatches };
-
 #[macro_use]
 extern crate nom;
 #[macro_use(position)]
 extern crate nom_locate;
-
 
 #[macro_use]
 mod debug;
@@ -34,6 +32,8 @@ mod export;
 mod transform;
 mod llvm;
 
+use regex::{ Regex };
+use clap::{ App, Arg, ArgMatches };
 use config::{ Options, EmitAs };
 
 fn main() {
@@ -111,7 +111,8 @@ fn build_options(matches: &ArgMatches) {
 fn compile_file(input: &str, output: Option<&str>) {
     let mut session = session::Session::new();
     let source = input.rsplitn(2, '.').collect::<Vec<&str>>()[1];
-    session.name = source.replace("/", ".");
+    let re = Regex::new(r"[^A-Za-z0-9_.]").unwrap();
+    session.name = re.replace_all(&source.replace("/", "."), "_").to_string();
     session.target = output.map(|s| String::from(s)).unwrap_or_else(|| String::from(source));
 
     let builtins = llvm::lib::get_builtins();

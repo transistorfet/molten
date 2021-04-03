@@ -8,5 +8,6 @@ nom = { version = "^4.0", features = ["verbose-errors"] }
 nom_locate = { version = "^0.3", features = ["verbose-errors"] }
 clap = "^2"
 llvm-sys = "^110"
+regex = "^1.1.0"
 rand = "^0.5"
 
