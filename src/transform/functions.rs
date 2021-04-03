@@ -69,26 +69,6 @@ impl<'a> Transformer<'a> {
         }
     }
 
-    pub fn transform_func_as_result(&mut self, exprs: &mut Vec<LLExpr>, func: &Expr, fargs: &mut Vec<LLExpr>) -> LLExpr {
-        match &func.kind {
-            ExprKind::Accessor(_, ident, oid) => {
-                let otype = self.session.get_type(*oid).unwrap();
-                match otype {
-                    Type::Object(_, _, _) => {
-                        // Convert method-style calls
-                        let defid = self.session.get_ref(func.id).unwrap();
-                        exprs.push(LLExpr::SetValue(*oid, r(fargs[0].clone())));
-                        fargs[0] = LLExpr::GetValue(*oid);
-                        exprs.extend(self.convert_accessor(defid, LLExpr::GetValue(*oid), &ident.name, otype));
-                        exprs.pop().unwrap()
-                    },
-                    _ => self.transform_as_result(exprs, func).unwrap(),
-                }
-            },
-            _ => self.transform_as_result(exprs, func).unwrap(),
-        }
-    }
-
     pub fn transform_vis(&mut self, vis: Visibility) -> LLLink {
         match vis {
             Visibility::Private => LLLink::Private,
@@ -153,7 +133,7 @@ impl CFuncTransform {
 
         let mut fargs = transform.transform_as_args(&mut exprs, args);
 
-        let funcresult = transform.transform_func_as_result(&mut exprs, func, &mut fargs);
+        let funcresult = transform.transform_as_result(&mut exprs, func).unwrap();
 
         exprs.extend(CFuncTransform::create_invoke(transform, funcresult, fargs));
         exprs
@@ -231,7 +211,7 @@ impl MFuncTransform {
 
         let mut fargs = transform.transform_as_args(&mut exprs, args);
 
-        let funcresult = transform.transform_func_as_result(&mut exprs, func, &mut fargs);
+        let funcresult = transform.transform_as_result(&mut exprs, func).unwrap();
 
         exprs.extend(MFuncTransform::create_invoke(transform, funcresult, fargs));
         exprs
@@ -384,7 +364,7 @@ impl ClosureTransform {
         let mut fargs = transform.transform_as_args(&mut exprs, args);
 
         let fid = NodeID::generate();
-        let funcresult = transform.transform_func_as_result(&mut exprs, func, &mut fargs);
+        let funcresult = transform.transform_as_result(&mut exprs, func).unwrap();
         exprs.push(LLExpr::SetValue(fid, r(funcresult)));
 
         exprs.extend(ClosureTransform::create_invoke(transform, LLExpr::GetValue(fid), fargs));
