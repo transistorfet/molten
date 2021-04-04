@@ -101,18 +101,6 @@ impl<'sess> Transformer<'sess> {
         self.context.last().map(|c| *c)
     }
 
-    /*
-    fn get_func_context(&self) -> Option<CodeContext> {
-        for i in (self.context.len() - 1) .. 0 {
-            match self.context[i] {
-                context @ CodeContext::Func(_, _) => return Some(context),
-                _ => { },
-            }
-        }
-        return None
-    }
-    */
-
     pub fn with_context<F, R>(&mut self, context: CodeContext, f: F) -> R where F: FnOnce(&mut Self) -> R {
         self.set_context(context);
         let ret = f(self);
@@ -865,16 +853,6 @@ impl<'sess> Transformer<'sess> {
         exprs
     }
 
-    /*
-    fn find_func(&mut self, name: &str, argtypes: &Vec<Type>) -> NodeID {
-        let compid = scope.get_var_def(&String::from(name)).unwrap();
-        match self.session.get_def(compid) {
-            Ok(Def::Overload(ol)) => ol.find_variant(self.session, Type::Tuple(argtypes.clone())).unwrap().0,
-            _ => compid,
-        }
-    }
-    */
-
     pub fn transform_side_effect(&mut self, op: &str, args: &Vec<Expr>) -> Vec<LLExpr> {
         let mut conds = vec!();
         let mut blocks = vec!();
@@ -907,13 +885,7 @@ impl<'sess> Transformer<'sess> {
             Type::Record(items) => LLType::Struct(items.iter().map(|item| self.transform_value_type(&item.1)).collect()),
             // TODO how will you do generics
             Type::Variable(_, _, _) => LLType::Var,
-            Type::Function(args, ret, abi) => {
-                match abi {
-                    ABI::C | ABI::MoltenFunc => LLType::Ptr(r(CFuncTransform::transform_def_type(self, &args.as_vec(), &*ret))),
-                    ABI::Molten | ABI::Unknown => ClosureTransform::transform_value_type(self, &args.as_vec(), &*ret),
-                    _ => panic!("Not Implemented: {:?}", abi),
-                }
-            },
+            Type::Function(args, ret, abi) => self.transform_func_value_type(*abi, &args.as_vec(), &*ret),
             _ => panic!("Not Implemented: {:?}", ttype),
         }
     }

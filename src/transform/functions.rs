@@ -21,6 +21,13 @@ use transform::llcode::{ LLType, LLLit, LLRef, LLCmpType, LLLink, LLCC, LLExpr, 
 
 
 impl<'a> Transformer<'a> {
+    pub fn transform_vis(&mut self, vis: Visibility) -> LLLink {
+        match vis {
+            Visibility::Private => LLLink::Private,
+            Visibility::Public => LLLink::Public,
+        }
+    }
+
     pub fn transform_func_name(&mut self, name: Option<&String>, id: NodeID) -> String {
         let scope = self.stack.get_scope();
         let ftype = self.session.get_type(id).unwrap();
@@ -31,6 +38,14 @@ impl<'a> Transformer<'a> {
         match abi {
             ABI::C | ABI::MoltenFunc => CFuncTransform::transform_def_type(self, args, ret),
             ABI::Molten | ABI::Unknown => ClosureTransform::transform_def_type(self, args, ret),
+            _ => panic!("Not Implemented: {:?}", abi),
+        }
+    }
+
+    pub fn transform_func_value_type(&mut self, abi: ABI, args: &Vec<Type>, ret: &Type) -> LLType {
+        match abi {
+            ABI::C | ABI::MoltenFunc => LLType::Ptr(r(CFuncTransform::transform_def_type(self, args, ret))),
+            ABI::Molten | ABI::Unknown => ClosureTransform::transform_value_type(self, args, ret),
             _ => panic!("Not Implemented: {:?}", abi),
         }
     }
@@ -69,12 +84,6 @@ impl<'a> Transformer<'a> {
         }
     }
 
-    pub fn transform_vis(&mut self, vis: Visibility) -> LLLink {
-        match vis {
-            Visibility::Private => LLLink::Private,
-            Visibility::Public => LLLink::Public,
-        }
-    }
 }
 
 
@@ -131,7 +140,7 @@ impl CFuncTransform {
     pub fn transform_invoke(transform: &mut Transformer, _id: NodeID, func: &Expr, args: &Vec<Expr>) -> Vec<LLExpr> {
         let mut exprs = vec!();
 
-        let mut fargs = transform.transform_as_args(&mut exprs, args);
+        let fargs = transform.transform_as_args(&mut exprs, args);
 
         let funcresult = transform.transform_as_result(&mut exprs, func).unwrap();
 
@@ -209,7 +218,7 @@ impl MFuncTransform {
     pub fn transform_invoke(transform: &mut Transformer, _id: NodeID, func: &Expr, args: &Vec<Expr>) -> Vec<LLExpr> {
         let mut exprs = vec!();
 
-        let mut fargs = transform.transform_as_args(&mut exprs, args);
+        let fargs = transform.transform_as_args(&mut exprs, args);
 
         let funcresult = transform.transform_as_result(&mut exprs, func).unwrap();
 
@@ -361,7 +370,7 @@ impl ClosureTransform {
     pub fn transform_invoke(transform: &mut Transformer, _id: NodeID, func: &Expr, args: &Vec<Expr>) -> Vec<LLExpr> {
         let mut exprs = vec!();
 
-        let mut fargs = transform.transform_as_args(&mut exprs, args);
+        let fargs = transform.transform_as_args(&mut exprs, args);
 
         let fid = NodeID::generate();
         let funcresult = transform.transform_as_result(&mut exprs, func).unwrap();

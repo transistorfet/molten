@@ -1,4 +1,7 @@
 
+* for transformer, you could have instead a vec of blocks, and the current block can have exprs appended to it, and it could also have the context,
+  but you'd have to add a block for if, while, sideeffect, match, try, and import
+
 * should you make all visitor functions take a reference to the node itself (since typecheck accessor/resolver needs to send the node onward)
 * convert transform to use visitor??
 * refactor transform to separate into multiple files
