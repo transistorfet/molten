@@ -10,6 +10,7 @@ use session::Session;
 use scope::{ Scope, ScopeRef };
 use ast::{ Pos };
 use hir::{ NodeID, Visibility, Mutability, Literal, Ident, Argument, MatchCase, Pattern, PatKind, Expr, ExprKind };
+use visitor::{ Visitor };
 
 use defs::functions::{ FuncDef, ClosureDefRef };
 use defs::classes::{ Define };
@@ -130,7 +131,7 @@ impl CFuncTransform {
         transform.stack.push_scope(fscope.clone());
         transform.with_context(CodeContext::Func(ABI::C, defid), |transform| {
             let llvis = transform.transform_vis(vis);
-            let llbody = transform.transform_node(body);
+            let llbody = transform.visit_node(body).unwrap();
             transform.add_global(LLGlobal::DefCFunc(defid, llvis, fname, lftype, fargs, llbody, LLCC::CCC));
         });
         transform.stack.pop_scope();
@@ -207,9 +208,10 @@ impl MFuncTransform {
             transform.with_exception(exp_id, |transform| {
                 transform.with_scope(fscope, |transform| {
                     let llvis = transform.transform_vis(vis);
-                    let llbody = transform.transform_node(body);
+                    let llbody = transform.visit_node(body).unwrap();
                     transform.add_global(LLGlobal::DefCFunc(defid, llvis, fname, lftype, fargs, llbody, LLCC::FastCC));
-                });
+                    Ok(vec!())
+                }).unwrap();
             });
         });
         vec!(LLExpr::GetValue(defid))
@@ -310,7 +312,8 @@ impl ClosureTransform {
         let mut fargs = CFuncTransform::transform_def_args(transform, args);
         transform.with_scope(fscope.clone(), |transform| {
             ClosureTransform::convert_def_args(transform, cl.clone(), exp_id, &mut fargs);
-        });
+            Ok(vec!())
+        }).unwrap();
 
         let ptype = ClosureTransform::convert_molten_type(transform, transform.session.get_type(defid).unwrap());
         cl.add_field(transform.session, cfid, "__func__", ptype.clone(), Define::Never);
@@ -320,8 +323,8 @@ impl ClosureTransform {
         let body = transform.with_context(CodeContext::Func(ABI::Molten, defid), |transform| {
             transform.with_exception(exp_id, |transform| {
                 transform.with_scope(fscope, |transform| {
-                    transform.transform_node(body)
-                })
+                    transform.visit_node(body)
+                }).unwrap()
             })
         });
         let llvis = transform.transform_vis(vis);
@@ -352,7 +355,7 @@ impl ClosureTransform {
 
         binding::NameBinder::bind_names(transform.session, scope.clone(), &code);
         typecheck::TypeChecker::check(transform.session, scope.clone(), &code);
-        let mut exprs = transform.transform_vec(&code);
+        let mut exprs = transform.visit_vec(&code).unwrap();
         let did_defid = transform.session.get_ref(did).unwrap();
 
         exprs.push(LLExpr::SetValue(defid, r(LLExpr::GetLocal(did_defid))));

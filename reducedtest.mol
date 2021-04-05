@@ -3,6 +3,11 @@ import lib.libcore
 
 4 < 3 or 5 > 10
 
+if true == true then {
+   println("hey");
+}
+
+
 /*
 // TODO this is only here because we were sometimes unable to import libcore
 fn str(num: Int) -> String {

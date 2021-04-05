@@ -53,7 +53,7 @@ impl<'sess> Visitor for NameBinder<'sess> {
         self.session.map.get(&id)
     }
 
-    fn handle_error(&mut self, node: &Expr, err: Error) -> Result<(), Error> {
+    fn handle_error(&mut self, node: &Expr, err: Error) -> Result<Self::Return, Error> {
         self.session.print_error(err.add_pos(&node.get_pos()));
         Ok(())
     }

@@ -1,12 +1,13 @@
 
-* for transformer, you could have instead a vec of blocks, and the current block can have exprs appended to it, and it could also have the context,
-  but you'd have to add a block for if, while, sideeffect, match, try, and import
+* for transformer, you could have a list of 'bodies' of code, which are appended to by the transform functions, rather than returned.
+  It could also store the context, but you'd have to add a body when transforming `if`, `while`, `sideeffect`, `match`, `try`, and `import`
+* move the pattern transform functions into the visitor, but right now you're passing in a value_id to use for comparisons.  It'd have to be stored in the transformer obj insteado
+* separate vtables and other transformation components out of that big file.  They could be separate objects, but maybe there's a better way?
 
 * should you make all visitor functions take a reference to the node itself (since typecheck accessor/resolver needs to send the node onward)
-* convert transform to use visitor??
-* refactor transform to separate into multiple files
-* separate vtables and other objects out transform.rs
 
+* upgrade the parser to nom 6 (code in stash, but with the changes, the parser is totally broken, no idea why)
+* upgrading to nom 5 there's an issue with line termination/whitespace, especially at the end of statements, and also infix notation
 
 * when a class has a member that is a closure function pointer, and that class is instantiated, then the compiler will segfault during optimization.
   It only happens if when trying to zero the allocated memory after calling molten_malloc to allocate a new object, but it happens either with a
@@ -17,7 +18,6 @@
   In the test, the match is inside a function, but when moved to the top level, it hangs while compiling.  It happens regardless of mathc arm it seems
 
 
-* upgrade the parser to nom 6 (code in stash, but with the changes, the parser is totally broken, no idea why)
 
 
 * make it possible to implement methods on enums
