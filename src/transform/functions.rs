@@ -25,7 +25,7 @@ impl<'a> Transformer<'a> {
     pub fn transform_vis(&mut self, vis: Visibility) -> LLLink {
         match vis {
             Visibility::Private => LLLink::Private,
-            Visibility::Public => LLLink::Public,
+            Visibility::Public | Visibility::Global => LLLink::Public,
         }
     }
 
@@ -260,7 +260,7 @@ impl ClosureTransform {
     }
 
     pub fn convert_to_value_type(transform: &mut Transformer, ltype: LLType) -> LLType {
-        LLType::Ptr(r(LLType::Struct(vec!(LLType::Ptr(r(ltype))))))
+        LLType::Struct(vec!(LLType::Ptr(r(ltype)), LLType::Ptr(r(LLType::I8))))
     }
 
     pub fn convert_molten_type(transform: &mut Transformer, ttype: Type) -> Type {
@@ -275,14 +275,13 @@ impl ClosureTransform {
         }
     }
 
-    pub fn transform_raw_func_data(transform: &mut Transformer, id: NodeID, fname: &String) -> (NodeID, String, LLType) {
+    pub fn transform_raw_func_data(transform: &mut Transformer, id: NodeID, fname: &String, cfid: NodeID) -> (String, LLType) {
         let ftype = transform.session.get_type(id).unwrap();
         let (argtypes, rettype, _) = ftype.get_function_types().unwrap();
         let cftype = ClosureTransform::transform_def_type(transform, &argtypes.as_vec(), rettype);
-        let cfid = NodeID::generate();
         let cfname = format!("{}_func", fname);
         transform.set_type(cfid, cftype.clone());
-        (cfid, cfname, cftype)
+        (cfname, cftype)
     }
 
     pub fn transform_decl(transform: &mut Transformer, defid: NodeID, _vis: Visibility, name: &String, ttype: &Type) -> Vec<LLExpr> {
@@ -303,9 +302,9 @@ impl ClosureTransform {
         let scope = transform.stack.get_scope();
         let fscope = transform.session.map.get(&defid);
         let fname = transform.transform_func_name(name, defid);
-        let (cfid, cfname, cftype) = ClosureTransform::transform_raw_func_data(transform, defid, &fname);
-
         let cl = transform.session.get_def(defid).unwrap().as_closure().unwrap();
+        let (compiled_func_name, compiled_func_type) = ClosureTransform::transform_raw_func_data(transform, defid, &fname, cl.compiled_func_id);
+
 
         // Add context argument to transformed arguments list
         let exp_id = NodeID::generate();
@@ -316,7 +315,6 @@ impl ClosureTransform {
         }).unwrap();
 
         let ptype = ClosureTransform::convert_molten_type(transform, transform.session.get_type(defid).unwrap());
-        cl.add_field(transform.session, cfid, "__func__", ptype.clone(), Define::Never);
 
         // Transforms body and create C function definition
         let index = transform.globals.len();
@@ -328,46 +326,55 @@ impl ClosureTransform {
             })
         });
         let llvis = transform.transform_vis(vis);
-        transform.insert_global(index, LLGlobal::DefCFunc(cfid, llvis, cfname.clone(), cftype, fargs, body, LLCC::FastCC));
+        transform.insert_global(index, LLGlobal::DefCFunc(cl.compiled_func_id, llvis, compiled_func_name.clone(), compiled_func_type, fargs, body, LLCC::FastCC));
 
         let structtype = LLType::Ptr(r(transform.transform_struct_def(&cl.context_struct)));
         transform.insert_global(index, LLGlobal::DefType(cl.context_type_id, format!("__context_{}__", cl.context_type_id), structtype.clone()));
 
 
-        FuncDef::define(transform.session, scope.clone(), cfid, cl.vis, &Some(cfname.clone()), Some(ptype)).unwrap();
+        FuncDef::define(transform.session, scope.clone(), cl.compiled_func_id, cl.vis, &Some(compiled_func_name.clone()), Some(ptype)).unwrap();
         let mut fields = vec!();
         cl.context_struct.foreach_field(|defid, field, _| {
             let rid = NodeID::generate();
             transform.session.set_ref(rid, defid);
-            if field.as_str() == "__func__" {
-                fields.push((Ident::from_str("__func__"), Expr::new_with_id(rid, Pos::empty(), ExprKind::Identifier(Ident::new(cfname.clone())))));
-            } else {
-                fields.push((Ident::from_str(field.as_str()), Expr::new_with_id(rid, Pos::empty(), ExprKind::Identifier(Ident::new(field.clone())))));
-            }
+            fields.push((Ident::from_str(field.as_str()), Expr::new_with_id(rid, Pos::empty(), ExprKind::Identifier(Ident::new(field.clone())))));
         });
 
         let mut code = vec!();
-        let did = NodeID::generate();
-        code.push(Expr::new_with_id(did, Pos::empty(), ExprKind::Definition(Mutability::Mutable, Ident::new(fname.clone()), None, r(Expr::make_ref(Pos::empty(), Expr::make_record(Pos::empty(), fields))))));
-        // TODO I'm going back on my decision to use a tuple pair to represent the function and context reference because it can't be converted to i8* (the generics type)
-        //      Once I have generics that can operate on different sized data instead of only references, I can switch back
-        //code.push(Expr::new_with_id(NodeID::generate(), Pos::empty(), ExprKind::Tuple(vec!(Expr::make_ident_from_str(Pos::empty(), real_fname.as_str()), Expr::make_ident(Pos::empty(), Ident::new(cname.clone()))))));
+        let did_context = NodeID::generate();
+        let context_name = format!("{}_context", fname);
+        // TODO if you could make this create and set the struct with the fptr and allocated context set before it then populates the context, then
+        //      you wouldn't need the special recursive case in transform_reference.  It should be represented as an object, since the closure has a
+        //      struct already, but it will take some refactoring first
+        code.push(Expr::new_with_id(did_context, Pos::empty(), ExprKind::Definition(Mutability::Mutable, Ident::new(context_name.clone()), None, r(
+            if fields.len() > 0 {
+                Expr::make_ref(Pos::empty(), Expr::make_record(Pos::empty(), fields))
+            } else {
+                Expr::make_nil()
+            }
+        ))));
 
         binding::NameBinder::bind_names(transform.session, scope.clone(), &code);
         typecheck::TypeChecker::check(transform.session, scope.clone(), &code);
         let mut exprs = transform.visit_vec(&code).unwrap();
-        let did_defid = transform.session.get_ref(did).unwrap();
+        let did_context_defid = transform.session.get_ref(did_context).unwrap();
 
-        exprs.push(LLExpr::SetValue(defid, r(LLExpr::GetLocal(did_defid))));
+        exprs.push(ClosureTransform::make_closure_value(transform, defid, cl, LLExpr::GetLocal(did_context_defid)));
         exprs.push(LLExpr::GetValue(defid));
 
         if vis == Visibility::Public {
             let gid = NodeID::generate();
             transform.add_global(LLGlobal::DefGlobal(gid, LLLink::Once, fname.clone(), structtype));
-            exprs.push(LLExpr::SetGlobal(gid, r(LLExpr::GetLocal(did_defid))));
+            exprs.push(LLExpr::SetGlobal(gid, r(LLExpr::GetValue(defid))));
         }
 
         exprs
+    }
+
+    pub fn make_closure_value(transform: &mut Transformer, id: NodeID, cl: ClosureDefRef, context: LLExpr) -> LLExpr {
+        LLExpr::DefStruct(id, LLType::Struct(vec!(LLType::Ptr(r(transform.get_type(cl.compiled_func_id).unwrap())), LLType::Ptr(r(LLType::I8)))), vec!(
+            LLExpr::GetValue(cl.compiled_func_id), context
+        ))
     }
 
     pub fn transform_invoke(transform: &mut Transformer, _id: NodeID, func: &Expr, args: &Vec<Expr>) -> Vec<LLExpr> {
@@ -386,9 +393,9 @@ impl ClosureTransform {
     pub fn create_invoke(transform: &mut Transformer, func: LLExpr, mut fargs: Vec<LLExpr>) -> Vec<LLExpr> {
         let mut exprs = vec!();
 
-        fargs.push(LLExpr::Cast(LLType::Ptr(r(LLType::I8)), r(func.clone())));
+        fargs.push(LLExpr::Cast(LLType::Ptr(r(LLType::I8)), r(LLExpr::GetItem(r(func.clone()), 1))));
 
-        let function = LLExpr::LoadRef(r(LLExpr::AccessRef(r(func), vec!(LLRef::Field(0)))));
+        let function = LLExpr::GetItem(r(func), 0);
         exprs.extend(MFuncTransform::create_invoke(transform, function, fargs));
         exprs
     }

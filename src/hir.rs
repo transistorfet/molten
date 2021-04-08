@@ -10,6 +10,7 @@ pub type NodeID = UniqueID;
 pub enum Visibility {
     Private,
     Public,
+    Global,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]

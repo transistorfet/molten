@@ -610,6 +610,7 @@ impl<'sess> Transformer<'sess> {
     pub fn create_reference(&mut self, defid: NodeID) -> Vec<LLExpr> {
         match self.session.get_def(defid) {
             Ok(Def::Var(_)) => vec!(LLExpr::GetLocal(defid)),
+            Ok(Def::Closure(cl)) if cl.vis == Visibility::Global => vec!(LLExpr::GetLocal(defid)),
             Ok(_) => vec!(LLExpr::GetValue(defid)),
             Err(_) => panic!("TransformError: attempting to reference a non-existent value"),
         }
@@ -626,7 +627,8 @@ impl<'sess> Transformer<'sess> {
                 Some(CodeContext::Func(ABI::Molten, ref cid)) => {
                     let cl = self.session.get_def(*cid).unwrap().as_closure().unwrap();
                     if *cid == defid {
-                        vec!(LLExpr::Cast(LLType::Alias(cl.context_type_id), r(LLExpr::GetValue(cl.context_arg_id))))
+                        //vec!(LLExpr::Cast(LLType::Alias(cl.context_type_id), r(LLExpr::GetValue(cl.context_arg_id))))
+                        vec!(ClosureTransform::make_closure_value(self, NodeID::generate(), cl.clone(), LLExpr::GetValue(cl.context_arg_id)))
                     } else {
                         let index = cl.find_or_add_field(self.session, defid, name.as_str(), self.session.get_type(defid).unwrap());
                         let context = LLExpr::Cast(LLType::Alias(cl.context_type_id), r(LLExpr::GetValue(cl.context_arg_id)));

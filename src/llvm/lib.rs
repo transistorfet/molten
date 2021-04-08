@@ -19,7 +19,7 @@ use config::Options;
 use misc::{ r, UniqueID };
 
 use defs::classes::{ ClassDef, Define };
-use defs::functions::{ AnyFunc, FuncDef };
+use defs::functions::{ AnyFunc };
 
 use transform::llcode::{ LLType };
 use transform::transform::Transformer;
@@ -74,14 +74,7 @@ pub fn declare_builtins_node<'sess>(session: &Session, scope: ScopeRef, node: &B
             bind_type_names(session, tscope.clone(), ftype.as_mut(), true).unwrap();
             debug!("BUILTIN TYPE: {:?}", ftype);
             let abi = ftype.as_ref().map(|t| t.get_abi().unwrap()).unwrap_or(ABI::Molten);
-            match *func {
-                FuncKind::Function(_) => {
-                    FuncDef::define(session, scope.clone(), *id, Visibility::Private, &Some(String::from(*name)), ftype.clone()).unwrap();
-                },
-                _ => {
-                    AnyFunc::define(session, scope.clone(), *id, Visibility::Private, &Some(String::from(*name)), abi, ftype.clone()).unwrap();
-                },
-            };
+            AnyFunc::define(session, scope.clone(), *id, Visibility::Global, &Some(String::from(*name)), abi, ftype.clone()).unwrap();
         },
         BuiltinDef::Class(id, name, params, _, entries) => {
             let tscope = session.map.get_or_add(*id, Some(scope.clone()));
@@ -116,6 +109,9 @@ pub unsafe fn define_builtins_node<'sess>(llvm: &LLVM<'sess>, transformer: &mut 
             let name = abi.mangle_name(sname, argtypes, 2);
             let ltype = transformer.transform_func_def_type(abi, &argtypes.as_vec(), rettype);
             match *func {
+                FuncKind::FromNamed => {
+                    llvm.set_value(*id, LLVMGetNamedFunction(llvm.module, cstring(&name)));
+                },
                 FuncKind::External => {
                     let func = LLVMAddFunction(llvm.module, cstring(&name), llvm.build_type(&ltype));
                     llvm.set_value(*id, func);
@@ -125,11 +121,19 @@ pub unsafe fn define_builtins_node<'sess>(llvm: &LLVM<'sess>, transformer: &mut 
                     llvm.set_value(*id, function);
                 },
                 FuncKind::Function(func) => {
-                    let function = build_lib_function(llvm, name.as_str(), &ltype, func);
-                    llvm.set_value(*id, function);
-                },
-                FuncKind::FromNamed => {
-                    llvm.set_value(*id, LLVMGetNamedFunction(llvm.module, cstring(&name)));
+                    if abi == ABI::Molten {
+                        let func_id = NodeID::generate();
+                        let function = build_lib_function(llvm, format!("{}_func", name).as_str(), &ltype, func);
+                        llvm.set_value(func_id, function);
+
+                        let mut items = vec!(function, llvm.null_const(llvm.build_type(&LLType::Ptr(r(LLType::I8)))));
+                        let rtype = llvm.build_type(&LLType::Struct(vec!(LLType::Ptr(r(ltype.clone())), LLType::Ptr(r(LLType::I8)))));
+                        let global = llvm.build_def_global(name.as_str(), LLLink::Once, rtype, LLVMConstStruct(items.as_mut_ptr(), items.len() as u32, 0));
+                        llvm.set_value(*id, global);
+                    } else {
+                        let function = build_lib_function(llvm, name.as_str(), &ltype, func);
+                        llvm.set_value(*id, function);
+                    }
                 },
             }
         },
@@ -547,6 +551,10 @@ unsafe fn string_get(llvm: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef {
 
 
 unsafe fn print(llvm: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef {
+    // This would access the char* inside a wide pointer/slice where the second element is the size
+    //let str = LLExpr::LoadRef(r(LLExpr::AccessRef(r(args[0]), vec!(LLRef::Field(0)))))
+    //LLExpr::CallC(r(LLExpr::GetNamed("fputs")), vec!(str), LLCC::CCC)
+    //LLExpr::Literal(LLLit::I32(0))
     llvm.build_call_by_name("fputs", &mut vec!(args[0], llvm.build_load(LLVMGetNamedGlobal(llvm.module, cstr("stdout")))));
     llvm.i32_const(0)
 }

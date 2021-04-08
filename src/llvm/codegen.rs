@@ -467,6 +467,13 @@ impl<'sess> LLVM<'sess> {
         pointer
     }
 
+    pub unsafe fn build_def_global(&self, name: &str, link: LLLink, rtype: LLVMTypeRef, initval: LLVMValueRef) -> LLVMValueRef {
+        let global = LLVMAddGlobal(self.module, rtype, cstr(&name));
+        LLVMSetInitializer(global, initval);
+        self.build_linkage(global, link);
+        global
+    }
+
     pub unsafe fn build_load(&self, pointer: LLVMValueRef) -> LLVMValueRef {
         LLVMBuildLoad(self.builder, pointer, cstr(""))
     }
@@ -734,9 +741,7 @@ impl<'sess> LLVM<'sess> {
 
                 LLGlobal::DefGlobal(id, link, name, ltype) => {
                     let rtype = self.build_type(ltype);
-                    let global = LLVMAddGlobal(self.module, rtype, cstr(name.as_str()));
-                    LLVMSetInitializer(global, self.null_const(rtype));
-                    self.build_linkage(global, *link);
+                    let global = self.build_def_global(name.as_str(), *link, rtype, self.null_const(rtype));
                     self.set_value(*id, global);
                 },
 

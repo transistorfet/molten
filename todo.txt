@@ -1,4 +1,10 @@
 
+
+* I really need the closures to be a tuple of the funcptr and context, and not a pointer in its own right, because then I can have closure literals with a null context and no malloc
+  but there is potentially an issue with generics, such that a tuple (wide pointer) can't be made into a generic since it isn't a single pointer.  I'm not sure where this
+  was a problem, but I noted it from a previous attempt.  It *might* be possible to allow generic wide pointers (make LLType::TypeVar == { i8*, i8* }).
+
+
 * for transformer, you could have a list of 'bodies' of code, which are appended to by the transform functions, rather than returned.
   It could also store the context, but you'd have to add a body when transforming `if`, `while`, `sideeffect`, `match`, `try`, and `import`
 * move the pattern transform functions into the visitor, but right now you're passing in a value_id to use for comparisons.  It'd have to be stored in the transformer obj insteado
@@ -20,7 +26,15 @@
 
 
 
+* if you had a way of indexing an object easily, given an llvm object, then you can fix the print() functions to take a SuperString (which would become String)
+* You could have a mutable ByteArray type, which contains the length, or an immutable ByteString or ZByteString that can be passed to C functions, so that SuperString
+  could have a ByteArray with the ability to index it (which would check the length), while a ZByteString would be unindexable (an opaque type)
+
+* how can you have primative functions that are closures?
+
 * make it possible to implement methods on enums
+* you know... it might be possible to make all 'methods' actually be functions with a fixed type for the first argument, since functions can be overloaded, and the
+  type would be unique.  I guess it wouldn't work for inheritence, but at least it doesn't cause this weird irregularity between classes/objects and enums (and eventually traits and trait objects)
 
 * can you remove access to getindex, buffer, etc?
 * you have to disallow the situation where a function returns a type variable that doesn't appear elsewhere in the definition, but that is then cast to a concrete type.  This

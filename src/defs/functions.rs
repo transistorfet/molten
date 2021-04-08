@@ -201,6 +201,7 @@ pub struct ClosureDef {
     pub context_arg_id: NodeID,
     pub context_type_id: NodeID,
     pub context_struct: StructDefRef,
+    pub compiled_func_id: NodeID,
 }
 
 pub type ClosureDefRef = Rc<ClosureDef>;
@@ -217,6 +218,7 @@ impl ClosureDef {
             context_arg_id: NodeID::generate(),
             context_type_id: ctid,
             context_struct: structdef,
+            compiled_func_id: NodeID::generate(),
         }));
 
         FuncDef::set_func_def(session, scope.clone(), id, name, def.clone(), ttype)?;
