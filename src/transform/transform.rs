@@ -14,12 +14,12 @@ use session::{ Session, Error };
 use ast::{ Pos };
 use hir::{ NodeID, Visibility, Mutability, AssignType, Literal, Ident, Argument, ClassSpec, MatchCase, EnumVariant, Pattern, PatKind, Expr, ExprKind };
 
-use defs::functions::{ FuncDef, ClosureDefRef };
+use defs::functions::{ FuncDef };
 use defs::classes::{ ClassDefRef, StructDefRef, Define, Vtable };
 
 use misc::{ r };
 use transform::llcode::{ LLType, LLLit, LLRef, LLCmpType, LLLink, LLCC, LLExpr, LLGlobal };
-use transform::functions::{ CFuncTransform, MFuncTransform, ClosureTransform };
+use transform::functions::{ CFuncTransform, ClosureTransform };
 
 use visitor::{ self, Visitor, ScopeStack };
 
@@ -128,11 +128,18 @@ impl<'sess> Transformer<'sess> {
         self.expoints.last().map(|e| *e)
     }
 
+    pub fn get_global_exception(&self) -> Option<NodeID> {
+        self.expoints.first().map(|e| *e)
+    }
 
     pub fn transform_code(&mut self, scope: ScopeRef, code: &Vec<Expr>) {
         self.stack.push_scope(scope.clone());
-        let run_id = self.build_run_func(code);
 
+        let exp_id = NodeID::generate();
+        self.declare_global_exception_point(exp_id);
+        self.expoints.push(exp_id);
+
+        let run_id = self.build_run_func(code);
         if !Options::as_ref().is_library {
             self.build_main_func(run_id);
         }
@@ -357,18 +364,18 @@ impl<'sess> Transformer<'sess> {
         self.add_global(LLGlobal::DefGlobal(module_memo_id, LLLink::Public, format!("memo.{}", self.session.name), LLType::I1));
 
         let run_id = NodeID::generate();
-        let run_ltype = MFuncTransform::convert_to_def_type(self, LLType::Function(vec!(), r(LLType::I64)));
+        let run_ltype = ClosureTransform::convert_to_def_type(self, LLType::Function(vec!(), r(LLType::I64)));
         self.set_type(run_id, run_ltype.clone());
 
-        let mut fargs = vec!();
         let exp_id = NodeID::generate();
-        MFuncTransform::convert_def_args(self, exp_id, &mut fargs);
+        let mut fargs = vec!();
+        ClosureTransform::convert_def_args(self, NodeID::generate(), exp_id, &mut fargs);
 
         // Set the memo, execute the module's top level scope, and then return 0
         let mut body = vec!();
         body.push(LLExpr::SetGlobal(module_memo_id, r(LLExpr::Literal(LLLit::I1(true)))));
         body.extend(
-            self.with_context(CodeContext::Func(ABI::MoltenFunc, run_id), |transform| {
+            self.with_context(CodeContext::Func(ABI::Molten, run_id), |transform| {
                 transform.with_exception(exp_id, |transform| {
                     transform.visit_vec(&code).unwrap()
                 })
@@ -399,12 +406,13 @@ impl<'sess> Transformer<'sess> {
         // Initialize the garbage collector
         main_body.push(LLExpr::CallC(r(LLExpr::GetNamed("molten_init".to_string())), vec!(), LLCC::CCC));
 
-        let exp_id = NodeID::generate();
-        let expoint = self.create_exception_point(&mut main_body, exp_id);
+        let exp_id = self.get_global_exception().unwrap();
+        let expoint = self.init_exception_point(&mut main_body, exp_id);
 
         // Try calling the module's run function
         let try = self.with_exception(exp_id, |transform| {
-            MFuncTransform::create_invoke(transform, LLExpr::GetValue(run_id), vec!())
+            let closure = ClosureTransform::make_closure_value(transform, NodeID::generate(), run_id, LLExpr::Literal(LLLit::Null(LLType::Ptr(r(LLType::I8)))));
+            ClosureTransform::create_invoke(transform, closure, vec!())
         });
 
         // If an exception occurs, print a message and exit with -1
@@ -578,9 +586,16 @@ impl<'sess> Transformer<'sess> {
         exprs
     }
 
+    pub fn declare_global_exception_point(&mut self, exp_id: NodeID) {
+        self.add_global(LLGlobal::DefGlobal(exp_id, LLLink::Once, String::from("__global_exception__"), LLType::ExceptionPoint));
+    }
+
     pub fn create_exception_point(&mut self, exprs: &mut Vec<LLExpr>, exp_id: NodeID) -> LLExpr {
         exprs.push(LLExpr::DefLocal(exp_id, String::from("__exception__"), LLType::ExceptionPoint, r(LLExpr::Literal(LLLit::Null(LLType::ExceptionPoint)))));
+        self.init_exception_point(exprs, exp_id)
+    }
 
+    pub fn init_exception_point(&mut self, exprs: &mut Vec<LLExpr>, exp_id: NodeID) -> LLExpr {
         let ret_id = NodeID::generate();
         exprs.push(LLExpr::SetValue(ret_id, r(LLExpr::CallC(r(LLExpr::GetNamed("setjmp".to_string())), vec!(LLExpr::GetValue(exp_id)), LLCC::CCC))));
         LLExpr::GetValue(ret_id)
@@ -628,7 +643,7 @@ impl<'sess> Transformer<'sess> {
                     let cl = self.session.get_def(*cid).unwrap().as_closure().unwrap();
                     if *cid == defid {
                         //vec!(LLExpr::Cast(LLType::Alias(cl.context_type_id), r(LLExpr::GetValue(cl.context_arg_id))))
-                        vec!(ClosureTransform::make_closure_value(self, NodeID::generate(), cl.clone(), LLExpr::GetValue(cl.context_arg_id)))
+                        vec!(ClosureTransform::make_closure_value(self, NodeID::generate(), cl.compiled_func_id, LLExpr::GetValue(cl.context_arg_id)))
                     } else {
                         let index = cl.find_or_add_field(self.session, defid, name.as_str(), self.session.get_type(defid).unwrap());
                         let context = LLExpr::Cast(LLType::Alias(cl.context_type_id), r(LLExpr::GetValue(cl.context_arg_id)));

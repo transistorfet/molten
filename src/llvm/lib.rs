@@ -21,7 +21,7 @@ use misc::{ r, UniqueID };
 use defs::classes::{ ClassDef, Define };
 use defs::functions::{ AnyFunc };
 
-use transform::llcode::{ LLType };
+use transform::llcode::{ LLType, LLLink };
 use transform::transform::Transformer;
 
 use llvm::codegen::{ LLVM, cstr, cstring };
@@ -335,75 +335,75 @@ pub fn get_builtins<'sess>() -> Vec<BuiltinDef<'sess>> {
         */
 
         //// Unit Builtins ////
-        BuiltinDef::Func(id(), "==",  "((), ()) -> Bool / MF",   FuncKind::Function(always_true)),
-        BuiltinDef::Func(id(), "!=",  "((), ()) -> Bool / MF",   FuncKind::Function(always_false)),
+        BuiltinDef::Func(id(), "==",  "((), ()) -> Bool",   FuncKind::Function(always_true)),
+        BuiltinDef::Func(id(), "!=",  "((), ()) -> Bool",   FuncKind::Function(always_false)),
 
 
         //// Boolean Builtins ////
-        BuiltinDef::Func(id(), "==",  "(Bool, Bool) -> Bool / MF",   FuncKind::Function(eq_bool)),
-        BuiltinDef::Func(id(), "!=",  "(Bool, Bool) -> Bool / MF",   FuncKind::Function(ne_bool)),
-        BuiltinDef::Func(id(), "not", "(Bool) -> Bool / MF",         FuncKind::Function(not_bool)),
+        BuiltinDef::Func(id(), "==",  "(Bool, Bool) -> Bool",   FuncKind::Function(eq_bool)),
+        BuiltinDef::Func(id(), "!=",  "(Bool, Bool) -> Bool",   FuncKind::Function(ne_bool)),
+        BuiltinDef::Func(id(), "not", "(Bool) -> Bool",         FuncKind::Function(not_bool)),
 
 
         //// Integer Builtins ////
-        BuiltinDef::Func(id(), "+",   "(Int, Int) -> Int / MF",      FuncKind::Function(add_int)),
-        BuiltinDef::Func(id(), "-",   "(Int, Int) -> Int / MF",      FuncKind::Function(sub_int)),
-        BuiltinDef::Func(id(), "*",   "(Int, Int) -> Int / MF",      FuncKind::Function(mul_int)),
-        BuiltinDef::Func(id(), "/",   "(Int, Int) -> Int / MF",      FuncKind::Function(div_int)),
-        BuiltinDef::Func(id(), "%",   "(Int, Int) -> Int / MF",      FuncKind::Function(mod_int)),
-        //BuiltinDef::Func(id(), "^",   "(Int, Int) -> Int / MF",    FuncKind::Function(pow_int)),
-        //BuiltinDef::Func(id(), "<<",  "(Int, Int) -> Int / MF",    FuncKind::Function(shl_int)),
-        //BuiltinDef::Func(id(), ">>",  "(Int, Int) -> Int / MF",    FuncKind::Function(shr_int)),
-        BuiltinDef::Func(id(), "&",   "(Int, Int) -> Int / MF",      FuncKind::Function(and_int)),
-        BuiltinDef::Func(id(), "|",   "(Int, Int) -> Int / MF",      FuncKind::Function(or_int)),
-        BuiltinDef::Func(id(), "<",   "(Int, Int) -> Bool / MF",     FuncKind::Function(lt_int)),
-        BuiltinDef::Func(id(), ">",   "(Int, Int) -> Bool / MF",     FuncKind::Function(gt_int)),
-        BuiltinDef::Func(id(), "<=",  "(Int, Int) -> Bool / MF",     FuncKind::Function(lte_int)),
-        BuiltinDef::Func(id(), ">=",  "(Int, Int) -> Bool / MF",     FuncKind::Function(gte_int)),
-        BuiltinDef::Func(id(), "==",  "(Int, Int) -> Bool / MF",     FuncKind::Function(eq_int)),
-        BuiltinDef::Func(id(), "!=",  "(Int, Int) -> Bool / MF",     FuncKind::Function(ne_int)),
-        BuiltinDef::Func(id(), "~",   "(Int) -> Int / MF",           FuncKind::Function(com_int)),
-        BuiltinDef::Func(id(), "not", "(Int) -> Bool / MF",          FuncKind::Function(not_int)),
+        BuiltinDef::Func(id(), "+",   "(Int, Int) -> Int",      FuncKind::Function(add_int)),
+        BuiltinDef::Func(id(), "-",   "(Int, Int) -> Int",      FuncKind::Function(sub_int)),
+        BuiltinDef::Func(id(), "*",   "(Int, Int) -> Int",      FuncKind::Function(mul_int)),
+        BuiltinDef::Func(id(), "/",   "(Int, Int) -> Int",      FuncKind::Function(div_int)),
+        BuiltinDef::Func(id(), "%",   "(Int, Int) -> Int",      FuncKind::Function(mod_int)),
+        //BuiltinDef::Func(id(), "^",   "(Int, Int) -> Int",    FuncKind::Function(pow_int)),
+        //BuiltinDef::Func(id(), "<<",  "(Int, Int) -> Int",    FuncKind::Function(shl_int)),
+        //BuiltinDef::Func(id(), ">>",  "(Int, Int) -> Int",    FuncKind::Function(shr_int)),
+        BuiltinDef::Func(id(), "&",   "(Int, Int) -> Int",      FuncKind::Function(and_int)),
+        BuiltinDef::Func(id(), "|",   "(Int, Int) -> Int",      FuncKind::Function(or_int)),
+        BuiltinDef::Func(id(), "<",   "(Int, Int) -> Bool",     FuncKind::Function(lt_int)),
+        BuiltinDef::Func(id(), ">",   "(Int, Int) -> Bool",     FuncKind::Function(gt_int)),
+        BuiltinDef::Func(id(), "<=",  "(Int, Int) -> Bool",     FuncKind::Function(lte_int)),
+        BuiltinDef::Func(id(), ">=",  "(Int, Int) -> Bool",     FuncKind::Function(gte_int)),
+        BuiltinDef::Func(id(), "==",  "(Int, Int) -> Bool",     FuncKind::Function(eq_int)),
+        BuiltinDef::Func(id(), "!=",  "(Int, Int) -> Bool",     FuncKind::Function(ne_int)),
+        BuiltinDef::Func(id(), "~",   "(Int) -> Int",           FuncKind::Function(com_int)),
+        BuiltinDef::Func(id(), "not", "(Int) -> Bool",          FuncKind::Function(not_int)),
 
 
         //// Character Builtins ////
-        BuiltinDef::Func(id(), "<",   "(Char, Char) -> Bool / MF",   FuncKind::Function(lt_char)),
-        BuiltinDef::Func(id(), ">",   "(Char, Char) -> Bool / MF",   FuncKind::Function(gt_char)),
-        BuiltinDef::Func(id(), "<=",  "(Char, Char) -> Bool / MF",   FuncKind::Function(lte_char)),
-        BuiltinDef::Func(id(), ">=",  "(Char, Char) -> Bool / MF",   FuncKind::Function(gte_char)),
-        BuiltinDef::Func(id(), "==",  "(Char, Char) -> Bool / MF",   FuncKind::Function(eq_char)),
-        BuiltinDef::Func(id(), "!=",  "(Char, Char) -> Bool / MF",   FuncKind::Function(ne_char)),
+        BuiltinDef::Func(id(), "<",   "(Char, Char) -> Bool",   FuncKind::Function(lt_char)),
+        BuiltinDef::Func(id(), ">",   "(Char, Char) -> Bool",   FuncKind::Function(gt_char)),
+        BuiltinDef::Func(id(), "<=",  "(Char, Char) -> Bool",   FuncKind::Function(lte_char)),
+        BuiltinDef::Func(id(), ">=",  "(Char, Char) -> Bool",   FuncKind::Function(gte_char)),
+        BuiltinDef::Func(id(), "==",  "(Char, Char) -> Bool",   FuncKind::Function(eq_char)),
+        BuiltinDef::Func(id(), "!=",  "(Char, Char) -> Bool",   FuncKind::Function(ne_char)),
 
 
         //// Real Builtins ////
-        BuiltinDef::Func(id(), "+",   "(Real, Real) -> Real / MF",   FuncKind::Function(add_real)),
-        BuiltinDef::Func(id(), "-",   "(Real, Real) -> Real / MF",   FuncKind::Function(sub_real)),
-        BuiltinDef::Func(id(), "*",   "(Real, Real) -> Real / MF",   FuncKind::Function(mul_real)),
-        BuiltinDef::Func(id(), "/",   "(Real, Real) -> Real / MF",   FuncKind::Function(div_real)),
-        BuiltinDef::Func(id(), "%",   "(Real, Real) -> Real / MF",   FuncKind::Function(mod_real)),
-        BuiltinDef::Func(id(), "^",   "(Real, Real) -> Real / MF",   FuncKind::Function(pow_real)),
-        BuiltinDef::Func(id(), "<",   "(Real, Real) -> Bool / MF",   FuncKind::Function(lt_real)),
-        BuiltinDef::Func(id(), ">",   "(Real, Real) -> Bool / MF",   FuncKind::Function(gt_real)),
-        BuiltinDef::Func(id(), "<=",  "(Real, Real) -> Bool / MF",   FuncKind::Function(lte_real)),
-        BuiltinDef::Func(id(), ">=",  "(Real, Real) -> Bool / MF",   FuncKind::Function(gte_real)),
-        BuiltinDef::Func(id(), "==",  "(Real, Real) -> Bool / MF",   FuncKind::Function(eq_real)),
-        BuiltinDef::Func(id(), "!=",  "(Real, Real) -> Bool / MF",   FuncKind::Function(ne_real)),
+        BuiltinDef::Func(id(), "+",   "(Real, Real) -> Real",   FuncKind::Function(add_real)),
+        BuiltinDef::Func(id(), "-",   "(Real, Real) -> Real",   FuncKind::Function(sub_real)),
+        BuiltinDef::Func(id(), "*",   "(Real, Real) -> Real",   FuncKind::Function(mul_real)),
+        BuiltinDef::Func(id(), "/",   "(Real, Real) -> Real",   FuncKind::Function(div_real)),
+        BuiltinDef::Func(id(), "%",   "(Real, Real) -> Real",   FuncKind::Function(mod_real)),
+        BuiltinDef::Func(id(), "^",   "(Real, Real) -> Real",   FuncKind::Function(pow_real)),
+        BuiltinDef::Func(id(), "<",   "(Real, Real) -> Bool",   FuncKind::Function(lt_real)),
+        BuiltinDef::Func(id(), ">",   "(Real, Real) -> Bool",   FuncKind::Function(gt_real)),
+        BuiltinDef::Func(id(), "<=",  "(Real, Real) -> Bool",   FuncKind::Function(lte_real)),
+        BuiltinDef::Func(id(), ">=",  "(Real, Real) -> Bool",   FuncKind::Function(gte_real)),
+        BuiltinDef::Func(id(), "==",  "(Real, Real) -> Bool",   FuncKind::Function(eq_real)),
+        BuiltinDef::Func(id(), "!=",  "(Real, Real) -> Bool",   FuncKind::Function(ne_real)),
 
 
-        BuiltinDef::Func(id(), "char", "(Int) -> Char / MF",         FuncKind::Function(int_to_char)),
-        BuiltinDef::Func(id(), "int", "(Char) -> Int / MF",          FuncKind::Function(char_to_int)),
-        BuiltinDef::Func(id(), "int", "(Real) -> Int / MF",          FuncKind::Function(real_to_int)),
-        BuiltinDef::Func(id(), "real", "(Int) -> Real / MF",         FuncKind::Function(int_to_real)),
+        BuiltinDef::Func(id(), "char", "(Int) -> Char",         FuncKind::Function(int_to_char)),
+        BuiltinDef::Func(id(), "int", "(Char) -> Int",          FuncKind::Function(char_to_int)),
+        BuiltinDef::Func(id(), "int", "(Real) -> Int",          FuncKind::Function(real_to_int)),
+        BuiltinDef::Func(id(), "real", "(Int) -> Real",         FuncKind::Function(int_to_real)),
 
-        BuiltinDef::Func(id(), "str", "(()) -> String / MF",         FuncKind::Function(unit_to_str)),
-        BuiltinDef::Func(id(), "str", "(Bool) -> String / MF",       FuncKind::Function(bool_to_str)),
-        BuiltinDef::Func(id(), "str", "(Char) -> String / MF",       FuncKind::Function(char_to_str)),
-        BuiltinDef::Func(id(), "str", "(Int) -> String / MF",        FuncKind::Function(int_to_str)),
-        BuiltinDef::Func(id(), "hex", "(Int) -> String / MF",        FuncKind::Function(int_to_hex)),
-        BuiltinDef::Func(id(), "str", "(Real) -> String / MF",       FuncKind::Function(real_to_str)),
+        BuiltinDef::Func(id(), "str", "(()) -> String",         FuncKind::Function(unit_to_str)),
+        BuiltinDef::Func(id(), "str", "(Bool) -> String",       FuncKind::Function(bool_to_str)),
+        BuiltinDef::Func(id(), "str", "(Char) -> String",       FuncKind::Function(char_to_str)),
+        BuiltinDef::Func(id(), "str", "(Int) -> String",        FuncKind::Function(int_to_str)),
+        BuiltinDef::Func(id(), "hex", "(Int) -> String",        FuncKind::Function(int_to_hex)),
+        BuiltinDef::Func(id(), "str", "(Real) -> String",       FuncKind::Function(real_to_str)),
 
 
-        BuiltinDef::Func(id(), "+", "(String, String) -> String / MF",  FuncKind::Function(add_str)),
+        BuiltinDef::Func(id(), "+", "(String, String) -> String",  FuncKind::Function(add_str)),
     )
 }
 

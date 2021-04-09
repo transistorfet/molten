@@ -63,14 +63,14 @@ pub fn +(str1: SuperString, ch: Char) -> SuperString {
 }
 
 
-pub fn ==(str1: String, str2: String) -> Bool / MF {
+pub fn ==(str1: String, str2: String) -> Bool {
     if strcmp(str1, str2) == 0 then
         true
     else
         false
 }
 
-pub fn !=(str1: String, str2: String) -> Bool / MF {
+pub fn !=(str1: String, str2: String) -> Bool {
     if strcmp(str1, str2) != 0 then
         true
     else
@@ -78,6 +78,27 @@ pub fn !=(str1: String, str2: String) -> Bool / MF {
 }
 
 
+enum OptionAlt<'item> =
+    | None
+    | Some('item)
+
+/*
+impl OptionAlt<'item> {
+    pub fn unwrap(self) -> 'item {
+        match self {
+            None => raise new Exception("Panic: unwrap on none")
+            Some(item) => item
+        }
+    }
+}
+
+fn unwrap(opt: OptionAlt<'item>) -> 'item {
+    match opt {
+        OptionAlt::None => raise new Exception("Panic: unwrap on none")
+        OptionAlt::Some(item) => item
+    }
+}
+*/
 
 class Option<'item> {
     let mut has = false

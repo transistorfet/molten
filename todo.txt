@@ -4,6 +4,12 @@
   but there is potentially an issue with generics, such that a tuple (wide pointer) can't be made into a generic since it isn't a single pointer.  I'm not sure where this
   was a problem, but I noted it from a previous attempt.  It *might* be possible to allow generic wide pointers (make LLType::TypeVar == { i8*, i8* }).
 
+* add a PtrI8 shorthand to llcode
+* add helper builders for use in transform
+* refactor struct and vtable stuff so that it could be reused
+* can you removed the Named function in lib.rs
+* can you remove FuncDef entirely?
+
 
 * for transformer, you could have a list of 'bodies' of code, which are appended to by the transform functions, rather than returned.
   It could also store the context, but you'd have to add a body when transforming `if`, `while`, `sideeffect`, `match`, `try`, and `import`
