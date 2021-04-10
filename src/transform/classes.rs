@@ -2,7 +2,7 @@
 use hir::{ NodeID, Expr, ExprKind };
 use visitor::{ Visitor };
 
-use defs::classes::{ ClassDefRef, StructDef, Vtable };
+use defs::classes::{ ClassDefRef, StructDef, StructDefRef, Vtable };
 
 use misc::{ r };
 use transform::transform::{ Transformer };
@@ -64,6 +64,22 @@ impl<'sess> Transformer<'sess> {
         exprs
     }
 
+    pub fn transform_access_method(&mut self, classdef: ClassDefRef, objval: LLExpr, field_id: NodeID) -> Vec<LLExpr> {
+        let vindex = classdef.get_struct_vtable_index().unwrap();
+        let index = classdef.vtable.get_index_by_id(field_id).unwrap();
+        let vtable = LLExpr::LoadRef(r(LLExpr::AccessRef(r(objval), vec!(LLRef::Field(vindex)))));
+        vec!(LLExpr::LoadRef(r(LLExpr::AccessRef(r(vtable), vec!(LLRef::Field(index))))))
+    }
+
+    pub fn transform_access_field(&mut self, structdef: StructDefRef, objval: LLExpr, field_id: NodeID) -> Vec<LLExpr> {
+        let (index, _) = structdef.find_field_by_id(field_id).unwrap();
+        vec!(LLExpr::LoadRef(r(LLExpr::AccessRef(r(objval), vec!(LLRef::Field(index))))))
+    }
+
+    pub fn transform_resolve_method(&mut self, classdef: ClassDefRef, field_id: NodeID) -> Vec<LLExpr> {
+        let index = classdef.vtable.get_index_by_id(field_id).unwrap();
+        vec!(LLExpr::LoadRef(r(LLExpr::AccessRef(r(LLExpr::GetGlobal(classdef.vtable.id)), vec!(LLRef::Field(index))))))
+    }
 }
 
 

@@ -11,7 +11,8 @@ use visitor::{ Visitor };
 use defs::functions::{ FuncDef };
 
 use misc::{ r };
-use transform::transform::{ Transformer, CodeContext, EXCEPTION_POINT_NAME };
+use transform::transform::{ Transformer, CodeContext };
+use transform::exceptions::{ EXCEPTION_POINT_NAME };
 use transform::classes::{ StructTransform };
 use transform::llcode::{ LLType, LLLink, LLCC, LLExpr, LLGlobal };
 

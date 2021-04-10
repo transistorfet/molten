@@ -10,16 +10,12 @@ use session::{ Session, Error };
 use ast::{ Pos };
 use hir::{ NodeID, Visibility, Mutability, AssignType, Literal, Ident, Argument, ClassSpec, MatchCase, EnumVariant, Pattern, PatKind, Expr, ExprKind };
 
-use defs::classes::{ StructDefRef };
-
 use misc::{ r };
 use transform::llcode::{ LLType, LLLit, LLRef, LLCmpType, LLLink, LLCC, LLExpr, LLGlobal };
 use transform::functions::{ CFuncTransform, ClosureTransform };
 
 use visitor::{ self, Visitor, ScopeStack };
 
-
-pub static EXCEPTION_POINT_NAME: &str = "__ExceptionPoint__";
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum CodeContext {
@@ -62,10 +58,7 @@ impl<'sess> Transformer<'sess> {
         self.set_type(global.get_type_def(&"String".to_string()).unwrap(), LLType::Ptr(r(LLType::I8)));
         self.set_type(global.get_type_def(&"Buffer".to_string()).unwrap(), LLType::Ptr(r(LLType::Ptr(r(LLType::I8)))));
 
-        let expoint_id = NodeID::generate();
-        global.define_type(String::from(EXCEPTION_POINT_NAME), Some(expoint_id)).unwrap();
-        self.session.set_type(expoint_id, Type::Object(String::from(EXCEPTION_POINT_NAME), expoint_id, vec!()));
-        self.set_type(expoint_id, LLType::Ptr(r(LLType::ExceptionPoint)));
+        self.initialize_exception_type();
     }
 
     pub fn set_type(&mut self, id: NodeID, ltype: LLType) {
@@ -220,8 +213,8 @@ impl<'sess> Visitor for Transformer<'sess> {
     }
 
     fn visit_resolver(&mut self, node: &Expr, left: &Expr, right: &Ident, oid: NodeID) -> Result<Self::Return, Error> {
-        let otype = self.session.get_type_from_ref(oid).unwrap();
-        Ok(self.transform_resolve(node.id, left, &right.name, otype))
+        let object_id = self.session.get_type_from_ref(oid).unwrap().get_id().unwrap();
+        Ok(self.transform_resolve(node.id, left, &right.name, object_id))
     }
 
     fn visit_accessor(&mut self, node: &Expr, left: &Expr, right: &Ident, oid: NodeID) -> Result<Self::Return, Error> {
@@ -489,66 +482,6 @@ impl<'sess> Transformer<'sess> {
         exprs
     }
 
-    pub fn transform_enum_def(&mut self, id: NodeID, name: &String) -> Vec<LLExpr> {
-        let defid = self.session.get_ref(id).unwrap();
-        let selector = LLType::I8;
-        let enumdef = self.session.get_def(defid).unwrap().as_enum().unwrap();
-
-        self.add_global(LLGlobal::DefNamedStruct(defid, name.clone(), false));
-        self.set_type(defid, LLType::Alias(defid));
-
-        let mut types = vec!();
-        for (i, variant) in enumdef.variants.borrow().iter().enumerate() {
-            let name = format!("{}_{}", name, variant.ident.name);
-            self.transform_enum_variant(variant.id, i as i8, name, selector.clone(), variant.ttype.clone());
-            if variant.ttype.is_some() {
-                types.push(self.transform_value_type(variant.ttype.as_ref().unwrap()));
-            }
-        }
-
-        self.add_global(LLGlobal::SetStructBody(defid, vec!(selector.clone(), LLType::Largest(types)), false));
-        vec!()
-    }
-
-    pub fn transform_enum_variant(&mut self, id: NodeID, variant: i8, name: String, selector: LLType, ttype: Option<Type>) {
-        let struct_id = NodeID::generate();
-        let etype = ttype.clone().map(|t| self.transform_value_type(&t));
-        self.create_enum_struct(struct_id, name.clone(), selector, etype);
-        self.set_type(id, LLType::Alias(struct_id));
-
-        if ttype.is_some() {
-            let ftype = self.session.get_type(id).unwrap();
-            let (argtypes, rettype, _) = ftype.get_function_types().unwrap();
-            let lftype = CFuncTransform::transform_def_type(self, &argtypes.as_vec(), rettype);
-
-            let mut params = vec!();
-            let mut tuple_items = vec!();
-            for (i, _) in argtypes.as_vec().iter().enumerate() {
-                let arg_id = NodeID::generate();
-                tuple_items.push(LLExpr::GetValue(arg_id));
-                params.push((arg_id, format!("value{}", i)));
-            }
-
-            let body = vec!(LLExpr::DefStruct(NodeID::generate(), self.get_type(struct_id).unwrap(), vec!(
-                LLExpr::Literal(LLLit::I8(variant as i8)),
-                LLExpr::DefStruct(NodeID::generate(), self.transform_value_type(argtypes), tuple_items)
-            )));
-            self.add_global(LLGlobal::DefCFunc(id, LLLink::Once, name, lftype, params, body, LLCC::CCC));
-        }
-    }
-
-    pub fn create_enum_struct(&mut self, id: NodeID, name: String, selector: LLType, ltype: Option<LLType>) {
-        let mut body = vec!(selector);
-        match ltype {
-            Some(ltype) => body.push(ltype),
-            None => { },
-        }
-
-        self.add_global(LLGlobal::DefNamedStruct(id, name.clone(), false));
-        self.add_global(LLGlobal::SetStructBody(id, body, false));
-        self.set_type(id, LLType::Alias(id));
-    }
-
     pub fn create_def_local(&mut self, id: NodeID, name: &String, valexpr: LLExpr) -> Vec<LLExpr> {
         let ltype = self.transform_value_type(&self.session.get_type(id).unwrap());
         vec!(LLExpr::DefLocal(id, name.clone(), ltype, r(valexpr)))
@@ -572,62 +505,6 @@ impl<'sess> Transformer<'sess> {
         exprs.extend(self.visit_vec(decls).unwrap());
         exprs
     }
-
-    pub fn transform_try(&mut self, code: &Expr, cases: &Vec<MatchCase>) -> Vec<LLExpr> {
-        let mut exprs = vec!();
-
-        let exp_id = NodeID::generate();
-        let expoint = self.create_exception_point(&mut exprs, exp_id);
-        let expoint_id = NodeID::generate();
-        exprs.push(LLExpr::SetValue(expoint_id, r(expoint)));
-
-        let tryblock = self.with_exception(exp_id, |transform| {
-            transform.visit_node(code).unwrap()
-        });
-
-
-        let exret_id = NodeID::generate();
-        exprs.push(LLExpr::SetValue(exret_id, r(LLExpr::GetItem(r(LLExpr::GetLocal(exp_id)), 1))));
-        let matchblock = self.create_match(LLExpr::GetValue(exret_id), cases);
-
-        exprs.extend(self.create_exception_block(LLExpr::GetValue(expoint_id), tryblock, matchblock));
-        exprs
-    }
-
-    pub fn declare_global_exception_point(&mut self, exp_id: NodeID) {
-        self.add_global(LLGlobal::DefGlobal(exp_id, LLLink::Once, String::from("__global_exception__"), LLType::ExceptionPoint));
-    }
-
-    pub fn create_exception_point(&mut self, exprs: &mut Vec<LLExpr>, exp_id: NodeID) -> LLExpr {
-        exprs.push(LLExpr::DefLocal(exp_id, String::from("__exception__"), LLType::ExceptionPoint, r(LLExpr::Literal(LLLit::Null(LLType::ExceptionPoint)))));
-        self.init_exception_point(exprs, exp_id)
-    }
-
-    pub fn init_exception_point(&mut self, exprs: &mut Vec<LLExpr>, exp_id: NodeID) -> LLExpr {
-        let ret_id = NodeID::generate();
-        exprs.push(LLExpr::SetValue(ret_id, r(LLExpr::CallC(r(LLExpr::GetNamed("setjmp".to_string())), vec!(LLExpr::GetValue(exp_id)), LLCC::CCC))));
-        LLExpr::GetValue(ret_id)
-    }
-
-    pub fn create_exception_block(&mut self, expoint: LLExpr, try: Vec<LLExpr>, catch: Vec<LLExpr>) -> Vec<LLExpr> {
-        let mut exprs = vec!();
-        let iszero = LLExpr::Cmp(LLCmpType::Equal, r(expoint), r(LLExpr::Literal(LLLit::I32(0))));
-        exprs.push(LLExpr::Phi(vec!(vec!(iszero), vec!(LLExpr::Literal(LLLit::I1(true)))), vec!(try, catch)));
-        exprs
-    }
-
-    pub fn transform_raise(&mut self, _id: NodeID, valexpr: &Expr) -> Vec<LLExpr> {
-        let mut exprs = vec!();
-        let exp_id = self.get_exception().unwrap();
-        let value = self.transform_as_result(&mut exprs, valexpr).unwrap();
-
-        exprs.push(LLExpr::StoreRef(r(LLExpr::AccessRef(r(LLExpr::GetValue(exp_id)), vec!(LLRef::Field(1)))), r(LLExpr::Cast(LLType::Var, r(value)))));
-        exprs.push(LLExpr::CallC(r(LLExpr::GetNamed("longjmp".to_string())), vec!(LLExpr::GetValue(exp_id), LLExpr::Literal(LLLit::I32(1))), LLCC::CCC));
-
-        exprs.push(LLExpr::Literal(LLLit::I32(0)));
-        exprs
-    }
-
 
 
     pub fn create_reference(&mut self, defid: NodeID) -> Vec<LLExpr> {
@@ -713,19 +590,13 @@ impl<'sess> Transformer<'sess> {
                 match self.session.get_def(defid) {
                     Ok(Def::Method(_)) => {
                         let classdef = objdef.as_class().unwrap();
-                        let vindex = classdef.get_struct_vtable_index().unwrap();
-                        let index = classdef.vtable.get_index_by_id(defid).unwrap();
-                        let vtable = LLExpr::LoadRef(r(LLExpr::AccessRef(r(objval), vec!(LLRef::Field(vindex)))));
-                        exprs.push(LLExpr::LoadRef(r(LLExpr::AccessRef(r(vtable), vec!(LLRef::Field(index))))));
+                        exprs.extend(self.transform_access_method(classdef, objval, defid));
                     },
                     Ok(Def::Field(_)) => {
-                        let (index, _) = objdef.as_struct().unwrap().find_field_by_id(defid).unwrap();
-                        exprs.push(LLExpr::LoadRef(r(LLExpr::AccessRef(r(objval), vec!(LLRef::Field(index))))));
+                        let structdef = objdef.as_struct().unwrap();
+                        exprs.extend(self.transform_access_field(structdef, objval, defid));
                     },
-                    Err(_) => {
-                        return vec!(LLExpr::GetValue(defid));
-                    },
-                    Ok(def) => panic!("Not Implemented: {:?}", def),
+                    result @ _ => panic!("Not Implemented: {:?}", result),
                 }
             },
             Type::Record(items) => {
@@ -741,22 +612,11 @@ impl<'sess> Transformer<'sess> {
         exprs
     }
 
-    pub fn transform_resolve(&mut self, id: NodeID, _path: &Expr, _field: &String, otype: Type) -> Vec<LLExpr> {
+    pub fn transform_resolve(&mut self, id: NodeID, _path: &Expr, _field: &String, object_id: NodeID) -> Vec<LLExpr> {
         let defid = self.session.get_ref(id).unwrap();
-        match self.session.get_def(otype.get_id().unwrap()).unwrap() {
-            Def::Class(classdef) => {
-                let index = classdef.vtable.get_index_by_id(defid).unwrap();
-                vec!(LLExpr::LoadRef(r(LLExpr::AccessRef(r(LLExpr::GetGlobal(classdef.vtable.id)), vec!(LLRef::Field(index))))))
-            },
-            Def::Enum(enumdef) => {
-                match enumdef.get_variant_type_by_id(defid) {
-                    Some(_) => vec!(LLExpr::GetValue(defid)),
-                    None => {
-                        let variant = enumdef.get_variant_by_id(defid).unwrap();
-                        vec!(LLExpr::DefStruct(id, self.get_type(defid).unwrap(), vec!(LLExpr::Literal(LLLit::I8(variant as i8)))))
-                    },
-                }
-            },
+        match self.session.get_def(object_id).unwrap() {
+            Def::Class(classdef) => self.transform_resolve_method(classdef, defid),
+            Def::Enum(enumdef) => self.transform_resolve_enum(id, enumdef, defid),
             def @ _ => panic!("DefError: expected class or enum but found {:?}", def),
         }
     }
@@ -768,9 +628,9 @@ impl<'sess> Transformer<'sess> {
         match &left.kind {
             ExprKind::Accessor(obj, _, oid) => {
                 let objval = self.transform_as_result(&mut exprs, obj).unwrap();
-                let fieldid = self.session.get_ref(left.id).unwrap();
+                let field_id = self.session.get_ref(left.id).unwrap();
                 let objdef = self.session.get_def(self.session.get_type(*oid).unwrap().get_id().unwrap()).unwrap();
-                let (index, _) = objdef.as_struct().unwrap().find_field_by_id(fieldid).unwrap();
+                let (index, _) = objdef.as_struct().unwrap().find_field_by_id(field_id).unwrap();
                 exprs.push(LLExpr::StoreRef(r(LLExpr::AccessRef(r(objval), vec!(LLRef::Field(index)))), r(value)));
             },
             ExprKind::Identifier(_) => {
