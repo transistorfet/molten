@@ -1,10 +1,6 @@
 
 use std::collections::HashMap;
 
-
-use binding;
-use typecheck;
-
 use abi::ABI;
 use defs::Def;
 use types::Type;
@@ -14,8 +10,7 @@ use session::{ Session, Error };
 use ast::{ Pos };
 use hir::{ NodeID, Visibility, Mutability, AssignType, Literal, Ident, Argument, ClassSpec, MatchCase, EnumVariant, Pattern, PatKind, Expr, ExprKind };
 
-use defs::functions::{ FuncDef };
-use defs::classes::{ ClassDefRef, StructDefRef, Define, Vtable };
+use defs::classes::{ StructDefRef };
 
 use misc::{ r };
 use transform::llcode::{ LLType, LLLit, LLRef, LLCmpType, LLLink, LLCC, LLExpr, LLGlobal };
@@ -246,7 +241,7 @@ impl<'sess> Visitor for Transformer<'sess> {
     }
 
 
-    fn visit_if(&mut self, id: NodeID, cond: &Expr, texpr: &Expr, fexpr: &Expr) -> Result<Self::Return, Error> {
+    fn visit_if(&mut self, _id: NodeID, cond: &Expr, texpr: &Expr, fexpr: &Expr) -> Result<Self::Return, Error> {
         Ok(self.transform_if_expr(cond, texpr, fexpr))
     }
 
@@ -254,7 +249,7 @@ impl<'sess> Visitor for Transformer<'sess> {
         Ok(self.transform_raise(id, expr))
     }
 
-    fn visit_try(&mut self, id: NodeID, code: &Expr, cases: &Vec<MatchCase>) -> Result<Self::Return, Error> {
+    fn visit_try(&mut self, _id: NodeID, code: &Expr, cases: &Vec<MatchCase>) -> Result<Self::Return, Error> {
         Ok(self.transform_try(code, cases))
     }
 
@@ -262,18 +257,18 @@ impl<'sess> Visitor for Transformer<'sess> {
         Ok(self.transform_match(cond, cases))
     }
 
-    fn visit_while(&mut self, id: NodeID, cond: &Expr, body: &Expr) -> Result<Self::Return, Error> {
+    fn visit_while(&mut self, _id: NodeID, cond: &Expr, body: &Expr) -> Result<Self::Return, Error> {
         Ok(vec!(LLExpr::Loop(self.visit_node(cond)?, self.visit_node(body)?)))
     }
 
 
-    fn visit_declare(&mut self, id: NodeID, vis: Visibility, ident: &Ident, ttype: &Type) -> Result<Self::Return, Error> {
+    fn visit_declare(&mut self, id: NodeID, vis: Visibility, ident: &Ident, _ttype: &Type) -> Result<Self::Return, Error> {
         let ttype = self.session.get_type_from_ref(id).unwrap();
         let abi = ttype.get_abi().unwrap();
         Ok(self.transform_func_decl(abi, id, vis, &ident.name, &ttype))
     }
 
-    fn visit_function(&mut self, id: NodeID, vis: Visibility, ident: &Option<Ident>, args: &Vec<Argument>, rettype: &Option<Type>, body: &Expr, abi: ABI) -> Result<Self::Return, Error> {
+    fn visit_function(&mut self, id: NodeID, vis: Visibility, ident: &Option<Ident>, args: &Vec<Argument>, _rettype: &Option<Type>, body: &Expr, abi: ABI) -> Result<Self::Return, Error> {
         Ok(self.transform_func_def(abi, id, vis, ident.as_ref().map(|ident| &ident.name), args, body))
     }
 
@@ -281,7 +276,7 @@ impl<'sess> Visitor for Transformer<'sess> {
         Ok(self.transform_new_object(id))
     }
 
-    fn visit_class(&mut self, id: NodeID, classspec: &ClassSpec, parentspec: &Option<ClassSpec>, body: &Vec<Expr>) -> Result<Self::Return, Error> {
+    fn visit_class(&mut self, id: NodeID, _classspec: &ClassSpec, _parentspec: &Option<ClassSpec>, body: &Vec<Expr>) -> Result<Self::Return, Error> {
         let mut exprs = self.transform_class_body(id, body);
         exprs.push(LLExpr::Literal(self.transform_lit(&Literal::Unit)));
         Ok(exprs)
@@ -306,7 +301,7 @@ impl<'sess> Visitor for Transformer<'sess> {
         Ok(self.transform_def_local(id, &ident.name, expr))
     }
 
-    fn visit_assignment(&mut self, id: NodeID, left: &Expr, right: &Expr, ty: AssignType) -> Result<Self::Return, Error> {
+    fn visit_assignment(&mut self, id: NodeID, left: &Expr, right: &Expr, _ty: AssignType) -> Result<Self::Return, Error> {
         Ok(self.transform_assignment(id, left, right))
     }
 
@@ -439,6 +434,19 @@ impl<'sess> Transformer<'sess> {
             fargs.push(self.transform_as_result(exprs, arg).unwrap());
         }
         fargs
+    }
+
+    pub fn transform_value_type(&mut self, ttype: &Type) -> LLType {
+        match &ttype {
+            Type::Object(_, id, _) => self.get_type(*id).unwrap(),
+            Type::Ref(ttype) => LLType::Ptr(r(self.transform_value_type(ttype))),
+            Type::Tuple(items) => LLType::Struct(items.iter().map(|item| self.transform_value_type(&item)).collect()),
+            Type::Record(items) => LLType::Struct(items.iter().map(|item| self.transform_value_type(&item.1)).collect()),
+            // TODO how will you do generics
+            Type::Variable(_, _, _) => LLType::Var,
+            Type::Function(args, ret, abi) => self.transform_func_value_type(*abi, &args.as_vec(), &*ret),
+            _ => panic!("Not Implemented: {:?}", ttype),
+        }
     }
 
     pub fn transform_lit(&mut self, lit: &Literal) -> LLLit {
@@ -689,85 +697,6 @@ impl<'sess> Transformer<'sess> {
         exprs
     }
 
-    pub fn transform_class_type_data(&mut self, classdef: ClassDefRef, body: &Vec<Expr>) {
-        classdef.build_vtable(self.session, body);
-        classdef.build_structdef(self.session, body);
-
-        self.add_global(LLGlobal::DefNamedStruct(classdef.id, classdef.classname.clone(), true));
-        self.set_type(classdef.id, LLType::Alias(classdef.id));
-        self.add_global(LLGlobal::DefNamedStruct(classdef.vtable.id, format!("{}_vtable", classdef.classname.clone()), true));
-        self.set_type(classdef.vtable.id, LLType::Alias(classdef.vtable.id));
-
-        let stype = self.transform_struct_def(&classdef.structdef);
-        self.add_global(LLGlobal::SetStructBody(classdef.id, stype.get_items(), true));
-
-        let vtype = self.transform_vtable_def(&classdef.vtable);
-        self.add_global(LLGlobal::SetStructBody(classdef.vtable.id, vtype.get_items(), true));
-    }
-
-    pub fn transform_vtable_def(&mut self, vtable: &Vtable) -> LLType {
-        let mut items = vec!();
-        vtable.foreach_entry(|_, _, ttype| {
-            items.push(self.transform_value_type(ttype));
-        });
-        LLType::Struct(items)
-    }
-
-    pub fn transform_class_vtable_init(&mut self, classdef: ClassDefRef) -> Vec<LLExpr> {
-        if !classdef.has_vtable() {
-            return vec!();
-        }
-
-        let tscope = self.session.map.get(&classdef.id);
-        self.transform_vtable_init(format!("__{}_vtable", tscope.get_basename()), &classdef.vtable)
-    }
-
-    pub fn transform_vtable_init(&mut self, name: String, vtable: &Vtable) -> Vec<LLExpr> {
-        let mut exprs = vec!();
-
-        self.add_global(LLGlobal::DefGlobal(vtable.id, LLLink::Once, name, self.get_type(vtable.id).unwrap()));
-        // TODO should vtables be dynamically allocated, or should we add a LLType::ElementOf() type or something to GetElement an aliased type
-        exprs.push(LLExpr::SetGlobal(vtable.id, r(LLExpr::AllocRef(NodeID::generate(), self.get_type(vtable.id).unwrap(), None))));
-        vtable.foreach_enumerated(|i, id, _, ttype| {
-            let ltype = self.transform_value_type(ttype);
-            let field = LLExpr::AccessRef(r(LLExpr::GetGlobal(vtable.id)), vec!(LLRef::Field(i)));
-            exprs.push(LLExpr::StoreRef(r(field), r(LLExpr::Cast(ltype, r(LLExpr::GetValue(id))))));
-            //exprs.push(LLExpr::SetItem(r(LLExpr::GetLocal(vtable.id)), i, r(LLExpr::Cast(ltype, r(LLExpr::GetValue(id))))));
-        });
-
-        exprs
-    }
-
-    pub fn transform_class_body(&mut self, id: NodeID, body: &Vec<Expr>) -> Vec<LLExpr> {
-        let defid = self.session.get_ref(id).unwrap();
-        let mut exprs = vec!();
-        let tscope = self.session.map.get(&defid);
-        let classdef = self.session.get_def(defid).unwrap().as_class().unwrap();
-
-        self.transform_class_type_data(classdef.clone(), body);
-
-        self.with_scope(tscope, |transform| {
-            for node in body {
-                match &node.kind {
-                    ExprKind::Function(vis, ident, args, _, body, abi) => {
-                        // TODO i switched to using scope here instead of tscope because it was causing problems with references inside closures
-                        exprs.extend(transform.transform_func_def(*abi, node.id, *vis, ident.as_ref().map(|ident| &ident.name), args, body));
-                    },
-                    ExprKind::Declare(vis, ident, _) => {
-                        let ttype = transform.session.get_type_from_ref(node.id).unwrap();
-                        exprs.extend(transform.transform_func_decl(ttype.get_abi().unwrap(), node.id, *vis, &ident.name, &ttype));
-                    },
-                    ExprKind::Definition(_, _, _, _) => { },
-                    _ => panic!("Not Implemented: {:?}", node),
-                }
-            }
-            Ok(vec!())
-        }).unwrap();
-
-        exprs.extend(self.transform_class_vtable_init(classdef));
-        exprs
-    }
-
     pub fn transform_accessor(&mut self, id: NodeID, obj: &Expr, field: &String, otype: Type) -> Vec<LLExpr> {
         let mut exprs = vec!();
         let defid = self.session.get_ref(id).unwrap();
@@ -856,8 +785,6 @@ impl<'sess> Transformer<'sess> {
         }
         exprs
     }
-
-
 
     pub fn transform_if_expr(&mut self, cond: &Expr, texpr: &Expr, fexpr: &Expr) -> Vec<LLExpr> {
         let mut conds = vec!();
@@ -964,29 +891,6 @@ impl<'sess> Transformer<'sess> {
             },
             _ => panic!("Not Implemented: {:?}", op),
         }
-    }
-
-
-
-    pub fn transform_value_type(&mut self, ttype: &Type) -> LLType {
-        match &ttype {
-            Type::Object(_, id, _) => self.get_type(*id).unwrap(),
-            Type::Ref(ttype) => LLType::Ptr(r(self.transform_value_type(ttype))),
-            Type::Tuple(items) => LLType::Struct(items.iter().map(|item| self.transform_value_type(&item)).collect()),
-            Type::Record(items) => LLType::Struct(items.iter().map(|item| self.transform_value_type(&item.1)).collect()),
-            // TODO how will you do generics
-            Type::Variable(_, _, _) => LLType::Var,
-            Type::Function(args, ret, abi) => self.transform_func_value_type(*abi, &args.as_vec(), &*ret),
-            _ => panic!("Not Implemented: {:?}", ttype),
-        }
-    }
-
-    pub fn transform_struct_def(&mut self, structdef: &StructDefRef) -> LLType {
-        let mut items = vec!();
-        structdef.foreach_field(|_, _, ttype| {
-            items.push(self.transform_value_type(ttype));
-        });
-        LLType::Struct(items)
     }
 }
 

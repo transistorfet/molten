@@ -293,7 +293,27 @@ pub fn get_builtins<'sess>() -> Vec<BuiltinDef<'sess>> {
         BuiltinDef::Class(id(), "Int",    vec!(), vec!(), vec!()),
         BuiltinDef::Class(id(), "Real",   vec!(), vec!(), vec!()),
         BuiltinDef::Class(id(), "String", vec!(), vec!(), vec!()),
+
         //    BuiltinDef::Func(id(), "[]",   "(String, Int) -> Int",            FuncKind::Runtime(build_string_get)),
+        BuiltinDef::Func(id(), "getindex",  "(String, Int) -> Char / C",                    FuncKind::Function(string_get)),
+
+
+        BuiltinDef::Class(id(), "Buffer",   vec!(Type::Variable(String::from("item"), UniqueID(0), true)), vec!(), vec!()),
+        BuiltinDef::Func(id(), "bufalloc",  "(Int) -> Buffer<'item> / C",                   FuncKind::Function(buffer_alloc)),
+        BuiltinDef::Func(id(), "bufresize", "(Buffer<'item>, Int) -> Buffer<'item> / C",    FuncKind::Function(buffer_resize)),
+        BuiltinDef::Func(id(), "bufget",    "(Buffer<'item>, Int) -> 'item / C",            FuncKind::Function(buffer_get)),
+        BuiltinDef::Func(id(), "bufset",    "(Buffer<'item>, Int, 'item) -> () / C",        FuncKind::Function(buffer_set)),
+
+        /*
+        BuiltinDef::Class(id(), "Buffer", vec!(Type::Variable(String::from("item"), UniqueID(0), true)), vec!(), vec!(
+            BuiltinDef::Func(id(), "__alloc__",  "() -> Buffer<'item>",                      FuncKind::Method(buffer_allocator)),
+            BuiltinDef::Func(id(), "new",        "(Buffer<'item>, Int) -> Buffer<'item>",    FuncKind::Method(buffer_constructor)),
+            BuiltinDef::Func(id(), "resize",     "(Buffer<'item>, Int) -> Buffer<'item>",    FuncKind::Method(buffer_resize)),
+            BuiltinDef::Func(id(), "[]",         "(Buffer<'item>, Int) -> 'item",            FuncKind::Method(buffer_get_method)),
+            BuiltinDef::Func(id(), "[]",         "(Buffer<'item>, Int, 'item) -> 'item",     FuncKind::Method(buffer_set_method)),
+        )),
+        */
+
         //BuiltinDef::Class(id(), "List",   vec!(Type::Variable(String::from("item"), UniqueID(0))), vec!(), vec!()),
         //BuiltinDef::Class(id(), "Class",  Type::Object(String::from("Class"), vec!())),
 
@@ -314,25 +334,6 @@ pub fn get_builtins<'sess>() -> Vec<BuiltinDef<'sess>> {
         BuiltinDef::Func(id(), "println",    "(String) -> () / C",              FuncKind::Function(println)),
         BuiltinDef::Func(id(), "readline",   "() -> String / C",                FuncKind::Function(readline)),
 
-
-        BuiltinDef::Class(id(), "Buffer",   vec!(Type::Variable(String::from("item"), UniqueID(0), true)), vec!(), vec!()),
-
-        BuiltinDef::Func(id(), "getindex",  "(String, Int) -> Char / C",                    FuncKind::Function(string_get)),
-        BuiltinDef::Func(id(), "bufalloc",  "(Int) -> Buffer<'item> / C",                   FuncKind::Function(buffer_alloc)),
-        BuiltinDef::Func(id(), "bufresize", "(Buffer<'item>, Int) -> Buffer<'item> / C",    FuncKind::Function(buffer_resize)),
-        BuiltinDef::Func(id(), "bufget",    "(Buffer<'item>, Int) -> 'item / C",            FuncKind::Function(buffer_get)),
-        BuiltinDef::Func(id(), "bufset",    "(Buffer<'item>, Int, 'item) -> () / C",        FuncKind::Function(buffer_set)),
-
-
-        /*
-        BuiltinDef::Class(id(), "Buffer", vec!(Type::Variable(String::from("item"), UniqueID(0), true)), vec!(), vec!(
-            BuiltinDef::Func(id(), "__alloc__",  "() -> Buffer<'item>",                      FuncKind::Method(buffer_allocator)),
-            BuiltinDef::Func(id(), "new",        "(Buffer<'item>, Int) -> Buffer<'item>",    FuncKind::Method(buffer_constructor)),
-            BuiltinDef::Func(id(), "resize",     "(Buffer<'item>, Int) -> Buffer<'item>",    FuncKind::Method(buffer_resize)),
-            BuiltinDef::Func(id(), "[]",         "(Buffer<'item>, Int) -> 'item",            FuncKind::Method(buffer_get_method)),
-            BuiltinDef::Func(id(), "[]",         "(Buffer<'item>, Int, 'item) -> 'item",     FuncKind::Method(buffer_set_method)),
-        )),
-        */
 
         //// Unit Builtins ////
         BuiltinDef::Func(id(), "==",  "((), ()) -> Bool",   FuncKind::Function(always_true)),

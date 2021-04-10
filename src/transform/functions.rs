@@ -3,25 +3,21 @@ use binding;
 use typecheck;
 
 use abi::ABI;
-use defs::Def;
 use types::Type;
-use config::Options;
-use session::Session;
-use scope::{ Scope, ScopeRef };
 use ast::{ Pos };
-use hir::{ NodeID, Visibility, Mutability, Literal, Ident, Argument, MatchCase, Pattern, PatKind, Expr, ExprKind };
+use hir::{ NodeID, Visibility, Mutability, Ident, Argument, Expr, ExprKind };
 use visitor::{ Visitor };
 
-use defs::functions::{ FuncDef, ClosureDefRef };
-use defs::classes::{ Define };
+use defs::functions::{ FuncDef };
 
 use misc::{ r };
 use transform::transform::{ Transformer, CodeContext, EXCEPTION_POINT_NAME };
-use transform::llcode::{ LLType, LLLit, LLRef, LLCmpType, LLLink, LLCC, LLExpr, LLGlobal };
+use transform::classes::{ StructTransform };
+use transform::llcode::{ LLType, LLLink, LLCC, LLExpr, LLGlobal };
 
 
 
-impl<'a> Transformer<'a> {
+impl<'sess> Transformer<'sess> {
     pub fn transform_vis(&mut self, vis: Visibility) -> LLLink {
         match vis {
             Visibility::Private => LLLink::Private,
@@ -249,7 +245,7 @@ impl ClosureTransform {
         let llvis = transform.transform_vis(vis);
         transform.insert_global(index, LLGlobal::DefCFunc(cl.compiled_func_id, llvis, compiled_func_name.clone(), compiled_func_type, fargs, body, LLCC::FastCC));
 
-        let structtype = LLType::Ptr(r(transform.transform_struct_def(&cl.context_struct)));
+        let structtype = LLType::Ptr(r(StructTransform::get_type(transform, &cl.context_struct)));
         transform.insert_global(index, LLGlobal::DefType(cl.context_type_id, format!("__context_{}__", cl.context_type_id), structtype.clone()));
 
 

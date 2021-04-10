@@ -68,7 +68,16 @@ impl<'sess> Visitor for NameBinder<'sess> {
         // Check for typevars in the type params
         let mut argtypes = vec!();
         for ref arg in args.iter() {
-            let arg_defid = self.session.new_def_id(arg.id);
+            //let arg_defid = self.session.new_def_id(arg.id);
+            // TODO this is a hack because the arguments are being cloned in the class desugaring in refinery, and that means the id is duplicated rather
+            //      when a class has a lambda style method defined and assigned to a class field, the refinery will include the class field initializer (the function)
+            //      and then also build the __init__() method for the class, it duplicates the value initializer (the function) and assigns it to the class member during init
+            let arg_defid = if let Ok(id) = self.session.get_ref(arg.id) {
+                id
+            } else {
+                self.session.new_def_id(arg.id)
+            };
+
             let mut ttype = arg.ttype.clone();
             bind_type_names(self.session, fscope.clone(), ttype.as_mut(), false)?;
             // TODO this is assumed to be always immutable, but maybe shouldn't be
