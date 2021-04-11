@@ -32,8 +32,8 @@ impl TypeAliasDef {
     #[must_use]
     pub fn define(session: &Session, scope: ScopeRef, id: NodeID, deftype: Type, aliastype: Type) -> Result<TypeAliasDefRef, Error> {
         let name = deftype.get_name()?;
-        let typealiasdef = Self::new_ref(id, deftype);
         scope.define_type(name, Some(id))?;
+        let typealiasdef = Self::new_ref(id, deftype);
         session.set_def(id, Def::TypeAlias(typealiasdef.clone()));
         session.set_type(id, aliastype);
         Ok(typealiasdef)

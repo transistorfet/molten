@@ -56,15 +56,15 @@ impl ClassDef {
         tscope.set_basename(name.clone());
 
         // Define Self and Super, and check for typevars in the type params
-        tscope.define_type(String::from("Self"), Some(id))?;
+        tscope.define_type("Self", Some(id))?;
         if let Some(ref ptype) = parenttype {
-            tscope.define_type(String::from("Super"), scope.get_type_def(&ptype.get_name()?))?;
+            tscope.define_type("Super", scope.get_type_def(&ptype.get_name()?))?;
         }
 
         let classdef = Self::create_class(session, scope.clone(), id, classtype.clone(), parenttype)?;
 
         // Define the class in the local scope
-        scope.define_type(name.clone(), Some(id))?;
+        scope.define_type(name, Some(id))?;
         session.set_def(id, Def::Class(classdef.clone()));
         session.set_type(id, classtype);
         // TODO i don't like this type == Class thing, but i don't know how i'll do struct types yet either
@@ -88,7 +88,7 @@ impl ClassDef {
 
         session.set_type(id, classtype.clone());
         let vtable = Vtable::create(session, NodeID::generate(), format!("{}_vtable", name.clone()))?;
-        let classdef = ClassDef::new_ref(id, name, classtype, parenttype, vars, vtable);
+        let classdef = ClassDef::new_ref(id, name.to_string(), classtype, parenttype, vars, vtable);
         Ok(classdef)
     }
 
@@ -189,11 +189,10 @@ impl StructDef {
     }
 
     pub fn add_field(&self, session: &Session, id: NodeID, mutable: Mutability, name: &str, ttype: Type, define: Define) {
-        let sname = String::from(name);
-        if define == Define::IfNotExists && self.vars.get_var_def(&sname).is_none() {
-            FieldDef::define(session, self.vars.clone(), id, mutable, &sname, Some(ttype.clone())).unwrap();
+        if define == Define::IfNotExists && self.vars.get_var_def(name).is_none() {
+            FieldDef::define(session, self.vars.clone(), id, mutable, name, Some(ttype.clone())).unwrap();
         }
-        self.fields.borrow_mut().push((id, sname, ttype));
+        self.fields.borrow_mut().push((id, name.to_string(), ttype));
     }
 
     pub fn get_index(&self, field: &str) -> Option<usize> {

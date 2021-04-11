@@ -74,7 +74,7 @@ pub fn declare_builtins_node<'sess>(session: &Session, scope: ScopeRef, node: &B
             bind_type_names(session, tscope.clone(), ftype.as_mut(), true).unwrap();
             debug!("BUILTIN TYPE: {:?}", ftype);
             let abi = ftype.as_ref().map(|t| t.get_abi().unwrap()).unwrap_or(ABI::Molten);
-            AnyFunc::define(session, scope.clone(), *id, Visibility::Global, &Some(String::from(*name)), abi, ftype.clone()).unwrap();
+            AnyFunc::define(session, scope.clone(), *id, Visibility::Global, Some(name), abi, ftype.clone()).unwrap();
         },
         BuiltinDef::Class(id, name, params, _, entries) => {
             let tscope = session.map.get_or_add(*id, Some(scope.clone()));

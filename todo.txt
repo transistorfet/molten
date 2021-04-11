@@ -4,17 +4,12 @@
   was a problem, but I noted it from a previous attempt.  It *might* be possible to allow generic wide pointers (make LLType::TypeVar == { i8*, i8* }).
 
 
-* move the class reference transform stuff to the classes.rs file
-* move enums transforms to their own file
-* move exceptions transforms to their own file
 * refactor struct and vtable stuff so that it could be reused
-* separate vtables and other transformation components out of that big file.  They could be separate objects, but maybe there's a better way?
 
 * add a PtrI8 shorthand to llcode
 * add helper builders for use in transform
 * can you removed the Named function in lib.rs
 * can you remove FuncDef entirely?
-* replace &String and &Option<String> with &str and Option<&str>? for ::define() functions in definitions
 * there is a bug caused by the duplicated argument caused by the __init__ function in class desugaring (object/funcptr-uninitialized-issue.mol)
 
 

@@ -40,7 +40,7 @@ impl EnumDef {
     pub fn define(session: &Session, scope: ScopeRef, id: NodeID, deftype: Type) -> Result<EnumDefRef, Error> {
         let name = deftype.get_name()?;
         let vars = Scope::new_ref(None);
-        vars.set_basename(name.clone());
+        vars.set_basename(name);
 
         let enumdef = Self::new_ref(id, vars, deftype.clone());
         scope.define_type(name, Some(id))?;
@@ -52,7 +52,7 @@ impl EnumDef {
 
     #[must_use]
     pub fn add_variant(&self, session: &Session, variant: EnumVariant) -> Result<(), Error> {
-        self.vars.define(variant.ident.name.clone(), Some(variant.id))?;
+        self.vars.define(&variant.ident.name, Some(variant.id))?;
         session.set_ref(variant.id, self.id);
         match variant.ttype {
             Some(ref ttype) => session.set_type(variant.id, Type::Function(r(ttype.clone()), r(self.deftype.clone()), ABI::C)),

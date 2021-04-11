@@ -63,7 +63,7 @@ impl<'sess> Visitor for NameBinder<'sess> {
 
         let scope = self.stack.get_scope();
         let fscope = self.session.map.add(defid, Some(scope.clone()));
-        fscope.set_basename(ident.as_ref().map_or(format!("anon{}", defid), |ident| ident.name.clone()));
+        fscope.set_basename(ident.as_ref().map_or(&format!("anon{}", defid), |ident| &ident.name));
 
         // Check for typevars in the type params
         let mut argtypes = vec!();
@@ -91,7 +91,7 @@ impl<'sess> Visitor for NameBinder<'sess> {
         let nftype = Type::Function(r(Type::Tuple(argtypes)), r(rettype.unwrap_or_else(|| self.session.new_typevar())), abi);
 
         // Define the function variable and it's arguments variables
-        AnyFunc::define(self.session, scope.clone(), defid, vis, &ident.as_ref().map(|ref ident| String::from(ident.as_str())), abi, Some(nftype))?;
+        AnyFunc::define(self.session, scope.clone(), defid, vis, ident.as_ref().map(|ident| ident.as_str()), abi, Some(nftype))?;
 
         self.with_scope(fscope, |visitor| {
             visitor.visit_node(body)
@@ -115,7 +115,7 @@ impl<'sess> Visitor for NameBinder<'sess> {
         let mut ttype = ttype.clone();
         bind_type_names(self.session, scope.clone(), Some(&mut ttype), false)?;
         let abi = ttype.get_abi().unwrap_or(ABI::Molten);
-        AnyFunc::define(self.session, scope.clone(), defid, vis, &Some(ident.name.clone()), abi, Some(ttype))?;
+        AnyFunc::define(self.session, scope.clone(), defid, vis, Some(ident.as_str()), abi, Some(ttype))?;
         Ok(())
     }
 
@@ -161,7 +161,7 @@ impl<'sess> Visitor for NameBinder<'sess> {
         let scope = self.stack.get_scope();
         let mut classspec = classspec.clone();
         bind_classspec_type_names(self.session, scope.clone(), &mut classspec, false)?;
-        let classtype = scope.make_obj(self.session, classspec.ident.name.clone(), classspec.types.clone())?;
+        let classtype = scope.make_obj(self.session, classspec.ident.as_str(), classspec.types.clone())?;
         self.session.set_type(id, classtype);
         match scope.get_type_def(&classspec.ident.name) {
             Some(defid) => self.session.set_ref(id, defid),
@@ -186,7 +186,7 @@ impl<'sess> Visitor for NameBinder<'sess> {
 
         let classtype = Type::Object(classspec.ident.name, defid, classspec.types);
         let parenttype = match parentspec {
-            Some(p) => Some(scope.make_obj(self.session, p.ident.name.clone(), p.types.clone())?),
+            Some(p) => Some(scope.make_obj(self.session, p.ident.as_str(), p.types.clone())?),
             None => None
         };
         //let classtype = Type::from_spec(classspec.clone());
@@ -328,7 +328,7 @@ pub fn bind_type_names(session: &Session, scope: ScopeRef, ttype: Option<&mut Ty
                     _ => {
                         *id = UniqueID::generate();
                         let ttype = Type::Variable(name.clone(), *id, existential);
-                        scope.define_type(name.clone(), Some(*id))?;
+                        scope.define_type(name, Some(*id))?;
                         session.set_type(*id, ttype);
                     }
                 }

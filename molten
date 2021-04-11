@@ -54,13 +54,10 @@ def main():
     cmd.add_argument("filename")
     cmd.set_defaults(command=command_run)
 
-    cmd = subparsers.add_parser("clean", help="delete all generated files")
-    cmd.add_argument("directory", nargs='?', default=".")
-    cmd.set_defaults(command=command_clean)
-
-    cmd = subparsers.add_parser("cleanall", help="delete all generated files including from all subdirectories")
+    cmd = subparsers.add_parser("clean", help="delete all generated files including from all subdirectories")
+    cmd.add_argument('-v', '--verbose', action='store_true', help='Print more info')
     cmd.add_argument("directory")
-    cmd.set_defaults(command=command_cleanall)
+    cmd.set_defaults(command=command_clean)
 
     args = parser.parse_args()
     if 'command' not in args:
@@ -78,6 +75,8 @@ def command_build(args):
     target = args.output if args.output else os.path.splitext(args.filename)[0]
     if args.assembly:
         target += ".bc"
+    else:
+        target += ".bin"
     deps = list(reversed(build_deps(args.filename, False if args.no_pre_link else True)))
     compile_and_link(target, deps, args=args)
     return target
@@ -96,15 +95,12 @@ def command_run(args):
 
 
 def command_clean(args):
-    os.system("cd {dir} && {rm} *.ll *.dec *.bc *.o *.bin".format(dir=args.directory, rm=RM))
-
-
-def command_cleanall(args):
     for (basedir, dirnames, filenames) in os.walk(args.directory):
         for filename in filenames:
-            if any(filename.endswith(ext) for ext in [ ".bc", ".ll", ".dec", ".o", ".bin" ]):
+            if any(filename.endswith(ext) for ext in [ ".bc", ".l", ".ll", ".dec", ".o", ".bin" ]):
                 path = os.path.join(basedir, filename)
-                print("Deleting " + path)
+                if args.verbose:
+                    print("Deleting " + path)
                 os.unlink(path)
 
 

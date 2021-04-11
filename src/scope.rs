@@ -3,7 +3,6 @@ use std::rc::Rc;
 use std::cell::Cell;
 use std::cell::RefCell;
 use std::collections::HashMap;
-use std::collections::hash_map::Entry;
 
 use types::Type;
 use hir::{ NodeID };
@@ -88,12 +87,12 @@ impl Scope {
     ///// Variable Functions /////
 
     #[must_use]
-    pub fn define(&self, name: String, defid: Option<NodeID>) -> Result<(), Error> {
+    pub fn define(&self, name: &str, defid: Option<NodeID>) -> Result<(), Error> {
         let mut names = self.names.borrow_mut();
-        match names.contains_key(&name) {
+        match names.contains_key(name) {
             true => Err(Error::new(format!("NameError: variable is already defined; {:?}", name))),
             false => {
-                names.insert(name, BindInfo {
+                names.insert(name.to_string(), BindInfo {
                     defid: defid,
                 });
                 Ok(())
@@ -101,29 +100,14 @@ impl Scope {
         }
     }
 
-    pub fn modify_local<F>(&self, name: &String, mut f: F) -> () where F: FnMut(&mut BindInfo) -> () {
-        match self.names.borrow_mut().entry(name.clone()) {
-            Entry::Vacant(_) => panic!("NameError: variable is undefined in this scope; {:?}", name),
-            Entry::Occupied(mut entry) => f(entry.get_mut()),
+    pub fn modify_local<F>(&self, name: &str, mut f: F) -> () where F: FnMut(&mut BindInfo) -> () {
+        match self.names.borrow_mut().get_mut(name) {
+            None => panic!("NameError: variable is undefined in this scope; {:?}", name),
+            Some(entry) => f(entry),
         }
     }
 
-    /*
-    pub fn modify<F>(&mut self, name: &String, mut f: F) -> () where F: FnMut(&mut BindInfo) -> () {
-        // TODO this might be an issue with overloaded functions; this was changed to make overloading work when in different scopes, which might cause a name/type error if something in a
-        // more global scope tries to access an overloaded type specified in a more local scope... maybe the solution is to create a new entry with the new variant only accessible from the
-        // more local scope... but will that cause a duplicate name error somewhere?
-        match self.names.entry(name.clone()) {
-            Entry::Occupied(mut entry) => f(entry.get_mut()),
-            _ => match self.parent {
-                Some(ref parent) => parent.modify(name, f),
-                _ => panic!("NameError: type is undefined; {:?}", name),
-            },
-        }
-    }
-    */
-
-    pub fn _search<F, U>(&self, name: &String, f: F) -> Option<U> where F: Fn(&BindInfo) -> Option<U> {
+    pub fn _search<F, U>(&self, name: &str, f: F) -> Option<U> where F: Fn(&BindInfo) -> Option<U> {
         if let Some(sym) = self.names.borrow().get(name) {
             f(sym)
         } else if let Some(ref parent) = self.parent {
@@ -133,18 +117,18 @@ impl Scope {
         }
     }
 
-    pub fn contains(&self, name: &String) -> bool {
+    pub fn contains(&self, name: &str) -> bool {
         match self._search(name, |_sym| Some(true)) {
             Some(true) => true,
             _ => false,
         }
     }
 
-    pub fn contains_local(&self, name: &String) -> bool {
+    pub fn contains_local(&self, name: &str) -> bool {
         self.names.borrow().contains_key(name)
     }
 
-    pub fn contains_context(&self, name: &String) -> bool {
+    pub fn contains_context(&self, name: &str) -> bool {
         if let Some(_) = self.names.borrow().get(name) {
             true
         } else {
@@ -156,11 +140,11 @@ impl Scope {
         }
     }
 
-    pub fn set_var_def(&self, name: &String, defid: NodeID) {
+    pub fn set_var_def(&self, name: &str, defid: NodeID) {
         self.modify_local(name, move |sym| { sym.defid = Some(defid.clone()); })
     }
 
-    pub fn get_var_def(&self, name: &String) -> Option<NodeID> {
+    pub fn get_var_def(&self, name: &str) -> Option<NodeID> {
         self._search(name, |sym| {
             match sym.defid.as_ref() {
                 Some(defid) => Some(defid.clone()),
@@ -174,12 +158,12 @@ impl Scope {
     ///// Type Functions /////
 
     #[must_use]
-    pub fn define_type(&self, name: String, defid: Option<NodeID>) -> Result<(), Error> {
+    pub fn define_type(&self, name: &str, defid: Option<NodeID>) -> Result<(), Error> {
         let mut types = self.types.borrow_mut();
-        match types.contains_key(&name) {
+        match types.contains_key(name) {
             true => Err(Error::new(format!("NameError: type is already defined; {:?}", name))),
             false => {
-                types.insert(name, BindInfo {
+                types.insert(name.to_string(), BindInfo {
                     defid: defid,
                 });
                 Ok(())
@@ -187,9 +171,9 @@ impl Scope {
         }
     }
 
-    pub fn _modify_type<F>(&self, name: &String, f: F) where F: Fn(&mut BindInfo) -> () {
-        match self.types.borrow_mut().entry(name.clone()) {
-            Entry::Occupied(mut entry) => f(entry.get_mut()),
+    pub fn _modify_type<F>(&self, name: &str, f: F) where F: Fn(&mut BindInfo) -> () {
+        match self.types.borrow_mut().get_mut(name) {
+            Some(entry) => f(entry),
             _ => match self.parent {
                 Some(ref parent) => {
                     parent._modify_type(name, f);
@@ -199,7 +183,7 @@ impl Scope {
         }
     }
 
-    fn _search_type<F, U>(&self, name: &String, f: F) -> Option<U> where F: Fn(&BindInfo) -> Option<U> {
+    fn _search_type<F, U>(&self, name: &str, f: F) -> Option<U> where F: Fn(&BindInfo) -> Option<U> {
         if let Some(ref info) = self.types.borrow().get(name) {
             f(info)
         } else if let Some(ref parent) = self.parent {
@@ -209,21 +193,21 @@ impl Scope {
         }
     }
 
-    pub fn find_type(&self, session: &Session, name: &String) -> Option<Type> {
-        match self.get_type_def(name) {
+    pub fn find_type(&self, session: &Session, name: &str) -> Option<Type> {
+        match self.get_type_def(&name) {
             Some(defid) => session.get_type(defid),
             None => None,
         }
     }
 
-    pub fn find_type_local(&self, session: &Session, name: &String) -> Option<Type> {
+    pub fn find_type_local(&self, session: &Session, name: &str) -> Option<Type> {
         match self.types.borrow().get(name).map(|info| info.defid) {
             Some(Some(defid)) => session.get_type(defid),
             _ => None,
         }
     }
 
-    pub fn get_type_def(&self, name: &String) -> Option<NodeID> {
+    pub fn get_type_def(&self, name: &str) -> Option<NodeID> {
         self._search_type(name, |info| {
             match info.defid.as_ref() {
                 Some(defid) => Some(defid.clone()),
@@ -233,19 +217,19 @@ impl Scope {
         })
     }
 
-    pub fn find_type_def(&self, session: &Session, name: &String) -> Result<Def, Error> {
-        session.get_def(self.get_type_def(name).ok_or(Error::new(format!("TypeError: definition not set for {:?}", name)))?)
+    pub fn find_type_def(&self, session: &Session, name: &str) -> Result<Def, Error> {
+        session.get_def(self.get_type_def(&name).ok_or(Error::new(format!("TypeError: definition not set for {:?}", name)))?)
     }
 
 
 
-    pub fn make_obj(&self, session: &Session, name: String, params: Vec<Type>) -> Result<Type, Error> {
+    pub fn make_obj(&self, session: &Session, name: &str, params: Vec<Type>) -> Result<Type, Error> {
         match self.find_type(session, &name) {
             Some(Type::Object(_, id, eparams)) => {
                 if eparams.len() != params.len() {
                     return Err(Error::new(format!("TypeError: type parameters don't match.  Expected {:?} but found {:?}", eparams, params)));
                 }
-                Ok(Type::Object(name, id, params))
+                Ok(Type::Object(name.to_string(), id, params))
             },
             Some(ttype) => Err(Error::new(format!("TypeError: expected object type but found {:?}", ttype))),
             None => Err(Error::new(format!("TypeError: type not found: {:?}", name)))
@@ -262,8 +246,8 @@ impl Scope {
 
     ///// Name Functions /////
 
-    pub fn set_basename(&self, name: String) {
-        *self.basename.borrow_mut() = name;
+    pub fn set_basename(&self, name: &str) {
+        *self.basename.borrow_mut() = name.to_string();
     }
 
     pub fn get_full_name(&self, name: Option<String>, id: UniqueID) -> String {

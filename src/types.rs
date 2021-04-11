@@ -27,9 +27,9 @@ pub enum Type {
 }
 
 impl Type {
-    pub fn get_name(&self) -> Result<String, Error> {
-        match *self {
-            Type::Object(ref name, _, _) => Ok(name.clone()),
+    pub fn get_name<'a>(&'a self) -> Result<&'a str, Error> {
+        match &self {
+            Type::Object(name, _, _) => Ok(name),
             _ => Err(Error::new(format!("TypeError: expected a class or concrete type, found {:?}", self))),
         }
     }
@@ -258,7 +258,6 @@ impl Type {
                 match varmap.get(&id).map(|x| x.clone()) {
                     Some(ptype) => ptype,
                     None => {
-                        //let etype = self.find_type(session, &name);
                         let etype = session.get_type(id);
                         debug!("EXISTING TYPEVAR for {:?}: {:?} vs {:?}", name, etype, id);
                         match Some(ttype) {

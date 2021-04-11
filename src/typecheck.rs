@@ -84,7 +84,7 @@ impl<'sess> Visitor for TypeChecker<'sess> {
 
     fn visit_vec(&mut self, code: &Vec<Expr>) -> Result<Self::Return, Error> {
         let scope = self.stack.get_scope();
-        let mut last: Type = scope.make_obj(self.session, String::from("()"), vec!())?;
+        let mut last: Type = scope.make_obj(self.session, "()", vec!())?;
         for node in code {
             last = self.visit_node(node)?;
         }
@@ -104,12 +104,12 @@ impl<'sess> Visitor for TypeChecker<'sess> {
     fn visit_literal(&mut self, _id: NodeID, _lit: &Literal) -> Result<Self::Return, Error> {
         let scope = self.stack.get_scope();
         match _lit {
-            Literal::Unit => scope.make_obj(self.session, String::from("()"), vec!()),
-            Literal::Boolean(_) => scope.make_obj(self.session, String::from("Bool"), vec!()),
-            Literal::Character(_) => scope.make_obj(self.session, String::from("Char"), vec!()),
-            Literal::Integer(_) => scope.make_obj(self.session, String::from("Int"), vec!()),
-            Literal::Real(_) => scope.make_obj(self.session, String::from("Real"), vec!()),
-            Literal::String(_) => scope.make_obj(self.session, String::from("String"), vec!()),
+            Literal::Unit => scope.make_obj(self.session, "()", vec!()),
+            Literal::Boolean(_) => scope.make_obj(self.session, "Bool", vec!()),
+            Literal::Character(_) => scope.make_obj(self.session, "Char", vec!()),
+            Literal::Integer(_) => scope.make_obj(self.session, "Int", vec!()),
+            Literal::Real(_) => scope.make_obj(self.session, "Real", vec!()),
+            Literal::String(_) => scope.make_obj(self.session, "String", vec!()),
         }
     }
 
@@ -129,7 +129,7 @@ impl<'sess> Visitor for TypeChecker<'sess> {
             //atype = expect_type(self.session, scope.clone(), atype, vtype, Check::Def)?;
 
             if &arg.ident.name[..] == "self" {
-                let stype = fscope.find_type(self.session, &String::from("Self")).ok_or(Error::new(format!("NameError: undefined type \"Self\" in the current scope\n")))?;
+                let stype = fscope.find_type(self.session, "Self").ok_or(Error::new(format!("NameError: undefined type \"Self\" in the current scope\n")))?;
                 atype = expect_type(self.session, Some(atype), Some(stype), Check::Def)?;
             }
             self.session.update_type(arg_defid, atype.clone())?;
@@ -220,7 +220,7 @@ impl<'sess> Visitor for TypeChecker<'sess> {
 
     fn visit_declare(&mut self, _refid: NodeID, _vis: Visibility, _ident: &Ident, _ttype: &Type) -> Result<Self::Return, Error> {
         let scope = self.stack.get_scope();
-        scope.make_obj(self.session, String::from("()"), vec!())
+        scope.make_obj(self.session, "()", vec!())
     }
 
     fn visit_identifier(&mut self, refid: NodeID, ident: &Ident) -> Result<Self::Return, Error> {
@@ -265,7 +265,7 @@ impl<'sess> Visitor for TypeChecker<'sess> {
     fn visit_try(&mut self, _id: NodeID, cond: &Expr, cases: &Vec<MatchCase>) -> Result<Self::Return, Error> {
         let scope = self.stack.get_scope();
         let btype = self.visit_node_expected(cond, None);
-        let mut ctype = scope.make_obj(self.session, String::from("Exception"), vec!())?;
+        let mut ctype = scope.make_obj(self.session, "Exception", vec!())?;
 
         let mut rtype = None;
         for ref case in cases {
@@ -284,9 +284,9 @@ impl<'sess> Visitor for TypeChecker<'sess> {
     fn visit_raise(&mut self, _id: NodeID, expr: &Expr) -> Result<Self::Return, Error> {
         let scope = self.stack.get_scope();
         // TODO should you check for a special error/exception type?
-        let extype = scope.make_obj(self.session, String::from("Exception"), vec!())?;
+        let extype = scope.make_obj(self.session, "Exception", vec!())?;
         expect_type(self.session, Some(extype.clone()), Some(self.visit_node_expected(expr, Some(extype))), Check::Def)?;
-        scope.make_obj(self.session, String::from("()"), vec!())
+        scope.make_obj(self.session, "()", vec!())
     }
 
     fn visit_while(&mut self, _id: NodeID, cond: &Expr, body: &Expr) -> Result<Self::Return, Error> {
@@ -294,7 +294,7 @@ impl<'sess> Visitor for TypeChecker<'sess> {
         // TODO should this require the cond type to be Bool?
         self.visit_node_expected(cond, None);
         self.visit_node_expected(body, None);
-        scope.make_obj(self.session, String::from("()"), vec!())
+        scope.make_obj(self.session, "()", vec!())
     }
 
     fn visit_nil(&mut self, refid: NodeID) -> Result<Self::Return, Error> {
@@ -371,12 +371,12 @@ impl<'sess> Visitor for TypeChecker<'sess> {
 
     fn visit_enum(&mut self, _id: NodeID, _classspec: &ClassSpec, _variants: &Vec<EnumVariant>) -> Result<Self::Return, Error> {
         let scope = self.stack.get_scope();
-        scope.make_obj(self.session, String::from("()"), vec!())
+        scope.make_obj(self.session, "()", vec!())
     }
 
     fn visit_type_alias(&mut self, _id: NodeID, _classspec: &ClassSpec, _ttype: &Type) -> Result<Self::Return, Error> {
         let scope = self.stack.get_scope();
-        scope.make_obj(self.session, String::from("()"), vec!())
+        scope.make_obj(self.session, "()", vec!())
     }
 
     fn visit_ptr_cast(&mut self, refid: NodeID, _ttype: &Type, code: &Expr) -> Result<Self::Return, Error> {
@@ -402,7 +402,7 @@ impl<'sess> Visitor for TypeChecker<'sess> {
         self.with_scope(tscope.clone(), |visitor| {
             visitor.visit_vec(body)
         })?;
-        scope.make_obj(self.session, String::from("()"), vec!())
+        scope.make_obj(self.session, "()", vec!())
     }
 
     fn visit_resolver(&mut self, node: &Expr, left: &Expr, right: &Ident, oid: NodeID) -> Result<Self::Return, Error> {
@@ -434,7 +434,7 @@ impl<'sess> Visitor for TypeChecker<'sess> {
     fn visit_import(&mut self, _id: NodeID, _ident: &Ident, decls: &Vec<Expr>) -> Result<Self::Return, Error> {
         let scope = self.stack.get_scope();
         self.visit_vec(decls)?;
-        scope.make_obj(self.session, String::from("()"), vec!())
+        scope.make_obj(self.session, "()", vec!())
     }
 
     fn visit_pattern_wild(&mut self, id: NodeID) -> Result<Self::Return, Error> {
@@ -509,7 +509,7 @@ impl<'sess> Visitor for TypeChecker<'sess> {
 impl<'sess> TypeChecker<'sess> {
     #[must_use]
     pub fn link_comparison_func(&self, scope: ScopeRef, refid: NodeID, ctype: &Type) -> Result<(), Error> {
-        match scope.get_var_def(&String::from("==")) {
+        match scope.get_var_def("==") {
             None => return Err(Error::new(format!("NameError: no \"==\" function defined for type {:?}", ctype))),
             Some(defid) => {
                 let (fid, ftype) = self.session_find_variant_id(defid, &Type::Tuple(vec!(ctype.clone(), ctype.clone())))?;

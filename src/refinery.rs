@@ -197,7 +197,7 @@ impl<'sess> Refinery<'sess> {
             },
 
             AST::Index(pos, base, index) => {
-                self.refine_node(AST::Invoke(pos.clone(), r(AST::Accessor(pos.clone(), base, Ident::new(String::from("[]")))), vec!(*index)))?
+                self.refine_node(AST::Invoke(pos.clone(), r(AST::Accessor(pos.clone(), base, Ident::from_str("[]"))), vec!(*index)))?
             },
 
             AST::Resolver(pos, left, right) => {
@@ -222,7 +222,7 @@ impl<'sess> Refinery<'sess> {
                         Expr::new(pos, ExprKind::Assignment(r(self.refine_node(left)?), r(self.refine_node(*right)?), ty))
                     },
                     AST::Index(ipos, base, index) => {
-                        self.refine_node(AST::Invoke(pos, r(AST::Accessor(ipos.clone(), base, Ident::new(String::from("[]")))), vec!(*index, *right)))?
+                        self.refine_node(AST::Invoke(pos, r(AST::Accessor(ipos.clone(), base, Ident::from_str("[]"))), vec!(*index, *right)))?
                     },
                     _ => return Err(Error::new(format!("SyntaxError: assignment to to an invalid element: {:?}", left))),
                 }
@@ -309,7 +309,7 @@ impl<'sess> Refinery<'sess> {
                     if ident.as_ref().map(|i| i.name.as_str()) == Some("new") {
                         has_new = true;
                         if args.len() > 0 && args[0].ident.as_str() == "self" {
-                            body = r(AST::Block(pos.clone(), vec!(*body, AST::Identifier(pos.clone(), Ident::new(String::from("self"))))));
+                            body = r(AST::Block(pos.clone(), vec!(*body, AST::Identifier(pos.clone(), Ident::from_str("self")))));
                         } else {
                             return Err(Error::new(format!("SyntaxError: the \"new\" method on a class must have \"self\" as its first parameter")));
                         }

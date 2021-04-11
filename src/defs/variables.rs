@@ -12,7 +12,7 @@ pub struct AnyVar();
 
 impl AnyVar {
     #[must_use]
-    pub fn define(session: &Session, scope: ScopeRef, id: NodeID, mutable: Mutability, name: &String, ttype: Option<Type>) -> Result<Def, Error> {
+    pub fn define(session: &Session, scope: ScopeRef, id: NodeID, mutable: Mutability, name: &str, ttype: Option<Type>) -> Result<Def, Error> {
         // TODO should you have a different one for Global, given that it'll compile to something different, until you remove it via closures...
         if scope.is_redirect() {
             FieldDef::define(session, scope, id, mutable, name, ttype)
@@ -33,7 +33,7 @@ pub type VarDefRef = Rc<VarDef>;
 
 impl VarDef {
     #[must_use]
-    pub fn define(session: &Session, scope: ScopeRef, id: NodeID, mutable: Mutability, name: &String, ttype: Option<Type>) -> Result<Def, Error> {
+    pub fn define(session: &Session, scope: ScopeRef, id: NodeID, mutable: Mutability, name: &str, ttype: Option<Type>) -> Result<Def, Error> {
 
         let def = Def::Var(Rc::new(VarDef {
             mutable: mutable,
@@ -44,10 +44,10 @@ impl VarDef {
         Ok(def)
     }
 
-    pub fn set_var_def(session: &Session, scope: ScopeRef, id: NodeID, name: &String, def: Def, ttype: Option<Type>) -> Result<(), Error> {
+    pub fn set_var_def(session: &Session, scope: ScopeRef, id: NodeID, name: &str, def: Def, ttype: Option<Type>) -> Result<(), Error> {
         let dscope = Scope::target(session, scope.clone());
 
-        dscope.define(name.clone(), Some(id))?;
+        dscope.define(name, Some(id))?;
         session.set_def(id, def.clone());
         if let Some(ttype) = ttype {
             session.update_type(id, ttype)?;
@@ -67,7 +67,7 @@ pub type ArgDefRef = Rc<ArgDef>;
 
 impl ArgDef {
     #[must_use]
-    pub fn define(session: &Session, scope: ScopeRef, id: NodeID, mutable: Mutability, name: &String, ttype: Option<Type>) -> Result<Def, Error> {
+    pub fn define(session: &Session, scope: ScopeRef, id: NodeID, mutable: Mutability, name: &str, ttype: Option<Type>) -> Result<Def, Error> {
         let def = Def::Arg(Rc::new(ArgDef {
             mutable: mutable,
 
@@ -89,7 +89,7 @@ pub type FieldDefRef = Rc<FieldDef>;
 
 impl FieldDef {
     #[must_use]
-    pub fn define(session: &Session, scope: ScopeRef, id: NodeID, mutable: Mutability, name: &String, ttype: Option<Type>) -> Result<Def, Error> {
+    pub fn define(session: &Session, scope: ScopeRef, id: NodeID, mutable: Mutability, name: &str, ttype: Option<Type>) -> Result<Def, Error> {
 
         let def = Def::Field(Rc::new(FieldDef {
             mutable: mutable,

@@ -250,7 +250,7 @@ impl ClosureTransform {
         transform.insert_global(index, LLGlobal::DefType(cl.context_type_id, format!("__context_{}__", cl.context_type_id), structtype.clone()));
 
 
-        FuncDef::define(transform.session, scope.clone(), cl.compiled_func_id, cl.vis, &Some(compiled_func_name.clone()), Some(ptype)).unwrap();
+        FuncDef::define(transform.session, scope.clone(), cl.compiled_func_id, cl.vis, Some(&compiled_func_name), Some(ptype)).unwrap();
         let mut fields = vec!();
         cl.context_struct.foreach_field(|defid, field, _| {
             let rid = NodeID::generate();
