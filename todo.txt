@@ -1,8 +1,7 @@
 
-* I really need the closures to be a tuple of the funcptr and context, and not a pointer in its own right, because then I can have closure literals with a null context and no malloc
-  but there is potentially an issue with generics, such that a tuple (wide pointer) can't be made into a generic since it isn't a single pointer.  I'm not sure where this
-  was a problem, but I noted it from a previous attempt.  It *might* be possible to allow generic wide pointers (make LLType::TypeVar == { i8*, i8* }).
-
+* you need to figure out what should and shouldn't be a reference type... objects are always references that are malloced with 'new', and only objects can use 'new',
+  whereas enums, records and tuples are not reference types, but can be made into references with 'ref'.  There will also be trait objects.  Enums are already 'Type::Object'
+  and are distinguished by their definition, yet one a reference always and the other is not.  Trait objects would implicitly always be a reference
 
 * refactor struct and vtable stuff so that it could be reused
 

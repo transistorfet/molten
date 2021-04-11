@@ -717,7 +717,24 @@ impl<'sess> Transformer<'sess> {
             PatKind::EnumArgs(left, args) => {
                 let variant_id = self.session.get_ref(pat.id).unwrap();
                 let item_id = NodeID::generate();
-                exprs.push(LLExpr::SetValue(item_id, r(LLExpr::GetItem(r(LLExpr::Cast(self.get_type(variant_id).unwrap(), r(LLExpr::GetValue(value_id)))), 1))));
+                //exprs.push(LLExpr::SetValue(item_id, r(LLExpr::GetItem(r(LLExpr::Cast(self.get_type(variant_id).unwrap(), r(LLExpr::GetValue(value_id)))), 1))));
+
+                // TODO this indirection is a fix for an infinite loop during optimization when directly fetching the second argument in an enum, the raw array
+                //      The problem with the previous approach is that the Cast llexpr is very complicated and will not necessarily do the right conversion when
+                //      using a struct instead of a pointer to a struct.  Creating a temporary variable means that the direct variable reference is a pointer, and
+                //      can thus be indexed as one.  This might change if enums are made into references always
+                let tmp_id = NodeID::generate();
+                let ltype = self.get_type(variant_id).unwrap();
+                exprs.push(LLExpr::DefLocal(tmp_id, tmp_id.to_string(), ltype.clone(), r(LLExpr::GetValue(value_id))));
+
+                exprs.push(LLExpr::SetValue(item_id, r(
+                    LLExpr::LoadRef(r(
+                        LLExpr::AccessRef(r(
+                            LLExpr::Cast(LLType::Ptr(r(ltype)), r(LLExpr::GetValue(tmp_id)))
+                        ), vec!(LLRef::Field(1)))
+                    ))
+                )));
+
                 for (i, arg) in args.iter().enumerate() {
                     let arg_id = NodeID::generate();
                     exprs.push(LLExpr::SetValue(arg_id, r(LLExpr::GetItem(r(LLExpr::GetValue(item_id)), i))));
