@@ -294,9 +294,9 @@ impl ScopeMapRef {
         scope
     }
 
-    //pub fn set(&self, id: UniqueID, scope: ScopeRef) {
-    //    self.0.borrow_mut().insert(id, scope);
-    //}
+    pub fn set(&self, id: UniqueID, scope: ScopeRef) {
+        self.0.borrow_mut().insert(id, scope);
+    }
 
     pub fn get(&self, id: &UniqueID) -> ScopeRef {
         self.0.borrow().get(id).unwrap().clone()

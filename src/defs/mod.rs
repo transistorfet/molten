@@ -3,15 +3,16 @@ use scope::ScopeRef;
 use hir::Mutability;
 use session::{ Error };
 
-//pub mod traits;
 pub mod enums;
 pub mod types;
 pub mod classes;
 pub mod variables;
 pub mod functions;
+//pub mod traits;
 
 use defs::enums::{ EnumDefRef };
 use defs::types::{ TypeAliasDefRef };
+//use defs::traits::{ TraitDefRef, TraitImplRef };
 use defs::classes::{ ClassDefRef, StructDefRef };
 use defs::variables::{ VarDefRef, ArgDefRef, FieldDefRef };
 use defs::functions::{ FuncDefRef, OverloadDefRef, ClosureDefRef, MethodDefRef, CFuncDefRef };
@@ -31,6 +32,8 @@ pub enum Def {
     Closure(ClosureDefRef),
     Method(MethodDefRef),
     CFunc(CFuncDefRef),
+    //Trait(TraitDefRef),
+    //TraitImpl(TraitImplRef),
 }
 
 

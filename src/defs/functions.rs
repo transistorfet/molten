@@ -29,6 +29,25 @@ impl AnyFunc {
             _ => return Err(Error::new(format!("DefError: unsupported ABI {:?}", abi))),
         }
     }
+
+    #[must_use]
+    pub fn set_func_def(session: &Session, scope: ScopeRef, id: NodeID, name: Option<&str>, def: Def, ttype: Option<Type>) -> Result<(), Error> {
+        session.set_def(id, def.clone());
+
+        if let Some(ref ttype) = ttype {
+            session.update_type(id, ttype.clone())?;
+        }
+
+        if let Some(name) = name {
+            let dscope = Scope::target(session, scope.clone());
+            if let Some(previd) = dscope.get_var_def(&name) {
+                OverloadDef::define(session, scope.clone(), &name, id, previd, ttype)?;
+            } else {
+                dscope.define(name, Some(id))?;
+            }
+        }
+        Ok(())
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -48,27 +67,8 @@ impl FuncDef {
             vis: vis,
         }));
 
-        FuncDef::set_func_def(session, scope.clone(), id, name, def.clone(), ttype)?;
+        AnyFunc::set_func_def(session, scope.clone(), id, name, def.clone(), ttype)?;
         Ok(def)
-    }
-
-    #[must_use]
-    pub fn set_func_def(session: &Session, scope: ScopeRef, id: NodeID, name: Option<&str>, def: Def, ttype: Option<Type>) -> Result<(), Error> {
-        session.set_def(id, def.clone());
-
-        if let Some(ref ttype) = ttype {
-            session.update_type(id, ttype.clone())?;
-        }
-
-        if let Some(name) = name {
-            let dscope = Scope::target(session, scope.clone());
-            if let Some(previd) = dscope.get_var_def(&name) {
-                OverloadDef::define(session, scope.clone(), &name, id, previd, ttype)?;
-            } else {
-                dscope.define(name, Some(id))?;
-            }
-        }
-        Ok(())
     }
 }
 
@@ -196,10 +196,10 @@ impl OverloadDef {
 pub struct ClosureDef {
     pub id: NodeID,
     pub vis: Visibility,
-    pub context_arg_id: NodeID,
     pub context_type_id: NodeID,
     pub context_struct: StructDefRef,
     pub compiled_func_id: NodeID,
+    pub context_arg_id: NodeID,
 }
 
 pub type ClosureDefRef = Rc<ClosureDef>;
@@ -213,13 +213,13 @@ impl ClosureDef {
         let def = Def::Closure(Rc::new(ClosureDef {
             id: id,
             vis: vis,
-            context_arg_id: NodeID::generate(),
             context_type_id: ctid,
             context_struct: structdef,
             compiled_func_id: NodeID::generate(),
+            context_arg_id: NodeID::generate(),
         }));
 
-        FuncDef::set_func_def(session, scope.clone(), id, name, def.clone(), ttype)?;
+        AnyFunc::set_func_def(session, scope.clone(), id, name, def.clone(), ttype)?;
         Ok(def)
     }
 
@@ -263,7 +263,6 @@ impl MethodDef {
             closure: closure,
         }));
 
-        //FuncDef::set_func_def(session, scope.clone(), id, name, def.clone(), ttype)?;
         session.set_def(id, def.clone());
         Ok(def)
     }

@@ -22,15 +22,6 @@
 
 * string-conversions.mol is now causing an intermitent problem, segfaulting during optimization.  For some reason it happens every few times it's run,
   with the dependencies being untouched between.  This actually seems to be happening in many files, and is likely related to the main/run functions and closures
-* when a class has a member that is a closure function pointer, and that class is instantiated, then the compiler will segfault during optimization.
-  It only happens if when trying to zero the allocated memory after calling molten_malloc to allocate a new object, but it happens either with a
-  "store zeroinitialize" instruction, or attempting to call memset(), and only if I use LLVMGetElementType(rtype).  If I zeroinitialize another
-  type or pass a const for size to memset(), it compiles without segfaulting.  It works without the zeroing even though molten_malloc() is passed
-  the same LLVMGetElementType(rtype) size determiner...
-* only when using llvm 11, and only with the match tt {} expr in reducedtest.mol, and optimizations enabled, the compiler hangs without ever completing
-  In the test, the match is inside a function, but when moved to the top level, it hangs while compiling.  It happens regardless of mathc arm it seems
-
-
 
 
 * can you remove access to getindex, buffer, etc?
