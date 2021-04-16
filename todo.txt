@@ -1,4 +1,11 @@
 
+* maybe instead of the intermediate value, in closure transform def, you already make the code to create the context, and then you either create the global, or local
+  depending on visibility, and set the fptr and context values as pointers without the subsequent move
+* you don't have the memo check at the beginning of the run function yet
+
+
+* add the string compare functions to lib.rs
+
 * you need to figure out what should and shouldn't be a reference type... objects are always references that are malloced with 'new', and only objects can use 'new',
   whereas enums, records and tuples are not reference types, but can be made into references with 'ref'.  There will also be trait objects.  Enums are already 'Type::Object'
   and are distinguished by their definition, yet one a reference always and the other is not.  Trait objects would implicitly always be a reference
