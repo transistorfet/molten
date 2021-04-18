@@ -8,7 +8,7 @@ use misc::{ UniqueID, r };
 
 use defs::enums::EnumDef;
 use defs::classes::ClassDef;
-use defs::functions::AnyFunc;
+use defs::functions::{ AnyFunc, ClosureDef };
 use defs::types::TypeAliasDef;
 use defs::variables::{ AnyVar, VarDef, ArgDef };
 
@@ -56,6 +56,21 @@ impl<'sess> Visitor for NameBinder<'sess> {
     fn handle_error(&mut self, node: &Expr, err: Error) -> Result<Self::Return, Error> {
         self.session.print_error(err.add_pos(&node.get_pos()));
         Ok(())
+    }
+
+    fn visit_module(&mut self, id: NodeID, name: &str, code: &Expr, memo_id: NodeID) -> Result<Self::Return, Error> {
+        let scope = self.stack.get_scope();
+
+        let memo_name = format!("memo.{}", name);
+        VarDef::define(self.session, scope.clone(), memo_id, Mutability::Mutable, &memo_name, Some(scope.make_obj(self.session, "Bool", vec!())?))?;
+
+        let defid = self.session.new_def_id(id);
+        let ttype = Type::Function(r(Type::Tuple(vec!())), r(scope.make_obj(self.session, "Bool", vec!())?), ABI::Molten);
+        self.session.map.set(defid, scope.clone());
+        self.session.set_type(defid, ttype.clone());
+
+        ClosureDef::define(self.session, scope.clone(), defid, Visibility::Public, Some(&format!("run_{}", name)), Some(ttype))?;
+        self.visit_node(code)
     }
 
     fn visit_function(&mut self, id: NodeID, vis: Visibility, ident: &Option<Ident>, args: &Vec<Argument>, rettype: &Option<Type>, body: &Expr, abi: ABI) -> Result<Self::Return, Error> {

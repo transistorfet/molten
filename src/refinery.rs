@@ -30,10 +30,7 @@ impl<'sess> Refinery<'sess> {
             context: RefCell::new(vec!()),
         };
 
-        //vec!(Expr::make_func(Pos::empty(), Some(Ident::new(Pos::empty(), format!("init.{}", "test"))), vec!(), None,
-        //    r(Expr::make_block(Pos::empty(), refine_vec(code))),
-        //ABI::Molten))
-        let refined = refinery.refine_vec(code);
+        let refined = refinery.refine_module(code);
         if session.errors.get() > 0 {
             panic!("Exiting due to previous errors");
         }
@@ -57,6 +54,29 @@ impl<'sess> Refinery<'sess> {
         len == 0 || self.get_context() == Some(CodeContext::ClassBody) && len == 1
     }
 
+    pub fn refine_module(&self, code: Vec<AST>) -> Vec<Expr> {
+        //let mut body = self.refine_vec(code);
+        //body.push(Expr::make_lit(Literal::Boolean(true)));
+
+        let module_name = self.session.name.replace(".", "_");
+        let memo = format!("memo.{}", module_name);
+        let memo_type = Type::Object("Bool".to_string(), UniqueID(0), vec!());
+        let module_run_name = format!("run_{}", module_name);
+
+        let mut init_code = vec!();
+        init_code.push(Expr::make_assign(Pos::empty(), Expr::make_ident_from_str(Pos::empty(), &memo), Expr::make_lit(Literal::Boolean(true)), AssignType::Update));
+        init_code.extend(self.refine_vec(code));
+        init_code.push(Expr::make_lit(Literal::Boolean(true)));
+
+        let body = vec!(
+            Expr::make_match(Pos::empty(), Expr::make_ident_from_str(Pos::empty(), &memo), vec!(
+                MatchCase::new(Pattern::make_lit(Literal::Boolean(true)), Expr::make_lit(Literal::Boolean(true))),
+                MatchCase::new(Pattern::make_lit(Literal::Boolean(false)), Expr::make_block(Pos::empty(), init_code)),
+            ))
+        );
+
+        vec!(Expr::make_module(module_name, Expr::make_block(Pos::empty(), body)))
+    }
 
     pub fn refine_vec(&self, code: Vec<AST>) -> Vec<Expr> {
         let mut block = vec!();
@@ -230,7 +250,8 @@ impl<'sess> Refinery<'sess> {
 
             AST::Import(pos, ident, _) => {
                 let path = ident.name.replace(".", "/") + ".dec";
-                let decls = self.session.parse_file(path.as_str(), true);
+                let ast = self.session.parse_file(path.as_str(), true);
+                let decls = self.refine_vec(ast);
                 Expr::new(pos, ExprKind::Import(ident, decls))
             },
 
@@ -259,7 +280,6 @@ impl<'sess> Refinery<'sess> {
         // TODO refine the pattern, if needed
         Ok(pat)
     }
-
 
     pub fn desugar_for_loop(&self, pos: Pos, ident: Ident, list: AST, body: AST) -> Result<Expr, Error> {
         let mut block = vec!();

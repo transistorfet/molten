@@ -5,7 +5,7 @@ use visitor::{ Visitor };
 use defs::classes::{ ClassDefRef, StructDef, StructDefRef, Vtable };
 
 use misc::{ r };
-use transform::transform::{ Transformer };
+use transform::transform::{ Transformer, CodeContext };
 use transform::llcode::{ LLType, LLRef, LLLink, LLExpr, LLGlobal };
 
 
@@ -25,6 +25,15 @@ impl<'sess> Transformer<'sess> {
     }
 
 
+    pub fn transform_class_vtable_decl(&mut self, classdef: ClassDefRef) -> Vec<LLExpr> {
+        if !classdef.has_vtable() {
+            return vec!();
+        }
+
+        let tscope = self.session.map.get(&classdef.id);
+        VtableTransform::decl_vtable(self, format!("__{}_vtable", tscope.get_basename()), &classdef.vtable)
+    }
+
     pub fn transform_class_vtable_init(&mut self, classdef: ClassDefRef) -> Vec<LLExpr> {
         if !classdef.has_vtable() {
             return vec!();
@@ -33,7 +42,6 @@ impl<'sess> Transformer<'sess> {
         let tscope = self.session.map.get(&classdef.id);
         VtableTransform::init_vtable(self, format!("__{}_vtable", tscope.get_basename()), &classdef.vtable)
     }
-
 
     pub fn transform_class_body(&mut self, id: NodeID, body: &Vec<Expr>) -> Vec<LLExpr> {
         let defid = self.session.get_ref(id).unwrap();
@@ -60,7 +68,12 @@ impl<'sess> Transformer<'sess> {
             Ok(vec!())
         }).unwrap();
 
-        exprs.extend(self.transform_class_vtable_init(classdef));
+        match self.get_context() {
+            Some(CodeContext::Import) =>
+                exprs.extend(self.transform_class_vtable_decl(classdef)),
+            _ =>
+                exprs.extend(self.transform_class_vtable_init(classdef)),
+        }
         exprs
     }
 
@@ -123,6 +136,11 @@ impl VtableTransform {
             items.push(transform.transform_value_type(ttype));
         });
         transform.add_global(LLGlobal::SetStructBody(vtable.id, items, true));
+    }
+
+    pub fn decl_vtable(transform: &mut Transformer, name: String, vtable: &Vtable) -> Vec<LLExpr> {
+        transform.add_global(LLGlobal::DefGlobal(vtable.id, LLLink::Once, name, transform.get_type(vtable.id).unwrap()));
+        vec!()
     }
 
     pub fn init_vtable(transform: &mut Transformer, name: String, vtable: &Vtable) -> Vec<LLExpr> {

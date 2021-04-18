@@ -14,7 +14,7 @@ use misc::{ r };
 use transform::transform::{ Transformer, CodeContext };
 use transform::exceptions::{ EXCEPTION_POINT_NAME };
 use transform::classes::{ StructTransform };
-use transform::llcode::{ LLType, LLLink, LLCC, LLExpr, LLGlobal };
+use transform::llcode::{ LLType, LLLink, LLCC, LLExpr, LLGlobal, LLLit, LLRef };
 
 
 
@@ -157,10 +157,10 @@ pub struct ClosureTransform;
 impl ClosureTransform {
     pub fn transform_def_type(transform: &mut Transformer, args: &Vec<Type>, ret: &Type) -> LLType {
         let ltype = CFuncTransform::transform_def_type(transform, args, ret);
-        ClosureTransform::convert_to_def_type(transform, ltype)
+        ClosureTransform::convert_to_def_type(ltype)
     }
 
-    pub fn convert_to_def_type(transform: &mut Transformer, ltype: LLType) -> LLType {
+    pub fn convert_to_def_type(ltype: LLType) -> LLType {
         match ltype {
             LLType::Function(mut args, ret) => {
                 args.push(LLType::Ptr(r(LLType::I8)));
@@ -173,10 +173,10 @@ impl ClosureTransform {
 
     pub fn transform_value_type(transform: &mut Transformer, args: &Vec<Type>, ret: &Type) -> LLType {
         let ltype = ClosureTransform::transform_def_type(transform, args, ret);
-        ClosureTransform::convert_to_value_type(transform, ltype)
+        ClosureTransform::convert_to_value_type(ltype)
     }
 
-    pub fn convert_to_value_type(transform: &mut Transformer, ltype: LLType) -> LLType {
+    pub fn convert_to_value_type(ltype: LLType) -> LLType {
         LLType::Struct(vec!(LLType::Ptr(r(ltype)), LLType::Ptr(r(LLType::I8))))
     }
 
@@ -232,7 +232,6 @@ impl ClosureTransform {
             Ok(vec!())
         }).unwrap();
 
-        let ptype = ClosureTransform::convert_molten_type(transform, transform.session.get_type(defid).unwrap());
 
         // Transforms body and create C function definition
         let index = transform.globals.len();
@@ -244,13 +243,12 @@ impl ClosureTransform {
             })
         });
         let llvis = transform.transform_vis(vis);
-        transform.insert_global(index, LLGlobal::DefCFunc(cl.compiled_func_id, llvis, compiled_func_name.clone(), compiled_func_type, fargs, body, LLCC::FastCC));
+        transform.insert_global(index, LLGlobal::DefCFunc(cl.compiled_func_id, llvis, compiled_func_name.clone(), compiled_func_type.clone(), fargs, body, LLCC::FastCC));
 
         let structtype = LLType::Ptr(r(StructTransform::get_type(transform, &cl.context_struct)));
         transform.insert_global(index, LLGlobal::DefType(cl.context_type_id, format!("__context_{}__", cl.context_type_id), structtype.clone()));
 
 
-        FuncDef::define(transform.session, scope.clone(), cl.compiled_func_id, cl.vis, Some(&compiled_func_name), Some(ptype)).unwrap();
         let mut fields = vec!();
         cl.context_struct.foreach_field(|defid, field, _| {
             let rid = NodeID::generate();
@@ -282,16 +280,18 @@ impl ClosureTransform {
 
         if vis == Visibility::Public {
             let gid = NodeID::generate();
-            transform.add_global(LLGlobal::DefGlobal(gid, LLLink::Once, fname.clone(), structtype));
+            transform.add_global(LLGlobal::DefGlobal(gid, LLLink::Once, fname.clone(), ClosureTransform::convert_to_value_type(compiled_func_type)));
             exprs.push(LLExpr::SetGlobal(gid, r(LLExpr::GetValue(defid))));
+            transform.session.set_ref(defid, gid);
         }
 
         exprs
     }
 
     pub fn make_closure_value(transform: &mut Transformer, id: NodeID, compiled_func_id: NodeID, context: LLExpr) -> LLExpr {
-        LLExpr::DefStruct(id, LLType::Struct(vec!(LLType::Ptr(r(transform.get_type(compiled_func_id).unwrap())), LLType::Ptr(r(LLType::I8)))), vec!(
-            LLExpr::GetValue(compiled_func_id), context
+        let lltype = ClosureTransform::convert_to_value_type(transform.get_type(compiled_func_id).unwrap());
+        LLExpr::DefStruct(id, lltype, vec!(
+            LLExpr::GetValue(compiled_func_id), LLExpr::Cast(LLType::Ptr(r(LLType::I8)), r(context))
         ))
     }
 
@@ -326,6 +326,7 @@ impl ClosureTransform {
         fargs.push(LLExpr::GetValue(exp_id));
 
         exprs.push(LLExpr::CallC(r(LLExpr::GetItem(r(LLExpr::GetValue(fobj_id)), 0)), fargs, LLCC::FastCC));
+
         exprs
     }
 }

@@ -9,10 +9,12 @@ use scope::{ Scope, ScopeRef };
 use session::{ Session, Error };
 use ast::{ Pos };
 use hir::{ NodeID, Visibility, Mutability, AssignType, Literal, Ident, Argument, ClassSpec, MatchCase, EnumVariant, Pattern, PatKind, Expr, ExprKind };
+use defs::functions::ClosureDef;
 
 use misc::{ r };
 use transform::llcode::{ LLType, LLLit, LLRef, LLCmpType, LLLink, LLCC, LLExpr, LLGlobal };
 use transform::functions::{ CFuncTransform, ClosureTransform };
+use transform::classes::{ StructTransform };
 
 use visitor::{ self, Visitor, ScopeStack };
 
@@ -20,6 +22,7 @@ use visitor::{ self, Visitor, ScopeStack };
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum CodeContext {
     Func(ABI, NodeID),
+    Import,
     ClassBody,
 }
 
@@ -127,9 +130,9 @@ impl<'sess> Transformer<'sess> {
         self.declare_global_exception_point(exp_id);
         self.expoints.push(exp_id);
 
-        let run_id = self.build_run_func(code);
+        let init_code = self.visit_vec(code).unwrap();
         if !Options::as_ref().is_library {
-            self.build_main_func(run_id);
+            self.build_main_func(init_code);
         }
     }
 }
@@ -298,6 +301,9 @@ impl<'sess> Visitor for Transformer<'sess> {
         Ok(self.transform_assignment(id, left, right))
     }
 
+    fn visit_module(&mut self, id: NodeID, name: &str, code: &Expr, memo_id: NodeID) -> Result<Self::Return, Error> {
+        Ok(self.transform_module(id, name, code, memo_id))
+    }
 
     /*
     fn visit_pattern_binding(&mut self, _id: NodeID, _ident: &Ident) -> Result<Self::Return, Error> {
@@ -346,47 +352,21 @@ impl<'sess> Visitor for Transformer<'sess> {
 
 
 impl<'sess> Transformer<'sess> {
-    pub fn build_run_func(&mut self, code: &Vec<Expr>) -> NodeID {
+
+    pub fn transform_module(&mut self, id: NodeID, name: &str, code: &Expr, memo_id: NodeID) -> Vec<LLExpr> {
+        let defid = self.session.get_ref(id).unwrap();
+
         // Define a global that will store whether we've run this function or not
-        let module_memo_id = NodeID::generate();
-        self.add_global(LLGlobal::DefGlobal(module_memo_id, LLLink::Public, format!("memo.{}", self.session.name), LLType::I1));
+        let memo_name = format!("memo.{}", name);
+        self.add_global(LLGlobal::DefGlobal(memo_id, LLLink::Once, memo_name, LLType::I1));
 
-        let run_id = NodeID::generate();
-        let run_ltype = ClosureTransform::convert_to_def_type(self, LLType::Function(vec!(), r(LLType::I64)));
-        self.set_type(run_id, run_ltype.clone());
+        let module_run_name = format!("run_{}", name);
+        let exprs = ClosureTransform::transform_def(self, defid, Visibility::Public, Some(&module_run_name), &vec!(), code);
 
-        let exp_id = NodeID::generate();
-        let mut fargs = vec!();
-        ClosureTransform::convert_def_args(self, NodeID::generate(), exp_id, &mut fargs);
-
-        // Set the memo, execute the module's top level scope, and then return 0
-        let mut body = vec!();
-        body.push(LLExpr::SetGlobal(module_memo_id, r(LLExpr::Literal(LLLit::I1(true)))));
-        body.extend(
-            self.with_context(CodeContext::Func(ABI::Molten, run_id), |transform| {
-                transform.with_exception(exp_id, |transform| {
-                    transform.visit_vec(&code).unwrap()
-                })
-            })
-        );
-        body.push(LLExpr::Literal(LLLit::I64(0)));
-
-        // If we've run before, return 0, else execute the body
-        let run_body = vec!(LLExpr::Phi(vec!(
-            vec!(LLExpr::Cmp(LLCmpType::Equal, r(LLExpr::GetGlobal(module_memo_id)), r(LLExpr::Literal(LLLit::I1(true))))),
-            vec!(LLExpr::Literal(LLLit::I1(true)))
-        ), vec!(
-            vec!(LLExpr::Literal(LLLit::I64(0))),
-            body
-        )));
-
-        let module_run_name = format!("run_{}", self.session.name.replace(".", "_"));
-        self.add_global(LLGlobal::DefCFunc(run_id, LLLink::Public, module_run_name, run_ltype, fargs, run_body, LLCC::FastCC));
-
-        run_id
+        exprs
     }
 
-    pub fn build_main_func(&mut self, run_id: NodeID) {
+    pub fn build_main_func(&mut self, init_code: Vec<LLExpr>) {
         let main_id = NodeID::generate();
         let main_ltype = LLType::Function(vec!(), r(LLType::I64));
         let mut main_body = vec!();
@@ -397,11 +377,18 @@ impl<'sess> Transformer<'sess> {
         let exp_id = self.get_global_exception().unwrap();
         let expoint = self.init_exception_point(&mut main_body, exp_id);
 
+        let scope = self.stack.get_scope();
+        // TODO there should be a better way of getting this, even if it's just a method on Session
+        let module_run_name = format!("run_{}", self.session.name.replace(".", "_"));
+        let run_id = scope.get_var_def(&module_run_name).unwrap();
+
+        main_body.extend(init_code);
+
         // Try calling the module's run function
-        let try = self.with_exception(exp_id, |transform| {
-            let closure = ClosureTransform::make_closure_value(transform, NodeID::generate(), run_id, LLExpr::Literal(LLLit::Null(LLType::Ptr(r(LLType::I8)))));
-            ClosureTransform::create_invoke(transform, closure, vec!())
+        let mut try = self.with_exception(exp_id, |transform| {
+            ClosureTransform::create_invoke(transform, LLExpr::GetLocal(transform.session.get_ref(run_id).unwrap()), vec!())
         });
+        try.push(LLExpr::Literal(LLLit::I64(0)));
 
         // If an exception occurs, print a message and exit with -1
         let catch = vec!(
@@ -497,12 +484,30 @@ impl<'sess> Transformer<'sess> {
 
     pub fn transform_import(&mut self, name: &String, decls: &Vec<Expr>) -> Vec<LLExpr> {
         let mut exprs = vec!();
-        let rid = NodeID::generate();
+
+        let defid = NodeID::generate();
+        let compiled_func_id = NodeID::generate();
+        let scope = self.stack.get_scope();
+        let ttype = Type::Function(r(Type::Tuple(vec!())), r(scope.make_obj(self.session, "Bool", vec!()).unwrap()), ABI::Molten);
+        let lltype = ClosureTransform::convert_to_def_type(LLType::Function(vec!(), r(LLType::I1)));
+        self.session.set_type(defid, ttype.clone());
+        self.set_type(compiled_func_id, lltype.clone());
+
         let module_run_name = format!("run_{}", name.replace(".", "_"));
-        let rftype = LLType::Function(vec!(), r(LLType::I64));
-        self.add_global(LLGlobal::DeclCFunc(rid, module_run_name, rftype, LLCC::FastCC));
-        exprs.extend(CFuncTransform::create_invoke(self, LLExpr::GetValue(rid), vec!()));
-        exprs.extend(self.visit_vec(decls).unwrap());
+        let module_run_name_global = self.transform_func_name(Some(&module_run_name), defid);
+        let module_run_name_func = format!("{}_func", module_run_name_global);
+        self.add_global(LLGlobal::DeclCFunc(compiled_func_id, module_run_name_func, lltype, LLCC::FastCC));
+
+        let ftype = self.transform_value_type(&ttype);
+        self.add_global(LLGlobal::DefGlobal(defid, LLLink::Once, module_run_name_global, ftype));
+        //exprs.extend(ClosureTransform::transform_decl(self, defid, Visibility::Public, &module_run_name, &ttype));
+
+        exprs.push(LLExpr::SetGlobal(defid, r(ClosureTransform::make_closure_value(self, NodeID::generate(), compiled_func_id, LLExpr::Literal(LLLit::Null(LLType::Ptr(r(LLType::I8))))))));
+        exprs.extend(ClosureTransform::create_invoke(self, LLExpr::GetLocal(defid), vec!()));
+
+        self.with_context(CodeContext::Import, |transform| {
+            exprs.extend(transform.visit_vec(decls).unwrap());
+        });
         exprs
     }
 

@@ -128,7 +128,7 @@ pub unsafe fn define_builtins_node<'sess>(llvm: &LLVM<'sess>, transformer: &mut 
 
                         let mut items = vec!(function, llvm.null_const(llvm.build_type(&LLType::Ptr(r(LLType::I8)))));
                         let rtype = llvm.build_type(&LLType::Struct(vec!(LLType::Ptr(r(ltype.clone())), LLType::Ptr(r(LLType::I8)))));
-                        let global = llvm.build_def_global(name.as_str(), LLLink::Once, rtype, LLVMConstStruct(items.as_mut_ptr(), items.len() as u32, 0));
+                        let global = llvm.build_def_global(name.as_str(), LLLink::Once, rtype, LLVMConstStructInContext(llvm.context, items.as_mut_ptr(), items.len() as u32, 0));
                         llvm.set_value(*id, global);
                     } else {
                         let function = build_lib_function(llvm, name.as_str(), &ltype, func);
@@ -182,12 +182,12 @@ unsafe fn declare_irregular_functions(llvm: &LLVM) {
     if Options::as_ref().no_gc {
         declare_c_function(llvm, "malloc", &mut [llvm.i64_type()], llvm.str_type(), false);
         declare_c_function(llvm, "realloc", &mut [llvm.str_type(), llvm.i64_type()], llvm.str_type(), false);
-        declare_c_function(llvm, "free", &mut [llvm.str_type()], LLVMVoidType(), false);
+        declare_c_function(llvm, "free", &mut [llvm.str_type()], llvm.void_type(), false);
     } else {
-        declare_c_function(llvm, "GC_init", &mut [], LLVMVoidType(), false);
+        declare_c_function(llvm, "GC_init", &mut [], llvm.void_type(), false);
         declare_c_function(llvm, "GC_malloc", &mut [llvm.i64_type()], llvm.str_type(), false);
         declare_c_function(llvm, "GC_realloc", &mut [llvm.str_type(), llvm.i64_type()], llvm.str_type(), false);
-        declare_c_function(llvm, "GC_free", &mut [llvm.str_type()], LLVMVoidType(), false);
+        declare_c_function(llvm, "GC_free", &mut [llvm.str_type()], llvm.void_type(), false);
     }
 
     build_lib_function(llvm, "molten_init", &LLType::Function(vec!(), r(LLType::I32)), molten_init);
@@ -390,7 +390,6 @@ pub fn get_builtins<'sess>() -> Vec<BuiltinDef<'sess>> {
         BuiltinDef::Func(id(), "==",  "(Real, Real) -> Bool",   FuncKind::Function(eq_real)),
         BuiltinDef::Func(id(), "!=",  "(Real, Real) -> Bool",   FuncKind::Function(ne_real)),
 
-
         BuiltinDef::Func(id(), "char", "(Int) -> Char",         FuncKind::Function(int_to_char)),
         BuiltinDef::Func(id(), "int", "(Char) -> Int",          FuncKind::Function(char_to_int)),
         BuiltinDef::Func(id(), "int", "(Real) -> Int",          FuncKind::Function(real_to_int)),
@@ -402,7 +401,6 @@ pub fn get_builtins<'sess>() -> Vec<BuiltinDef<'sess>> {
         BuiltinDef::Func(id(), "str", "(Int) -> String",        FuncKind::Function(int_to_str)),
         BuiltinDef::Func(id(), "hex", "(Int) -> String",        FuncKind::Function(int_to_hex)),
         BuiltinDef::Func(id(), "str", "(Real) -> String",       FuncKind::Function(real_to_str)),
-
 
         BuiltinDef::Func(id(), "+", "(String, String) -> String",  FuncKind::Function(add_str)),
     )

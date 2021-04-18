@@ -12,8 +12,8 @@ use parser;
 use types::Type;
 use config::Options;
 use refinery::Refinery;
-use ast::{ Pos };
-use hir::{ NodeID, Expr };
+use ast::{ Pos, AST };
+use hir::{ NodeID };
 use defs::{ Def };
 use scope::{ ScopeMapRef };
 
@@ -57,14 +57,12 @@ impl Session {
         panic!("Error: file not found, {}", filename);
     }
 
-    pub fn parse_string(&self, name: &str, contents: String) -> Vec<Expr> {
+    pub fn parse_string(&self, name: &str, contents: String) -> Vec<AST> {
         self.files.borrow_mut().push((String::from(name), contents));
-        let ast = parser::parse_or_error(name, self.files.borrow().last().unwrap().1.as_bytes());
-        let hir = Refinery::refine(self, ast);
-        hir
+        parser::parse_or_error(name, self.files.borrow().last().unwrap().1.as_bytes())
     }
 
-    pub fn parse_file(&self, filename: &str, import: bool) -> Vec<Expr> {
+    pub fn parse_file(&self, filename: &str, import: bool) -> Vec<AST> {
         if import && Options::as_ref().linkfile_only {
             self.files.borrow_mut().push((String::from(filename), String::from("")));
             vec!()

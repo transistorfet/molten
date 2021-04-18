@@ -172,6 +172,9 @@ pub trait Visitor: Sized {
         walk_assignment(self, id, left, right, ty)
     }
 
+    fn visit_module(&mut self, _id: NodeID, name: &str, code: &Expr, memo_id: NodeID) -> Result<Self::Return, Error> {
+        self.visit_node(code)
+    }
 
 
     fn visit_pattern_binding(&mut self, _id: NodeID, _ident: &Ident) -> Result<Self::Return, Error> {
@@ -462,6 +465,10 @@ pub fn walk_node<R, V: Visitor<Return = R>>(visitor: &mut V, node: &Expr) -> Res
 
         ExprKind::Assignment(left, right, ty) => {
             visitor.visit_assignment(node.id, left, right, *ty)
+        },
+
+        ExprKind::Module(name, code, memo_id) => {
+            visitor.visit_module(node.id, name, code, *memo_id)
         },
     }
 }

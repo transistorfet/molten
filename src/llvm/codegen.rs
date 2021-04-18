@@ -69,7 +69,7 @@ impl<'sess> LLVM<'sess> {
     pub fn new(session: &Session) -> LLVM {
         unsafe {
             let context = LLVMContextCreate();
-            let module = LLVMModuleCreateWithName(cstring(&session.name));
+            let module = LLVMModuleCreateWithNameInContext(cstring(&session.name), context);
             let builder = LLVMCreateBuilderInContext(context);
 
             LLVM {
@@ -269,7 +269,7 @@ impl<'sess> LLVM<'sess> {
         for ltype in etypes {
             rtypes.push(self.build_type(ltype));
         }
-        LLVMStructType(rtypes.as_mut_ptr(), rtypes.len() as u32, false as i32)
+        LLVMStructTypeInContext(self.context, rtypes.as_mut_ptr(), rtypes.len() as u32, false as i32)
     }
 
     pub unsafe fn array_type(&self, itype: &LLType, size: usize) -> LLVMTypeRef {
@@ -300,7 +300,7 @@ impl<'sess> LLVM<'sess> {
                 }
                 //self.build_type(&LLType::Array(r(LLType::I64), (largest / 8) as usize))
                 let ptrsize = LLVMPointerSize(*self.target_data.borrow());
-                LLVMArrayType(LLVMIntType(ptrsize * 8), (largest as u32) / ptrsize)
+                LLVMArrayType(LLVMIntTypeInContext(self.context, ptrsize * 8), (largest as u32) / ptrsize)
             }
         }
     }
@@ -502,10 +502,9 @@ impl<'sess> LLVM<'sess> {
 
     pub unsafe fn build_struct(&self, rtype: LLVMTypeRef, evalues: Vec<LLVMValueRef>) -> LLVMValueRef {
         let pointer = LLVMBuildAlloca(self.builder, rtype, cstr(""));
-        for (index, value) in evalues.iter().enumerate() {
-            let mut indices = vec!(self.i32_const(0), self.i32_const(index as i32));
-            let field = LLVMBuildGEP(self.builder, pointer, indices.as_mut_ptr(), indices.len() as u32, cstr(""));
-            LLVMBuildStore(self.builder, *value, field);
+        for (index, value) in evalues.into_iter().enumerate() {
+            let field = LLVMBuildStructGEP(self.builder, pointer, index as u32, cstr(""));
+            LLVMBuildStore(self.builder, value, field);
         }
         LLVMBuildLoad(self.builder, pointer, cstr(""))
     }
@@ -609,8 +608,10 @@ impl<'sess> LLVM<'sess> {
 
     pub unsafe fn build_expr(&self, expr: &LLExpr) -> LLVMValueRef {
         match expr {
-            LLExpr::Literal(lit) => self.build_literal(lit),
-            LLExpr::GetValue(id) => self.get_value(*id).unwrap(),
+            LLExpr::Literal(lit) =>
+                self.build_literal(lit),
+            LLExpr::GetValue(id) =>
+                self.get_value(*id).unwrap(),
             LLExpr::SetValue(id, value) => {
                 let value = self.build_expr(value);
                 self.set_value(*id, value);
@@ -646,12 +647,14 @@ impl<'sess> LLVM<'sess> {
                 def
             },
 
-            LLExpr::GetLocal(id) | LLExpr::GetGlobal(id) => {
+            LLExpr::GetLocal(id) |
+            LLExpr::GetGlobal(id) => {
                 let pointer = self.get_value(*id).unwrap();
                 self.build_load(pointer)
             },
 
-            LLExpr::SetLocal(id, expr) | LLExpr::SetGlobal(id, expr) => {
+            LLExpr::SetLocal(id, expr) |
+            LLExpr::SetGlobal(id, expr) => {
                 let value = self.build_expr(expr);
                 let pointer = self.get_value(*id).unwrap();
                 self.build_store(pointer, value)
@@ -681,7 +684,7 @@ impl<'sess> LLVM<'sess> {
                 let rtype = self.build_type(ltype);
                 let value = match code {
                     Some(code) => self.build_expr(code),
-                    None => LLVMConstNull(LLVMGetElementType(rtype)),
+                    None => LLVMConstNull(LLVMGetElementType(self.build_type(ltype))),
                 };
                 let pointer = self.build_boxed(rtype, value);
                 self.set_value(*id, pointer);
@@ -741,7 +744,8 @@ impl<'sess> LLVM<'sess> {
 
                 LLGlobal::DefGlobal(id, link, name, ltype) => {
                     let rtype = self.build_type(ltype);
-                    let global = self.build_def_global(name.as_str(), *link, rtype, self.null_const(rtype));
+                    let initializer = self.null_const(self.build_type(ltype));
+                    let global = self.build_def_global(name.as_str(), *link, rtype, initializer);
                     self.set_value(*id, global);
                 },
 
