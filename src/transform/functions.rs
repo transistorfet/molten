@@ -202,13 +202,11 @@ impl ClosureTransform {
         (cfname, cftype)
     }
 
-    pub fn transform_decl(transform: &mut Transformer, defid: NodeID, _vis: Visibility, name: &String, ttype: &Type) -> Vec<LLExpr> {
+    pub fn transform_decl(transform: &mut Transformer, defid: NodeID, vis: Visibility, name: &String, ttype: &Type) -> Vec<LLExpr> {
         let fname = transform.transform_func_name(Some(name), defid);
         let ftype = transform.transform_value_type(ttype);
 
-        let did = NodeID::generate();
-        transform.add_global(LLGlobal::DefGlobal(did, LLLink::Public, fname, ftype, false));
-        vec!(LLExpr::SetValue(defid, r(LLExpr::GetLocal(did))))
+        ClosureTransform::make_definition(transform, defid, vis, fname, ftype, None)
     }
 
     pub fn convert_def_args(transform: &mut Transformer, context_arg_id: NodeID, exp_id: NodeID, fargs: &mut Vec<(NodeID, String)>) {
@@ -275,16 +273,28 @@ impl ClosureTransform {
         let mut exprs = transform.visit_vec(&code).unwrap();
         let did_context_defid = transform.session.get_ref(did_context).unwrap();
 
-        exprs.push(ClosureTransform::make_closure_value(transform, defid, cl.compiled_func_id, LLExpr::GetLocal(did_context_defid)));
-        exprs.push(LLExpr::GetValue(defid));
+        let did = NodeID::generate();
+        exprs.push(ClosureTransform::make_closure_value(transform, did, cl.compiled_func_id, LLExpr::GetLocal(did_context_defid)));
 
-        if vis == Visibility::Public {
-            let gid = NodeID::generate();
-            transform.add_global(LLGlobal::DefGlobal(gid, LLLink::Once, fname.clone(), ClosureTransform::convert_to_value_type(compiled_func_type), true));
-            exprs.push(LLExpr::SetGlobal(gid, r(LLExpr::GetValue(defid))));
-            transform.session.set_ref(defid, gid);
+        let lltype = ClosureTransform::convert_to_value_type(transform.get_type(cl.compiled_func_id).unwrap());
+        exprs.extend(ClosureTransform::make_definition(transform, defid, vis, fname, lltype, Some(LLExpr::GetValue(did))));
+
+        exprs
+    }
+
+    fn make_definition(transform: &mut Transformer, id: NodeID, vis: Visibility, name: String, ltype: LLType, value: Option<LLExpr>) -> Vec<LLExpr> {
+        let mut exprs = vec!();
+
+        if let Some(CodeContext::Import) = transform.get_context() {
+            transform.add_global(LLGlobal::DefGlobal(id, LLLink::Public, name, ltype, false));
+        } else if vis == Visibility::Public {
+            transform.add_global(LLGlobal::DefGlobal(id, LLLink::Once, name, ltype, true));
+            exprs.push(LLExpr::SetGlobal(id, r(value.unwrap())));
+        } else {
+            exprs.push(LLExpr::DefLocal(id, name, ltype, r(value.unwrap())));
         }
 
+        exprs.push(LLExpr::GetLocal(id));
         exprs
     }
 

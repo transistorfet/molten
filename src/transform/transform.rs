@@ -386,7 +386,7 @@ impl<'sess> Transformer<'sess> {
 
         // Try calling the module's run function
         let mut try = self.with_exception(exp_id, |transform| {
-            ClosureTransform::create_invoke(transform, LLExpr::GetLocal(transform.session.get_ref(run_id).unwrap()), vec!())
+            ClosureTransform::create_invoke(transform, LLExpr::GetLocal(run_id), vec!())
         });
         try.push(LLExpr::Literal(LLLit::I64(0)));
 
@@ -515,7 +515,7 @@ impl<'sess> Transformer<'sess> {
     pub fn create_reference(&mut self, defid: NodeID) -> Vec<LLExpr> {
         match self.session.get_def(defid) {
             Ok(Def::Var(_)) => vec!(LLExpr::GetLocal(defid)),
-            Ok(Def::Closure(cl)) if cl.vis == Visibility::Global => vec!(LLExpr::GetLocal(defid)),
+            Ok(Def::Closure(cl)) => vec!(LLExpr::GetLocal(defid)),
             Ok(_) => vec!(LLExpr::GetValue(defid)),
             Err(_) => panic!("TransformError: attempting to reference a non-existent value"),
         }
