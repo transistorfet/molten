@@ -139,14 +139,14 @@ impl VtableTransform {
     }
 
     pub fn decl_vtable(transform: &mut Transformer, name: String, vtable: &Vtable) -> Vec<LLExpr> {
-        transform.add_global(LLGlobal::DefGlobal(vtable.id, LLLink::Once, name, transform.get_type(vtable.id).unwrap()));
+        transform.add_global(LLGlobal::DefGlobal(vtable.id, LLLink::Once, name, transform.get_type(vtable.id).unwrap(), false));
         vec!()
     }
 
     pub fn init_vtable(transform: &mut Transformer, name: String, vtable: &Vtable) -> Vec<LLExpr> {
         let mut exprs = vec!();
 
-        transform.add_global(LLGlobal::DefGlobal(vtable.id, LLLink::Once, name, transform.get_type(vtable.id).unwrap()));
+        transform.add_global(LLGlobal::DefGlobal(vtable.id, LLLink::Once, name, transform.get_type(vtable.id).unwrap(), true));
         // TODO should vtables be dynamically allocated, or should we add a LLType::ElementOf() type or something to GetElement an aliased type
         exprs.push(LLExpr::SetGlobal(vtable.id, r(LLExpr::AllocRef(NodeID::generate(), transform.get_type(vtable.id).unwrap(), None))));
         vtable.foreach_enumerated(|i, id, _, ttype| {

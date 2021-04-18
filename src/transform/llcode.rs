@@ -126,7 +126,7 @@ pub enum LLExpr {
 pub enum LLGlobal {
     DefType(NodeID, String, LLType),
 
-    DefGlobal(NodeID, LLLink, String, LLType),
+    DefGlobal(NodeID, LLLink, String, LLType, bool),
     DefCFunc(NodeID, LLLink, String, LLType, Vec<(NodeID, String)>, Vec<LLExpr>, LLCC),
     DeclCFunc(NodeID, String, LLType, LLCC),
 

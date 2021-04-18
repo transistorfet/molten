@@ -358,7 +358,7 @@ impl<'sess> Transformer<'sess> {
 
         // Define a global that will store whether we've run this function or not
         let memo_name = format!("memo.{}", name);
-        self.add_global(LLGlobal::DefGlobal(memo_id, LLLink::Once, memo_name, LLType::I1));
+        self.add_global(LLGlobal::DefGlobal(memo_id, LLLink::Once, memo_name, LLType::I1, true));
 
         let module_run_name = format!("run_{}", name);
         let exprs = ClosureTransform::transform_def(self, defid, Visibility::Public, Some(&module_run_name), &vec!(), code);
@@ -499,7 +499,7 @@ impl<'sess> Transformer<'sess> {
         self.add_global(LLGlobal::DeclCFunc(compiled_func_id, module_run_name_func, lltype, LLCC::FastCC));
 
         let ftype = self.transform_value_type(&ttype);
-        self.add_global(LLGlobal::DefGlobal(defid, LLLink::Once, module_run_name_global, ftype));
+        self.add_global(LLGlobal::DefGlobal(defid, LLLink::Once, module_run_name_global, ftype, true));
         //exprs.extend(ClosureTransform::transform_decl(self, defid, Visibility::Public, &module_run_name, &ttype));
 
         exprs.push(LLExpr::SetGlobal(defid, r(ClosureTransform::make_closure_value(self, NodeID::generate(), compiled_func_id, LLExpr::Literal(LLLit::Null(LLType::Ptr(r(LLType::I8))))))));

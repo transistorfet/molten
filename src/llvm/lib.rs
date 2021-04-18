@@ -126,9 +126,9 @@ pub unsafe fn define_builtins_node<'sess>(llvm: &LLVM<'sess>, transformer: &mut 
                         let function = build_lib_function(llvm, format!("{}_func", name).as_str(), &ltype, func);
                         llvm.set_value(func_id, function);
 
-                        let mut items = vec!(function, llvm.null_const(llvm.build_type(&LLType::Ptr(r(LLType::I8)))));
-                        let rtype = llvm.build_type(&LLType::Struct(vec!(LLType::Ptr(r(ltype.clone())), LLType::Ptr(r(LLType::I8)))));
-                        let global = llvm.build_def_global(name.as_str(), LLLink::Once, rtype, LLVMConstStructInContext(llvm.context, items.as_mut_ptr(), items.len() as u32, 0));
+                        let closure = llvm.struct_const(vec!(function, llvm.null_const(llvm.str_type())));
+                        let rtype = LLVMTypeOf(closure);
+                        let global = llvm.build_def_global(name.as_str(), LLLink::Once, rtype, Some(closure));
                         llvm.set_value(*id, global);
                     } else {
                         let function = build_lib_function(llvm, name.as_str(), &ltype, func);

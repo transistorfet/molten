@@ -42,7 +42,7 @@ impl<'sess> Transformer<'sess> {
     }
 
     pub fn declare_global_exception_point(&mut self, exp_id: NodeID) {
-        self.add_global(LLGlobal::DefGlobal(exp_id, LLLink::Once, String::from("__global_exception__"), LLType::ExceptionPoint));
+        self.add_global(LLGlobal::DefGlobal(exp_id, LLLink::Once, String::from("__global_exception__"), LLType::ExceptionPoint, true));
     }
 
     pub fn create_exception_point(&mut self, exprs: &mut Vec<LLExpr>, exp_id: NodeID) -> LLExpr {

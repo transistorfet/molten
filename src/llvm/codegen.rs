@@ -397,6 +397,10 @@ impl<'sess> LLVM<'sess> {
         LLVMBuildGlobalStringPtr(self.builder, cstr(string), cstr("__string"))
     }
 
+    pub unsafe fn struct_const(&self, mut items: Vec<LLVMValueRef>) -> LLVMValueRef {
+        LLVMConstStructInContext(self.context, items.as_mut_ptr(), items.len() as u32, 0)
+    }
+
     pub unsafe fn build_linkage(&self, val: LLVMValueRef, link: LLLink) {
         let linktype = match link {
             LLLink::Private => LLVMLinkage::LLVMInternalLinkage,
@@ -467,10 +471,12 @@ impl<'sess> LLVM<'sess> {
         pointer
     }
 
-    pub unsafe fn build_def_global(&self, name: &str, link: LLLink, rtype: LLVMTypeRef, initval: LLVMValueRef) -> LLVMValueRef {
+    pub unsafe fn build_def_global(&self, name: &str, link: LLLink, rtype: LLVMTypeRef, initval: Option<LLVMValueRef>) -> LLVMValueRef {
         let global = LLVMAddGlobal(self.module, rtype, cstr(&name));
-        LLVMSetInitializer(global, initval);
         self.build_linkage(global, link);
+        if let Some(initval) = initval {
+            LLVMSetInitializer(global, initval);
+        }
         global
     }
 
@@ -684,7 +690,7 @@ impl<'sess> LLVM<'sess> {
                 let rtype = self.build_type(ltype);
                 let value = match code {
                     Some(code) => self.build_expr(code),
-                    None => LLVMConstNull(LLVMGetElementType(self.build_type(ltype))),
+                    None => LLVMConstNull(LLVMGetElementType(rtype)),
                 };
                 let pointer = self.build_boxed(rtype, value);
                 self.set_value(*id, pointer);
@@ -742,9 +748,9 @@ impl<'sess> LLVM<'sess> {
                     self.set_type(*id, self.build_type(ltype));
                 },
 
-                LLGlobal::DefGlobal(id, link, name, ltype) => {
+                LLGlobal::DefGlobal(id, link, name, ltype, should_init) => {
                     let rtype = self.build_type(ltype);
-                    let initializer = self.null_const(self.build_type(ltype));
+                    let initializer = if *should_init { Some(self.null_const(rtype)) } else { None };
                     let global = self.build_def_global(name.as_str(), *link, rtype, initializer);
                     self.set_value(*id, global);
                 },
@@ -802,7 +808,7 @@ impl<'sess> LLVM<'sess> {
                 },
 
                 LLGlobal::DefType(_, _, _) |
-                LLGlobal::DefGlobal(_, _, _, _) |
+                LLGlobal::DefGlobal(_, _, _, _, _) |
                 LLGlobal::DeclCFunc(_, _, _, _) |
                 LLGlobal::DefNamedStruct(_, _, _) |
                 LLGlobal::SetStructBody(_, _, _) => { /* Nothing Needs To Be Done */ }

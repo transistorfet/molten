@@ -1,26 +1,10 @@
 
-* so far, I'm getting an error during optimization where the pointers of two llvm types asserts as inequal.  It happens in replaceAllUsesWith() during an attempt to
-  replace things with constants.  The exact line is the call to the closure from the main() function.  In optimized form at the crash site, it reads as:
-  %3 = call fastcc i1 @_Z14run_parsertestT0_func(i8* null, %JmpBuf* @__global_exception__)
-    where as the unoptimized form is:
-  %8 = load { i1 (i8*, %JmpBuf*)*, i8* }, { i1 (i8*, %JmpBuf*)*, i8* }* @_Z14run_parsertestT0, align 8
-  %9 = extractvalue { i1 (i8*, %JmpBuf*)*, i8* } %8, 0
-  %10 = extractvalue { i1 (i8*, %JmpBuf*)*, i8* } %8, 1
-  %11 = call fastcc i1 %9(i8* %10, %JmpBuf* @__global_exception__)
-    something about the actual pointers to the i1 return value being different.  This kind of makes sense why the separate opt program works fine, because it's reading in
-  the IR from the file fresh, whereas the embedded optimizations are using an LLVM tree that may or may not share pointers!  I'm not sure if the issue is that pointers
-  should be shared or shouldn't be shared... so I'm still at a bit of a loss
-
-* I think there is an unrelated assertion error after "fixing" the previous one.  Constant not found in constant table
-i8** getelementptr inbounds ({ i1 (i8*, %JmpBuf*)*, i8* }, { i1 (i8*, %JmpBuf*)*, i8* }* @_Z14run_parsertestT0, i64 0, i32 1)
-
-
 * maybe instead of the intermediate value, in closure transform def, you already make the code to create the context, and then you either create the global, or local
   depending on visibility, and set the fptr and context values as pointers without the subsequent move
-* you don't have the memo check at the beginning of the run function yet
 
+* is there a way to remove all the references to memo and run functions (they're just duplicated, and they shouldn't be)
 
-* add the string compare functions to lib.rs
+* add the string compare functions to lib.rs instead of being in libcore
 
 * you need to figure out what should and shouldn't be a reference type... objects are always references that are malloced with 'new', and only objects can use 'new',
   whereas enums, records and tuples are not reference types, but can be made into references with 'ref'.  There will also be trait objects.  Enums are already 'Type::Object'

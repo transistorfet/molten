@@ -207,7 +207,7 @@ impl ClosureTransform {
         let ftype = transform.transform_value_type(ttype);
 
         let did = NodeID::generate();
-        transform.add_global(LLGlobal::DefGlobal(did, LLLink::Once, fname, ftype));
+        transform.add_global(LLGlobal::DefGlobal(did, LLLink::Public, fname, ftype, false));
         vec!(LLExpr::SetValue(defid, r(LLExpr::GetLocal(did))))
     }
 
@@ -280,7 +280,7 @@ impl ClosureTransform {
 
         if vis == Visibility::Public {
             let gid = NodeID::generate();
-            transform.add_global(LLGlobal::DefGlobal(gid, LLLink::Once, fname.clone(), ClosureTransform::convert_to_value_type(compiled_func_type)));
+            transform.add_global(LLGlobal::DefGlobal(gid, LLLink::Once, fname.clone(), ClosureTransform::convert_to_value_type(compiled_func_type), true));
             exprs.push(LLExpr::SetGlobal(gid, r(LLExpr::GetValue(defid))));
             transform.session.set_ref(defid, gid);
         }
@@ -300,11 +300,8 @@ impl ClosureTransform {
 
         let fargs = transform.transform_as_args(&mut exprs, args);
 
-        let fid = NodeID::generate();
         let funcresult = transform.transform_as_result(&mut exprs, func).unwrap();
-        exprs.push(LLExpr::SetValue(fid, r(funcresult)));
-
-        exprs.extend(ClosureTransform::create_invoke(transform, LLExpr::GetValue(fid), fargs));
+        exprs.extend(ClosureTransform::create_invoke(transform, funcresult, fargs));
         exprs
     }
 
