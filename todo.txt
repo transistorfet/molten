@@ -1,22 +1,17 @@
 
-* maybe instead of the intermediate value, in closure transform def, you already make the code to create the context, and then you either create the global, or local
-  depending on visibility, and set the fptr and context values as pointers without the subsequent move
+* why is the primative == and != not causing an overload error?  (I assume it's because over*riding* is enabled (primative scope is different from module scope), but it's still a bit weird)
 
 * is there a way to remove all the references to memo and run functions (they're just duplicated, and they shouldn't be)
-
-* add the string compare functions to lib.rs instead of being in libcore
-
 * you need to figure out what should and shouldn't be a reference type... objects are always references that are malloced with 'new', and only objects can use 'new',
   whereas enums, records and tuples are not reference types, but can be made into references with 'ref'.  There will also be trait objects.  Enums are already 'Type::Object'
   and are distinguished by their definition, yet one a reference always and the other is not.  Trait objects would implicitly always be a reference
 
-* refactor struct and vtable stuff so that it could be reused
+* will there be an issue where declaring a function that's external, but not importing it, might cause the global variable to be defined incorrectly??
 
-* add a PtrI8 shorthand to llcode
+
 * add helper builders for use in transform
 * can you removed the Named function in lib.rs
 * can you remove FuncDef entirely?
-* there is a bug caused by the duplicated argument caused by the __init__ function in class desugaring (object/funcptr-uninitialized-issue.mol)
 
 
 * should you make all visitor functions take a reference to the node itself (since typecheck accessor/resolver needs to send the node onward)
@@ -26,9 +21,6 @@
 
 * upgrade the parser to nom 6 (code in stash, but with the changes, the parser is totally broken, no idea why)
 * upgrading to nom 5 there's an issue with line termination/whitespace, especially at the end of statements, and also infix notation
-
-* string-conversions.mol is now causing an intermitent problem, segfaulting during optimization.  For some reason it happens every few times it's run,
-  with the dependencies being untouched between.  This actually seems to be happening in many files, and is likely related to the main/run functions and closures
 
 
 * can you remove access to getindex, buffer, etc?
@@ -46,6 +38,7 @@
 * rename String type to ByteString, ByteArray, or CString, or ZString, or NullString, or NullByteArray, or ZByteArray, RawString;  I'm leaning ZByteArray or ByteString
 * rename SuperString type to String, will require a bunch of libcore changes
 * rename List to Array or Vec
+
 
 * need a way to import/compile directory of many files (libcore as many files)
 * add a module keyword which is automatically inserted into .dec files, which actually calls the run function, including the canonical name/path when the module was compiled

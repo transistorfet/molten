@@ -63,21 +63,6 @@ pub fn +(str1: SuperString, ch: Char) -> SuperString {
 }
 
 
-pub fn ==(str1: String, str2: String) -> Bool {
-    if strcmp(str1, str2) == 0 then
-        true
-    else
-        false
-}
-
-pub fn !=(str1: String, str2: String) -> Bool {
-    if strcmp(str1, str2) != 0 then
-        true
-    else
-        false
-}
-
-
 enum OptionAlt<'item> =
     | None
     | Some('item)

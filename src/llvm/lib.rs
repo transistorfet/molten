@@ -403,6 +403,8 @@ pub fn get_builtins<'sess>() -> Vec<BuiltinDef<'sess>> {
         BuiltinDef::Func(id(), "str", "(Real) -> String",       FuncKind::Function(real_to_str)),
 
         BuiltinDef::Func(id(), "+", "(String, String) -> String",  FuncKind::Function(add_str)),
+        BuiltinDef::Func(id(), "==", "(String, String) -> Bool",  FuncKind::Function(eq_str)),
+        BuiltinDef::Func(id(), "!=", "(String, String) -> Bool",  FuncKind::Function(ne_str)),
     )
 }
 
@@ -458,15 +460,6 @@ fn int_to_real(llvm: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { 
 
 fn unit_to_str(llvm: &LLVM, _args: Vec<LLVMValueRef>) -> LLVMValueRef { unsafe { llvm.str_const("()") } }
 
-
-
-/*
-fn sprintf(llvm: &LLVM, mut args: Vec<LLVMValueRef>) -> LLVMValueRef {
-    unsafe {
-        llvm.build_call_by_name("sprintf", &mut args)
-    }
-}
-*/
 
 
 unsafe fn molten_init(llvm: &LLVM, _args: Vec<LLVMValueRef>) -> LLVMValueRef {
@@ -618,51 +611,13 @@ unsafe fn add_str(llvm: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef {
     buffer
 }
 
-
-
-/*
-unsafe fn buffer_allocator(llvm: &LLVM, objtype: LLVMTypeRef, mut args: Vec<LLVMValueRef>) -> LLVMValueRef {
-    llvm.null_const(objtype)
+unsafe fn eq_str(llvm: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef {
+    let result = llvm.build_call_by_name("strcmp", &mut vec!(args[0], args[1]));
+    LLVMBuildICmp(llvm.builder, llvm_sys::LLVMIntPredicate::LLVMIntEQ, result, llvm.i64_const(0), cstr(""))
 }
 
-unsafe fn buffer_constructor(llvm: &LLVM, objtype: LLVMTypeRef, args: Vec<LLVMValueRef>) -> LLVMValueRef {
-    let size = LLVMBuildMul(llvm.builder, args[1], LLVMSizeOf(llvm.i64_type()), cstr(""));
-    let ptr = llvm.build_call_by_name("molten_malloc", &mut vec!(size));
-    LLVMBuildPointerCast(llvm.builder, ptr, objtype, cstr("ptr"))
+unsafe fn ne_str(llvm: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef {
+    let result = llvm.build_call_by_name("strcmp", &mut vec!(args[0], args[1]));
+    LLVMBuildICmp(llvm.builder, llvm_sys::LLVMIntPredicate::LLVMIntNE, result, llvm.i64_const(0), cstr(""))
 }
 
-unsafe fn buffer_resize(llvm: &LLVM, objtype: LLVMTypeRef, args: Vec<LLVMValueRef>) -> LLVMValueRef {
-    let buffer = LLVMBuildPointerCast(llvm.builder, args[0], llvm.str_type(), cstr("tmp"));
-    let size = LLVMBuildMul(llvm.builder, args[1], LLVMSizeOf(LLVMInt64TypeInContext(llvm.context)), cstr("tmp"));
-    let newptr = llvm.build_call_by_name("realloc", &mut vec!(buffer, size));
-    LLVMBuildPointerCast(llvm.builder, newptr, objtype, cstr("ptr"))
-}
-
-unsafe fn buffer_get_method(llvm: &LLVM, objtype: LLVMTypeRef, args: Vec<LLVMValueRef>) -> LLVMValueRef {
-    // TODO generate this in place of the custom function
-    //Return(
-    //  AccessVar(
-    //    AccessOffset(
-    //        AccessValue(arg 0),
-    //        Cast(AccessValue(arg 1), i32)
-    //    )
-    //  )
-    //)
-    // AccessOffset has one index, AccessField has a (0, fieldnum) to deref it first
-
-    let index = LLVMBuildCast(llvm.builder, llvm::LLVMOpcode::LLVMTrunc, args[1], llvm.i32_type(), cstr("tmp"));
-    let mut indices = vec!(index);
-    let pointer = LLVMBuildGEP(llvm.builder, args[0], indices.as_mut_ptr(), indices.len() as u32, cstr("tmp"));
-    LLVMBuildLoad(llvm.builder, pointer, cstr("tmp"))
-}
-
-unsafe fn buffer_set_method(llvm: &LLVM, objtype: LLVMTypeRef, args: Vec<LLVMValueRef>) -> LLVMValueRef {
-    let index = LLVMBuildCast(llvm.builder, llvm::LLVMOpcode::LLVMTrunc, args[1], llvm.i32_type(), cstr("tmp"));
-    let mut indices = vec!(index);
-    let pointer = LLVMBuildGEP(llvm.builder, args[0], indices.as_mut_ptr(), indices.len() as u32, cstr("tmp"));
-    let value = llvm.build_cast(llvm.str_type(), args[2]);
-    LLVMBuildStore(llvm.builder, value, pointer);
-
-    llvm.null_const(llvm.str_type())
-}
-*/
