@@ -1,26 +1,13 @@
 
-* why is the primative == and != not causing an overload error?  (I assume it's because over*riding* is enabled (primative scope is different from module scope), but it's still a bit weird)
-
 * is there a way to remove all the references to memo and run functions (they're just duplicated, and they shouldn't be)
-* you need to figure out what should and shouldn't be a reference type... objects are always references that are malloced with 'new', and only objects can use 'new',
-  whereas enums, records and tuples are not reference types, but can be made into references with 'ref'.  There will also be trait objects.  Enums are already 'Type::Object'
-  and are distinguished by their definition, yet one a reference always and the other is not.  Trait objects would implicitly always be a reference
-
-* will there be an issue where declaring a function that's external, but not importing it, might cause the global variable to be defined incorrectly??
-
-
 * add helper builders for use in transform
 * can you removed the Named function in lib.rs
 * can you remove FuncDef entirely?
-
 
 * should you make all visitor functions take a reference to the node itself (since typecheck accessor/resolver needs to send the node onward)
 * for transformer, you could have a list of 'bodies' of code, which are appended to by the transform functions, rather than returned.
   It could also store the context, but you'd have to add a body when transforming `if`, `while`, `sideeffect`, `match`, `try`, and `import`
 * move the pattern transform functions into the visitor, but right now you're passing in a value_id to use for comparisons.  It'd have to be stored in the transformer obj insteado
-
-* upgrade the parser to nom 6 (code in stash, but with the changes, the parser is totally broken, no idea why)
-* upgrading to nom 5 there's an issue with line termination/whitespace, especially at the end of statements, and also infix notation
 
 
 * can you remove access to getindex, buffer, etc?
@@ -28,16 +15,43 @@
 * You could have a mutable ByteArray type, which contains the length, or an immutable ByteString or ZByteString that can be passed to C functions, so that SuperString
   could have a ByteArray with the ability to index it (which would check the length), while a ZByteString would be unindexable (an opaque type)
 
-* make it possible to implement methods on enums
-* you know... it might be possible to make all 'methods' actually be functions with a fixed type for the first argument, since functions can be overloaded, and the
-  type would be unique.  I guess it wouldn't work for inheritence, but at least it doesn't cause this weird irregularity between classes/objects and enums (and eventually traits and trait objects)
-
 * you have to disallow the situation where a function returns a type variable that doesn't appear elsewhere in the definition, but that is then cast to a concrete type.  This
   is a blind cast and is unsafe, but we're currently relying on it for memory allocations and such
 * rename Buffer type to RawPointerArray, or GenericsArray, or BoxArray
 * rename String type to ByteString, ByteArray, or CString, or ZString, or NullString, or NullByteArray, or ZByteArray, RawString;  I'm leaning ZByteArray or ByteString
 * rename SuperString type to String, will require a bunch of libcore changes
 * rename List to Array or Vec
+
+
+* make it possible to implement methods on enums
+* you know... it might be possible to make all 'methods' actually be functions with a fixed type for the first argument, since functions can be overloaded, and the
+  type would be unique.  I guess it wouldn't work for inheritence, but at least it doesn't cause this weird irregularity between classes/objects and enums (and eventually traits and trait objects)
+* you need to figure out what should and shouldn't be a reference type... objects are always references that are malloced with 'new', and only objects can use 'new',
+  whereas enums, records and tuples are not reference types, but can be made into references with 'ref'.  There will also be trait objects.  Enums are already 'Type::Object'
+  and are distinguished by their definition, yet one a reference always and the other is not.  Trait objects would implicitly always be a reference
+
+
+TRAITS/TYPECLASSES:
+
+* add typeclasses
+* going from an object type to a trait object type would require automatically inserting a conversion, which we sort of do for type variables/generics in a really hacky way, with
+  the codegen build_cast function which will automagically box any non-pointer types
+* we could possibly implement traits statically, so the object would always be typed (no trait objects, and thus no generics with traits unless you switch to monomorphizing... or
+  trait objects), but having static traits would allow the implementation to be separated from the class definition
+* non boxed types should be able to use static traits too. I suppose all traits can have a static reference to the trait vtable rather than searching through the object's vtable,
+  but we'd have to make function lookup a lot more complicated (search scope, then search for a trait impl for that type that contains that function?)
+* how would the need to restrict traits to non typevars affect things? Would that be hard to change, just for traits
+
+
+
+
+
+* why is the primative == and != not causing an overload error?  (I assume it's because over*riding* is enabled (primative scope is different from module scope), but it's still a bit weird)
+* will there be an issue where declaring a function that's external, but not importing it, might cause the global variable to be defined incorrectly??
+
+* upgrade the parser to nom 6 (code in stash, but with the changes, the parser is totally broken, no idea why)
+* upgrading to nom 5 there's an issue with line termination/whitespace, especially at the end of statements, and also infix notation
+
 
 
 * need a way to import/compile directory of many files (libcore as many files)
@@ -53,19 +67,6 @@
 * add namespace of some kind, such that you can group functions?  like 'module' from ML?? like impl from rust?? or like namespace from C
 * there is an issue with raise, in that it is considered to return unit () instead of somehow being marked as not returning...  Getting type errors in Option def
 * for Expr resolve and accessor, the oid's could maybe be integrated into the ident? same for invoke now
-
-
-TRAITS/TYPECLASSES:
-
-* add typeclasses
-* going from an object type to a trait object type would require automatically inserting a conversion, which we sort of do for type variables/generics in a really hacky way, with
-  the codegen build_cast function which will automagically box any non-pointer types
-* we could possibly implement traits statically, so the object would always be typed (no trait objects, and thus no generics with traits unless you switch to monomorphizing... or
-  trait objects), but having static traits would allow the implementation to be separated from the class definition
-* non boxed types should be able to use static traits too. I suppose all traits can have a static reference to the trait vtable rather than searching through the object's vtable,
-  but we'd have to make function lookup a lot more complicated (search scope, then search for a trait impl for that type that contains that function?)
-* how would the need to restrict traits to non typevars affect things? Would that be hard to change, just for traits
-
 
 
 

@@ -14,14 +14,14 @@ impl<'sess> Transformer<'sess> {
         classdef.build_vtable(self.session, body);
         classdef.build_structdef(self.session, body);
 
-        StructTransform::declare_struct(self, classdef.id, classdef.classname.clone());
+        StructTransform::declare_struct_type(self, classdef.id, classdef.classname.clone());
 
-        VtableTransform::declare_vtable(self, format!("{}_vtable", classdef.classname.clone()), &classdef.vtable);
+        VtableTransform::declare_vtable_type(self, format!("{}_vtable", classdef.classname.clone()), &classdef.vtable);
 
         // The struct definition refers to the type of the vtable, so the vtable needs to be declared before the struct body can be defined
-        StructTransform::define_struct(self, classdef.id, &classdef.structdef);
+        StructTransform::define_struct_type(self, classdef.id, &classdef.structdef);
 
-        VtableTransform::define_vtable(self, &classdef.vtable);
+        VtableTransform::define_vtable_type(self, &classdef.vtable);
     }
 
 
@@ -99,12 +99,12 @@ impl<'sess> Transformer<'sess> {
 pub struct StructTransform;
 
 impl StructTransform {
-    pub fn declare_struct(transform: &mut Transformer, id: NodeID, name: String) {
+    pub fn declare_struct_type(transform: &mut Transformer, id: NodeID, name: String) {
         transform.add_global(LLGlobal::DefNamedStruct(id, name, true));
         transform.set_type(id, LLType::Alias(id));
     }
 
-    pub fn define_struct(transform: &mut Transformer, id: NodeID, structdef: &StructDef) {
+    pub fn define_struct_type(transform: &mut Transformer, id: NodeID, structdef: &StructDef) {
         let mut items = vec!();
         structdef.foreach_field(|_, _, ttype| {
             items.push(transform.transform_value_type(ttype));
@@ -125,12 +125,12 @@ impl StructTransform {
 pub struct VtableTransform;
 
 impl VtableTransform {
-    pub fn declare_vtable(transform: &mut Transformer, name: String, vtable: &Vtable) {
+    pub fn declare_vtable_type(transform: &mut Transformer, name: String, vtable: &Vtable) {
         transform.add_global(LLGlobal::DefNamedStruct(vtable.id, name, true));
         transform.set_type(vtable.id, LLType::Alias(vtable.id));
     }
 
-    pub fn define_vtable(transform: &mut Transformer, vtable: &Vtable) {
+    pub fn define_vtable_type(transform: &mut Transformer, vtable: &Vtable) {
         let mut items = vec!();
         vtable.foreach_entry(|_, _, ttype| {
             items.push(transform.transform_value_type(ttype));
