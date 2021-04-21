@@ -64,9 +64,9 @@ pub enum AST {
 impl Pos {
     pub fn new(span: Span) -> Pos {
         Pos {
-            offset: span.offset,
+            offset: span.location_offset(),
             column: span.get_utf8_column(),
-            line: span.line,
+            line: span.location_line(),
             filenum: 0,
         }
     }

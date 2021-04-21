@@ -4,8 +4,8 @@ version = "0.1.0"
 authors = ["transistor <trans@jabberwocky.ca>"]
 
 [dependencies]
-nom = { version = "^5.0" }
-nom_locate = { version = "^0.4" }
+nom = { version = "^6.1.2" }
+nom_locate = { version = "^3.0" }
 clap = "^2"
 llvm-sys = "^110"
 regex = "^1.1.0"
