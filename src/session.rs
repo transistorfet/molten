@@ -59,7 +59,7 @@ impl Session {
 
     pub fn parse_string(&self, name: &str, contents: String) -> Vec<AST> {
         self.files.borrow_mut().push((String::from(name), contents));
-        parser::parse_or_error(name, self.files.borrow().last().unwrap().1.as_bytes())
+        parser::parse_or_error(name, self.files.borrow().last().unwrap().1.as_str())
     }
 
     pub fn parse_file(&self, filename: &str, import: bool) -> Vec<AST> {

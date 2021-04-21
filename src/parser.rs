@@ -2,21 +2,26 @@
 
 extern crate nom;
 use nom::{
-    digit,
-    hex_digit,
-    oct_digit,
-    line_ending,
-    not_line_ending,
-    anychar,
-    space,
-    multispace,
-    is_alphanumeric,
-    is_alphabetic,
-    Context,
-    ErrorKind,
-    error_to_list
+    character::{
+        is_alphabetic,
+        is_alphanumeric,
+        complete::{
+            digit1,
+            hex_digit1,
+            oct_digit1,
+            line_ending,
+            not_line_ending,
+            anychar,
+            space1,
+            multispace1,
+        },
+    },
+    bytes::complete::{
+        take_while,
+        take_while1,
+    },
+    error::ErrorKind,
 };
-use nom::types::CompleteByteSlice;
 
 extern crate nom_locate;
 use nom_locate::LocatedSpan;
@@ -43,7 +48,7 @@ const ERR_IN_FOR: u32 = 44;
 const ERR_IN_CLASS: u32 = 45;
 const ERR_IN_LIST: u32 = 46;
 
-pub type Span<'a> = LocatedSpan<CompleteByteSlice<'a>>;
+pub type Span<'a> = LocatedSpan<&'a str>;
 
 //named!(sp, eat_separator!(&b" \t"[..]));
 
@@ -57,9 +62,6 @@ macro_rules! sp {
 #[macro_export]
 macro_rules! wscom {
     ($i:expr, $submac:ident!( $($args:tt)* )) => ({
-        //terminated!($i, $submac!($($args)*), line_or_space_or_comment)
-        //preceded!($i, line_or_space_or_comment, $submac!($($args)*))
-        //sep!($i, line_or_space_or_comment, $submac!($($args)*))
         delimited!($i, line_or_space_or_comment, $submac!($($args)*), line_or_space_or_comment)
     });
 
@@ -71,10 +73,7 @@ macro_rules! wscom {
 #[macro_export]
 macro_rules! wscoml {
     ($i:expr, $submac:ident!( $($args:tt)* )) => ({
-        //terminated!($i, $submac!($($args)*), line_or_space_or_comment)
         preceded!($i, line_or_space_or_comment, $submac!($($args)*))
-        //sep!($i, line_or_space_or_comment, $submac!($($args)*))
-        //delimited!($i, line_or_space_or_comment, $submac!($($args)*), line_or_space_or_comment)
     });
 
     ($i:expr, $f:expr) => (
@@ -110,10 +109,10 @@ macro_rules! map_ident (
 
 ///// Parser /////
 
-pub fn parse_or_error(name: &str, text: &[u8]) -> Vec<AST> {
-    let span = Span::new(CompleteByteSlice(text));
+pub fn parse_or_error(name: &str, text: &str) -> Vec<AST> {
+    let span = Span::new(text);
     match parse(span) {
-        Ok((rem, _)) if rem.fragment != CompleteByteSlice(&[]) => panic!("InternalError: unparsed input remaining: {:?}", rem),
+        Ok((rem, _)) if rem.fragment != "" => panic!("InternalError: unparsed input remaining: {:?}", rem),
         Ok((_, code)) => code,
         Err(err) => { print_error(name, err); panic!("") },
     }
@@ -121,17 +120,17 @@ pub fn parse_or_error(name: &str, text: &[u8]) -> Vec<AST> {
 
 
 named!(pub parse(Span) -> Vec<AST>,
-    complete!(do_parse!(
+    do_parse!(
         e: statement_list >>
         eof!() >>
         (e)
-    ))
+    )
 );
 
 named!(statement_list(Span) -> Vec<AST>,
     do_parse!(
-        l: wscom!(separated_list_complete!(terminator, statement)) >>
-        t: opt!(terminator) >>
+        l: wscom!(separated_list!(terminator, statement)) >>
+        t: opt!(complete!(terminator)) >>
         (add_terminator(l, t.unwrap_or(None)))
     )
 );
@@ -157,16 +156,16 @@ named!(terminator(Span) -> Option<AST>,
 );
 
 named!(statement(Span) -> AST,
-    alt_complete!(
-        import |
-        class |
-        typealias |
-        typeenum |
-        declare |
-        raise |
-        definition |
-        assignment |
-        expression
+    alt!(
+        complete!(import) |
+        complete!(class) |
+        complete!(typealias) |
+        complete!(typeenum) |
+        complete!(declare) |
+        complete!(raise) |
+        complete!(definition) |
+        complete!(assignment) |
+        complete!(expression)
     )
 );
 
@@ -174,7 +173,7 @@ named!(import(Span) -> AST,
     do_parse!(
         pos: position!() >>
         wscom!(tag_word!("import")) >>
-        e: recognize!(separated_list_complete!(tag!("."), identifier)) >>
+        e: recognize!(separated_list!(tag!("."), identifier)) >>
         (AST::Import(Pos::new(pos), ident_from_span(&e), vec!()))
     )
 );
@@ -215,7 +214,7 @@ named!(whileloop(Span) -> AST,
         wscom!(tag_word!("while")) >>
         c: expression >>
         line_or_space_or_comment >>
-        e: return_error!(ErrorKind::Custom(ERR_IN_WHILE), expression) >>
+        e: return_error!(ErrorKind::Tag /*ErrorKind::Custom(ERR_IN_WHILE) */, expression) >>
         (AST::While(Pos::new(pos), r(c), r(e)))
     )
 );
@@ -227,13 +226,13 @@ named!(class(Span) -> AST,
         i: class_spec >>
         p: opt!(preceded!(wscom!(tag_word!("extends")), class_spec)) >>
         wscom!(tag!("{")) >>
-        s: many0!(wscom!(alt_complete!(
+        s: many0!(wscom!(alt!(
             typealias |
             definition |
             declare |
             function
         ))) >>
-        return_error!(ErrorKind::Custom(ERR_IN_CLASS), tag!("}")) >>
+        return_error!(ErrorKind::Tag /*ErrorKind::Custom(ERR_IN_CLASS) */, tag!("}")) >>
         (AST::Class(Pos::new(pos), i, p, s))
         )
     );
@@ -256,7 +255,7 @@ named!(typeenum(Span) -> AST,
         c: class_spec >>
         wscom!(tag!("=")) >>
         wscom!(opt!(tag!("|"))) >>
-        ev: separated_list_complete!(wscom!(tag!("|")), enum_variant) >>
+        ev: separated_list!(complete!(wscom!(tag!("|"))), enum_variant) >>
         (AST::Enum(Pos::new(pos), c, ev))
     )
 );
@@ -265,7 +264,7 @@ named!(enum_variant(Span) -> (Pos, Ident, Option<Type>),
     do_parse!(
         pos: position!() >>
         i: identifier >>
-        t: opt!(delimited!(tag!("("), separated_list_complete!(wscom!(tag!(",")), type_description), tag!(")"))) >>
+        t: opt!(complete!(delimited!(tag!("("), separated_list!(wscom!(tag!(",")), type_description), tag!(")")))) >>
         ((Pos::new(pos), i, t.map(|t| Type::Tuple(t))))
     )
 );
@@ -273,11 +272,11 @@ named!(enum_variant(Span) -> (Pos, Ident, Option<Type>),
 
 
 named!(expression_list(Span) -> Vec<AST>,
-    separated_list_complete!(wscom!(tag!(",")), expression)
+    separated_list!(wscom!(tag!(",")), expression)
 );
 
 named!(expression(Span) -> AST,
-    alt_complete!(
+    alt!(
         //underscore |
         ifexpr |
         trywith |
@@ -332,11 +331,11 @@ named!(trywith(Span) -> AST,
         c: expression >>
         line_or_space_or_comment >>
         opt!(wscom!(tag_word!("catch"))) >>
-        return_error!(ErrorKind::Custom(ERR_IN_TRY),
+        return_error!(ErrorKind::Tag, //ErrorKind::Custom(ERR_IN_TRY),
             tag!("{")
         ) >>
         l: caselist >>
-        return_error!(ErrorKind::Custom(ERR_IN_TRY),
+        return_error!(ErrorKind::Tag, //ErrorKind::Custom(ERR_IN_TRY),
             tag!("}")
         ) >>
         (AST::Try(Pos::new(pos), r(c), l))
@@ -359,11 +358,11 @@ named!(matchcase(Span) -> AST,
         c: expression >>
         line_or_space_or_comment >>
         //wscom!(tag_word!("with")) >>
-        return_error!(ErrorKind::Custom(ERR_IN_MATCH),
+        return_error!(ErrorKind::Tag, //ErrorKind::Custom(ERR_IN_MATCH),
             tag!("{")
         ) >>
         l: caselist >>
-        return_error!(ErrorKind::Custom(ERR_IN_MATCH),
+        return_error!(ErrorKind::Tag, //ErrorKind::Custom(ERR_IN_MATCH),
             tag!("}")
         ) >>
         (AST::Match(Pos::new(pos), r(c), l))
@@ -371,7 +370,7 @@ named!(matchcase(Span) -> AST,
 );
 
 named!(caselist(Span) -> Vec<(Pattern, AST)>,
-    //separated_list_complete!(wscom!(tag!("|")), do_parse!(
+    //separated_list!(wscom!(tag!("|")), do_parse!(
     dbg_dmp!(many1!(wscom!(do_parse!(
         //wscom!(tag!("|")) >>
         c: pattern >>
@@ -390,7 +389,7 @@ named!(forloop(Span) -> AST,
         wscom!(tag_word!("in")) >>
         l: expression >>
         line_or_space_or_comment >>
-        e: return_error!(ErrorKind::Custom(ERR_IN_FOR), expression) >>
+        e: return_error!(ErrorKind::Tag /*ErrorKind::Custom(ERR_IN_FOR) */, expression) >>
         (AST::For(Pos::new(pos), i, r(l), r(e)))
     )
 );
@@ -415,7 +414,7 @@ named!(declare(Span) -> AST,
         pos: position!() >>
         vis: opt!(wscom!(tag_word!("pub"))) >>
         wscom!(tag_word!("decl")) >>
-        n: alt_complete!(identifier | any_op) >>
+        n: alt!(identifier | any_op) >>
         t: type_function >>
         (AST::Declare(Pos::new(pos), if vis.is_some() { Visibility::Public } else { Visibility::Private }, n, t))
     )
@@ -427,9 +426,9 @@ named!(function(Span) -> AST,
         vis: opt!(wscom!(tag_word!("pub"))) >>
         wscom!(tag_word!("fn")) >>
         //n: opt!(identifier) >>
-        l: alt_complete!(
+        l: alt!(
             do_parse!(
-                n: opt!(alt_complete!(identifier | any_op)) >>
+                n: opt!(alt!(identifier | any_op)) >>
                 //n: opt!(identifier) >>
                 l: delimited!(tag!("("), argument_list, tag!(")")) >>
                 ((n, l))
@@ -438,9 +437,9 @@ named!(function(Span) -> AST,
         ) >>
         rt: opt!(preceded!(wscom!(tag!("->")), type_description)) >>
         a: abi_specifier >>
-        e: alt_complete!(
-            preceded!(wscom!(tag!("=>")), return_error!(ErrorKind::Custom(ERR_IN_FUNC), expression)) |
-            return_error!(ErrorKind::Custom(ERR_IN_FUNC), wscoml!(block))
+        e: alt!(
+            preceded!(wscom!(tag!("=>")), return_error!(ErrorKind::Tag /*ErrorKind::Custom(ERR_IN_FUNC) */, expression)) |
+            return_error!(ErrorKind::Tag /*ErrorKind::Custom(ERR_IN_FUNC) */, wscoml!(block))
         ) >>
         (AST::Function(Pos::new(pos), if vis.is_some() { Visibility::Public } else { Visibility::Private }, l.0, l.1, rt, r(e), a))
     )
@@ -458,14 +457,14 @@ named!(reference(Span) -> AST,
 named!(annotation(Span) -> AST,
     do_parse!(
         e: atomic >>
-        wscom!(tag!(":")) >>
+        wscom!(complete!(tag!(":"))) >>
         t: type_description >>
         (AST::PtrCast(t, r(e)))
     )
 );
 
 named!(argument_list(Span) -> Vec<Argument>,
-    separated_list_complete!(wscom!(tag!(",")),
+    separated_list!(wscom!(tag!(",")),
         do_parse!(
             i: identifier_typed >>
             // TODO this needs an Expr instead of AST, so probably needs an intermediate struct, but default args aren't supported yet anyways
@@ -572,7 +571,7 @@ named!(infix(Span) -> AST,
 );
 
 named!(atomic(Span) -> AST,
-    alt_complete!(
+    alt!(
         prefix |
         subatomic_operation
     )
@@ -589,7 +588,7 @@ named!(prefix(Span) -> AST,
     do_parse!(
         pos: position!() >>
         op: prefix_op >>
-        opt!(space) >>
+        opt!(space1) >>
         a: atomic >>
         //(AST::Prefix(op, r(a)))
         (AST::Invoke(Pos::new(pos), r(AST::Identifier(Pos::new(pos), op)), vec!(a)))
@@ -599,10 +598,10 @@ named!(prefix(Span) -> AST,
 named!(subatomic_operation(Span) -> AST,
     do_parse!(
         left: subatomic >>
-        operations: many0!(alt_complete!(
+        operations: many0!(alt!(
             map!(delimited!(tag!("["), tuple!(position!(), wscom!(expression)), tag!("]")), |(p, e)| SubOP::Index(Pos::new(p), e)) |
             map!(delimited!(tag!("("), tuple!(position!(), wscom!(expression_list)), tag!(")")), |(p, e)| SubOP::Invoke(Pos::new(p), e)) |
-            map!(preceded!(tag!("."), tuple!(position!(), alt!(identifier | map!(digit, |s| ident_from_span(&s))))), |(p, s)| SubOP::Accessor(Pos::new(p), s)) |
+            map!(preceded!(tag!("."), tuple!(position!(), alt!(identifier | map!(digit1, |s| ident_from_span(&s))))), |(p, s)| SubOP::Accessor(Pos::new(p), s)) |
             map!(preceded!(tag!("::"), tuple!(position!(), identifier)), |(p, s)| SubOP::Resolver(Pos::new(p), s))
         )) >>
         (AST::fold_access(left, operations))
@@ -632,7 +631,7 @@ impl AST {
 }
 
 named!(subatomic(Span) -> AST,
-    alt_complete!(
+    alt!(
         delimited!(tag!("("), wscom!(expression), tag!(")")) |
         record_update |
         block |
@@ -652,7 +651,7 @@ named!(record_update(Span) -> AST,
             l: wscom!(record_field_assignments) >>
             (AST::RecordUpdate(Pos::new(pos), r(i), l))
         ),
-        return_error!(ErrorKind::Custom(ERR_IN_LIST), tag!("}"))
+        return_error!(ErrorKind::Tag /*ErrorKind::Custom(ERR_IN_LIST) */, tag!("}"))
     )
 );
 
@@ -677,8 +676,8 @@ named!(identifier(Span) -> Ident,
     do_parse!(
         not_reserved >>
         s: recognize!(preceded!(
-            take_while1!(is_alpha_underscore),
-            take_while!(is_alphanumeric_underscore)
+            call!(take_while1(is_alpha_underscore)),
+            call!(take_while(is_alphanumeric_underscore))
         )) >>
         (ident_from_span(&s))
     )
@@ -688,7 +687,7 @@ named!(class_spec(Span) -> ClassSpec,
     do_parse!(
         pos: position!() >>
         i: identifier >>
-        p: opt!(complete!(delimited!(tag!("<"), separated_list_complete!(wscom!(tag!(",")), type_description), tag!(">")))) >>
+        p: opt!(complete!(delimited!(tag!("<"), separated_list!(wscom!(tag!(",")), type_description), tag!(">")))) >>
         (ClassSpec::new(Pos::new(pos), i, p.unwrap_or(vec!())))
     )
 );
@@ -707,14 +706,22 @@ named!(any_op(Span) -> Ident,
 );
 
 pub fn parse_type(s: &str) -> Option<Type> {
-    match type_description(Span::new(CompleteByteSlice(s.as_bytes()))) {
+    match complete_type_description(Span::new(s)) {
         Ok((_, t)) => Some(t),
         e => panic!("Error Parsing Type: {:?}   [{:?}]", s, e)
     }
 }
 
+named!(complete_type_description(Span) -> Type,
+    do_parse!(
+        t: type_description >>
+        eof!() >>
+        (t)
+    )
+);
+
 named!(type_description(Span) -> Type,
-    alt_complete!(
+    alt!(
         type_function |
         type_unit |
         type_ref |
@@ -734,7 +741,7 @@ named!(type_ref(Span) -> Type,
 );
 
 named!(type_unit(Span) -> Type,
-    map!(tag!("()"), |_| Type::Object(String::from("()"), UniqueID(0), vec!()))
+    map!(complete!(tag!("()")), |_| Type::Object(String::from("()"), UniqueID(0), vec!()))
 );
 
 named!(type_object(Span) -> Type,
@@ -750,7 +757,7 @@ named!(type_variable(Span) -> Type,
 
 named!(type_tuple(Span) -> Type,
     do_parse!(
-        types: delimited!(tag!("("), separated_list_complete!(wscom!(tag!(",")), type_description), tag!(")")) >>
+        types: delimited!(tag!("("), separated_list!(wscom!(tag!(",")), type_description), tag!(")")) >>
         (Type::Tuple(types))
     )
 );
@@ -759,7 +766,7 @@ named!(type_record(Span) -> Type,
     do_parse!(
         types: delimited!(
             tag!("{"),
-            wscom!(separated_list_complete!(wscom!(tag!(",")), do_parse!(
+            wscom!(separated_list!(wscom!(tag!(",")), do_parse!(
                 i: identifier >>
                 wscom!(tag!(":")) >>
                 t: type_description >>
@@ -772,20 +779,20 @@ named!(type_record(Span) -> Type,
 );
 
 named!(type_function(Span) -> Type,
-    do_parse!(
-        //args: delimited!(tag!("("), separated_list_complete!(wscom!(tag!(",")), type_description), tag!(")")) >>
-        args: alt_complete!(type_tuple | type_variable | type_object) >>
+    complete!(do_parse!(
+        //args: delimited!(tag!("("), separated_list!(wscom!(tag!(",")), type_description), tag!(")")) >>
+        args: alt!(type_tuple | type_variable | type_object) >>
         wscom!(tag!("->")) >>
         ret: type_description >>
         abi: abi_specifier >>
         (Type::Function(r(args), r(ret), abi))
-    )
+    ))
 );
 
 // TODO this used to be Overload, but it could potentially be useful as a contrained type of sorts
 //named!(type_ambiguous(Span) -> Type,
 //    map!(
-//        delimited!(tag!("Ambiguous["), wscom!(separated_list_complete!(wscom!(tag!(",")), type_description)), tag!("]")),
+//        delimited!(tag!("Ambiguous["), wscom!(separated_list!(wscom!(tag!(",")), type_description)), tag!("]")),
 //        |t| Type::Ambiguous(t)
 //    )
 //);
@@ -799,7 +806,7 @@ named!(abi_specifier(Span) -> ABI,
 
 
 named!(literal(Span) -> AST,
-    alt_complete!(
+    alt!(
         unit |
         nil |
         boolean |
@@ -827,21 +834,21 @@ named!(boolean(Span) -> AST,
     )
 );
 
-named!(escaped_character(Span) -> &[u8],
+named!(escaped_character(Span) -> &str,
     alt!(
-        tag!("\\") => { |_| &b"\\"[..] } |
-        tag!("\"") => { |_| &b"\""[..] } |
-        tag!("n")  => { |_| &b"\n"[..] } |
-        tag!("r")  => { |_| &b"\r"[..] } |
-        tag!("t")  => { |_| &b"\t"[..] } |
-        tag!("0")  => { |_| &b"\0"[..] }
+        tag!("\\") => { |_| &"\\"[..] } |
+        tag!("\"") => { |_| &"\""[..] } |
+        tag!("n")  => { |_| &"\n"[..] } |
+        tag!("r")  => { |_| &"\r"[..] } |
+        tag!("t")  => { |_| &"\t"[..] } |
+        tag!("0")  => { |_| &"\0"[..] }
     )
 );
 
 named!(string_contents(Span) -> AST,
     map!(
         escaped_transform!(is_not!("\"\\"), '\\', escaped_character),
-        |s| AST::Literal(Literal::String(String::from_utf8_lossy(&s).into_owned()))
+        |s| AST::Literal(Literal::String(String::from(s)))
     )
 );
 
@@ -862,8 +869,8 @@ named!(character(Span) -> AST,
         delimited!(
             tag!("\'"),
             alt!(
-                map!(preceded!(tag!("\\"), escaped_character), |c| c[0] as char) |
-                map!(anychar, |c| c as char)
+                map!(preceded!(tag!("\\"), escaped_character), |c| c[0..1].chars().next().unwrap()) |
+                map!(anychar, |c| c)
             ),
             tag!("\'")
         ),
@@ -873,7 +880,7 @@ named!(character(Span) -> AST,
 
 
 named!(number(Span) -> AST,
-    alt_complete!(
+    alt!(
         value!(AST::Literal(Literal::Real(std::f64::NEG_INFINITY)), tag_word!("-Inf")) |
         value!(AST::Literal(Literal::Real(std::f64::INFINITY)), tag_word!("Inf")) |
         value!(AST::Literal(Literal::Real(std::f64::NAN)), tag_word!("NaN")) |
@@ -885,15 +892,15 @@ named!(number(Span) -> AST,
 
 named!(hex_number(Span) -> AST,
     map!(
-        preceded!(tag!("0x"), hex_digit),
-        |s| AST::Literal(Literal::Integer(isize::from_str_radix(str::from_utf8(&s.fragment).unwrap(), 16).unwrap()))
+        preceded!(tag!("0x"), hex_digit1),
+        |s| AST::Literal(Literal::Integer(isize::from_str_radix(s.fragment, 16).unwrap()))
     )
 );
 
 named!(oct_number(Span) -> AST,
     map!(
-        preceded!(tag!("0"), oct_digit),
-        |s| AST::Literal(Literal::Integer(isize::from_str_radix(str::from_utf8(&s.fragment).unwrap(), 8).unwrap()))
+        preceded!(tag!("0"), oct_digit1),
+        |s| AST::Literal(Literal::Integer(isize::from_str_radix(s.fragment, 8).unwrap()))
     )
 );
 
@@ -902,22 +909,21 @@ named!(int_or_float_number(Span) -> AST,
         recognize!(
             tuple!(
                opt!(tag!("-")),
-               digit,
-               opt!(complete!(preceded!(tag!("."), digit)))
+               digit1,
+               opt!(complete!(preceded!(tag!("."), digit1)))
                //opt!(complete!(float_exponent))
             )
         ),
-        |s| AST::number_from_utf8(&s.fragment)
+        |s| AST::number_from_utf8(s.fragment)
     )
 );
 
 impl AST {
-    fn number_from_utf8(s : &[u8]) -> Self {
-        let n = str::from_utf8(s).unwrap();
-        if let Ok(i) = isize::from_str_radix(n, 10) {
+    fn number_from_utf8(s: &str) -> Self {
+        if let Ok(i) = isize::from_str_radix(s, 10) {
             AST::Literal(Literal::Integer(i))
         } else {
-            AST::Literal(Literal::Real(f64::from_str(n).unwrap()))
+            AST::Literal(Literal::Real(f64::from_str(s).unwrap()))
         }
     }
 }
@@ -927,7 +933,7 @@ named!(tuple(Span) -> AST,
         pos: position!() >>
         l: delimited!(
             tag!("("),
-            wscom!(separated_list_complete!(wscom!(tag!(",")), expression)),
+            wscom!(separated_list!(wscom!(tag!(",")), expression)),
             tag!(")")
         ) >>
         (AST::Tuple(Pos::new(pos), l))
@@ -940,14 +946,14 @@ named!(record(Span) -> AST,
         l: delimited!(
             tag!("{"),
             wscom!(record_field_assignments),
-            return_error!(ErrorKind::Custom(ERR_IN_LIST), tag!("}"))
+            return_error!(ErrorKind::Tag /*ErrorKind::Custom(ERR_IN_LIST)*/, tag!("}"))
         ) >>
         (AST::Record(Pos::new(pos), l))
     )
 );
 
 named!(record_field_assignments(Span) -> Vec<(Ident, AST)>,
-    separated_list_complete!(wscom!(tag!(",")), do_parse!(
+    separated_list!(wscom!(tag!(",")), do_parse!(
         i: identifier >>
         wscom!(tag!("=")) >>
         e: expression >>
@@ -960,7 +966,7 @@ named!(list(Span) -> AST,
         pos: position!() >>
         l: delimited!(
             tag!("["),
-            wscom!(separated_list_complete!(wscom!(tag!(",")), expression)),
+            wscom!(separated_list!(wscom!(tag!(",")), expression)),
             tag!("]")
         ) >>
         (AST::List(Pos::new(pos), l))
@@ -1003,7 +1009,7 @@ named!(pattern(Span) -> Pattern,
 );
 
 named!(pattern_atomic(Span) -> Pattern,
-    alt_complete!(
+    alt!(
         value!(Pattern::new(Pos::empty(), PatKind::Wild), tag!("_")) |
         pattern_literal |
         pattern_enum_variant |
@@ -1014,7 +1020,7 @@ named!(pattern_atomic(Span) -> Pattern,
 );
 
 named!(pattern_literal(Span) -> Pattern,
-    map!(alt_complete!(
+    map!(alt!(
         unit |
         nil |
         boolean |
@@ -1043,7 +1049,7 @@ named!(pattern_enum_variant(Span) -> Pattern,
         p: pattern_resolve >>
         o: opt!(delimited!(
             tag!("("),
-            separated_list_complete!(wscom!(tag!(",")), pattern),
+            separated_list!(wscom!(tag!(",")), pattern),
             tag!(")")
         )) >>
         (match o {
@@ -1058,7 +1064,7 @@ named!(pattern_tuple(Span) -> Pattern,
         pos: position!() >>
         l: delimited!(
             tag!("("),
-            wscom!(separated_list_complete!(wscom!(tag!(",")), pattern)),
+            wscom!(separated_list!(wscom!(tag!(",")), pattern)),
             tag!(")")
         ) >>
         (Pattern::new(Pos::new(pos), PatKind::Tuple(l)))
@@ -1071,14 +1077,14 @@ named!(pattern_record(Span) -> Pattern,
         l: delimited!(
             tag!("{"),
             wscom!(pattern_record_field_assignments),
-            return_error!(ErrorKind::Custom(ERR_IN_LIST), tag!("}"))
+            return_error!(ErrorKind::Tag /*ErrorKind::Custom(ERR_IN_LIST) */, tag!("}"))
         ) >>
         (Pattern::new(Pos::new(pos), PatKind::Record(l)))
     )
 );
 
 named!(pattern_record_field_assignments(Span) -> Vec<(Ident, Pattern)>,
-    separated_list_complete!(wscom!(tag!(",")), do_parse!(
+    separated_list!(wscom!(tag!(",")), do_parse!(
         i: identifier >>
         wscom!(tag!("=")) >>
         p: pattern >>
@@ -1090,112 +1096,70 @@ named!(pattern_record_field_assignments(Span) -> Vec<(Ident, Pattern)>,
 
 
 named!(line_comment(Span) -> Span,
-    delimited!(tag!("//"), not_line_ending, peek!(line_ending))    //, |s| AST::Comment(String::from(str::from_utf8(s).unwrap())))
+    complete!(delimited!(tag!("//"), not_line_ending, peek!(line_ending)))    //, |s| AST::Comment(String::from(str::from_utf8(s).unwrap())))
 );
 
 named!(block_comment(Span) -> Span,
-    delimited!(
+    complete!(delimited!(
         tag!("/*"),
-        recognize!(many0!(
-           alt!(
-                block_comment |
-                recognize!(many_till!(anychar, peek!(alt!(tag!("/*") | tag!("*/")))))
-            )
+        recognize!(tuple!(
+            recognize!(many0!(tuple!(non_block_comment_chars, block_comment))),
+            non_block_comment_chars
         )),
         tag!("*/")
-    )
-);
-
-
-/*
-named!(separator(Span) -> Span,
-    recognize!(many0!(
-        //alt!(take_while1!(is_ws) | comment)
-        //alt!(take_while1!(is_ws) | delimited!(tag!("//"), not_line_ending, line_ending))
-        //terminated!(sp!(alt!(line_comment | block_comment)), line_ending)
-        //delimited!(space_or_comment, alt!(line_ending | tag!(";")), line_or_space_or_comment)
-        delimited!(space_or_comment, line_ending, line_or_space_or_comment)
     ))
 );
-*/
+
+named!(non_block_comment_chars(Span) -> Span,
+    recognize!(many_till!(anychar, peek!(alt!(tag!("/*") | tag!("*/")))))
+);
 
 named!(space_or_comment(Span) -> Span,
-    recognize!(many0!(alt!(line_comment | block_comment | space)))
+    recognize!(many0!(alt!(line_comment | block_comment | space1)))
 );
 
 named!(line_or_space_or_comment(Span) -> Span,
-    recognize!(many0!(alt!(line_comment | block_comment | multispace)))
+    recognize!(many0!(alt!(line_comment | block_comment | multispace1)))
 );
 
 named!(line_continuation(Span) -> Span,
-    recognize!(tuple!(
-        space_or_comment,
-        many0!(opt!(tuple!(tag!("\\"), line_ending, space_or_comment)))
-    ))
+    recognize!(tuple!(many0!(recognize!(tuple!(space_or_comment, tag!("\\"), line_ending))), space_or_comment))
 );
 
 
 
-/*
-macro_rules! named_method {
-    ($name:ident( $i:ty ) -> $o:ty, $submac:ident!( $($args:tt)* )) => (
-        fn $name<'a>( &self, i: $i ) -> IResult<$i, $o, u32> {
-            $submac!(i, $($args)*)
-        }
-    );
-}
-
-struct Test(u32);
-
-impl Test {
-    fn test<'a>(&self, i: Span<'a>) -> IResult<Span<'a>, Span<'a>> {
-        tag!(i, "Hey")
-    }
-
-    named_method!(test2(Span<'a>) -> Span<'a>,
-        tag!("Hey")
-    );
-}
-*/
 
 named!(alphanumeric_underscore(Span) -> Span,
-    take_while1!(is_alphanumeric_underscore)
+    call!(take_while1(is_alphanumeric_underscore))
 );
 
-pub fn is_alpha_underscore(ch: u8) -> bool {
-    ch == b'_' || is_alphabetic(ch)
+pub fn is_alpha_underscore(ch: char) -> bool {
+    ch == '_' || is_alphabetic(ch as u8)
 }
 
-pub fn is_alphanumeric_underscore(ch: u8) -> bool {
-    ch == b'_' || is_alphanumeric(ch)
+pub fn is_alphanumeric_underscore(ch: char) -> bool {
+    ch == '_' || is_alphanumeric(ch as u8)
 }
 
 pub fn ident_from_span(span: &Span) -> Ident {
     Ident {
-        name: String::from(str::from_utf8(&span.fragment).unwrap()),
+        name: String::from(span.fragment),
     }
 }
 
 
 
-pub fn print_error(name: &str, err: nom::Err<Span, u32>) {
+pub fn print_error(name: &str, err: nom::Err<(Span, ErrorKind)>) {
     match err {
-        nom::Err::Incomplete(_) => println!("ParseError: incomplete input..."),
-        nom::Err::Error(Context::Code(span, code)) |
-        nom::Err::Failure(Context::Code(span, code)) => {
-            println!("\x1B[1;31m{}:{}:{}: ParseError ({:?}) near {:?}\x1B[0m", name, span.line, span.get_utf8_column(), code, format_snippet(&span));
-        },
-        nom::Err::Error(list @ Context::List(_)) |
-        nom::Err::Failure(list @ Context::List(_)) => {
-            let errors = error_to_list(&list);
-            let (span, _) = &errors[errors.len() - 1];
-            println!("\x1B[1;31m{}:{}:{}: ParseError ({}) near {:?}\x1B[0m", name, span.line, span.get_utf8_column(), format_codes(&errors), format_snippet(&span));
-        },
+        nom::Err::Error((span, kind)) =>
+            println!("\x1B[1;31m{}:{}:{}: ParseError ({:?}) near {:?}\x1B[0m", name, span.line, span.get_utf8_column(), kind, format_snippet(&span)),
+        _ =>
+            println!("\x1B[1;31mParseError: {:?}", err),
     }
 }
 
 pub fn format_snippet<'a>(span: &'a Span) -> String {
-    let snippet = str::from_utf8(&span.fragment).unwrap();
+    let snippet = span.fragment;
     let index = snippet.find('\n').unwrap_or(snippet.len());
     String::from(snippet.get(..index).unwrap())
 }

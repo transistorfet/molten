@@ -51,6 +51,9 @@ TRAITS/TYPECLASSES:
 
 * upgrade the parser to nom 6 (code in stash, but with the changes, the parser is totally broken, no idea why)
 * upgrading to nom 5 there's an issue with line termination/whitespace, especially at the end of statements, and also infix notation
+  the problem is related to the removal of the CompleteByteSlice type, which forced all parses to return a complete match or fail.  Removing this from the nom 4.2 parser will result in the
+  same failures.  Currently it seems to fail when parsing "((), ()) -> Bool" and will instead parse it as a tuple (the function parser is failing
+* next issue is cont!() is not working in infix parsing.  Replacing it with wscom!() fixes it and then the next issue is a failure to parse the block comments
 
 
 
