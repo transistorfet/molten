@@ -188,8 +188,8 @@ impl Type {
                 let ret = ret.convert(f);
                 Type::Function(r(args), r(ret), abi)
             },
-            Type::Variable(name, id, existential) => {
-                Type::Variable(name, id, existential)
+            Type::Variable(name, id, universal) => {
+                Type::Variable(name, id, universal)
             }
         };
         f(ttype)
@@ -254,17 +254,17 @@ impl Type {
 
     pub fn map_typevars(session: &Session, varmap: &mut HashMap<UniqueID, Type>, ttype: Type) -> Type {
         match ttype.clone() {
-            Type::Variable(name, id, existential) => {
+            Type::Variable(name, id, universal) => {
                 match varmap.get(&id).map(|x| x.clone()) {
                     Some(ptype) => ptype,
                     None => {
                         let etype = session.get_type(id);
                         debug!("EXISTING TYPEVAR for {:?}: {:?} vs {:?}", name, etype, id);
                         match Some(ttype) {
-                            Some(Type::Variable(_, ref eid, _)) if *eid == id && !existential => etype.clone().unwrap(),
+                            Some(Type::Variable(_, ref eid, _)) if *eid == id && !universal => etype.clone().unwrap(),
                             None | Some(Type::Variable(_, _, _)) => {
-                                let orgtype = Type::Variable(name.clone(), id, existential);
-                                if existential {
+                                let orgtype = Type::Variable(name.clone(), id, universal);
+                                if universal {
                                     let maptype = session.new_typevar();
                                     varmap.insert(id, maptype.clone());
                                     debug!("MAPPED from {:?} to {:?}", orgtype, maptype);
@@ -323,22 +323,22 @@ pub fn check_type(session: &Session, odtype: Option<Type>, octype: Option<Type>,
         let ctype = resolve_type(session, octype.unwrap(), false)?;
 
         debug!("CHECK TYPE {:?} {:?} {:?}", dtype, ctype, update);
-        if let Type::Variable(ref _dname, ref did, dex) = dtype {
+        if let Type::Variable(ref _dname, ref did, duni) = dtype {
 
-            if let Type::Variable(ref _cname, ref cid, cex) = ctype {
-                if cex {
-                    if update && !dex { session.set_type(*did, ctype.clone()); }
+            if let Type::Variable(ref _cname, ref cid, cuni) = ctype {
+                if cuni {
+                    if update && !duni { session.set_type(*did, ctype.clone()); }
                     Ok(resolve_type(session, ctype.clone(), false)?)
                 } else {
-                    if update && !cex { session.set_type(*cid, dtype.clone()); }
+                    if update && !cuni { session.set_type(*cid, dtype.clone()); }
                     Ok(resolve_type(session, dtype.clone(), false)?)
                 }
             } else {
-                if update && !dex { session.update_type(*did, ctype.clone())?; }
+                if update && !duni { session.update_type(*did, ctype.clone())?; }
                 Ok(resolve_type(session, ctype.clone(), false)?)
             }
-        } else if let Type::Variable(_, ref cid, cex) = ctype {
-            if update && !cex { session.update_type(*cid, dtype.clone())?; }
+        } else if let Type::Variable(_, ref cid, cuni) = ctype {
+            if update && !cuni { session.update_type(*cid, dtype.clone())?; }
             Ok(resolve_type(session, dtype.clone(), false)?)
             //Err(Error::new(format!("TypeError: attempting to cast a type variable {} to a concrete {}", ctype, dtype)))
         } else {
@@ -472,8 +472,8 @@ pub fn resolve_type(session: &Session, ttype: Type, require_resolve: bool) -> Re
                 Some(vtype) => {
                     debug!("~~~~~~ {:?} -> {:?}", id, vtype);
                     match vtype {
-                        Type::Variable(_, ref eid, ref eex) if eid == id => {
-                            if !require_resolve || *eex {
+                        Type::Variable(_, ref eid, ref euni) if eid == id => {
+                            if !require_resolve || *euni {
                                 Ok(vtype.clone())
                             } else {
                                 Err(Error::new(format!("TypeError: unification variable unresolved: {}", vtype)))

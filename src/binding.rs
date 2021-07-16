@@ -331,7 +331,7 @@ pub fn bind_type_names(session: &Session, scope: ScopeRef, ttype: Option<&mut Ty
                 bind_type_names(session, scope.clone(), Some(args.as_mut()), always_new)?;
                 bind_type_names(session, scope, Some(ret.as_mut()), always_new)?;
             },
-            &mut Type::Variable(ref name, ref mut id, existential) => {
+            &mut Type::Variable(ref name, ref mut id, universal) => {
                 let vtype = match always_new {
                     true => scope.find_type_local(session, name),
                     false => scope.find_type(session, name),
@@ -342,7 +342,7 @@ pub fn bind_type_names(session: &Session, scope: ScopeRef, ttype: Option<&mut Ty
                     },
                     _ => {
                         *id = UniqueID::generate();
-                        let ttype = Type::Variable(name.clone(), *id, existential);
+                        let ttype = Type::Variable(name.clone(), *id, universal);
                         scope.define_type(name, Some(*id))?;
                         session.set_type(*id, ttype);
                     }
@@ -413,7 +413,7 @@ pub fn check_recursive_type(ttype: &Option<&Type>, forbidden_id: NodeID) -> Resu
                     check_recursive_type(&Some(ttype), forbidden_id)?;
                 }
             },
-            Type::Variable(ref _name, ref _id, ref _existential) => {
+            Type::Variable(ref _name, ref _id, ref _universal) => {
                 // TODO this might be an error?
             },
             Type::Ref(_) |
