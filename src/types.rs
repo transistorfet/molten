@@ -304,14 +304,12 @@ pub fn expect_type(session: &Session, odtype: Option<Type>, octype: Option<Type>
     check_type(session, odtype, octype, mode, true)
 }
 
-//
-// Compare the defined type to the calculated type and return the common type, or error if they do not match
-// dtype < ctype: ie. ctype will be downcast to match dtype, but not the inverse
-//
+/// Compare the defined type to the calculated type and return the common type, or error if they cannot be unified
+///
+/// If mode is Check::Def, then dtype <: ctype (ie. ctype will be downcast to match dtype, but not the inverse)
+/// If mode is Check::List, then forall X, X <: dtype AND X <: ctype (ie. the type that both given types can downcast to)
 pub fn check_type(session: &Session, odtype: Option<Type>, octype: Option<Type>, mode: Check, update: bool) -> Result<Type, Error> {
-    //debug!("TYPECHECK: {:?} {:?}", odtype, octype);
     if odtype.is_none() {
-        // TODO should the else case just be Nil...
         match octype {
             Some(ctype) => Ok(resolve_type(session, ctype, false)?),
             None => Ok(session.new_typevar()),
@@ -323,82 +321,75 @@ pub fn check_type(session: &Session, odtype: Option<Type>, octype: Option<Type>,
         let ctype = resolve_type(session, octype.unwrap(), false)?;
 
         debug!("CHECK TYPE {:?} {:?} {:?}", dtype, ctype, update);
-        if let Type::Variable(ref _dname, ref did, duni) = dtype {
 
-            if let Type::Variable(ref _cname, ref cid, cuni) = ctype {
-                if cuni {
+        match (&dtype, &ctype) {
+            (Type::Variable(ref dname, ref did, duni), Type::Variable(ref cname, ref cid, cuni)) => {
+                if *cuni {
                     if update && !duni { session.set_type(*did, ctype.clone()); }
-                    Ok(resolve_type(session, ctype.clone(), false)?)
+                    Ok(resolve_type(session, ctype, false)?)
                 } else {
                     if update && !cuni { session.set_type(*cid, dtype.clone()); }
-                    Ok(resolve_type(session, dtype.clone(), false)?)
+                    Ok(resolve_type(session, dtype, false)?)
                 }
-            } else {
-                if update && !duni { session.update_type(*did, ctype.clone())?; }
-                Ok(resolve_type(session, ctype.clone(), false)?)
+            },
+
+            (Type::Variable(ref name, ref id, ref uni), ntype) |
+            (ntype, Type::Variable(ref name, ref id, ref uni)) => {
+                if update && !uni { session.update_type(*id, ntype.clone())?; }
+                Ok(resolve_type(session, ntype.clone(), false)?)
             }
-        } else if let Type::Variable(_, ref cid, cuni) = ctype {
-            if update && !cuni { session.update_type(*cid, dtype.clone())?; }
-            Ok(resolve_type(session, dtype.clone(), false)?)
-            //Err(Error::new(format!("TypeError: attempting to cast a type variable {} to a concrete {}", ctype, dtype)))
-        } else {
-            match (dtype.clone(), ctype.clone()) {
-                (Type::Function(ref aargs, ref aret, ref aabi), Type::Function(ref bargs, ref bret, ref babi)) => {
-                    let oabi = aabi.compare(babi);
-                    if oabi.is_some() {
-                        let argtypes = check_type(session, Some(*aargs.clone()), Some(*bargs.clone()), mode, update)?;
-                        Ok(Type::Function(r(argtypes), r(check_type(session, Some(*aret.clone()), Some(*bret.clone()), mode, update)?), oabi.unwrap()))
-                    } else {
-                        Err(Error::new(format!("TypeError: type mismatch, expected {} but found {}", dtype, ctype)))
+
+            (Type::Function(ref aargs, ref aret, ref aabi), Type::Function(ref bargs, ref bret, ref babi)) => {
+                let oabi = aabi.compare(babi);
+                if oabi.is_some() {
+                    let argtypes = check_type(session, Some(*aargs.clone()), Some(*bargs.clone()), mode, update)?;
+                    Ok(Type::Function(r(argtypes), r(check_type(session, Some(*aret.clone()), Some(*bret.clone()), mode, update)?), oabi.unwrap()))
+                } else {
+                    Err(Error::new(format!("TypeError: type mismatch, expected {} but found {}", dtype, ctype)))
+                }
+            },
+            (Type::Tuple(ref atypes), Type::Tuple(ref btypes)) => {
+                let mut types = vec!();
+                if atypes.len() == btypes.len() {
+                    for (atype, btype) in atypes.iter().zip(btypes.iter()) {
+                        types.push(check_type(session, Some(atype.clone()), Some(btype.clone()), mode, update)?);
                     }
-                },
-                (Type::Tuple(ref atypes), Type::Tuple(ref btypes)) => {
-                    let mut types = vec!();
-                    if atypes.len() == btypes.len() {
-                        for (atype, btype) in atypes.iter().zip(btypes.iter()) {
-                            types.push(check_type(session, Some(atype.clone()), Some(btype.clone()), mode, update)?);
+                    Ok(Type::Tuple(types))
+                } else {
+                    Err(Error::new(format!("TypeError: type mismatch, expected {} but found {}", dtype, ctype)))
+                }
+            },
+            (Type::Record(ref atypes), Type::Record(ref btypes)) => {
+                let mut types = vec!();
+                if atypes.len() == btypes.len() {
+                    for ((aname, atype), (bname, btype)) in atypes.iter().zip(btypes.iter()) {
+                        if aname != bname {
+                            return Err(Error::new(format!("TypeError: type mismatch, expected {} but found {}", dtype, ctype)));
                         }
-                        Ok(Type::Tuple(types))
-                    } else {
-                        Err(Error::new(format!("TypeError: type mismatch, expected {} but found {}", dtype, ctype)))
+                        types.push((aname.clone(), check_type(session, Some(atype.clone()), Some(btype.clone()), mode, update)?));
                     }
-                },
-                (Type::Record(ref atypes), Type::Record(ref btypes)) => {
-                    let mut types = vec!();
-                    if atypes.len() == btypes.len() {
-                        for ((aname, atype), (bname, btype)) in atypes.iter().zip(btypes.iter()) {
-                            if aname != bname {
-                                return Err(Error::new(format!("TypeError: type mismatch, expected {} but found {}", dtype, ctype)));
-                            }
-                            types.push((aname.clone(), check_type(session, Some(atype.clone()), Some(btype.clone()), mode, update)?));
-                        }
-                        Ok(Type::Record(types))
-                    } else {
-                        Err(Error::new(format!("TypeError: type mismatch, expected {} but found {}", dtype, ctype)))
-                    }
-                },
-                (Type::Object(ref aname, ref aid, ref atypes), Type::Object(ref bname, ref bid, ref btypes)) => {
-                    match is_subclass_of(session, (bname, *bid, btypes), (aname, *aid, atypes), mode) {
-                        ok @ Ok(_) => ok,
-                        err @ Err(_) => match mode {
-                            Check::List => is_subclass_of(session, (aname, *aid, atypes), (bname, *bid, btypes), mode),
-                            _ => err,
-                        }
-                    }
-                },
-                (Type::Ref(ref atype), Type::Ref(ref btype)) => {
-                    let ttype = check_type(session, Some(*atype.clone()), Some(*btype.clone()), mode, update)?;
-                    Ok(Type::Ref(r(ttype)))
-                },
-                (_, Type::Ambiguous(_)) |
-                (Type::Ambiguous(_), _) => Err(Error::new(format!("TypeError: overloaded types are not allowed here..."))),
-                _ => {
-                    if dtype == ctype {
-                        Ok(dtype)
-                    } else {
-                        Err(Error::new(format!("TypeError: type mismatch, expected {} but found {}", dtype, ctype)))
+                    Ok(Type::Record(types))
+                } else {
+                    Err(Error::new(format!("TypeError: type mismatch, expected {} but found {}", dtype, ctype)))
+                }
+            },
+            (Type::Object(ref aname, ref aid, ref atypes), Type::Object(ref bname, ref bid, ref btypes)) => {
+                match is_subclass_of(session, (bname, *bid, btypes), (aname, *aid, atypes), mode) {
+                    ok @ Ok(_) => ok,
+                    err @ Err(_) => match mode {
+                        Check::List => is_subclass_of(session, (aname, *aid, atypes), (bname, *bid, btypes), mode),
+                        _ => err,
                     }
                 }
+            },
+            (Type::Ref(ref atype), Type::Ref(ref btype)) => {
+                let ttype = check_type(session, Some(*atype.clone()), Some(*btype.clone()), mode, update)?;
+                Ok(Type::Ref(r(ttype)))
+            },
+            (_, Type::Ambiguous(_)) |
+            (Type::Ambiguous(_), _) => Err(Error::new(format!("TypeError: overloaded types are not allowed here..."))),
+            _ => {
+                Err(Error::new(format!("TypeError: type mismatch, expected {} but found {}", dtype, ctype)))
             }
         }
     }
