@@ -1,9 +1,24 @@
 
+* can you separate the placeholder and universal variables, and make it typecheck such that a universal variable cannot unify with a concrete type, but then you also need to
+  distinguish between explicitly declared universal variables, which are always universal, and implicitly declared (eg. function argument with no type specified) which can either
+  unify to a concrete type, or if no type is specified, it can be a universal...
+  The trick is that I don't know how the last part could work.  Could you have an extra thing after function body typechecking which tries to unify any types for that function/args
+
+* there is a fundamental type error in function declarations where a type variable is specified, but the body of the function uses it as a specific type
+* reduce the number of clones.  There are a lot of Strings passed around which could be sent as &str and cloned as necessary
 * maybe require an ignore type function call for statements that don't return unit (ie.  disallow having comparisons and math functions where the return value is ignored and the code will be optimized away,
   since it could be unintended)
 * the type variable tag 'existential' should be replaced with 'universal'.  There are 3 types, the 3rd being placeholder types, which must be unified to concrete terms
 
 TRAITS/TYPECLASSES:
+
+* currently you have function overloading, and class method overloading, which are forms of ad-hoc polymorphism.  Should all function overloading instead require a trait
+  implementation (eg. all the infix operator functions and str functions would become traits which would be implemented for different types instead of being overloaded funcs).
+  Class methods kind of still need to be ad-hoc.
+* if you made overloaded functions implement traits instead, then you'd want to be able to call them like functions, maybe sometimes also like methods (eg. str(x) and x.str())
+* would you still be able overload function names and argument numbers?  You could have trait { add('a, 'a) } and also add(String, String, String), since the types of the functions
+  don't overlap, but you couldn't also have add(Int, Int) which isn't defined as a trait impl, since it would conflict with add('a, 'a).  This might not be too different from what
+  you have now, as long as you make sure to check trait def types when checking for overloading
 
 * traits are currently being defined as object types (bindings:260), and the commented out code for subtyping allows a trait name to be used as an object, but if you switch
   to traits being constraints on type variables, then this would need to change.  Would you even record traits specially, as in not call define_type() but instead have a third

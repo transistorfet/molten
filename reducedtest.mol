@@ -323,3 +323,17 @@ println(str(char(0x30)))
 println(str(real(54)))
 println(str(int(12.25)))
 
+// TODO THIS CAUSES AN UNCAUGHT ERROR
+// we define the argument as a universal variable, but we treat it like an Int
+// and because we created a placeholder variable to check the body with, it worked
+// such that it matched to Int, but we can pass in a string since the function type
+// takes anything, but it will erroneously be treated as an Int.  If we didn't
+// explicitly declare that it has type 'a then I think it would produce an error.
+// Honestly, it's surprising how many cases it does actually catch... the return
+// type declaration, as 'a, is being ignored, so the return type is correct, but
+// the case below is still illogical/not-well-formed
+fn universal(a: 'a) -> 'a {
+    a + 5
+}
+println(str(universal("Hey")))
+
