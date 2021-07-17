@@ -21,8 +21,8 @@ use self::llvm_sys::transforms::pass_manager_builder::*;
 
 use hir::NodeID;
 use config::Options;
-use session::Session;
 use misc::{ UniqueID };
+use session::{ Session, Error };
 
 use transform::llcode::{ LLType, LLLit, LLRef, LLCmpType, LLLink, LLCC, LLExpr, LLGlobal, LLBlock };
 
@@ -193,17 +193,17 @@ impl<'sess> LLVM<'sess> {
         self.values.borrow_mut().insert(id, value);
     }
 
-    pub fn get_value(&self, id: UniqueID) -> Option<LLVMValueRef> {
+    pub fn get_value(&self, id: UniqueID) -> Result<LLVMValueRef, Error> {
         debug!("<<<<<<<<< GET VALUE: {:?} = {:?}", id, self.values.borrow().get(&id).cloned());
-        self.values.borrow().get(&id).cloned()
+        self.values.borrow().get(&id).cloned().ok_or(Error::new(format!("Codegen Value Unset: {:?}", id)))
     }
 
     pub fn set_type(&self, id: UniqueID, value: LLVMTypeRef) {
         self.types.borrow_mut().insert(id, value);
     }
 
-    pub fn get_type(&self, id: UniqueID) -> Option<LLVMTypeRef> {
-        self.types.borrow().get(&id).cloned()
+    pub fn get_type(&self, id: UniqueID) -> Result<LLVMTypeRef, Error> {
+        self.types.borrow().get(&id).cloned().ok_or(Error::new(format!("Codegen Type Unset: {:?}", id)))
     }
 
 

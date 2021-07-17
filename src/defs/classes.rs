@@ -267,7 +267,7 @@ impl Vtable {
     }
 
     pub fn add_entry(&self, session: &Session, id: NodeID, name: &str, ftype: Type) {
-        debug!("ADDING VTABLE ENTRY: {:?} {:?}", name, ftype);
+        debug!("ADDING VTABLE ENTRY: {} {:?} {:?}", id, name, ftype);
         if let Some(index) = self.get_index(session, name, &ftype) {
             self.table.borrow_mut()[index].0 = id;
         } else {

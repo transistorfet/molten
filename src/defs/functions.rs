@@ -2,10 +2,11 @@
 use std::rc::Rc;
 use std::cell::RefCell;
 
-use types::*;
+use abi::ABI;
 use defs::Def;
 use scope::{ Scope, ScopeRef };
 use session::{ Session, Error };
+use types::{ Type, Check, check_type };
 use hir::{ NodeID, Mutability, Visibility };
 
 use defs::classes::{ Define, StructDef, StructDefRef };
