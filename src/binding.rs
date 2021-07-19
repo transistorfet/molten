@@ -331,26 +331,30 @@ pub fn bind_type_names(session: &Session, scope: ScopeRef, ttype: Option<&mut Ty
                 bind_type_names(session, scope.clone(), Some(args.as_mut()), always_new)?;
                 bind_type_names(session, scope, Some(ret.as_mut()), always_new)?;
             },
-            &mut Type::Variable(ref name, ref mut id, universal) => {
-                let vtype = match always_new {
-                    true => scope.find_type_local(session, name),
-                    false => scope.find_type(session, name),
-                };
-                match vtype {
-                    Some(Type::Variable(_, ref eid, _)) => {
-                        *id = *eid
+            &mut Type::Variable(ref mut id) => {
+                if *id == UniqueID(0) {
+                    panic!("InternalError: Type::Variable with id 0");
+                }
+                session.set_type(*id, Type::Variable(*id));
+            },
+            &mut Type::Universal(ref name, ref mut id) => {
+                match scope.find_type(session, name) {
+                    Some(Type::Universal(_, ref eid)) => {
+                        *id = *eid;
                     },
-                    _ => {
+                    None => {
                         *id = UniqueID::generate();
-                        let ttype = Type::Variable(name.clone(), *id, universal);
+                        let ttype = Type::Universal(name.clone(), *id);
                         scope.define_type(name, Some(*id))?;
                         session.set_type(*id, ttype);
                     }
+                    Some(ttype) => return Err(Error::new(format!("NameError: expected Universal type with name {:?}, but found {:?}", name, ttype))),
                 }
             },
             &mut Type::Ref(ref mut ttype) => {
                 bind_type_names(session, scope.clone(), Some(ttype), always_new)?;
             },
+            &mut Type::Variable(_) => { },
             &mut Type::Ambiguous(_) => { },
         },
         None => { },
@@ -364,31 +368,6 @@ pub fn bind_classspec_type_names(session: &Session, scope: ScopeRef, classspec: 
     types.iter_mut().map(|ref mut ttype| bind_type_names(session, scope.clone(), Some(ttype), always_new)).count();
     Ok(())
 }
-
-/*
-pub fn bind_type_names(session: &Session, scope: ScopeRef, ttype: Type, always_new: bool) -> Type {
-    convert(|ttype| {
-        match ttype {
-            Type::Variable(name, id) => {
-                let vtype = match always_new {
-                    true => scope.find_type_local(session, name),
-                    false => scope.find_type(session, name),
-                };
-                match vtype {
-                    Some(Type::Variable(_, ref eid)) => *id = *eid,
-                    _ => {
-                        *id = UniqueID::generate();
-                        if !scope.contains_type_local(name) && !scope.is_primative() {
-                            scope.define_type(name.clone(), Type::Variable(name.clone(), *id))?;
-                        }
-                        session.set_type(*id, ttype);
-                    }
-                }
-            },
-            node @ _ => node
-        }
-    });
-*/
 
 #[must_use]
 pub fn check_recursive_type(ttype: &Option<&Type>, forbidden_id: NodeID) -> Result<(), Error> {
@@ -413,7 +392,8 @@ pub fn check_recursive_type(ttype: &Option<&Type>, forbidden_id: NodeID) -> Resu
                     check_recursive_type(&Some(ttype), forbidden_id)?;
                 }
             },
-            Type::Variable(ref _name, ref _id, ref _universal) => {
+            Type::Universal(_, ref _id) |
+            Type::Variable(ref _id) => {
                 // TODO this might be an error?
             },
             Type::Ref(_) |

@@ -395,7 +395,7 @@ impl<'sess> Refinery<'sess> {
             r(AST::Invoke(pos.clone(),
                 r(AST::make_resolve_ident(pos.clone(), Ident::from_str("List"), "new")),
                 vec!(
-                    AST::New(pos.clone(), ClassSpec::new(pos.clone(), Ident::from_str("List"), vec!(Type::Variable(typevar.to_string(), UniqueID(0), false))))
+                    AST::New(pos.clone(), ClassSpec::new(pos.clone(), Ident::from_str("List"), vec!(Type::Variable(UniqueID::generate()))))
                     /*, AST::Integer(items.len() as isize)*/
                 )))));
         for item in items {

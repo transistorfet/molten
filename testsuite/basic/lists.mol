@@ -17,7 +17,12 @@
     list1[0] = 123
     println(str(list1[0]))
 
-    let list2: List<'thing> = [ "ONE", "TWO", "THREE" ]
+    let list2 = [ "ONE", "TWO", "THREE" ]
     list2[1] = "FIVE"
     println(list2[1])
+
+    // TODO 2021-07-17 I think with the type system changes this is actually wrong, with forcing List<'thing>
+    //let list2: List<'thing> = [ "ONE", "TWO", "THREE" ]
+    //list2[1] = "FIVE"
+    //println(list2[1])
 

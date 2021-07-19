@@ -10,6 +10,15 @@ use session::{ Session, Error };
 pub use abi::ABI;
 
 
+/*
+#[derive(Clone, Debug, PartialEq)]
+struct Constraint {
+    name: String,
+    params: Vec<Type>,
+}
+*/
+
+
 #[derive(Clone, Debug, PartialEq)]
 pub enum Type {
     Object(String, UniqueID, Vec<Type>),
@@ -18,8 +27,8 @@ pub enum Type {
     Ref(R<Type>),
     Function(R<Type>, R<Type>, ABI),
 
-    Variable(String, UniqueID, bool),
-    //Existential(UniqueID),
+    Variable(UniqueID),
+    Universal(String, UniqueID),
 
     // TODO this isn't used atm, I don't think, but we could use it for a constrained type
     Ambiguous(Vec<Type>),
@@ -129,23 +138,17 @@ impl Type {
     #[allow(dead_code)]
     pub fn is_variable(&self) -> bool {
         match *self {
-            Type::Variable(_, _, _) => true,
+            Type::Universal(_, _) => true,
+            Type::Variable(_) => true,
             _ => false
-        }
-    }
-
-    #[allow(dead_code)]
-    pub fn get_varname(&self) -> Result<String, Error> {
-        match self {
-            &Type::Variable(ref name, _, _) => Ok(name.clone()),
-            _ => Err(Error::new(format!("TypeError: expected variable type, found {:?}", self))),
         }
     }
 
     pub fn get_id(&self) -> Result<UniqueID, Error> {
         match self {
             &Type::Object(_, ref id, _) => Ok(*id),
-            &Type::Variable(_, ref id, _) => Ok(*id),
+            &Type::Variable(ref id) => Ok(*id),
+            &Type::Universal(_, ref id) => Ok(*id),
             _ => Err(Error::new(format!("TypeError: expected object or variable type, found {:?}", self))),
         }
     }
@@ -188,8 +191,8 @@ impl Type {
                 let ret = ret.convert(f);
                 Type::Function(r(args), r(ret), abi)
             },
-            Type::Variable(name, id, universal) => {
-                Type::Variable(name, id, universal)
+            Type::Variable(id) => {
+                Type::Variable(id)
             }
         };
         f(ttype)
@@ -205,11 +208,14 @@ impl Type {
 impl fmt::Display for Type {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            Type::Object(ref name, ref _id, ref types) => {
+            Type::Object(ref name, _, ref types) => {
                 let params = if types.len() > 0 { format!("<{}>", types.iter().map(|p| format!("{}", p)).collect::<Vec<String>>().join(", ")) } else { String::from("") };
                 write!(f, "{}{}", name, params)
             },
-            Type::Variable(ref name, ref _id, _) => {
+            Type::Variable(ref id) => {
+                write!(f, "?{}", id)
+            }
+            Type::Universal(ref name, _) => {
                 write!(f, "'{}", name)
             }
             Type::Tuple(ref types) => {
@@ -254,31 +260,17 @@ impl Type {
 
     pub fn map_typevars(session: &Session, varmap: &mut HashMap<UniqueID, Type>, ttype: Type) -> Type {
         match ttype.clone() {
-            Type::Variable(name, id, universal) => {
+            Type::Universal(name, id) => {
                 match varmap.get(&id).map(|x| x.clone()) {
                     Some(ptype) => ptype,
                     None => {
-                        let etype = session.get_type(id);
-                        debug!("EXISTING TYPEVAR for {:?}: {:?} vs {:?}", name, etype, id);
-                        match Some(ttype) {
-                            Some(Type::Variable(_, ref eid, _)) if *eid == id && !universal => etype.clone().unwrap(),
-                            None | Some(Type::Variable(_, _, _)) => {
-                                let orgtype = Type::Variable(name.clone(), id, universal);
-                                if universal {
-                                    let maptype = session.new_typevar();
-                                    varmap.insert(id, maptype.clone());
-                                    debug!("MAPPED from {:?} to {:?}", orgtype, maptype);
-                                    maptype
-                                } else {
-                                    debug!("NOT MAPPED: {:?}", orgtype);
-                                    orgtype.clone()
-                                }
-                            },
-                            _ => etype.clone().unwrap(),
-                        }
+                        let maptype = session.new_typevar();
+                        varmap.insert(id, maptype.clone());
+                        maptype
                     }
                 }
             },
+            Type::Variable(id) => Type::Variable(id),
             Type::Function(args, ret, abi) => Type::Function(r(Type::map_typevars(session, varmap, *args)), r(Type::map_typevars(session, varmap, *ret)), abi),
             Type::Tuple(types) => Type::Tuple(Type::map_typevars_vec(session, varmap, types)),
             Type::Record(types) => Type::Record(types.into_iter().map(|(n, t)| (n, Type::map_typevars(session, varmap, t))).collect()),
@@ -322,22 +314,34 @@ pub fn check_type(session: &Session, odtype: Option<Type>, octype: Option<Type>,
 
         debug!("CHECK TYPE {:?} {:?} {:?}", dtype, ctype, update);
 
-        match (&dtype, &ctype) {
-            (Type::Variable(ref dname, ref did, duni), Type::Variable(ref cname, ref cid, cuni)) => {
-                if *cuni {
-                    if update && !duni { session.set_type(*did, ctype.clone()); }
-                    Ok(resolve_type(session, ctype, false)?)
-                } else {
-                    if update && !cuni { session.set_type(*cid, dtype.clone()); }
-                    Ok(resolve_type(session, dtype, false)?)
+        // If the update flag is false, then universal variables can unify with any type.  This
+        // assumes that update is only false when not type checking, such as looking for overloaded
+        // function variants, or making sure overloaded functions definitions don't overlap
+        if !update {
+            match (&dtype, &ctype) {
+                (Type::Universal(_, _), ntype) |
+                (ntype, Type::Universal(_, _)) if !update => {
+                    return Ok(ntype.clone());
                 }
+                _ => { },
+            }
+        }
+
+        match (&dtype, &ctype) {
+            (Type::Variable(ref did), Type::Variable(ref cid)) => {
+                if update { session.set_type(*cid, dtype.clone()); }
+                Ok(resolve_type(session, dtype, false)?)
             },
 
-            (Type::Variable(ref name, ref id, ref uni), ntype) |
-            (ntype, Type::Variable(ref name, ref id, ref uni)) => {
-                if update && !uni { session.update_type(*id, ntype.clone())?; }
+            (Type::Variable(ref id), ntype) |
+            (ntype, Type::Variable(ref id)) => {
+                if update { session.update_type(*id, ntype.clone())?; }
                 Ok(resolve_type(session, ntype.clone(), false)?)
             }
+
+            (Type::Universal(_, ref aid), Type::Universal(_, ref bid)) if aid == bid => {
+                Ok(dtype.clone())
+            },
 
             (Type::Function(ref aargs, ref aret, ref aabi), Type::Function(ref bargs, ref bret, ref babi)) => {
                 let oabi = aabi.compare(babi);
@@ -348,6 +352,7 @@ pub fn check_type(session: &Session, odtype: Option<Type>, octype: Option<Type>,
                     Err(Error::new(format!("TypeError: type mismatch, expected {} but found {}", dtype, ctype)))
                 }
             },
+
             (Type::Tuple(ref atypes), Type::Tuple(ref btypes)) => {
                 let mut types = vec!();
                 if atypes.len() == btypes.len() {
@@ -359,6 +364,7 @@ pub fn check_type(session: &Session, odtype: Option<Type>, octype: Option<Type>,
                     Err(Error::new(format!("TypeError: type mismatch, expected {} but found {}", dtype, ctype)))
                 }
             },
+
             (Type::Record(ref atypes), Type::Record(ref btypes)) => {
                 let mut types = vec!();
                 if atypes.len() == btypes.len() {
@@ -373,21 +379,27 @@ pub fn check_type(session: &Session, odtype: Option<Type>, octype: Option<Type>,
                     Err(Error::new(format!("TypeError: type mismatch, expected {} but found {}", dtype, ctype)))
                 }
             },
+
             (Type::Object(ref aname, ref aid, ref atypes), Type::Object(ref bname, ref bid, ref btypes)) => {
-                match is_subclass_of(session, (bname, *bid, btypes), (aname, *aid, atypes), mode) {
+                match is_subclass_of(session, (bname, *bid, btypes), (aname, *aid, atypes), mode, update) {
                     ok @ Ok(_) => ok,
                     err @ Err(_) => match mode {
-                        Check::List => is_subclass_of(session, (aname, *aid, atypes), (bname, *bid, btypes), mode),
+                        Check::List => is_subclass_of(session, (aname, *aid, atypes), (bname, *bid, btypes), mode, update),
                         _ => err,
                     }
                 }
             },
+
             (Type::Ref(ref atype), Type::Ref(ref btype)) => {
                 let ttype = check_type(session, Some(*atype.clone()), Some(*btype.clone()), mode, update)?;
                 Ok(Type::Ref(r(ttype)))
             },
+
             (_, Type::Ambiguous(_)) |
-            (Type::Ambiguous(_), _) => Err(Error::new(format!("TypeError: overloaded types are not allowed here..."))),
+            (Type::Ambiguous(_), _) => {
+                Err(Error::new(format!("TypeError: overloaded types are not allowed here...")))
+            },
+
             _ => {
                 Err(Error::new(format!("TypeError: type mismatch, expected {} but found {}", dtype, ctype)))
             }
@@ -396,7 +408,7 @@ pub fn check_type(session: &Session, odtype: Option<Type>, octype: Option<Type>,
 }
 
 
-fn is_subclass_of(session: &Session, adef: (&String, UniqueID, &Vec<Type>), bdef: (&String, UniqueID, &Vec<Type>), mode: Check) -> Result<Type, Error> {
+fn is_subclass_of(session: &Session, adef: (&String, UniqueID, &Vec<Type>), bdef: (&String, UniqueID, &Vec<Type>), mode: Check, update: bool) -> Result<Type, Error> {
     debug!("IS SUBCLASS: {:?} of {:?}", adef, bdef);
     let mut names = Type::map_new();
     let mut adef = (adef.0.clone(), adef.1, adef.2.clone());
@@ -404,12 +416,14 @@ fn is_subclass_of(session: &Session, adef: (&String, UniqueID, &Vec<Type>), bdef
 
     loop {
         let mut class = session.get_type(adef.1).unwrap();
-        class = Type::map_typevars(session, &mut names, class);
-        adef.2 = check_type_params(session, &class.get_params()?, &adef.2, mode, true)?;
+        if update {
+            class = Type::map_typevars(session, &mut names, class);
+        }
+        adef.2 = check_type_params(session, &class.get_params()?, &adef.2, mode, update)?;
 
         if *bdef.0 == adef.0 {
             let ptypes = if bdef.2.len() > 0 || adef.2.len() > 0 {
-                check_type_params(session, &adef.2, bdef.2, mode, true)?
+                check_type_params(session, &adef.2, bdef.2, mode, update)?
             } else {
                 vec!()
             };
@@ -422,7 +436,12 @@ fn is_subclass_of(session: &Session, adef: (&String, UniqueID, &Vec<Type>), bdef
         if classdef.parenttype.is_none() {
             return Err(Error::new(format!("TypeError: type mismatch, expected {} but found {}", Type::Object(bdef.0.clone(), bdef.1, bdef.2.clone()), Type::Object(adef.0.clone(), adef.1, adef.2))));
         }
-        let parent = Type::map_typevars(session, &mut names, classdef.parenttype.clone().unwrap());
+        let parent = classdef.parenttype.clone().unwrap();
+        let parent = if update {
+            Type::map_typevars(session, &mut names, parent)
+        } else {
+            parent
+        };
         match resolve_type(session, parent, false)? {
             Type::Object(name, id, params) => adef = (name, id, params),
             ttype @ _ => return Err(Error::new(format!("TypeError: expected Object but found {}", ttype))),
@@ -458,13 +477,12 @@ pub fn resolve_type(session: &Session, ttype: Type, require_resolve: bool) -> Re
                 },
             }
         },
-        Type::Variable(_, ref id, _) => {
+        Type::Variable(ref id) => {
             match session.get_type(*id) {
                 Some(vtype) => {
-                    debug!("~~~~~~ {:?} -> {:?}", id, vtype);
                     match vtype {
-                        Type::Variable(_, ref eid, ref euni) if eid == id => {
-                            if !require_resolve || *euni {
+                        Type::Variable(ref eid) if eid == id => {
+                            if !require_resolve {
                                 Ok(vtype.clone())
                             } else {
                                 Err(Error::new(format!("TypeError: unification variable unresolved: {}", vtype)))
@@ -475,6 +493,9 @@ pub fn resolve_type(session: &Session, ttype: Type, require_resolve: bool) -> Re
                 },
                 None => Err(Error::new(format!("TypeError: undefined type variable {}", ttype))),
             }
+        },
+        Type::Universal(ref name, ref id) => {
+            Ok(Type::Universal(name.clone(), *id))
         },
         Type::Tuple(ref types) => {
             let types = types.iter().map(|ttype| resolve_type(session, ttype.clone(), require_resolve)).collect::<Result<Vec<Type>, Error>>()?;

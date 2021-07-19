@@ -170,7 +170,7 @@ impl Session {
 
     pub fn new_typevar(&self) -> Type {
         let id = NodeID::generate();
-        let ttype = Type::Variable(format!("{}", id), id, false);
+        let ttype = Type::Variable(id);
         self.set_type(id, ttype.clone());
         debug!("NEW TYPEVAR: {:?}", ttype);
         ttype
@@ -183,7 +183,7 @@ impl Session {
         let etype = self.get_type(id);
         let ntype = match etype.clone() {
             // NOTE don't update a variable with itself or it will cause infinite recursion due to the update call in check_type
-            Some(Type::Variable(_, eid, _)) if eid == id => ttype,
+            Some(Type::Variable(eid)) if eid == id => ttype,
             etype @ Some(_) => {
                 types::check_type(self, etype, Some(ttype.clone()), types::Check::Def, true)?
             },

@@ -1,4 +1,4 @@
-Fri 16 Jul 2021 11:36:53 PM PDT
+Sun 18 Jul 2021 07:58:55 PM PDT
 [01/69] basic/abi-across-exprs.mol......................................success
 [02/69] basic/block-assign.mol..........................................success
 [03/69] basic/block-invoke.mol..........................................success
@@ -67,5 +67,5 @@ Fri 16 Jul 2021 11:36:53 PM PDT
 [66/69] typecheck/infer-forward-method.mol..............................success
 [67/69] typecheck/method-overload-mismatch.mol..........................FAIL
 [68/69] typecheck/object-typevar-params.mol.............................success
-[69/69] typecheck/universal-type-erasure-error.mol......................FAIL
-64 tests passed, 5 tests failed, 69 total
+[69/69] typecheck/universal-type-erasure-error.mol......................success
+65 tests passed, 4 tests failed, 69 total

@@ -168,11 +168,11 @@ impl OverloadDef {
         let mut found = vec!();
         let mut variant_types = vec!();
         for id in variants {
-                debug!(">>>: {:?} = {:?}", id, session.get_type(id));
+            debug!(">>>: {:?} = {:?}", id, session.get_type(id));
+
             // Fetch the variant's type and map its typevars if necessary
             let ttype = match session.get_type(id) {
-                Some(vtype @ Type::Variable(_, _, _)) => vtype,
-                Some(ttype) => ttype, //Type::map_all_typevars(session, ttype),
+                Some(ttype) => ttype,
                 None => {
                     let vtype = session.new_typevar();
                     session.set_type(id, vtype.clone());

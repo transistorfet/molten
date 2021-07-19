@@ -261,11 +261,7 @@ impl ClosureTransform {
         //      you wouldn't need the special recursive case in transform_reference.  It should be represented as an object, since the closure has a
         //      struct already, but it will take some refactoring first
         code.push(Expr::new_with_id(did_context, Pos::empty(), ExprKind::Definition(Mutability::Mutable, Ident::new(context_name.clone()), None, r(
-            if fields.len() > 0 {
-                Expr::make_ref(Pos::empty(), Expr::make_record(Pos::empty(), fields))
-            } else {
-                Expr::make_nil()
-            }
+            Expr::make_ref(Pos::empty(), Expr::make_record(Pos::empty(), fields))
         ))));
 
         binding::NameBinder::bind_names(transform.session, scope.clone(), &code);

@@ -95,7 +95,8 @@ pub fn molten_mangle_name(name: &str, argtypes: &Type, funcdefs: i32) -> String 
 pub fn molten_mangle_type(ttype: &Type) -> String {
     match ttype {
         // TODO add type paramaters into name
-        Type::Variable(_, _, _) => format!("V"),
+        Type::Variable(_) => panic!("Placeholder type variables shouldn't appear here"),
+        Type::Universal(_, _) => format!("V"),
         Type::Object(name, _, _types) => format!("N{}{}", name.len(), name),
         Type::Tuple(types) => {
             let mut tuple = String::from("");

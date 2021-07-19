@@ -422,8 +422,9 @@ impl<'sess> Transformer<'sess> {
             Type::Ref(ttype) => LLType::Ptr(r(self.transform_value_type(ttype))),
             Type::Tuple(items) => LLType::Struct(items.iter().map(|item| self.transform_value_type(&item)).collect()),
             Type::Record(items) => LLType::Struct(items.iter().map(|item| self.transform_value_type(&item.1)).collect()),
+            Type::Variable(id) => panic!("Unexpected placeholder type variable during transform: {}", id),
             // TODO how will you do generics
-            Type::Variable(_, _, _) => LLType::Var,
+            Type::Universal(_, _) => LLType::Var,
             Type::Function(args, ret, abi) => self.transform_func_value_type(*abi, &args.as_vec(), &*ret),
             _ => panic!("Not Implemented: {:?}", ttype),
         }

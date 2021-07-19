@@ -143,8 +143,10 @@ pub fn unparse_type(session: &Session, ttype: Type) -> String {
             let params = if types.len() > 0 { format!("<{}>", types.iter().map(|p| unparse_type(session, p.clone())).collect::<Vec<String>>().join(", ")) } else { String::from("") };
             name.clone() + &params
         },
-        Type::Variable(name, _id, _) => {
-            //format!("'v{}", id)
+        Type::Variable(id) => {
+            format!("?{}", id)
+        },
+        Type::Universal(name, _id) => {
             format!("'{}", name)
         },
         Type::Tuple(types) => {

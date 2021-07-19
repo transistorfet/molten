@@ -1,5 +1,10 @@
 
 //!should_fail
+//!err .*TypeError: type mismatch, expected Int but found 'a
+//!err .*
+//!err .*
+//!err .*
+//!err .*
 
 // This Causes An Uncaught Error
 //

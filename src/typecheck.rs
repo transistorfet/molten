@@ -101,6 +101,19 @@ impl<'sess> Visitor for TypeChecker<'sess> {
         }
     }
 
+    fn visit_pattern(&mut self, pat: &Pattern) -> Result<Self::Return, Error> {
+        match visitor::walk_pattern(self, pat) {
+            Ok(ttype) => {
+                debug!("CHECK: {:?} {:?}", ttype, pat);
+                Ok(ttype)
+            },
+            Err(err) => {
+                self.session.print_error(err.add_pos(&pat.pos));
+                Ok(self.default_return())
+            },
+        }
+    }
+
     fn visit_literal(&mut self, _id: NodeID, _lit: &Literal) -> Result<Self::Return, Error> {
         let scope = self.stack.get_scope();
         match _lit {
@@ -173,8 +186,8 @@ impl<'sess> Visitor for TypeChecker<'sess> {
         let dtype = self.session_find_variant(refid, fexpr, &atypes)?;
         debug!("INVOKE TYPE: {:?} has type {:?}", refid, dtype);
         let etype = match dtype {
-            Type::Variable(_, _, _) => dtype.clone(),
-            _ => Type::map_all_typevars(self.session, dtype.clone()),
+            dtype @ Type::Variable(_) => dtype,
+            dtype @ _ => Type::map_all_typevars(self.session, dtype),
         };
 
         let ftype = match etype {
@@ -186,7 +199,7 @@ impl<'sess> Visitor for TypeChecker<'sess> {
 
                 ftype
             },
-            Type::Variable(_, vid, _) => {
+            Type::Variable(vid) => {
                 let ftype = Type::Function(r(atypes), r(self.session.get_type(refid).unwrap_or_else(|| self.session.new_typevar())), ABI::Unknown);
                 self.session.update_type(vid, ftype.clone())?;
                 ftype
@@ -318,7 +331,7 @@ impl<'sess> Visitor for TypeChecker<'sess> {
                 self.session.set_type(refid, etype.clone());
                 Ok(etype)
             },
-            Type::Variable(_, vid, _) => {
+            Type::Variable(vid) => {
                 let etype = expect_type(self.session, self.session.get_type(refid), None, Check::Def)?;
                 self.session.update_type(vid, Type::Ref(r(etype.clone())))?;
                 self.session.set_type(refid, etype.clone());
@@ -469,11 +482,12 @@ impl<'sess> Visitor for TypeChecker<'sess> {
         let defid = vars.get_var_def(&field.name).ok_or(Error::new(format!("VarError: definition not set for {:?}", field.name)))?;
         self.session.set_ref(id, defid);
         let ttype = self.session.get_type(defid).ok_or(Error::new(format!("TypeError: no type set for id {:?}", defid)))?;
+        let ttype = Type::map_all_typevars(self.session, ttype);
         expect_type(self.session, Some(ttype), self.session.get_type(id), Check::Def)
     }
 
     fn visit_pattern_enum_args(&mut self, id: NodeID, left: &Pattern, args: &Vec<Pattern>) -> Result<Self::Return, Error> {
-        self.visit_pattern(left)?;
+        let ltype = self.visit_pattern(left)?;
         let variant_id = self.session.get_ref(left.get_id())?;
         self.session.set_ref(id, variant_id);
         let enumdef = self.session.get_def(self.session.get_ref(variant_id)?)?.as_enum()?;
@@ -483,7 +497,7 @@ impl<'sess> Visitor for TypeChecker<'sess> {
                 // Map the typevars from the enum type params into the enum variant's types, in order to use type hint from 'expected'
                 let mut typevars = Type::map_new();
                 let vtype = Type::map_typevars(self.session, &mut typevars, enumdef.deftype.clone());
-                let ctype = expect_type(self.session, Some(vtype), self.session.get_type(id), Check::Def)?;
+                let vtype = expect_type(self.session, Some(vtype), self.session.get_type(id), Check::Def)?;
                 let rtype = resolve_type(self.session, Type::map_typevars(self.session, &mut typevars, ttype), false)?;
                 let types = rtype.as_vec();
 
@@ -496,8 +510,9 @@ impl<'sess> Visitor for TypeChecker<'sess> {
                     argtypes.push(self.visit_pattern_expected(&arg, Some(ttype.clone()))?);
                 }
 
-                expect_type(self.session, Some(rtype), Some(Type::Tuple(argtypes)), Check::Def)?;
-                Ok(enumdef.deftype.clone())
+                let etype = expect_type(self.session, Some(rtype), Some(Type::Tuple(argtypes)), Check::Def)?;
+                expect_type(self.session, Some(ltype), Some(Type::Function(r(etype), r(Type::map_typevars(self.session, &mut typevars, enumdef.deftype.clone())), ABI::Unknown)), Check::Def)?;
+                Ok(Type::map_typevars(self.session, &mut typevars, enumdef.deftype.clone()))
             },
         }
     }

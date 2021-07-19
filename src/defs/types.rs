@@ -50,8 +50,8 @@ impl TypeAliasDef {
         let mut map = Type::map_new();
         for (def, param) in defparams.iter().zip(params) {
             match def {
-                Type::Variable(_, ref id, _) => { map.insert(*id, param); },
-                _ => return Err(Error::new(format!("UnsupportedError: currently only typevars are supported as type parameters in type aliases"))),
+                Type::Universal(_, ref id) => { map.insert(*id, param); },
+                _ => return Err(Error::new(format!("UnsupportedError: currently only universal type variables are supported as type parameters in type aliases"))),
             }
         }
         Ok(Type::map_typevars(session, &mut map, etype))

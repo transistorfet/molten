@@ -1,4 +1,14 @@
 
+* there's the issue with transforming placeholder values (no idea where those placeholders are from), and also need to rewrite the enums checking a bit
+
+* the problem with lists.mol test is caused when matching overloaded variants by type.  There are two places that this happens, and fixing it for one breaks it for the other.
+  When calling a method, it tries to resolve the overloaded variant, which fails because the universal variables don't compare.  Mapping the variables works for invoke, but then
+  breaks with unresolved unification when in method definitions (list class), when it checks if there's a variant with a unifiable type.  If that checks fails, then the function
+  definition is allowed.  If it passes, then it returns a type containing placeholders, which is then dropped without resolving further, leaving unresolved type variables.
+
+* the print_error() method should take a reference!!
+
+
 * can you separate the placeholder and universal variables, and make it typecheck such that a universal variable cannot unify with a concrete type, but then you also need to
   distinguish between explicitly declared universal variables, which are always universal, and implicitly declared (eg. function argument with no type specified) which can either
   unify to a concrete type, or if no type is specified, it can be a universal...

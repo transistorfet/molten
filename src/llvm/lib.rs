@@ -71,7 +71,7 @@ pub fn declare_builtins_node<'sess>(session: &Session, scope: ScopeRef, node: &B
             };
 
             let mut ftype = parse_type(ftype);
-            bind_type_names(session, tscope.clone(), ftype.as_mut(), true).unwrap();
+            bind_type_names(session, tscope.clone(), ftype.as_mut(), false).unwrap();
             debug!("BUILTIN TYPE: {:?}", ftype);
             let abi = ftype.as_ref().map(|t| t.get_abi().unwrap()).unwrap_or(ABI::Molten);
             AnyFunc::define(session, scope.clone(), *id, Visibility::Global, Some(name), abi, ftype.clone()).unwrap();
@@ -298,14 +298,14 @@ pub fn get_builtins<'sess>() -> Vec<BuiltinDef<'sess>> {
         BuiltinDef::Func(id(), "getindex",  "(String, Int) -> Char / C",                    FuncKind::Function(string_get)),
 
 
-        BuiltinDef::Class(id(), "Buffer",   vec!(Type::Variable(String::from("item"), UniqueID(0), true)), vec!(), vec!()),
+        BuiltinDef::Class(id(), "Buffer",   vec!(Type::Universal(String::from("item"), UniqueID(0))), vec!(), vec!()),
         BuiltinDef::Func(id(), "bufalloc",  "(Int) -> Buffer<'item> / C",                   FuncKind::Function(buffer_alloc)),
         BuiltinDef::Func(id(), "bufresize", "(Buffer<'item>, Int) -> Buffer<'item> / C",    FuncKind::Function(buffer_resize)),
         BuiltinDef::Func(id(), "bufget",    "(Buffer<'item>, Int) -> 'item / C",            FuncKind::Function(buffer_get)),
         BuiltinDef::Func(id(), "bufset",    "(Buffer<'item>, Int, 'item) -> () / C",        FuncKind::Function(buffer_set)),
 
         /*
-        BuiltinDef::Class(id(), "Buffer", vec!(Type::Variable(String::from("item"), UniqueID(0), true)), vec!(), vec!(
+        BuiltinDef::Class(id(), "Buffer", vec!(Type::Universal(String::from("item"), UniqueID(0))), vec!(), vec!(
             BuiltinDef::Func(id(), "__alloc__",  "() -> Buffer<'item>",                      FuncKind::Method(buffer_allocator)),
             BuiltinDef::Func(id(), "new",        "(Buffer<'item>, Int) -> Buffer<'item>",    FuncKind::Method(buffer_constructor)),
             BuiltinDef::Func(id(), "resize",     "(Buffer<'item>, Int) -> Buffer<'item>",    FuncKind::Method(buffer_resize)),
@@ -314,7 +314,7 @@ pub fn get_builtins<'sess>() -> Vec<BuiltinDef<'sess>> {
         )),
         */
 
-        //BuiltinDef::Class(id(), "List",   vec!(Type::Variable(String::from("item"), UniqueID(0))), vec!(), vec!()),
+        //BuiltinDef::Class(id(), "List",   vec!(Type::Universal(String::from("item"), UniqueID(0))), vec!(), vec!()),
         //BuiltinDef::Class(id(), "Class",  Type::Object(String::from("Class"), vec!())),
 
         BuiltinDef::Func(id(), "strlen",     "(String) -> Int / C",             FuncKind::External),

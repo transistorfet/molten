@@ -755,7 +755,7 @@ named!(type_object(Span) -> Type,
 );
 
 named!(type_variable(Span) -> Type,
-    map!(preceded!(tag!("'"), identifier), |s| Type::Variable(s.name.clone(), UniqueID(0), true))
+    map!(preceded!(tag!("'"), identifier), |s| Type::Universal(s.name.clone(), UniqueID(0)))
 );
 
 named!(type_tuple(Span) -> Type,
