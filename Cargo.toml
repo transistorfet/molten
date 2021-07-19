@@ -9,5 +9,4 @@ nom_locate = { version = "^3.0" }
 clap = "^2"
 llvm-sys = "^110"
 regex = "^1.1.0"
-rand = "^0.5"
 

@@ -24,17 +24,19 @@ use defs::functions::{ AnyFunc };
 use transform::llcode::{ LLType, LLLink };
 use transform::transform::Transformer;
 
-use llvm::codegen::{ LLVM, cstr, cstring };
+use llvm::codegen::{ LLVM, cstr };
 
 pub type ObjectFunction = unsafe fn(&LLVM, LLVMTypeRef, Vec<LLVMValueRef>) -> LLVMValueRef;
 pub type PlainFunction = unsafe fn(&LLVM, Vec<LLVMValueRef>) -> LLVMValueRef;
 
 #[derive(Clone)]
 pub enum FuncKind {
-    FromNamed,
     External,
+    Function(PlainFunction),
+    #[allow(dead_code)]
+    FromNamed,
+    #[allow(dead_code)]
     Method(ObjectFunction),
-    Function(PlainFunction)
 }
 
 #[derive(Clone)]
@@ -50,9 +52,7 @@ pub fn make_global<'sess>(session: &Session, builtins: &Vec<BuiltinDef<'sess>>) 
 
     declare_builtins_vec(session, primatives.clone(), builtins);
 
-    let _global = session.map.add(ScopeMapRef::GLOBAL, Some(primatives));
-    // NOTE disabling this allows the identifier closure convertor to convert references to variables inside the main function
-    //global.set_context(Context::Global);
+    session.map.add(ScopeMapRef::GLOBAL, Some(primatives));
 }
 
 pub fn declare_builtins_vec<'sess>(session: &Session, scope: ScopeRef, entries: &Vec<BuiltinDef<'sess>>) {
@@ -63,7 +63,7 @@ pub fn declare_builtins_vec<'sess>(session: &Session, scope: ScopeRef, entries: 
 
 pub fn declare_builtins_node<'sess>(session: &Session, scope: ScopeRef, node: &BuiltinDef<'sess>) {
     match node {
-        BuiltinDef::Func(id, name, ftype, func) => {
+        BuiltinDef::Func(id, name, ftype, _) => {
             let tscope = if scope.is_primative() {
                 Scope::new_ref(Some(scope.clone()))
             } else {
@@ -110,10 +110,10 @@ pub unsafe fn define_builtins_node<'sess>(llvm: &LLVM<'sess>, transformer: &mut 
             let ltype = transformer.transform_func_def_type(abi, &argtypes.as_vec(), rettype);
             match *func {
                 FuncKind::FromNamed => {
-                    llvm.set_value(*id, LLVMGetNamedFunction(llvm.module, cstring(&name)));
+                    llvm.set_value(*id, LLVMGetNamedFunction(llvm.module, cstr(&name)));
                 },
                 FuncKind::External => {
-                    let func = LLVMAddFunction(llvm.module, cstring(&name), llvm.build_type(&ltype));
+                    let func = LLVMAddFunction(llvm.module, cstr(&name), llvm.build_type(&ltype));
                     llvm.set_value(*id, func);
                 },
                 FuncKind::Method(func) => {
@@ -141,9 +141,6 @@ pub unsafe fn define_builtins_node<'sess>(llvm: &LLVM<'sess>, transformer: &mut 
             let tscope = llvm.session.map.get(id);
             //let cname = String::from(*name);
             let classdef = llvm.session.get_def(*id).unwrap().as_class().unwrap();
-            if entries.len() <= 0 {
-                classdef.set_primative();
-            }
             let ltype = transformer.transform_value_type(&llvm.session.get_type(*id).unwrap());
 
             let lltype = if structdef.len() > 0 {
@@ -543,10 +540,6 @@ unsafe fn string_get(llvm: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef {
 
 
 unsafe fn print(llvm: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef {
-    // This would access the char* inside a wide pointer/slice where the second element is the size
-    //let str = LLExpr::LoadRef(r(LLExpr::AccessRef(r(args[0]), vec!(LLRef::Field(0)))))
-    //LLExpr::CallC(r(LLExpr::GetNamed("fputs")), vec!(str), LLCC::CCC)
-    //LLExpr::Literal(LLLit::I32(0))
     llvm.build_call_by_name("fputs", &mut vec!(args[0], llvm.build_load(LLVMGetNamedGlobal(llvm.module, cstr("stdout")))));
     llvm.i32_const(0)
 }
@@ -560,7 +553,7 @@ unsafe fn println(llvm: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef {
 unsafe fn readline(llvm: &LLVM, _args: Vec<LLVMValueRef>) -> LLVMValueRef {
     let buffer = llvm.build_cast(llvm.str_type(), llvm.build_call_by_name("molten_malloc", &mut vec!(llvm.i64_const(2048))));
 
-    let ret = llvm.build_call_by_name("fgets", &mut vec!(buffer, llvm.i64_const(2048), llvm.build_load(LLVMGetNamedGlobal(llvm.module, cstr("stdin")))));
+    let _ret = llvm.build_call_by_name("fgets", &mut vec!(buffer, llvm.i64_const(2048), llvm.build_load(LLVMGetNamedGlobal(llvm.module, cstr("stdin")))));
     // TODO we ignore ret which could cause the buffer to not be null terminated
     let len = llvm.build_call_by_name("strlen", &mut vec!(buffer));
     llvm.build_call_by_name("molten_realloc", &mut vec!(buffer, len))

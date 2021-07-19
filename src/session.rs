@@ -11,7 +11,6 @@ use std::collections::HashMap;
 use parser;
 use types::Type;
 use config::Options;
-use refinery::Refinery;
 use ast::{ Pos, AST };
 use hir::{ NodeID };
 use defs::{ Def };
@@ -87,7 +86,7 @@ impl Session {
 
 
 
-    pub fn print_error(&self, err: Error) {
+    pub fn print_error(&self, err: &Error) {
         self.errors.set(self.errors.get() + 1);
         let fborrow = self.files.borrow();
         if let Some(ref pos) = err.pos {
@@ -102,7 +101,7 @@ impl Session {
     #[allow(dead_code)]
     pub fn raise_error(&self, pos: &Pos, msg: String) -> Error {
         let err = Error::new_pos(pos, msg);
-        self.print_error(err.clone());
+        self.print_error(&err);
         err
     }
 
@@ -205,7 +204,7 @@ impl Session {
                     debug!("Resolving type for id {:?} from {:?} to {:?}", key, ttype, ntype);
                     self.set_type(key, ntype);
                 },
-                Err(err) => self.print_error(err),
+                Err(err) => self.print_error(&err),
             }
         }
     }
@@ -232,12 +231,6 @@ impl Error {
         self.pos = Some(pos.clone());
         self
     }
-
-    /*
-    pub fn pos<R>(res: Result<R, Error>, pos: &Pos) -> Result<R, Error> {
-        res.map_err(|mut err| { err.pos = pos.clone(); err })
-    }
-    */
 }
 
 impl fmt::Display for Error {

@@ -26,13 +26,8 @@ pub enum Type {
     Record(Vec<(String, Type)>),
     Ref(R<Type>),
     Function(R<Type>, R<Type>, ABI),
-
     Variable(UniqueID),
     Universal(String, UniqueID),
-
-    // TODO this isn't used atm, I don't think, but we could use it for a constrained type
-    Ambiguous(Vec<Type>),
-    //Constrained(R<&mut AST>),
 }
 
 impl Type {
@@ -153,52 +148,9 @@ impl Type {
         }
     }
 
-    #[allow(dead_code)]
-    pub fn is_ambiguous(&self) -> bool {
-        match *self {
-            Type::Ambiguous(_) => true,
-            _ => false
-        }
-    }
-
     pub fn from_spec(classspec: ClassSpec, id: UniqueID) -> Type {
         Type::Object(classspec.ident.name, id, classspec.types)
     }
-
-    /*
-    pub fn convert<F>(self, f: &F) -> Type where F: FnOnce(Type) -> Type {
-        let ttype = match self {
-            Type::Object(name, id, types) => {
-                let types = types.into_iter().map(move |ttype| {
-                    ttype.convert(f)
-                }).collect();
-                Type::Object(name, id, types)
-            },
-            Type::Ambiguous(types) => {
-                let types = types.into_iter().map(move |ttype| {
-                    ttype.convert(f)
-                }).collect();
-                Type::Ambiguous(types)
-            },
-            Type::Tuple(types) => {
-                let types = types.into_iter().map(move |ttype| {
-                    ttype.convert(f)
-                }).collect();
-                Type::Tuple(types)
-            },
-            Type::Function(args, ret, abi) => {
-                let args = args.convert(f);
-                let ret = ret.convert(f);
-                Type::Function(r(args), r(ret), abi)
-            },
-            Type::Variable(id) => {
-                Type::Variable(id)
-            }
-        };
-        f(ttype)
-    }
-    */
-
 
     pub fn display_vec(list: &Vec<Type>) -> String {
         list.iter().map(|t| format!("{}", t)).collect::<Vec<String>>().join(", ")
@@ -232,20 +184,9 @@ impl fmt::Display for Type {
             Type::Ref(ref ttype) => {
                 write!(f, "ref {}", ttype)
             }
-            Type::Ambiguous(ref variants) => {
-                let varstr: Vec<String> = variants.iter().map(|v| format!("{}", v)).collect();
-                write!(f, "Ambiguous[{}]", varstr.join(", "))
-            },
         }
     }
 }
-
-//impl fmt::Display for Vec<Type> {
-//    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-//        self.iter().map(|t| format!("{}", t)).collect().join(", ")
-//    }
-//}
-
 
 impl Type {
     pub fn map_all_typevars(session: &Session, ttype: Type) -> Type {
@@ -260,7 +201,7 @@ impl Type {
 
     pub fn map_typevars(session: &Session, varmap: &mut HashMap<UniqueID, Type>, ttype: Type) -> Type {
         match ttype.clone() {
-            Type::Universal(name, id) => {
+            Type::Universal(_, id) => {
                 match varmap.get(&id).map(|x| x.clone()) {
                     Some(ptype) => ptype,
                     None => {
@@ -274,7 +215,6 @@ impl Type {
             Type::Function(args, ret, abi) => Type::Function(r(Type::map_typevars(session, varmap, *args)), r(Type::map_typevars(session, varmap, *ret)), abi),
             Type::Tuple(types) => Type::Tuple(Type::map_typevars_vec(session, varmap, types)),
             Type::Record(types) => Type::Record(types.into_iter().map(|(n, t)| (n, Type::map_typevars(session, varmap, t))).collect()),
-            Type::Ambiguous(variants) => Type::Ambiguous(Type::map_typevars_vec(session, varmap, variants)),
             Type::Ref(ttype) => Type::Ref(r(Type::map_typevars(session, varmap, *ttype))),
             Type::Object(name, id, types) => Type::Object(name.clone(), id, Type::map_typevars_vec(session, varmap, types)),
         }
@@ -328,8 +268,8 @@ pub fn check_type(session: &Session, odtype: Option<Type>, octype: Option<Type>,
         }
 
         match (&dtype, &ctype) {
-            (Type::Variable(ref did), Type::Variable(ref cid)) => {
-                if update { session.set_type(*cid, dtype.clone()); }
+            (Type::Variable(_), Type::Variable(ref id)) => {
+                if update { session.set_type(*id, dtype.clone()); }
                 Ok(resolve_type(session, dtype, false)?)
             },
 
@@ -393,11 +333,6 @@ pub fn check_type(session: &Session, odtype: Option<Type>, octype: Option<Type>,
             (Type::Ref(ref atype), Type::Ref(ref btype)) => {
                 let ttype = check_type(session, Some(*atype.clone()), Some(*btype.clone()), mode, update)?;
                 Ok(Type::Ref(r(ttype)))
-            },
-
-            (_, Type::Ambiguous(_)) |
-            (Type::Ambiguous(_), _) => {
-                Err(Error::new(format!("TypeError: overloaded types are not allowed here...")))
             },
 
             _ => {
@@ -513,10 +448,6 @@ pub fn resolve_type(session: &Session, ttype: Type, require_resolve: bool) -> Re
         },
         Type::Ref(ref ttype) => {
             Ok(Type::Ref(r(resolve_type(session, *ttype.clone(), require_resolve)?)))
-        },
-        Type::Ambiguous(ref variants) => {
-            let newvars = variants.iter().map(|variant| resolve_type(session, variant.clone(), require_resolve)).collect::<Result<Vec<Type>, Error>>()?;
-            Ok(Type::Ambiguous(newvars))
         },
     }
 }

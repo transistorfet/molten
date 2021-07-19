@@ -3,11 +3,6 @@
 use std::fmt;
 use std::str;
 
-//extern crate nom;
-//use nom::{ digit };
-//use nom::types::CompleteByteSlice;
-//use parser;
-
 use hir::Ident;
 use types::Type;
 
@@ -55,16 +50,6 @@ impl ABI {
         }
     }
 
-    pub fn can_overload(&self) -> bool {
-        match *self {
-            ABI::Cpp |
-            ABI::Molten => true,
-            ABI::C |
-            ABI::Rust |
-            ABI::Unknown => false,
-        }
-    }
-
     pub fn mangle_name(&self, name: &str, argtypes: &Type, funcdefs: i32) -> String {
         match *self {
             ABI::Molten => molten_mangle_name(name, argtypes, funcdefs),
@@ -109,21 +94,4 @@ pub fn molten_mangle_type(ttype: &Type) -> String {
         _ => String::from("")
     }
 }
-
-/*
-pub fn molten_unmangle_name(name: &str) -> Option<String> {
-    named!(unmangle(parser::Span) -> String,
-        preceded!(tag!("_Z"),
-            map!(
-                length_bytes!(map!(digit, |s| usize::from_str_radix(str::from_utf8(&s.fragment).unwrap(), 10).unwrap())),
-                |s| parser::span_to_string(s)
-            )
-        )
-    );
-    match unmangle(parser::Span::new(CompleteByteSlice(name.as_bytes()))) {
-        Ok((_, value)) => Some(value),
-        _ => None,
-    }
-}
-*/
 

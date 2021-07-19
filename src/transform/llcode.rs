@@ -5,6 +5,7 @@ use misc::{ R };
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum LLType {
+    #[allow(dead_code)]
     Void,
     I1,
     I8,
@@ -15,10 +16,11 @@ pub enum LLType {
     ExceptionPoint,
     Ptr(R<LLType>),
     Struct(Vec<LLType>),
-    Array(R<LLType>, usize),
     Function(Vec<LLType>, R<LLType>),
     Alias(NodeID),
     Largest(Vec<LLType>),
+    #[allow(dead_code)]
+    Array(R<LLType>, usize),
 }
 
 impl LLType {
@@ -26,27 +28,6 @@ impl LLType {
         match self {
             LLType::Function(args, _) => args.len(),
             _ => 0,
-        }
-    }
-
-    pub fn get_rettype(&self) -> LLType {
-        match self {
-            LLType::Function(_, ret) => *ret.clone(),
-            _ => LLType::Void,
-        }
-    }
-
-    pub fn get_element(&self) -> LLType {
-        match self {
-            LLType::Ptr(element) => *element.clone(),
-            _ => self.clone(),
-        }
-    }
-
-    pub fn get_items(&self) -> Vec<LLType> {
-        match self {
-            LLType::Struct(items) => items.clone(),
-            _ => panic!("InternalError: attempting to get items from a non-struct type {:?}", self),
         }
     }
 }
@@ -64,14 +45,15 @@ pub enum LLLit {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum LLRef {
+    #[allow(dead_code)]
     Deref,
     Field(usize),
-    Index(usize),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum LLCmpType {
     Equal,
+    #[allow(dead_code)]
     NotEqual,
 }
 
@@ -103,6 +85,7 @@ pub enum LLExpr {
 
     DefLocal(NodeID, String, LLType, R<LLExpr>),
     GetLocal(NodeID),
+    #[allow(dead_code)]
     SetLocal(NodeID, R<LLExpr>),
 
     GetGlobal(NodeID),
@@ -110,6 +93,7 @@ pub enum LLExpr {
 
     DefStruct(NodeID, LLType, Vec<LLExpr>),
     GetItem(R<LLExpr>, usize),
+    #[allow(dead_code)]
     SetItem(R<LLExpr>, usize, R<LLExpr>),
 
     AllocRef(NodeID, LLType, Option<R<LLExpr>>),

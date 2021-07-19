@@ -58,7 +58,7 @@ impl<'sess> Visitor for ExportsCollector<'sess> {
     }
 
     fn handle_error(&mut self, node: &Expr, err: Error) -> Result<(), Error> {
-        self.session.print_error(err.add_pos(&node.get_pos()));
+        self.session.print_error(&err.add_pos(&node.get_pos()));
         Ok(())
     }
 
@@ -121,7 +121,7 @@ impl<'sess> Visitor for ExportsCollector<'sess> {
 
 }
 
-fn emit_declaration(session: &Session, id: NodeID, vis: Visibility, name: &String) -> String {
+fn emit_declaration(session: &Session, id: NodeID, vis: Visibility, name: &str) -> String {
     if vis == Visibility::Public {
         //let name = get_mangled_name(session, &ident.name, *id);
         let ttype = session.get_type(id).unwrap();
@@ -131,7 +131,7 @@ fn emit_declaration(session: &Session, id: NodeID, vis: Visibility, name: &Strin
     }
 }
 
-fn emit_field(session: &Session, id: NodeID, mutable: Mutability, name: &String) -> String {
+fn emit_field(session: &Session, id: NodeID, mutable: Mutability, name: &str) -> String {
     let ttype = session.get_type(id).unwrap();
     let mutable_str = if let Mutability::Mutable = mutable { "mut " } else { "" };
     format!("let {}{}: {}\n", mutable_str, name, unparse_type(session, ttype))
@@ -162,10 +162,6 @@ pub fn unparse_type(session: &Session, ttype: Type) -> String {
         },
         Type::Ref(ttype) => {
             format!("ref {}", unparse_type(session, *ttype))
-        },
-        Type::Ambiguous(variants) => {
-            let varstr: Vec<String> = variants.iter().map(|v| unparse_type(session, v.clone())).collect();
-            format!("Ambiguous[{}]", varstr.join(", "))
         },
     }
 }

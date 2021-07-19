@@ -9,21 +9,18 @@ use scope::{ Scope, ScopeRef };
 use session::{ Session, Error };
 use ast::{ Pos };
 use hir::{ NodeID, Visibility, Mutability, AssignType, Literal, Ident, Argument, ClassSpec, MatchCase, EnumVariant, Pattern, PatKind, Expr, ExprKind };
-use defs::functions::ClosureDef;
 
 use misc::{ r };
 use transform::llcode::{ LLType, LLLit, LLRef, LLCmpType, LLLink, LLCC, LLExpr, LLGlobal };
-use transform::functions::{ CFuncTransform, ClosureTransform };
-use transform::classes::{ StructTransform };
+use transform::functions::{ ClosureTransform };
 
-use visitor::{ self, Visitor, ScopeStack };
+use visitor::{ Visitor, ScopeStack };
 
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum CodeContext {
     Func(ABI, NodeID),
     Import,
-    ClassBody,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -155,7 +152,7 @@ impl<'sess> Visitor for Transformer<'sess> {
     }
 
     fn handle_error(&mut self, node: &Expr, err: Error) -> Result<Self::Return, Error> {
-        self.session.print_error(err.add_pos(&node.get_pos()));
+        self.session.print_error(&err.add_pos(&node.get_pos()));
         Ok(vec!())
     }
 
@@ -265,7 +262,7 @@ impl<'sess> Visitor for Transformer<'sess> {
     }
 
     fn visit_function(&mut self, id: NodeID, vis: Visibility, ident: &Option<Ident>, args: &Vec<Argument>, _rettype: &Option<Type>, body: &Expr, abi: ABI) -> Result<Self::Return, Error> {
-        Ok(self.transform_func_def(abi, id, vis, ident.as_ref().map(|ident| &ident.name), args, body))
+        Ok(self.transform_func_def(abi, id, vis, ident.as_ref().map(|ident| ident.name.as_str()), args, body))
     }
 
     fn visit_new(&mut self, id: NodeID, _classspec: &ClassSpec) -> Result<Self::Return, Error> {
@@ -343,7 +340,7 @@ impl<'sess> Visitor for Transformer<'sess> {
     }
     */
 
-    fn visit_pattern(&mut self, pat: &Pattern) -> Result<Self::Return, Error> {
+    fn visit_pattern(&mut self, _pat: &Pattern) -> Result<Self::Return, Error> {
         //Ok(self.transform_pattern(pat))
         panic!("TODO: Shouldn't be using visit_pattern yet\n");
     }
@@ -426,7 +423,6 @@ impl<'sess> Transformer<'sess> {
             // TODO how will you do generics
             Type::Universal(_, _) => LLType::Var,
             Type::Function(args, ret, abi) => self.transform_func_value_type(*abi, &args.as_vec(), &*ret),
-            _ => panic!("Not Implemented: {:?}", ttype),
         }
     }
 
@@ -470,12 +466,12 @@ impl<'sess> Transformer<'sess> {
         exprs
     }
 
-    pub fn create_def_local(&mut self, id: NodeID, name: &String, valexpr: LLExpr) -> Vec<LLExpr> {
+    pub fn create_def_local(&mut self, id: NodeID, name: &str, valexpr: LLExpr) -> Vec<LLExpr> {
         let ltype = self.transform_value_type(&self.session.get_type(id).unwrap());
-        vec!(LLExpr::DefLocal(id, name.clone(), ltype, r(valexpr)))
+        vec!(LLExpr::DefLocal(id, name.to_string(), ltype, r(valexpr)))
     }
 
-    pub fn transform_def_local(&mut self, id: NodeID, name: &String, value: &Expr) -> Vec<LLExpr> {
+    pub fn transform_def_local(&mut self, id: NodeID, name: &str, value: &Expr) -> Vec<LLExpr> {
         let defid = self.session.get_ref(id).unwrap();
         let mut exprs = vec!();
         let valexpr = self.transform_as_result(&mut exprs, value).unwrap();
@@ -483,7 +479,7 @@ impl<'sess> Transformer<'sess> {
         exprs
     }
 
-    pub fn transform_import(&mut self, name: &String, decls: &Vec<Expr>) -> Vec<LLExpr> {
+    pub fn transform_import(&mut self, name: &str, decls: &Vec<Expr>) -> Vec<LLExpr> {
         let mut exprs = vec!();
 
         let defid = NodeID::generate();
@@ -516,13 +512,13 @@ impl<'sess> Transformer<'sess> {
     pub fn create_reference(&mut self, defid: NodeID) -> Vec<LLExpr> {
         match self.session.get_def(defid) {
             Ok(Def::Var(_)) => vec!(LLExpr::GetLocal(defid)),
-            Ok(Def::Closure(cl)) => vec!(LLExpr::GetLocal(defid)),
+            Ok(Def::Closure(_)) => vec!(LLExpr::GetLocal(defid)),
             Ok(_) => vec!(LLExpr::GetValue(defid)),
             Err(_) => panic!("TransformError: attempting to reference a non-existent value"),
         }
     }
 
-    pub fn transform_reference(&mut self, defid: NodeID, name: &String) -> Vec<LLExpr> {
+    pub fn transform_reference(&mut self, defid: NodeID, name: &str) -> Vec<LLExpr> {
         let scope = self.stack.get_scope();
         if
             !scope.contains_context(name)
@@ -536,7 +532,7 @@ impl<'sess> Transformer<'sess> {
                         //vec!(LLExpr::Cast(LLType::Alias(cl.context_type_id), r(LLExpr::GetValue(cl.context_arg_id))))
                         vec!(ClosureTransform::make_closure_value(self, NodeID::generate(), cl.compiled_func_id, LLExpr::GetValue(cl.context_arg_id)))
                     } else {
-                        let index = cl.find_or_add_field(self.session, defid, name.as_str(), self.session.get_type(defid).unwrap());
+                        let index = cl.find_or_add_field(self.session, defid, name, self.session.get_type(defid).unwrap());
                         let context = LLExpr::Cast(LLType::Alias(cl.context_type_id), r(LLExpr::GetValue(cl.context_arg_id)));
                         vec!(LLExpr::LoadRef(r(LLExpr::AccessRef(r(context), vec!(LLRef::Field(index))))))
                     }
@@ -580,7 +576,7 @@ impl<'sess> Transformer<'sess> {
         exprs
     }
 
-    pub fn transform_accessor(&mut self, id: NodeID, obj: &Expr, field: &String, otype: Type) -> Vec<LLExpr> {
+    pub fn transform_accessor(&mut self, id: NodeID, obj: &Expr, field: &str, otype: Type) -> Vec<LLExpr> {
         let mut exprs = vec!();
         let defid = self.session.get_ref(id).unwrap();
         let objval = self.transform_as_result(&mut exprs, obj).unwrap();
@@ -588,7 +584,7 @@ impl<'sess> Transformer<'sess> {
         exprs
     }
 
-    pub fn convert_accessor(&mut self, defid: NodeID, objval: LLExpr, field: &String, otype: Type) -> Vec<LLExpr> {
+    pub fn convert_accessor(&mut self, defid: NodeID, objval: LLExpr, field: &str, otype: Type) -> Vec<LLExpr> {
         let mut exprs = vec!();
         match otype {
             Type::Object(_, objid, _) => {
@@ -618,7 +614,7 @@ impl<'sess> Transformer<'sess> {
         exprs
     }
 
-    pub fn transform_resolve(&mut self, id: NodeID, _path: &Expr, _field: &String, object_id: NodeID) -> Vec<LLExpr> {
+    pub fn transform_resolve(&mut self, id: NodeID, _path: &Expr, _field: &str, object_id: NodeID) -> Vec<LLExpr> {
         let defid = self.session.get_ref(id).unwrap();
         match self.session.get_def(object_id).unwrap() {
             Def::Class(classdef) => self.transform_resolve_method(classdef, defid),

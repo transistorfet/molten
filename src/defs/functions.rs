@@ -19,7 +19,6 @@ impl AnyFunc {
     pub fn define(session: &Session, scope: ScopeRef, id: NodeID, vis: Visibility, name: Option<&str>, abi: ABI, ttype: Option<Type>) -> Result<Def, Error> {
         match abi {
             ABI::C => CFuncDef::define(session, scope.clone(), id, vis, name, ttype),
-            //ABI::MoltenFunc => FuncDef::define(session, scope.clone(), id, vis, name, ttype),
             ABI::Molten => {
                 if scope.is_redirect() && name.is_some() {
                     MethodDef::define(session, scope.clone(), id, vis, name, ttype)
@@ -48,28 +47,6 @@ impl AnyFunc {
             }
         }
         Ok(())
-    }
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub struct FuncDef {
-    pub id: NodeID,
-    pub vis: Visibility,
-}
-
-pub type FuncDefRef = Rc<FuncDef>;
-
-impl FuncDef {
-    #[must_use]
-    pub fn define(session: &Session, scope: ScopeRef, id: NodeID, vis: Visibility, name: Option<&str>, ttype: Option<Type>) -> Result<Def, Error> {
-
-        let def = Def::Func(Rc::new(FuncDef {
-            id: id,
-            vis: vis,
-        }));
-
-        AnyFunc::set_func_def(session, scope.clone(), id, name, def.clone(), ttype)?;
-        Ok(def)
     }
 }
 
@@ -107,7 +84,6 @@ impl OverloadDef {
                 Ok(Def::Overload(prev)) => {
                     prev.add_variant(session, id);
                 },
-                Ok(Def::Func(_)) |
                 Ok(Def::Method(_)) |
                 Ok(Def::Closure(_)) => {
                     let defid = OverloadDef::create(session, None, vec!(previd, id));

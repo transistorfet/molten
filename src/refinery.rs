@@ -1,8 +1,6 @@
 
 use std::cell::RefCell;
 
-use rand;
-
 use abi::ABI;
 use types::Type;
 use ast::{ Pos, AST };
@@ -60,8 +58,6 @@ impl<'sess> Refinery<'sess> {
 
         let module_name = self.session.name.replace(".", "_");
         let memo = format!("memo.{}", module_name);
-        let memo_type = Type::Object("Bool".to_string(), UniqueID(0), vec!());
-        let module_run_name = format!("run_{}", module_name);
 
         let mut init_code = vec!();
         init_code.push(Expr::make_assign(Pos::empty(), Expr::make_ident_from_str(Pos::empty(), &memo), Expr::make_lit(Literal::Boolean(true)), AssignType::Update));
@@ -84,7 +80,7 @@ impl<'sess> Refinery<'sess> {
             let pos = node.get_pos();
             match self.refine_node(node) {
                 Ok(refined) => block.push(refined),
-                Err(err) => self.session.print_error(err.add_pos(&pos)),
+                Err(err) => self.session.print_error(&err.add_pos(&pos)),
             }
         }
         block
@@ -107,7 +103,7 @@ impl<'sess> Refinery<'sess> {
                 Expr::new(pos, ExprKind::Declare(vis, ident, ttype))
             },
 
-            AST::Function(pos, vis, ident, args, ret, body, abi) => {
+            AST::Function(pos, _vis, ident, args, ret, body, abi) => {
                 // TODO visibility is forced here so I don't have to add 'pub' keywords yet
                 let vis = if self.top_level() {
                     Visibility::Public
@@ -125,7 +121,7 @@ impl<'sess> Refinery<'sess> {
                 let mut args = self.refine_vec(args);
 
                 // We refine fexpr before cloning here, so that the IDs will be identical (otherwise typechecking wont unify the accessed object and first argument)
-                if let ExprKind::Accessor(expr, field, oid) = fexpr.kind {
+                if let ExprKind::Accessor(expr, field, _oid) = fexpr.kind {
                     let tmpname = format!("{}", UniqueID::generate());
                     args.insert(0, Expr::make_ident_from_str(pos.clone(), &tmpname));
 
@@ -388,7 +384,6 @@ impl<'sess> Refinery<'sess> {
     pub fn desugar_list(&self, pos: Pos, items: Vec<AST>) -> Result<Expr, Error> {
         let mut block = vec!();
         let tmplist = format!("{}", UniqueID::generate());
-        let typevar = rand::random::<i32>();
 
         // TODO this makes lists immutable, which might not be what we want
         block.push(AST::Definition(pos.clone(), Mutability::Immutable, Ident::new(tmplist.clone()), None,

@@ -54,7 +54,7 @@ impl<'sess> Visitor for NameBinder<'sess> {
     }
 
     fn handle_error(&mut self, node: &Expr, err: Error) -> Result<Self::Return, Error> {
-        self.session.print_error(err.add_pos(&node.get_pos()));
+        self.session.print_error(&err.add_pos(&node.get_pos()));
         Ok(())
     }
 
@@ -354,8 +354,6 @@ pub fn bind_type_names(session: &Session, scope: ScopeRef, ttype: Option<&mut Ty
             &mut Type::Ref(ref mut ttype) => {
                 bind_type_names(session, scope.clone(), Some(ttype), always_new)?;
             },
-            &mut Type::Variable(_) => { },
-            &mut Type::Ambiguous(_) => { },
         },
         None => { },
     }
@@ -400,7 +398,6 @@ pub fn check_recursive_type(ttype: &Option<&Type>, forbidden_id: NodeID) -> Resu
             Type::Function(_, _, _) => {
                 // Any reference or function containing the type is ok
             },
-            Type::Ambiguous(_) => { },
         },
         None => { },
     }

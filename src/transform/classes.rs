@@ -55,7 +55,7 @@ impl<'sess> Transformer<'sess> {
             for node in body {
                 match &node.kind {
                     ExprKind::Function(vis, ident, args, _, body, abi) => {
-                        exprs.extend(transform.transform_func_def(*abi, node.id, *vis, ident.as_ref().map(|ident| &ident.name), args, body));
+                        exprs.extend(transform.transform_func_def(*abi, node.id, *vis, ident.as_ref().map(|ident| ident.name.as_str()), args, body));
                     },
                     ExprKind::Declare(vis, ident, _) => {
                         let ttype = transform.session.get_type_from_ref(node.id).unwrap();

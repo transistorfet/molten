@@ -1,6 +1,5 @@
 
 use std::rc::Rc;
-use std::cell::Cell;
 use std::cell::RefCell;
 
 use defs::Def;
@@ -18,7 +17,6 @@ use defs::variables::FieldDef;
 pub struct ClassDef {
     pub id: NodeID,
     pub initid: NodeID,
-    pub primative: Cell<bool>,
     pub classname: String,
     pub classtype: Type,
     pub parenttype: Option<Type>,
@@ -34,7 +32,6 @@ impl ClassDef {
         Self {
             id: id,
             initid: NodeID::generate(),
-            primative: Cell::new(false),
             classname: classname,
             classtype: classtype,
             parenttype: parenttype,
@@ -67,8 +64,6 @@ impl ClassDef {
         scope.define_type(name, Some(id))?;
         session.set_def(id, Def::Class(classdef.clone()));
         session.set_type(id, classtype);
-        // TODO i don't like this type == Class thing, but i don't know how i'll do struct types yet either
-        //scope.define(name.clone(), Some(Type::Object(name.clone(), vec!())))?;
 
         Ok(classdef)
     }
@@ -91,16 +86,6 @@ impl ClassDef {
         let classdef = ClassDef::new_ref(id, name.to_string(), classtype, parenttype, vars, vtable);
         Ok(classdef)
     }
-
-
-    pub fn set_primative(&self) {
-        self.primative.set(true);
-    }
-
-    pub fn is_primative(&self) -> bool {
-        self.primative.get()
-    }
-
 
     fn get_parent_class(&self, session: &Session) -> Option<ClassDefRef> {
         match self.parenttype {
@@ -161,6 +146,7 @@ impl ClassDef {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Define {
     IfNotExists,
+    #[allow(dead_code)]
     Never,
 }
 
@@ -208,7 +194,7 @@ impl StructDef {
         self.fields.borrow().iter().position(|ref r| r.0 == id)
     }
 
-    pub fn foreach_field<F>(&self, mut f: F) where F: FnMut(NodeID, &String, &Type) -> () {
+    pub fn foreach_field<F>(&self, mut f: F) where F: FnMut(NodeID, &str, &Type) -> () {
         for field in self.fields.borrow().iter() {
             f(field.0, &field.1, &field.2);
         }
@@ -289,13 +275,13 @@ impl Vtable {
         self.table.borrow().len()
     }
 
-    pub fn foreach_entry<F>(&self, mut f: F) where F: FnMut(NodeID, &String, &Type) -> () {
+    pub fn foreach_entry<F>(&self, mut f: F) where F: FnMut(NodeID, &str, &Type) -> () {
         for entry in self.table.borrow().iter() {
             f(entry.0, &entry.1, &entry.2);
         }
     }
 
-    pub fn foreach_enumerated<F>(&self, mut f: F) where F: FnMut(usize, NodeID, &String, &Type) -> () {
+    pub fn foreach_enumerated<F>(&self, mut f: F) where F: FnMut(usize, NodeID, &str, &Type) -> () {
         for (i, entry) in self.table.borrow().iter().enumerate() {
             f(i, entry.0, &entry.1, &entry.2);
         }

@@ -36,11 +36,6 @@ pub struct Scope {
 }
 
 pub type ScopeRef = Rc<Scope>;
-//pub type ScopeRef = Rc<RefCell<Scope>>;
-//#[derive(Clone, Debug, PartialEq)]
-//pub struct ScopeRef(Rc<RefCell<Scope>>);
-//pub struct ScopeRef(&'sess ScopeMapRef, UniqueID);
-
 
 impl Scope {
     pub fn new(parent: Option<ScopeRef>) -> Scope {
@@ -200,13 +195,6 @@ impl Scope {
         }
     }
 
-    pub fn find_type_local(&self, session: &Session, name: &str) -> Option<Type> {
-        match self.types.borrow().get(name).map(|info| info.defid) {
-            Some(Some(defid)) => session.get_type(defid),
-            _ => None,
-        }
-    }
-
     pub fn get_type_def(&self, name: &str) -> Option<NodeID> {
         self._search_type(name, |info| {
             match info.defid.as_ref() {
@@ -305,11 +293,5 @@ impl ScopeMapRef {
     pub fn get_global(&self) -> ScopeRef {
         self.get(&ScopeMapRef::GLOBAL)
     }
-
-    //pub fn foreach<F>(&self, f: F) where F: Fn(ScopeRef) -> () {
-    //    for (_, scope) in self.0.borrow().iter() {
-    //        f(scope);
-    //    }
-    //}
 }
 

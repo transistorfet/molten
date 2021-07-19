@@ -50,8 +50,8 @@ pub fn cstr(string: &str) -> *mut i8 {
     CString::new(string).unwrap().into_raw()
 }
 
-pub fn cstring(string: &String) -> *mut i8 {
-    CString::new(string.as_str()).unwrap().into_raw()
+pub fn cstring(string: String) -> *mut i8 {
+    CString::new(string).unwrap().into_raw()
 }
 
 
@@ -69,7 +69,7 @@ impl<'sess> LLVM<'sess> {
     pub fn new(session: &Session) -> LLVM {
         unsafe {
             let context = LLVMContextCreate();
-            let module = LLVMModuleCreateWithNameInContext(cstring(&session.name), context);
+            let module = LLVMModuleCreateWithNameInContext(cstr(&session.name), context);
             let builder = LLVMCreateBuilderInContext(context);
 
             LLVM {
@@ -239,6 +239,7 @@ impl<'sess> LLVM<'sess> {
         LLVMPointerType(LLVMPointerType(LLVMInt8TypeInContext(self.context), 0), 0)
     }
 
+    #[allow(dead_code)]
     pub unsafe fn ptr_of(&self, etype: LLVMTypeRef) -> LLVMTypeRef {
         LLVMPointerType(etype, 0)
     }
@@ -251,6 +252,7 @@ impl<'sess> LLVM<'sess> {
         self.get_type(EXCEPTION_ID).unwrap()
     }
 
+    #[allow(dead_code)]
     pub unsafe fn exp_ref_type(&self) -> LLVMTypeRef {
         LLVMPointerType(self.get_type(EXCEPTION_ID).unwrap(), 0)
     }
@@ -495,7 +497,6 @@ impl<'sess> LLVM<'sess> {
             match &lref {
                 LLRef::Deref => indices.push(self.i32_const(0)),
                 LLRef::Field(index) => indices.push(self.i32_const(*index as i32)),
-                LLRef::Index(index) => indices.push(self.i32_const(*index as i32)),
             }
         }
         indices
@@ -530,6 +531,7 @@ impl<'sess> LLVM<'sess> {
         reference
     }
 
+    #[allow(dead_code)]
     pub unsafe fn build_if(&self, cond_body: &LLBlock, true_body: &LLBlock, false_body: &LLBlock) -> LLVMValueRef {
         let true_block = LLVMAppendBasicBlockInContext(self.context, *self.curfunc.borrow(), cstr("if_true"));
         let false_block = LLVMAppendBasicBlockInContext(self.context, *self.curfunc.borrow(), cstr("if_false"));
@@ -558,10 +560,10 @@ impl<'sess> LLVM<'sess> {
         let mut return_vals = vec!();
 
         for _ in blocks {
-            cond_vals.push(LLVMAppendBasicBlockInContext(self.context, *self.curfunc.borrow(), cstring(&format!("{}_cond", label))));
-            block_vals.push(LLVMAppendBasicBlockInContext(self.context, *self.curfunc.borrow(), cstring(&format!("{}_block", label))));
+            cond_vals.push(LLVMAppendBasicBlockInContext(self.context, *self.curfunc.borrow(), cstring(format!("{}_cond", label))));
+            block_vals.push(LLVMAppendBasicBlockInContext(self.context, *self.curfunc.borrow(), cstring(format!("{}_block", label))));
         }
-        let merge_block = LLVMAppendBasicBlockInContext(self.context, *self.curfunc.borrow(), cstring(&format!("{}_end", label)));
+        let merge_block = LLVMAppendBasicBlockInContext(self.context, *self.curfunc.borrow(), cstring(format!("{}_end", label)));
         cond_vals.push(merge_block);
 
         LLVMBuildBr(self.builder, cond_vals[0]);
@@ -758,9 +760,9 @@ impl<'sess> LLVM<'sess> {
                 LLGlobal::DeclCFunc(id, name, ltype, cc) |
                 LLGlobal::DefCFunc(id, _, name, ltype, _, _, cc) => {
                     let ftype = self.build_type(ltype);
-                    let mut function = LLVMGetNamedFunction(self.module, cstring(&name));
+                    let mut function = LLVMGetNamedFunction(self.module, cstr(&name));
                     if function == ptr::null_mut() {
-                        function = LLVMAddFunction(self.module, cstring(&name), ftype);
+                        function = LLVMAddFunction(self.module, cstr(&name), ftype);
                     }
                     LLVMSetFunctionCallConv(function, self.get_callconv(*cc) as c_uint);
                     self.set_value(*id, function);
@@ -789,7 +791,7 @@ impl<'sess> LLVM<'sess> {
 
         for (i, ref arg) in args.iter().enumerate() {
             let llarg = LLVMGetParam(function, i as u32);
-            LLVMSetValueName(llarg, cstring(&arg.1));
+            LLVMSetValueName2(llarg, cstr(&arg.1), arg.1.len());
             self.set_value(arg.0, llarg);
         }
 

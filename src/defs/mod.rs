@@ -15,7 +15,7 @@ use defs::types::{ TypeAliasDefRef };
 //use defs::traits::{ TraitDefRef, TraitImplRef };
 use defs::classes::{ ClassDefRef, StructDefRef };
 use defs::variables::{ VarDefRef, ArgDefRef, FieldDefRef };
-use defs::functions::{ FuncDefRef, OverloadDefRef, ClosureDefRef, MethodDefRef, CFuncDefRef };
+use defs::functions::{ OverloadDefRef, ClosureDefRef, MethodDefRef, CFuncDefRef };
 
 
 #[derive(Clone, Debug, PartialEq)]
@@ -25,9 +25,9 @@ pub enum Def {
     Arg(ArgDefRef),
     Field(FieldDefRef),
     Class(ClassDefRef),
+    #[allow(dead_code)]
     Struct(StructDefRef),
     Enum(EnumDefRef),
-    Func(FuncDefRef),
     Overload(OverloadDefRef),
     Closure(ClosureDefRef),
     Method(MethodDefRef),
@@ -69,13 +69,6 @@ impl Def {
         }
     }
 
-    pub fn as_overload(&self) -> Result<OverloadDefRef, Error> {
-        match *self {
-            Def::Overload(ref class) => Ok(class.clone()),
-            _ => Err(Error::new(format!("DefError: expected overload def but found {:#?}", self))),
-        }
-    }
-
     pub fn as_closure(&self) -> Result<ClosureDefRef, Error> {
         match *self {
             Def::Closure(ref cl) => Ok(cl.clone()),
@@ -84,19 +77,9 @@ impl Def {
         }
     }
 
-    /*
-    pub fn as_overloadable(&self) -> Option<Box<Overloadable>> {
-        match self {
-            Def::Func(def) => Some(Box::new(def.clone())),
-            Def::Method(def) => Some(Box::new(def.func.clone())),
-            _ => None
-        }
-    }
-    */
-
     pub fn is_globally_accessible(&self) -> bool {
         match self {
-            Def::CFunc(_) | Def::Func(_) => true,
+            Def::CFunc(_) => true,
             _ => false,
         }
     }

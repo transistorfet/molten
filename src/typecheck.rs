@@ -38,7 +38,7 @@ impl<'sess> TypeChecker<'sess> {
     fn visit_node_expected(&mut self, node: &Expr, expected: Option<Type>) -> Type {
         if let Some(ttype) = expected {
             if let Err(err) = self.session.update_type(node.id, ttype) {
-                self.session.print_error(err.add_pos(&node.get_pos()));
+                self.session.print_error(&err.add_pos(&node.get_pos()));
             }
         }
 
@@ -48,7 +48,7 @@ impl<'sess> TypeChecker<'sess> {
         match self.session.update_type(node.id, ttype.clone()) {
             Ok(_) => ttype,
             Err(err) => {
-                self.session.print_error(err.add_pos(&node.get_pos()));
+                self.session.print_error(&err.add_pos(&node.get_pos()));
                 ttype
             },
         }
@@ -78,7 +78,7 @@ impl<'sess> Visitor for TypeChecker<'sess> {
     }
 
     fn handle_error(&mut self, node: &Expr, err: Error) -> Result<Self::Return, Error> {
-        self.session.print_error(err.add_pos(&node.get_pos()));
+        self.session.print_error(&err.add_pos(&node.get_pos()));
         Ok(self.default_return())
     }
 
@@ -108,7 +108,7 @@ impl<'sess> Visitor for TypeChecker<'sess> {
                 Ok(ttype)
             },
             Err(err) => {
-                self.session.print_error(err.add_pos(&pat.pos));
+                self.session.print_error(&err.add_pos(&pat.pos));
                 Ok(self.default_return())
             },
         }
@@ -126,7 +126,7 @@ impl<'sess> Visitor for TypeChecker<'sess> {
         }
     }
 
-    fn visit_function(&mut self, refid: NodeID, _vis: Visibility, ident: &Option<Ident>, args: &Vec<Argument>, rettype: &Option<Type>, body: &Expr, abi: ABI) -> Result<Self::Return, Error> {
+    fn visit_function(&mut self, refid: NodeID, _vis: Visibility, ident: &Option<Ident>, args: &Vec<Argument>, _rettype: &Option<Type>, body: &Expr, abi: ABI) -> Result<Self::Return, Error> {
         let defid = self.session.get_ref(refid)?;
         let fscope = self.session.map.get(&defid);
         let dftype = self.session.get_type(defid).unwrap();
@@ -497,7 +497,7 @@ impl<'sess> Visitor for TypeChecker<'sess> {
                 // Map the typevars from the enum type params into the enum variant's types, in order to use type hint from 'expected'
                 let mut typevars = Type::map_new();
                 let vtype = Type::map_typevars(self.session, &mut typevars, enumdef.deftype.clone());
-                let vtype = expect_type(self.session, Some(vtype), self.session.get_type(id), Check::Def)?;
+                let _ = expect_type(self.session, Some(vtype), self.session.get_type(id), Check::Def)?;
                 let rtype = resolve_type(self.session, Type::map_typevars(self.session, &mut typevars, ttype), false)?;
                 let types = rtype.as_vec();
 

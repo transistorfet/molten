@@ -43,14 +43,6 @@ use hir::{ NodeID, Mutability, Visibility, AssignType, Literal, Ident, Argument,
 
 ///// Parsing Macros /////
 
-const ERR_IN_FUNC: u32 = 40;
-const ERR_IN_MATCH: u32 = 41;
-const ERR_IN_TRY: u32 = 42;
-const ERR_IN_WHILE: u32 = 43;
-const ERR_IN_FOR: u32 = 44;
-const ERR_IN_CLASS: u32 = 45;
-const ERR_IN_LIST: u32 = 46;
-
 pub type Span<'a> = LocatedSpan<&'a str>;
 
 //named!(sp, eat_separator!(&b" \t"[..]));
@@ -1167,13 +1159,3 @@ pub fn format_snippet<'a>(span: &'a Span) -> String {
     String::from(snippet.get(..index).unwrap())
 }
 
-pub fn format_codes(codes: &Vec<(Span, ErrorKind)>) -> String {
-    codes.iter().fold(String::new(), |acc, (_, code)| {
-        let string = format!("{:?}", code);
-        if &acc == "" {
-            string
-        } else {
-            acc + " " + &string
-        }
-    })
-}

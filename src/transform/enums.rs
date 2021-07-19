@@ -10,12 +10,12 @@ use transform::llcode::{ LLType, LLLit, LLCC, LLLink, LLExpr, LLGlobal };
 
 
 impl<'sess> Transformer<'sess> {
-    pub fn transform_enum_def(&mut self, id: NodeID, name: &String) -> Vec<LLExpr> {
+    pub fn transform_enum_def(&mut self, id: NodeID, name: &str) -> Vec<LLExpr> {
         let defid = self.session.get_ref(id).unwrap();
         let selector = LLType::I8;
         let enumdef = self.session.get_def(defid).unwrap().as_enum().unwrap();
 
-        self.add_global(LLGlobal::DefNamedStruct(defid, name.clone(), false));
+        self.add_global(LLGlobal::DefNamedStruct(defid, name.to_string(), false));
         self.set_type(defid, LLType::Alias(defid));
 
         let mut types = vec!();

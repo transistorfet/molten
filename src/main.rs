@@ -1,7 +1,6 @@
 
 use std::str;
 
-extern crate rand;
 extern crate regex;
 extern crate clap;
 #[macro_use]
