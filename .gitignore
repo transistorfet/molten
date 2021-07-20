@@ -11,5 +11,5 @@ Cargo.lock
 *.bin
 a.out
 
-session.vim
+*.vim
 .local.vimrc

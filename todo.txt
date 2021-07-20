@@ -1,10 +1,33 @@
 
+* you know... you could make ExprKind::Function take a vec as its body, and then you wouldn't need to insert blocks
 * reduce the number of clone()s
 * maybe require an ignore type function call for statements that don't return unit (ie.  disallow having comparisons and math functions where the return value is ignored and the code will be optimized away,
   since it could be unintended)
 
 
 TRAITS/TYPECLASSES:
+
+* you could store constraints for universal variables in a global table in session, since all the copies of a single universal variable will have the same constraints, however
+  universal variables cannot be mapped to placeholder variables unless the placeholders also record the constraints, which would then need to combine when the placeholder variables
+  are being type checked/unified.  The constraints on universal variables would only need to be used during typechecking when mapping type variables, when they are transferred to
+  the placeholder variables.  The placeholders would then unify against concrete types only if those concrete types implement the required trait constraints.
+  For function bodies that use constrained universals, when a function is called from within that defines it's own universals with constraints, then it would map to placeholders,
+  and the universals from the function body would be compared against placeholders??? wait, how do universals work in this case currently?  A placeholder variable *will* unify with
+  a universal because it unifies with everything (currently)
+  So the universals in the function being called will be mapped to placeholders with constraints, and then when a placeholder is checked with anything else, we'll probably need to
+  treat each "anything else" type differently: for each trait constraint, if object then look for trait impl of that type; if universal then look up its constraints and match them;
+  if ref... then maybe get it's internal type and check that (ie. if X implements constraints then ref X implements them, but maybe this would require treating each as different during
+  transform still, since you'd need to insert an extra dereference?); if record, tuple, function, I'm not sure... for now it might fail if more than one constraint...  These types would
+  need to be translated, such that "?a where ?a: Debug" wouldn't unify with a tuple/record/etc, but "(?a: Debug, ?a: Debug) would unify with (?b: Debug + Add, ?b: Debug + Add)"...
+  In other words, yes, tuple/record/function cannot unify with a placeholder with constraints but it can unify with a placeholder without constraints or a tuple/record/function which
+  contains placeholders with constraints.  If you could specify a type with placholders as an actual constraint, then you can have functions that have arguments that are universals
+  "?a where ?a: ('b, 'b) -> 'b, 'b: Debug" there are two constraints, one on ?a that must be ('b, 'b) -> 'b, and one on 'b that must be Debug
+
+* So... a constraint would need to be a Vec<(NodeID, Type)> such that each NodeID is the ID of a placeholder or universal that the constraint applies to, and the Type must
+  unify (with the update arg in check_type being false) in order for the constraint to hold, for each constraint
+
+* for traits, you still need to fix the passing of the object to the trait methods, which currently passes the trait object but the function expects the actual concrete type, and segfaults
+* you could insert some code to do the argument unboxing inside each function being implemented, and make the body of the func use the unboxed reference, but that might not be trivial
 
 * currently you have function overloading, and class method overloading, which are forms of ad-hoc polymorphism.  Should all function overloading instead require a trait
   implementation (eg. all the infix operator functions and str functions would become traits which would be implemented for different types instead of being overloaded funcs).
@@ -17,7 +40,6 @@ TRAITS/TYPECLASSES:
 * traits are currently being defined as object types (bindings:260), and the commented out code for subtyping allows a trait name to be used as an object, but if you switch
   to traits being constraints on type variables, then this would need to change.  Would you even record traits specially, as in not call define_type() but instead have a third
   (globally scoped?) map of traits?  Or do you make it a type, but a new special Trait type which can only be used in constraits?
-* for traits, you still need to fix the passing of the object to the trait methods, which currently passes the trait object but the function expects the actual concrete type, and segfaults
 * traits need inheritence/subtraits, such that the vtable could have pointers to the vtables of the dependents, or they could use a similar kind of inheritence as classes, but you need to
   have multiple dependent traits to work
 * can you assume that all dependent traits are implemented for the same type, or could they be different types and thus the object/self that is passed to subtraits might need to be different???
