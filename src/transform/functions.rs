@@ -54,7 +54,7 @@ impl<'sess> Transformer<'sess> {
         }
     }
 
-    pub fn transform_func_def(&mut self, abi: ABI, id: NodeID, vis: Visibility, name: Option<&str>, args: &Vec<Argument>, body: &Expr) -> Vec<LLExpr> {
+    pub fn transform_func_def(&mut self, abi: ABI, id: NodeID, vis: Visibility, name: Option<&str>, args: &Vec<Argument>, body: &Vec<Expr>) -> Vec<LLExpr> {
         let defid = self.session.get_ref(id).unwrap();
         match abi {
             ABI::C => CFuncTransform::transform_def(self, defid, vis, name, args, body),
@@ -111,7 +111,7 @@ impl CFuncTransform {
         args.iter().map(|arg| (transform.session.get_ref(arg.id).unwrap(), arg.ident.name.clone())).collect()
     }
 
-    pub fn transform_def(transform: &mut Transformer, defid: NodeID, vis: Visibility, name: Option<&str>, args: &Vec<Argument>, body: &Expr) -> Vec<LLExpr> {
+    pub fn transform_def(transform: &mut Transformer, defid: NodeID, vis: Visibility, name: Option<&str>, args: &Vec<Argument>, body: &Vec<Expr>) -> Vec<LLExpr> {
         let fscope = transform.session.map.get(&defid);
         let fname = transform.transform_func_name(name, defid);
 
@@ -125,7 +125,7 @@ impl CFuncTransform {
         transform.stack.push_scope(fscope.clone());
         transform.with_context(CodeContext::Func(ABI::C, defid), |transform| {
             let llvis = transform.transform_vis(vis);
-            let llbody = transform.visit_node(body).unwrap();
+            let llbody = transform.visit_vec(body).unwrap();
             transform.add_global(LLGlobal::DefCFunc(defid, llvis, fname, lftype, fargs, llbody, LLCC::CCC));
         });
         transform.stack.pop_scope();
@@ -198,7 +198,7 @@ impl ClosureTransform {
         fargs.push((exp_id, String::from("__exception__")));
     }
 
-    pub fn transform_def(transform: &mut Transformer, defid: NodeID, vis: Visibility, name: Option<&str>, args: &Vec<Argument>, body: &Expr) -> Vec<LLExpr> {
+    pub fn transform_def(transform: &mut Transformer, defid: NodeID, vis: Visibility, name: Option<&str>, args: &Vec<Argument>, body: &Vec<Expr>) -> Vec<LLExpr> {
         let scope = transform.stack.get_scope();
         let fscope = transform.session.map.get(&defid);
         let fname = transform.transform_func_name(name, defid);
@@ -220,7 +220,7 @@ impl ClosureTransform {
         let body = transform.with_context(CodeContext::Func(ABI::Molten, defid), |transform| {
             transform.with_exception(exp_id, |transform| {
                 transform.with_scope(fscope, |transform| {
-                    transform.visit_node(body)
+                    transform.visit_vec(body)
                 }).unwrap()
             })
         });

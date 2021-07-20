@@ -292,15 +292,19 @@ named!(expression(Span) -> AST,
 //    value!(AST::Underscore, tag!("_"))
 //);
 
-named!(block(Span) -> AST,
+named!(block_vec(Span) -> Vec<AST>,
     delimited!(
         alt!(tag_word!("begin") | tag!("{")),
-        do_parse!(
-            pos: position!() >>
-            s: wscom!(statement_list) >>
-            (AST::Block(Pos::new(pos), s))
-        ),
+        wscom!(statement_list),
         alt!(tag_word!("end") | tag!("}"))
+    )
+);
+
+named!(block(Span) -> AST,
+    do_parse!(
+        pos: position!() >>
+        v: block_vec >>
+        (AST::Block(Pos::new(pos), v))
     )
 );
 
@@ -433,10 +437,12 @@ named!(function(Span) -> AST,
         rt: opt!(preceded!(wscom!(tag!("->")), type_description)) >>
         a: abi_specifier >>
         e: alt!(
-            preceded!(wscom!(tag!("=>")), return_error!(ErrorKind::Tag /*ErrorKind::Custom(ERR_IN_FUNC) */, expression)) |
-            return_error!(ErrorKind::Tag /*ErrorKind::Custom(ERR_IN_FUNC) */, wscoml!(block))
+            preceded!(wscom!(tag!("=>")), return_error!(ErrorKind::Tag /*ErrorKind::Custom(ERR_IN_FUNC) */,
+                map!(expression, |s| vec!(s)))) |
+            return_error!(ErrorKind::Tag /*ErrorKind::Custom(ERR_IN_FUNC) */,
+                wscoml!(block_vec))
         ) >>
-        (AST::Function(Pos::new(pos), if vis.is_some() { Visibility::Public } else { Visibility::Private }, l.0, l.1, rt, r(e), a))
+        (AST::Function(Pos::new(pos), if vis.is_some() { Visibility::Public } else { Visibility::Private }, l.0, l.1, rt, e, a))
     )
 );
 

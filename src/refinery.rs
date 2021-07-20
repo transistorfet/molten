@@ -71,7 +71,7 @@ impl<'sess> Refinery<'sess> {
             ))
         );
 
-        vec!(Expr::make_module(module_name, Expr::make_block(Pos::empty(), body)))
+        vec!(Expr::make_module(module_name, body))
     }
 
     pub fn refine_vec(&self, code: Vec<AST>) -> Vec<Expr> {
@@ -112,7 +112,7 @@ impl<'sess> Refinery<'sess> {
                 };
 
                 self.with_context(CodeContext::Func(abi), || {
-                    Ok(Expr::new(pos, ExprKind::Function(vis, ident, args, ret, r(self.refine_node(*body)?), abi)))
+                    Ok(Expr::new(pos, ExprKind::Function(vis, ident, args, ret, self.refine_vec(body), abi)))
                 })?
             },
 
@@ -325,7 +325,7 @@ impl<'sess> Refinery<'sess> {
                     if ident.as_ref().map(|i| i.name.as_str()) == Some("new") {
                         has_new = true;
                         if args.len() > 0 && args[0].ident.as_str() == "self" {
-                            body = r(AST::Block(pos.clone(), vec!(*body, AST::Identifier(pos.clone(), Ident::from_str("self")))));
+                            body.push(AST::Identifier(pos.clone(), Ident::from_str("self")));
                         } else {
                             return Err(Error::new(format!("SyntaxError: the \"new\" method on a class must have \"self\" as its first parameter")));
                         }
@@ -371,7 +371,7 @@ impl<'sess> Refinery<'sess> {
                     vec!(AST::Identifier(pos.clone(), Ident::from_str("self")))));
             }
             init.push(AST::make_ident_from_str(pos.clone(), "self"));
-            let initcode = AST::Function(pos.clone(), Visibility::Public, Some(Ident::from_str("__init__")), iargs, None, r(AST::Block(pos.clone(), init)), ABI::Molten);
+            let initcode = AST::Function(pos.clone(), Visibility::Public, Some(Ident::from_str("__init__")), iargs, None, init, ABI::Molten);
             newbody.push(initcode);
         }
 

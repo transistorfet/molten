@@ -128,7 +128,7 @@ pub enum ExprKind {
     While(R<Expr>, R<Expr>),
 
     Declare(Visibility, Ident, Type),
-    Function(Visibility, Option<Ident>, Vec<Argument>, Option<Type>, R<Expr>, ABI),
+    Function(Visibility, Option<Ident>, Vec<Argument>, Option<Type>, Vec<Expr>, ABI),
     New(ClassSpec),
     Class(ClassSpec, Option<ClassSpec>, Vec<Expr>),
     TypeAlias(ClassSpec, Type),
@@ -138,7 +138,7 @@ pub enum ExprKind {
     Definition(Mutability, Ident, Option<Type>, R<Expr>),
     Assignment(R<Expr>, R<Expr>, AssignType),
 
-    Module(String, R<Expr>, NodeID),
+    Module(String, Vec<Expr>, NodeID),
 }
 
 
@@ -365,8 +365,8 @@ impl Expr {
     }
 
     #[allow(dead_code)]
-    pub fn make_func(pos: Pos, vis: Visibility, ident: Option<Ident>, args: Vec<Argument>, rtype: Option<Type>, body: Expr, abi: ABI) -> Expr {
-        Expr { id: NodeID::generate(), pos: pos, kind: ExprKind::Function(vis, ident, args, rtype, r(body), abi) }
+    pub fn make_func(pos: Pos, vis: Visibility, ident: Option<Ident>, args: Vec<Argument>, rtype: Option<Type>, body: Vec<Expr>, abi: ABI) -> Expr {
+        Expr { id: NodeID::generate(), pos: pos, kind: ExprKind::Function(vis, ident, args, rtype, body, abi) }
     }
 
     #[allow(dead_code)]
@@ -410,8 +410,8 @@ impl Expr {
     }
 
     #[allow(dead_code)]
-    pub fn make_module(name: String, code: Expr) -> Expr {
-        Expr { id: NodeID::generate(), pos: Pos::empty(), kind: ExprKind::Module(name, r(code), NodeID::generate()) }
+    pub fn make_module(name: String, code: Vec<Expr>) -> Expr {
+        Expr { id: NodeID::generate(), pos: Pos::empty(), kind: ExprKind::Module(name, code, NodeID::generate()) }
     }
 }
 

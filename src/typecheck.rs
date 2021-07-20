@@ -126,7 +126,7 @@ impl<'sess> Visitor for TypeChecker<'sess> {
         }
     }
 
-    fn visit_function(&mut self, refid: NodeID, _vis: Visibility, ident: &Option<Ident>, args: &Vec<Argument>, _rettype: &Option<Type>, body: &Expr, abi: ABI) -> Result<Self::Return, Error> {
+    fn visit_function(&mut self, refid: NodeID, _vis: Visibility, ident: &Option<Ident>, args: &Vec<Argument>, _rettype: &Option<Type>, body: &Vec<Expr>, abi: ABI) -> Result<Self::Return, Error> {
         let defid = self.session.get_ref(refid)?;
         let fscope = self.session.map.get(&defid);
         let dftype = self.session.get_type(defid).unwrap();
@@ -150,7 +150,7 @@ impl<'sess> Visitor for TypeChecker<'sess> {
         }
 
         let rettype = self.with_scope(fscope.clone(), |visitor| {
-            expect_type(visitor.session, Some(rtype.clone()), Some(visitor.visit_node_expected(body, Some(rtype.clone()))), Check::Def)
+            expect_type(visitor.session, Some(rtype.clone()), Some(visitor.visit_vec(body)?), Check::Def)
         })?;
 
         // Resolve type variables that can be

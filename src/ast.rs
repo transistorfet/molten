@@ -49,7 +49,7 @@ pub enum AST {
     While(Pos, R<AST>, R<AST>),
 
     Declare(Pos, Visibility, Ident, Type),
-    Function(Pos, Visibility, Option<Ident>, Vec<Argument>, Option<Type>, R<AST>, ABI),
+    Function(Pos, Visibility, Option<Ident>, Vec<Argument>, Option<Type>, Vec<AST>, ABI),
     New(Pos, ClassSpec),
     Class(Pos, ClassSpec, Option<ClassSpec>, Vec<AST>),
     TypeAlias(Pos, ClassSpec, Type),

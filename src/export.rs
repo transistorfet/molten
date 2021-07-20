@@ -73,7 +73,7 @@ impl<'sess> Visitor for ExportsCollector<'sess> {
         Ok(())
     }
 
-    fn visit_function(&mut self, id: NodeID, vis: Visibility, ident: &Option<Ident>, _args: &Vec<Argument>, _rettype: &Option<Type>, _body: &Expr, _abi: ABI) -> Result<Self::Return, Error> {
+    fn visit_function(&mut self, id: NodeID, vis: Visibility, ident: &Option<Ident>, _args: &Vec<Argument>, _rettype: &Option<Type>, _body: &Vec<Expr>, _abi: ABI) -> Result<Self::Return, Error> {
         if let Some(ref ident) = *ident {
             let defid = self.session.get_ref(id)?;
             self.declarations.push_str(&emit_declaration(self.session, defid, vis, &ident.name));

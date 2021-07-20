@@ -27,7 +27,7 @@ pub fn print_types_node(session: &Session, scope: ScopeRef, node: &Expr) {
             let defid = session.get_ref(node.id).unwrap();
             let fscope = session.map.get(&defid);
             print_types_scope(session, fscope.clone());
-            print_types_node(session, fscope, body);
+            print_types(session, fscope, body);
         },
         ExprKind::Definition(mutable, name, ttype, body) => {
             println!("\nDefining {:?}: {:?} {:?}", mutable, name, ttype);

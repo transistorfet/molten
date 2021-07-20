@@ -261,7 +261,7 @@ impl<'sess> Visitor for Transformer<'sess> {
         Ok(self.transform_func_decl(abi, id, vis, &ident.name, &ttype))
     }
 
-    fn visit_function(&mut self, id: NodeID, vis: Visibility, ident: &Option<Ident>, args: &Vec<Argument>, _rettype: &Option<Type>, body: &Expr, abi: ABI) -> Result<Self::Return, Error> {
+    fn visit_function(&mut self, id: NodeID, vis: Visibility, ident: &Option<Ident>, args: &Vec<Argument>, _rettype: &Option<Type>, body: &Vec<Expr>, abi: ABI) -> Result<Self::Return, Error> {
         Ok(self.transform_func_def(abi, id, vis, ident.as_ref().map(|ident| ident.name.as_str()), args, body))
     }
 
@@ -298,7 +298,7 @@ impl<'sess> Visitor for Transformer<'sess> {
         Ok(self.transform_assignment(id, left, right))
     }
 
-    fn visit_module(&mut self, id: NodeID, name: &str, code: &Expr, memo_id: NodeID) -> Result<Self::Return, Error> {
+    fn visit_module(&mut self, id: NodeID, name: &str, code: &Vec<Expr>, memo_id: NodeID) -> Result<Self::Return, Error> {
         Ok(self.transform_module(id, name, code, memo_id))
     }
 
@@ -350,7 +350,7 @@ impl<'sess> Visitor for Transformer<'sess> {
 
 impl<'sess> Transformer<'sess> {
 
-    pub fn transform_module(&mut self, id: NodeID, name: &str, code: &Expr, memo_id: NodeID) -> Vec<LLExpr> {
+    pub fn transform_module(&mut self, id: NodeID, name: &str, code: &Vec<Expr>, memo_id: NodeID) -> Vec<LLExpr> {
         let defid = self.session.get_ref(id).unwrap();
 
         // Define a global that will store whether we've run this function or not

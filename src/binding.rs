@@ -58,7 +58,7 @@ impl<'sess> Visitor for NameBinder<'sess> {
         Ok(())
     }
 
-    fn visit_module(&mut self, id: NodeID, name: &str, code: &Expr, memo_id: NodeID) -> Result<Self::Return, Error> {
+    fn visit_module(&mut self, id: NodeID, name: &str, code: &Vec<Expr>, memo_id: NodeID) -> Result<Self::Return, Error> {
         let scope = self.stack.get_scope();
 
         let memo_name = format!("memo.{}", name);
@@ -70,10 +70,10 @@ impl<'sess> Visitor for NameBinder<'sess> {
         self.session.set_type(defid, ttype.clone());
 
         ClosureDef::define(self.session, scope.clone(), defid, Visibility::Public, Some(&format!("run_{}", name)), Some(ttype))?;
-        self.visit_node(code)
+        self.visit_vec(code)
     }
 
-    fn visit_function(&mut self, id: NodeID, vis: Visibility, ident: &Option<Ident>, args: &Vec<Argument>, rettype: &Option<Type>, body: &Expr, abi: ABI) -> Result<Self::Return, Error> {
+    fn visit_function(&mut self, id: NodeID, vis: Visibility, ident: &Option<Ident>, args: &Vec<Argument>, rettype: &Option<Type>, body: &Vec<Expr>, abi: ABI) -> Result<Self::Return, Error> {
         let defid = self.session.new_def_id(id);
 
         let scope = self.stack.get_scope();
@@ -109,7 +109,7 @@ impl<'sess> Visitor for NameBinder<'sess> {
         AnyFunc::define(self.session, scope.clone(), defid, vis, ident.as_ref().map(|ident| ident.as_str()), abi, Some(nftype))?;
 
         self.with_scope(fscope, |visitor| {
-            visitor.visit_node(body)
+            visitor.visit_vec(body)
         })
     }
 

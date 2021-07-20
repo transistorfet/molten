@@ -139,7 +139,7 @@ pub trait Visitor: Sized {
         Ok(self.default_return())
     }
 
-    fn visit_function(&mut self, id: NodeID, vis: Visibility, ident: &Option<Ident>, args: &Vec<Argument>, rettype: &Option<Type>, body: &Expr, abi: ABI) -> Result<Self::Return, Error> {
+    fn visit_function(&mut self, id: NodeID, vis: Visibility, ident: &Option<Ident>, args: &Vec<Argument>, rettype: &Option<Type>, body: &Vec<Expr>, abi: ABI) -> Result<Self::Return, Error> {
         walk_function(self, id, vis, ident, args, rettype, body, abi)
     }
 
@@ -172,8 +172,8 @@ pub trait Visitor: Sized {
         walk_assignment(self, id, left, right, ty)
     }
 
-    fn visit_module(&mut self, _id: NodeID, _name: &str, code: &Expr, _memo_id: NodeID) -> Result<Self::Return, Error> {
-        self.visit_node(code)
+    fn visit_module(&mut self, _id: NodeID, _name: &str, code: &Vec<Expr>, _memo_id: NodeID) -> Result<Self::Return, Error> {
+        self.visit_vec(code)
     }
 
 
@@ -293,11 +293,11 @@ pub fn walk_while<R, V: Visitor<Return = R>>(visitor: &mut V, _id: NodeID, cond:
     Ok(visitor.default_return())
 }
 
-pub fn walk_function<R, V: Visitor<Return = R>>(visitor: &mut V, id: NodeID, _vis: Visibility, _ident: &Option<Ident>, _args: &Vec<Argument>, _rettype: &Option<Type>, body: &Expr, _abi: ABI) -> Result<R, Error> {
+pub fn walk_function<R, V: Visitor<Return = R>>(visitor: &mut V, id: NodeID, _vis: Visibility, _ident: &Option<Ident>, _args: &Vec<Argument>, _rettype: &Option<Type>, body: &Vec<Expr>, _abi: ABI) -> Result<R, Error> {
     let fscope = visitor.get_scope_by_id(id);
     // TODO visit arguments
     visitor.with_scope(fscope, |visitor| {
-        visitor.visit_node(body)
+        visitor.visit_vec(body)
     })?;
     Ok(visitor.default_return())
 }
