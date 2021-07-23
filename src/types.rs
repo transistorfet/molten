@@ -239,7 +239,8 @@ pub fn expect_type(session: &Session, odtype: Option<Type>, octype: Option<Type>
 /// Compare the defined type to the calculated type and return the common type, or error if they cannot be unified
 ///
 /// If mode is Check::Def, then dtype <: ctype (ie. ctype will be downcast to match dtype, but not the inverse)
-/// If mode is Check::List, then forall X, X <: dtype AND X <: ctype (ie. the type that both given types can downcast to)
+/// If mode is Check::List, dtype <: ctype OR ctype <: dtype (ie. the most general unifier between the two types)
+/// This behavioral difference is limited to object (class) subtyping
 pub fn check_type(session: &Session, odtype: Option<Type>, octype: Option<Type>, mode: Check, update: bool) -> Result<Type, Error> {
     if odtype.is_none() {
         match octype {
@@ -252,7 +253,7 @@ pub fn check_type(session: &Session, odtype: Option<Type>, octype: Option<Type>,
         let dtype = resolve_type(session, odtype.unwrap(), false)?;
         let ctype = resolve_type(session, octype.unwrap(), false)?;
 
-        debug!("CHECK TYPE {:?} {:?} {:?}", dtype, ctype, update);
+        debug!("CHECK TYPE {:?} {:?} {:?} {:?}", dtype, ctype, mode, update);
 
         // If the update flag is false, then universal variables can unify with any type.  This
         // assumes that update is only false when not type checking, such as looking for overloaded
@@ -356,7 +357,8 @@ fn is_subclass_of(session: &Session, adef: (&String, UniqueID, &Vec<Type>), bdef
         }
         adef.2 = check_type_params(session, &class.get_params()?, &adef.2, mode, update)?;
 
-        if *bdef.0 == adef.0 {
+        // Compare the IDs of the type (since it could be an alias in the case of "Self")
+        if bdef.1 == adef.1 {
             let ptypes = if bdef.2.len() > 0 || adef.2.len() > 0 {
                 check_type_params(session, &adef.2, bdef.2, mode, update)?
             } else {

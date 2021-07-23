@@ -1,5 +1,5 @@
 
-* you know... you could make ExprKind::Function take a vec as its body, and then you wouldn't need to insert blocks
+* I'd really like to change the way method calls are done.  It's annoying having all these definitions and blocks for every call
 * reduce the number of clone()s
 * maybe require an ignore type function call for statements that don't return unit (ie.  disallow having comparisons and math functions where the return value is ignored and the code will be optimized away,
   since it could be unintended)
