@@ -432,7 +432,8 @@ impl<'sess> LLVM<'sess> {
     }
 
     pub unsafe fn build_expr_block(&self, exprs: &Vec<LLExpr>) -> LLVMValueRef {
-        let mut last = ptr::null_mut();
+        // The default return is Unit, which in LLVM is represented with an i32 0 value
+        let mut last = self.i32_const(0);
         for expr in exprs {
             last = self.build_expr(expr);
         }
