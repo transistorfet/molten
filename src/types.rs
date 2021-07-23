@@ -344,34 +344,34 @@ pub fn check_type(session: &Session, odtype: Option<Type>, octype: Option<Type>,
 }
 
 
-fn is_subclass_of(session: &Session, adef: (&String, UniqueID, &Vec<Type>), bdef: (&String, UniqueID, &Vec<Type>), mode: Check, update: bool) -> Result<Type, Error> {
-    debug!("IS SUBCLASS: {:?} of {:?}", adef, bdef);
+fn is_subclass_of(session: &Session, sdef: (&String, UniqueID, &Vec<Type>), pdef: (&String, UniqueID, &Vec<Type>), mode: Check, update: bool) -> Result<Type, Error> {
+    debug!("IS SUBCLASS: {:?} of {:?}", sdef, pdef);
     let mut names = Type::map_new();
-    let mut adef = (adef.0.clone(), adef.1, adef.2.clone());
-    //let mut deftype = session.get_type(adef.1)?.get_params()?;
+    let mut sdef = (sdef.0.clone(), sdef.1, sdef.2.clone());
+    //let mut deftype = session.get_type(sdef.1)?.get_params()?;
 
     loop {
-        let mut class = session.get_type(adef.1).unwrap();
+        let mut class = session.get_type(sdef.1).unwrap();
         if update {
             class = Type::map_typevars(session, &mut names, class);
         }
-        adef.2 = check_type_params(session, &class.get_params()?, &adef.2, mode, update)?;
+        sdef.2 = check_type_params(session, &class.get_params()?, &sdef.2, mode, update)?;
 
         // Compare the IDs of the type (since it could be an alias in the case of "Self")
-        if bdef.1 == adef.1 {
-            let ptypes = if bdef.2.len() > 0 || adef.2.len() > 0 {
-                check_type_params(session, &adef.2, bdef.2, mode, update)?
+        if pdef.1 == sdef.1 {
+            let ptypes = if pdef.2.len() > 0 || sdef.2.len() > 0 {
+                check_type_params(session, &sdef.2, pdef.2, mode, update)?
             } else {
                 vec!()
             };
-            let rtype = Type::Object(adef.0, adef.1, ptypes);
+            let rtype = Type::Object(sdef.0, sdef.1, ptypes);
             debug!("DONE SUBCLASS: {:?}", rtype);
             return Ok(rtype);
         }
 
-        let classdef = session.get_def(adef.1)?.as_class()?;
+        let classdef = session.get_def(sdef.1)?.as_class()?;
         if classdef.parenttype.is_none() {
-            return Err(Error::new(format!("TypeError: type mismatch, expected {} but found {}", Type::Object(bdef.0.clone(), bdef.1, bdef.2.clone()), Type::Object(adef.0.clone(), adef.1, adef.2))));
+            return Err(Error::new(format!("TypeError: type mismatch, expected {} but found {}", Type::Object(pdef.0.clone(), pdef.1, pdef.2.clone()), Type::Object(sdef.0.clone(), sdef.1, sdef.2))));
         }
         let parent = classdef.parenttype.clone().unwrap();
         let parent = if update {
@@ -380,7 +380,7 @@ fn is_subclass_of(session: &Session, adef: (&String, UniqueID, &Vec<Type>), bdef
             parent
         };
         match resolve_type(session, parent, false)? {
-            Type::Object(name, id, params) => adef = (name, id, params),
+            Type::Object(name, id, params) => sdef = (name, id, params),
             ttype @ _ => return Err(Error::new(format!("TypeError: expected Object but found {}", ttype))),
         }
     }
