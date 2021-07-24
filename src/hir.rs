@@ -129,7 +129,7 @@ pub enum ExprKind {
 
     Declare(Visibility, Ident, Type),
     Function(Visibility, Option<Ident>, Vec<Argument>, Option<Type>, Vec<Expr>, ABI),
-    New(ClassSpec),
+    AllocObject(Type),
     Class(ClassSpec, Option<ClassSpec>, Vec<Expr>),
     TypeAlias(ClassSpec, Type),
     Enum(ClassSpec, Vec<EnumVariant>),
@@ -226,6 +226,7 @@ impl Pattern {
 }
 
 impl Expr {
+    #[allow(dead_code)]
     pub fn new(pos: Pos, kind: ExprKind) -> Expr {
         Expr {
             id: NodeID::generate(),
@@ -234,6 +235,7 @@ impl Expr {
         }
     }
 
+    #[allow(dead_code)]
     pub fn new_with_id(id: NodeID, pos: Pos, kind: ExprKind) -> Expr {
         Expr {
             id: id,
@@ -370,8 +372,8 @@ impl Expr {
     }
 
     #[allow(dead_code)]
-    pub fn make_new(pos: Pos, classspec: ClassSpec) -> Expr {
-        Expr { id: NodeID::generate(), pos: pos, kind: ExprKind::New(classspec) }
+    pub fn make_alloc_object(pos: Pos, ttype: Type) -> Expr {
+        Expr { id: NodeID::generate(), pos: pos, kind: ExprKind::AllocObject(ttype) }
     }
 
     #[allow(dead_code)]
@@ -405,13 +407,19 @@ impl Expr {
     }
 
     #[allow(dead_code)]
-    pub fn make_type_enum(pos: Pos, classspec: ClassSpec, variants: Vec<EnumVariant>) -> Expr {
+    pub fn make_enum(pos: Pos, classspec: ClassSpec, variants: Vec<EnumVariant>) -> Expr {
         Expr { id: NodeID::generate(), pos: pos, kind: ExprKind::Enum(classspec, variants) }
     }
 
     #[allow(dead_code)]
     pub fn make_module(name: String, code: Vec<Expr>) -> Expr {
         Expr { id: NodeID::generate(), pos: Pos::empty(), kind: ExprKind::Module(name, code, NodeID::generate()) }
+    }
+
+
+    #[allow(dead_code)]
+    pub fn make_resolve_ident(pos: Pos, object: &Ident, name: &str) -> Expr {
+        Expr::make_resolve(pos.clone(), Expr::make_ident(pos, object.clone()), Ident::from_str(name))
     }
 }
 

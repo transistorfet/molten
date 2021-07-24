@@ -45,15 +45,6 @@ use hir::{ NodeID, Mutability, Visibility, AssignType, Literal, Ident, Argument,
 
 pub type Span<'a> = LocatedSpan<&'a str>;
 
-//named!(sp, eat_separator!(&b" \t"[..]));
-
-#[macro_export]
-macro_rules! sp {
-    ($i:expr, $($args:tt)*) => {
-        sep!($i, sp, $($args)*)
-    }
-}
-
 #[macro_export]
 macro_rules! wscom {
     ($i:expr, $submac:ident!( $($args:tt)* )) => ({
@@ -177,7 +168,7 @@ named!(definition(Span) -> AST,
     do_parse!(
         pos: position!() >>
         wscom!(tag_word!("let")) >>
-        m: opt!(wscom!(tag_word!("mut"))) >>
+        m: mutability >>
         i: identifier_typed >>
         e: opt!(preceded!(
             wscom!(tag!("=")),
@@ -185,7 +176,7 @@ named!(definition(Span) -> AST,
         )) >>
         (AST::Definition(
             Pos::new(pos),
-            if m.is_some() { Mutability::Mutable } else { Mutability::Immutable },
+            m,
             i.1,
             i.2,
             r(if e.is_some() { e.unwrap() } else { AST::Nil })
@@ -398,31 +389,26 @@ named!(newclass(Span) -> AST,
         pos: position!() >>
         wscom!(tag_word!("new")) >>
         cs: class_spec >>
-        a: map!(
-            delimited!(tag!("("), expression_list, tag!(")")),
-            |mut a| { a.insert(0, AST::New(Pos::new(pos), cs.clone())); a }
-        ) >>
-        (AST::PtrCast(
-            Type::Object(cs.ident.name.clone(), UniqueID(0), cs.types.clone()),
-            r(AST::Invoke(Pos::new(pos), r(AST::Resolver(Pos::new(pos), r(AST::Identifier(Pos::new(pos), cs.ident.clone())), Ident::from_str("new"))), a))))
+        a: delimited!(tag!("("), expression_list, tag!(")")) >>
+        (AST::New(Pos::new(pos), cs, a))
     )
 );
 
 named!(declare(Span) -> AST,
     do_parse!(
         pos: position!() >>
-        vis: opt!(wscom!(tag_word!("pub"))) >>
+        vis: visibility >>
         wscom!(tag_word!("decl")) >>
         n: alt!(identifier | any_op) >>
         t: type_function >>
-        (AST::Declare(Pos::new(pos), if vis.is_some() { Visibility::Public } else { Visibility::Private }, n, t))
+        (AST::Declare(Pos::new(pos), vis, n, t))
     )
 );
 
 named!(function(Span) -> AST,
     do_parse!(
         pos: position!() >>
-        vis: opt!(wscom!(tag_word!("pub"))) >>
+        vis: visibility >>
         wscom!(tag_word!("fn")) >>
         //n: opt!(identifier) >>
         l: alt!(
@@ -442,7 +428,7 @@ named!(function(Span) -> AST,
             return_error!(ErrorKind::Tag /*ErrorKind::Custom(ERR_IN_FUNC) */,
                 wscoml!(block_vec))
         ) >>
-        (AST::Function(Pos::new(pos), if vis.is_some() { Visibility::Public } else { Visibility::Private }, l.0, l.1, rt, e, a))
+        (AST::Function(Pos::new(pos), vis, l.0, l.1, rt, e, a))
     )
 );
 
@@ -705,6 +691,21 @@ named!(identifier_typed(Span) -> (Pos, Ident, Option<Type>),
 named!(any_op(Span) -> Ident,
     alt!(infix_op | prefix_op | map_ident!(alt!(tag!("[]") | tag!("::"))))
 );
+
+named!(mutability(Span) -> Mutability,
+    map!(
+        opt!(wscom!(tag_word!("mut"))),
+        |m| if m.is_some() { Mutability::Mutable } else { Mutability::Immutable }
+    )
+);
+
+named!(visibility(Span) -> Visibility,
+    map!(
+        opt!(wscom!(tag_word!("pub"))),
+        |vis| if vis.is_some() { Visibility::Public } else { Visibility::Private }
+    )
+);
+
 
 pub fn parse_type(s: &str) -> Option<Type> {
     match complete_type_description(Span::new(s)) {

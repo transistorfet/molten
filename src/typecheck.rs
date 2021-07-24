@@ -382,7 +382,7 @@ impl<'sess> Visitor for TypeChecker<'sess> {
         Ok(ttype.unwrap())
     }
 
-    fn visit_new(&mut self, refid: NodeID, _classspec: &ClassSpec) -> Result<Self::Return, Error> {
+    fn visit_alloc_object(&mut self, refid: NodeID, _ttype: &Type) -> Result<Self::Return, Error> {
         let classtype = self.session.get_type(refid).unwrap();
         let dtype = self.session.get_type_from_ref(refid)?;
         let mtype = Type::map_all_typevars(self.session, dtype.clone());

@@ -1,5 +1,6 @@
 
 use std::fmt;
+use std::convert::From;
 use std::collections::HashMap;
 
 use defs::Def;
@@ -61,7 +62,6 @@ impl Type {
         }
     }
 
-
     #[allow(dead_code)]
     pub fn is_record(&self) -> bool {
         match *self {
@@ -99,7 +99,6 @@ impl Type {
             _ => false
         }
     }
-
 
     pub fn get_argtypes(&self) -> Result<&Type, Error> {
         match self {
@@ -148,12 +147,15 @@ impl Type {
         }
     }
 
-    pub fn from_spec(classspec: ClassSpec, id: UniqueID) -> Type {
-        Type::Object(classspec.ident.name, id, classspec.types)
-    }
-
     pub fn display_vec(list: &Vec<Type>) -> String {
         list.iter().map(|t| format!("{}", t)).collect::<Vec<String>>().join(", ")
+    }
+}
+
+
+impl From<&ClassSpec> for Type {
+    fn from(item: &ClassSpec) -> Self {
+        Type::Object(item.ident.name.clone(), UniqueID(0), item.types.clone())
     }
 }
 

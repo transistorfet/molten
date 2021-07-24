@@ -1,4 +1,5 @@
 
+* should we change classspec into a type and be done with it?  We can decompose the type later
 * I'd really like to change the way method calls are done.  It's annoying having all these definitions and blocks for every call
 * reduce the number of clone()s
 * maybe require an ignore type function call for statements that don't return unit (ie.  disallow having comparisons and math functions where the return value is ignored and the code will be optimized away,

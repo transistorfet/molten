@@ -92,15 +92,15 @@ impl<'sess> Refinery<'sess> {
                 if code.len() == 0 {
                     code.push(AST::Literal(Literal::Unit))
                 }
-                Expr::new(pos, ExprKind::Block(self.refine_vec(code)))
+                Expr::make_block(pos, self.refine_vec(code))
             },
 
             AST::Definition(pos, mutable, ident, ttype, code) => {
-                Expr::new(pos, ExprKind::Definition(mutable, ident, ttype, r(self.refine_node(*code)?)))
+                Expr::make_def(pos, mutable, ident, ttype, self.refine_node(*code)?)
             },
 
             AST::Declare(pos, vis, ident, ttype) => {
-                Expr::new(pos, ExprKind::Declare(vis, ident, ttype))
+                Expr::make_decl(pos, vis, ident, ttype)
             },
 
             AST::Function(pos, _vis, ident, args, ret, body, abi) => {
@@ -112,7 +112,7 @@ impl<'sess> Refinery<'sess> {
                 };
 
                 self.with_context(CodeContext::Func(abi), || {
-                    Ok(Expr::new(pos, ExprKind::Function(vis, ident, args, ret, self.refine_vec(body), abi)))
+                    Ok(Expr::make_func(pos, vis, ident, args, ret, self.refine_vec(body), abi))
                 })?
             },
 
@@ -127,29 +127,29 @@ impl<'sess> Refinery<'sess> {
 
                     Expr::make_block(pos.clone(), vec!(
                         Expr::make_def(pos.clone(), Mutability::Immutable, Ident::from_str(&tmpname), None, *expr), 
-                        Expr::new(pos.clone(), ExprKind::Invoke(r(Expr::make_access(pos.clone(), Expr::make_ident_from_str(pos.clone(), &tmpname), field)), args, NodeID::generate())),
+                        Expr::make_invoke(pos.clone(), Expr::make_access(pos.clone(), Expr::make_ident_from_str(pos.clone(), &tmpname), field), args),
                     ))
                 } else {
-                    Expr::new(pos, ExprKind::Invoke(r(fexpr), args, NodeID::generate()))
+                    Expr::make_invoke(pos, fexpr, args)
                 }
             },
 
             AST::SideEffect(pos, op, args) => {
-                Expr::new(pos, ExprKind::SideEffect(op, self.refine_vec(args)))
+                Expr::make_side_effect(pos, op, self.refine_vec(args))
             },
 
             AST::If(pos, cond, texpr, fexpr) => {
-                Expr::new(pos, ExprKind::If(r(self.refine_node(*cond)?), r(self.refine_node(*texpr)?), r(self.refine_node(*fexpr)?)))
+                Expr::make_if(pos, self.refine_node(*cond)?, self.refine_node(*texpr)?, self.refine_node(*fexpr)?)
             },
 
             AST::Match(pos, cond, cases) => {
                 let cases = self.refine_cases(cases)?;
-                Expr::new(pos, ExprKind::Match(r(self.refine_node(*cond)?), cases))
+                Expr::make_match(pos, self.refine_node(*cond)?, cases)
             },
 
             AST::Try(pos, cond, cases) => {
                 let cases = self.refine_cases(cases)?;
-                Expr::new(pos, ExprKind::Try(r(self.refine_node(*cond)?), cases))
+                Expr::make_try(pos, self.refine_node(*cond)?, cases)
             },
 
             AST::Raise(pos, expr) => {
@@ -159,21 +159,21 @@ impl<'sess> Refinery<'sess> {
                         return Err(Error::new(format!("SyntaxError: raise keyword cannot appear in this context"))),
                     _ => { },
                 }
-                Expr::new(pos, ExprKind::Raise(r(self.refine_node(*expr)?)))
+                Expr::make_raise(pos, self.refine_node(*expr)?)
             },
 
             AST::While(pos, cond, body) => {
-                Expr::new(pos, ExprKind::While(r(self.refine_node(*cond)?), r(self.refine_node(*body)?)))
+                Expr::make_while(pos, self.refine_node(*cond)?, self.refine_node(*body)?)
             },
 
             AST::For(pos, ident, list, body) => {
                 self.desugar_for_loop(pos, ident, *list, *body)?
             },
 
-            AST::Ref(pos, expr) => { Expr::new(pos, ExprKind::Ref(r(self.refine_node(*expr)?))) },
-            AST::Deref(pos, expr) => { Expr::new(pos, ExprKind::Deref(r(self.refine_node(*expr)?))) },
+            AST::Ref(pos, expr) => { Expr::make_ref(pos, self.refine_node(*expr)?) },
+            AST::Deref(pos, expr) => { Expr::make_deref(pos, self.refine_node(*expr)?) },
 
-            AST::Tuple(pos, items) => { Expr::new(pos, ExprKind::Tuple(self.refine_vec(items))) },
+            AST::Tuple(pos, items) => { Expr::make_tuple(pos, self.refine_vec(items)) },
 
             AST::Record(pos, mut items) => {
                 items.sort_unstable_by(|a, b| a.0.name.cmp(&b.0.name));
@@ -181,7 +181,7 @@ impl<'sess> Refinery<'sess> {
                 for (i, e) in items {
                     refined.push((i, self.refine_node(e)?));
                 }
-                Expr::new(pos, ExprKind::Record(refined))
+                Expr::make_record(pos, refined)
             },
 
             AST::RecordUpdate(pos, record, mut items) => {
@@ -190,22 +190,29 @@ impl<'sess> Refinery<'sess> {
                 for (i, e) in items {
                     refined.push((i, self.refine_node(e)?));
                 }
-                Expr::new(pos, ExprKind::RecordUpdate(r(self.refine_node(*record)?), refined))
+                Expr::make_record_update(pos, self.refine_node(*record)?, refined)
             },
 
             AST::Enum(pos, classspec, variants) => {
                 let variants = variants.into_iter().map(|(pos, ident, ttype)| EnumVariant::new(pos, ident, ttype)).collect();
-                Expr::new(pos, ExprKind::Enum(classspec, variants))
+                Expr::make_enum(pos, classspec, variants)
             },
 
             AST::List(pos, items) => {
                 self.desugar_list(pos, items)?
             },
 
-            AST::New(pos, classspec) => {
-                Expr::make_invoke(pos.clone(),
-                    Expr::make_resolve(pos.clone(), Expr::new(pos.clone(), ExprKind::Identifier(classspec.ident.clone())), Ident::from_str("__init__")),
-                    vec!(Expr::new(pos.clone(), ExprKind::New(classspec))))
+            AST::New(pos, classspec, args) => {
+                let ttype = Type::from(&classspec);
+
+                let object =
+                    Expr::make_invoke(pos.clone(), Expr::make_resolve_ident(pos.clone(), &classspec.ident, "__init__"),
+                        vec!(Expr::make_alloc_object(pos.clone(), ttype.clone())));
+
+                let mut args = args.into_iter().map(|arg| self.refine_node(arg)).collect::<Result<Vec<_>, _>>()?;
+                args.insert(0, object);
+                Expr::make_ptr_cast(ttype.clone(),
+                    Expr::make_invoke(pos.clone(), Expr::make_resolve_ident(pos.clone(), &classspec.ident, "new"), args))
             },
 
             AST::Class(pos, classspec, parentspec, body) => {
@@ -222,11 +229,11 @@ impl<'sess> Refinery<'sess> {
                     AST::Identifier(_, _) => { },
                     _ => return Err(Error::new(format!("SyntaxError: left-hand side of scope resolver must be identifier"))),
                 }
-                Expr::new(pos, ExprKind::Resolver(r(self.refine_node(*left)?), right, NodeID::generate()))
+                Expr::make_resolve(pos, self.refine_node(*left)?, right)
             },
 
             AST::Accessor(pos, left, right) => {
-                Expr::new(pos, ExprKind::Accessor(r(self.refine_node(*left)?), right, NodeID::generate()))
+                Expr::make_access(pos, self.refine_node(*left)?, right)
             },
 
             AST::Assignment(pos, left, right, ty) => {
@@ -235,7 +242,7 @@ impl<'sess> Refinery<'sess> {
                     //AST::Identifier_, _) |
                     AST::Deref(_, _) |
                     AST::Accessor(_, _, _) => {
-                        Expr::new(pos, ExprKind::Assignment(r(self.refine_node(left)?), r(self.refine_node(*right)?), ty))
+                        Expr::make_assign(pos, self.refine_node(left)?, self.refine_node(*right)?, ty)
                     },
                     AST::Index(ipos, base, index) => {
                         self.refine_node(AST::Invoke(pos, r(AST::Accessor(ipos.clone(), base, Ident::from_str("[]"))), vec!(*index, *right)))?
@@ -248,17 +255,17 @@ impl<'sess> Refinery<'sess> {
                 let path = ident.name.replace(".", "/") + ".dec";
                 let ast = self.session.parse_file(path.as_str(), true);
                 let decls = self.refine_vec(ast);
-                Expr::new(pos, ExprKind::Import(ident, decls))
+                Expr::make_import(pos, ident, decls)
             },
 
             AST::PtrCast(ttype, value) => {
-                Expr::new(Pos::empty(), ExprKind::PtrCast(ttype, r(self.refine_node(*value)?)))
+                Expr::make_ptr_cast(ttype, self.refine_node(*value)?)
             },
 
-            AST::Literal(val) => { Expr::new(Pos::empty(), ExprKind::Literal(val)) },
-            AST::Nil => { Expr::new(Pos::empty(), ExprKind::Nil) },
-            AST::Identifier(pos, ident) => { Expr::new(pos, ExprKind::Identifier(ident)) },
-            AST::TypeAlias(pos, classspec, ttype) => { Expr::new(pos, ExprKind::TypeAlias(classspec, ttype)) },
+            AST::Nil => { Expr::make_nil() },
+            AST::Literal(val) => { Expr::make_lit(val) },
+            AST::Identifier(pos, ident) => { Expr::make_ident(pos, ident) },
+            AST::TypeAlias(pos, classspec, ttype) => { Expr::make_type_alias(pos, classspec, ttype) },
         })
     }
 
@@ -310,7 +317,7 @@ impl<'sess> Refinery<'sess> {
         body_block.push(Expr::make_assign(pos.clone(), self.refine_node(access_iter())?, self.refine_node(invoke(r(AST::Identifier(pos.clone(), Ident::from_str("+"))),
             vec!(access_iter(), AST::Literal(Literal::Integer(1)))))?, AssignType::Update));
 
-        block.push(Expr::new(pos.clone(), ExprKind::While(r(Expr::make_block(pos.clone(), cond_block)), r(Expr::make_block(pos.clone(), body_block)))));
+        block.push(Expr::make_while(pos.clone(), Expr::make_block(pos.clone(), cond_block), Expr::make_block(pos.clone(), body_block)));
         Ok(Expr::make_block(pos.clone(), block))
     }
 
@@ -378,7 +385,7 @@ impl<'sess> Refinery<'sess> {
         let body = self.with_context(CodeContext::ClassBody, || {
             self.refine_vec(newbody)
         });
-        Ok(Expr::new(pos, ExprKind::Class(classspec, parentspec, body)))
+        Ok(Expr::make_class(pos, classspec, parentspec, body))
     }
 
     pub fn desugar_list(&self, pos: Pos, items: Vec<AST>) -> Result<Expr, Error> {
@@ -387,12 +394,7 @@ impl<'sess> Refinery<'sess> {
 
         // TODO this makes lists immutable, which might not be what we want
         block.push(AST::Definition(pos.clone(), Mutability::Immutable, Ident::new(tmplist.clone()), None,
-            r(AST::Invoke(pos.clone(),
-                r(AST::make_resolve_ident(pos.clone(), Ident::from_str("List"), "new")),
-                vec!(
-                    AST::New(pos.clone(), ClassSpec::new(pos.clone(), Ident::from_str("List"), vec!(Type::Variable(UniqueID::generate()))))
-                    /*, AST::Integer(items.len() as isize)*/
-                )))));
+            r(AST::New(pos.clone(), ClassSpec::new(pos.clone(), Ident::from_str("List"), vec!(Type::Variable(UniqueID::generate()))), vec!(/*, AST::Integer(items.len() as isize)*/)))));
         for item in items {
             block.push(AST::Invoke(pos.clone(),
                 r(AST::Accessor(pos.clone(), r(AST::Identifier(pos.clone(), Ident::new(tmplist.clone()))), Ident::from_str("push"))),

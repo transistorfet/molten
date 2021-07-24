@@ -265,8 +265,8 @@ impl<'sess> Visitor for Transformer<'sess> {
         Ok(self.transform_func_def(abi, id, vis, ident.as_ref().map(|ident| ident.name.as_str()), args, body))
     }
 
-    fn visit_new(&mut self, id: NodeID, _classspec: &ClassSpec) -> Result<Self::Return, Error> {
-        Ok(self.transform_new_object(id))
+    fn visit_alloc_object(&mut self, id: NodeID, _ttype: &Type) -> Result<Self::Return, Error> {
+        Ok(self.transform_alloc_object(id))
     }
 
     fn visit_class(&mut self, id: NodeID, _classspec: &ClassSpec, _parentspec: &Option<ClassSpec>, body: &Vec<Expr>) -> Result<Self::Return, Error> {
@@ -561,7 +561,7 @@ impl<'sess> Transformer<'sess> {
         exprs
     }
 
-    pub fn transform_new_object(&mut self, id: NodeID) -> Vec<LLExpr> {
+    pub fn transform_alloc_object(&mut self, id: NodeID) -> Vec<LLExpr> {
         let mut exprs = vec!();
         let defid = self.session.get_ref(id).unwrap();
         let ltype = self.transform_value_type(&self.session.get_type(defid).unwrap());

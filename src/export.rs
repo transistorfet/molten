@@ -4,7 +4,6 @@ use std::io::prelude::*;
 
 use abi::ABI;
 use types::Type;
-use misc::UniqueID;
 use config::Options;
 use scope::{ ScopeRef };
 use session::{ Session, Error };
@@ -83,9 +82,9 @@ impl<'sess> Visitor for ExportsCollector<'sess> {
     }
 
     fn visit_class(&mut self, _id: NodeID, classspec: &ClassSpec, parentspec: &Option<ClassSpec>, body: &Vec<Expr>) -> Result<Self::Return, Error> {
-        let namespec = unparse_type(self.session, Type::from_spec(classspec.clone(), UniqueID(0)));
+        let namespec = unparse_type(self.session, Type::from(classspec));
         let fullspec = if parentspec.is_some() {
-            format!("{} extends {}", namespec, unparse_type(self.session, Type::from_spec(parentspec.clone().unwrap(), UniqueID(0))))
+            format!("{} extends {}", namespec, unparse_type(self.session, Type::from(parentspec.as_ref().unwrap())))
         } else {
             namespec.clone()
         };

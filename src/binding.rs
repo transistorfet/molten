@@ -172,15 +172,15 @@ impl<'sess> Visitor for NameBinder<'sess> {
         self.visit_node(code)
     }
 
-    fn visit_new(&mut self, id: NodeID, classspec: &ClassSpec) -> Result<Self::Return, Error> {
+    fn visit_alloc_object(&mut self, id: NodeID, ttype: &Type) -> Result<Self::Return, Error> {
         let scope = self.stack.get_scope();
-        let mut classspec = classspec.clone();
-        bind_classspec_type_names(self.session, scope.clone(), &mut classspec, false)?;
-        let classtype = scope.make_obj(self.session, classspec.ident.as_str(), classspec.types.clone())?;
-        self.session.set_type(id, classtype);
-        match scope.get_type_def(&classspec.ident.name) {
+        let name = ttype.get_name()?;
+        let mut ttype = ttype.clone();
+        bind_type_names(self.session, scope.clone(), Some(&mut ttype), false)?;
+        self.session.set_type(id, ttype);
+        match scope.get_type_def(&name) {
             Some(defid) => self.session.set_ref(id, defid),
-            None => return Err(Error::new(format!("NameError: undefined identifier {:?}", classspec.ident.name)))
+            None => return Err(Error::new(format!("NameError: undefined identifier {:?}", name)))
         }
         Ok(())
     }

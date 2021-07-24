@@ -50,7 +50,7 @@ pub enum AST {
 
     Declare(Pos, Visibility, Ident, Type),
     Function(Pos, Visibility, Option<Ident>, Vec<Argument>, Option<Type>, Vec<AST>, ABI),
-    New(Pos, ClassSpec),
+    New(Pos, ClassSpec, Vec<AST>),
     Class(Pos, ClassSpec, Option<ClassSpec>, Vec<AST>),
     TypeAlias(Pos, ClassSpec, Type),
     Enum(Pos, ClassSpec, Vec<(Pos, Ident, Option<Type>)>),
@@ -117,7 +117,7 @@ impl AST {
             AST::For(ref pos, _, _, _) |
             AST::Declare(ref pos, _, _, _) |
             AST::Function(ref pos, _, _, _, _, _, _) |
-            AST::New(ref pos, _) |
+            AST::New(ref pos, _, _) |
             AST::Class(ref pos, _, _, _) |
             AST::Import(ref pos, _, _) |
             AST::Definition(ref pos, _, _, _, _) |

@@ -143,7 +143,7 @@ pub trait Visitor: Sized {
         walk_function(self, id, vis, ident, args, rettype, body, abi)
     }
 
-    fn visit_new(&mut self, _id: NodeID, _classspec: &ClassSpec) -> Result<Self::Return, Error> {
+    fn visit_alloc_object(&mut self, _id: NodeID, _ttype: &Type) -> Result<Self::Return, Error> {
         Ok(self.default_return())
     }
 
@@ -438,8 +438,8 @@ pub fn walk_node<R, V: Visitor<Return = R>>(visitor: &mut V, node: &Expr) -> Res
             visitor.visit_function(node.id, *vis, ident, args, rettype, body, *abi)
         },
 
-        ExprKind::New(classspec) => {
-            visitor.visit_new(node.id, classspec)
+        ExprKind::AllocObject(ttype) => {
+            visitor.visit_alloc_object(node.id, ttype)
         },
 
         ExprKind::Class(classspec, parentspec, body) => {
