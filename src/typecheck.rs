@@ -234,8 +234,9 @@ impl<'sess> Visitor for TypeChecker<'sess> {
     }
 
     fn visit_if(&mut self, _id: NodeID, cond: &Expr, texpr: &Expr, fexpr: &Expr) -> Result<Self::Return, Error> {
-        // TODO should this require the cond type to be Bool?
-        self.visit_node_or_error(cond);
+        let scope = self.stack.get_scope();
+        let ctype = self.visit_node_or_error(cond);
+        expect_type(self.session, Some(scope.make_obj(self.session, "Bool", vec!())?), Some(ctype), Check::Def)?;
         let ttype = self.visit_node_or_error(texpr);
         let ftype = self.visit_node_or_error(fexpr);
         expect_type(self.session, Some(ttype), Some(ftype), Check::List)
@@ -286,8 +287,8 @@ impl<'sess> Visitor for TypeChecker<'sess> {
 
     fn visit_while(&mut self, _id: NodeID, cond: &Expr, body: &Expr) -> Result<Self::Return, Error> {
         let scope = self.stack.get_scope();
-        // TODO should this require the cond type to be Bool?
-        self.visit_node_or_error(cond);
+        let ctype = self.visit_node_or_error(cond);
+        expect_type(self.session, Some(scope.make_obj(self.session, "Bool", vec!())?), Some(ctype), Check::Def)?;
         self.visit_node_or_error(body);
         scope.make_obj(self.session, "()", vec!())
     }

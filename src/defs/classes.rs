@@ -50,7 +50,7 @@ impl ClassDef {
         let name = classtype.get_name()?;
         let tscope = session.map.get_or_add(id, Some(scope.clone()));
         tscope.set_redirect(true);
-        tscope.set_basename(name.clone());
+        tscope.set_basename(name);
 
         // Define Self and Super, and check for typevars in the type params
         tscope.define_type("Self", Some(id))?;
@@ -79,7 +79,7 @@ impl ClassDef {
 
         // Create class name bindings for checking ast::accessors
         let vars = Scope::new_ref(parentclass.map(|p| p.structdef.vars.clone()));
-        vars.set_basename(name.clone());
+        vars.set_basename(name);
 
         session.set_type(id, classtype.clone());
         let vtable = Vtable::create(session, NodeID::generate(), format!("{}_vtable", name.clone()))?;

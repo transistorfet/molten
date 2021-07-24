@@ -167,7 +167,6 @@ Changes:
 * how does rust do "use" if there is a circular dependency?
 * the module level scope is now a closed function, so you could return a representation of it as the "module" object
 
-* comparisons need to be bools, so you can either force that in type checking or somehow desugar or use the comps style from match, or use typeclasses when added
 * you could modify the forloop code to take an iterator in future
 * should vtables be dynamically allocated, or should we add a LLType::ElementOf() type or something to GetElement an aliased type
 * strings, buffers, and all the primative types require vtables if they have methods, but there aren't vtables stored inside them.  You could make static vtable exceptions for them
