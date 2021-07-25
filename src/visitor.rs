@@ -63,7 +63,7 @@ pub trait Visitor: Sized {
         Ok(self.default_return())
     }
 
-    fn visit_ptr_cast(&mut self, _id: NodeID, _ttype: &Type, code: &Expr) -> Result<Self::Return, Error> {
+    fn visit_annotation(&mut self, _id: NodeID, _ttype: &Type, code: &Expr) -> Result<Self::Return, Error> {
         self.visit_node(code)
     }
 
@@ -358,8 +358,8 @@ pub fn walk_node<R, V: Visitor<Return = R>>(visitor: &mut V, node: &Expr) -> Res
             visitor.visit_nil(node.id)
         },
 
-        ExprKind::PtrCast(ttype, code) => {
-            visitor.visit_ptr_cast(node.id, ttype, code)
+        ExprKind::Annotation(ttype, code) => {
+            visitor.visit_annotation(node.id, ttype, code)
         },
 
         ExprKind::Ref(expr) => {

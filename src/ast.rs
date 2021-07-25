@@ -21,7 +21,7 @@ pub struct Pos {
 pub enum AST {
     Literal(Literal),
     Nil,
-    PtrCast(Type, R<AST>),
+    Annotation(Type, R<AST>),
     Ref(Pos, R<AST>),
     Deref(Pos, R<AST>),
 

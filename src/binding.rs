@@ -164,7 +164,7 @@ impl<'sess> Visitor for NameBinder<'sess> {
     }
 
 
-    fn visit_ptr_cast(&mut self, id: NodeID, ttype: &Type, code: &Expr) -> Result<Self::Return, Error> {
+    fn visit_annotation(&mut self, id: NodeID, ttype: &Type, code: &Expr) -> Result<Self::Return, Error> {
         let scope = self.stack.get_scope();
         let mut ttype = ttype.clone();
         bind_type_names(self.session, scope.clone(), Some(&mut ttype), false)?;

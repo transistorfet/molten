@@ -105,9 +105,9 @@ pub struct Expr {
 pub enum ExprKind {
     Literal(Literal),
     Nil,
-    PtrCast(Type, R<Expr>),
     Ref(R<Expr>),
     Deref(R<Expr>),
+    Annotation(Type, R<Expr>),
 
     Tuple(Vec<Expr>),
     Record(Vec<(Ident, Expr)>),
@@ -267,8 +267,8 @@ impl Expr {
     }
 
     #[allow(dead_code)]
-    pub fn make_ptr_cast(ttype: Type, expr: Expr) -> Expr {
-        Expr { id: NodeID::generate(), pos: Pos::empty(), kind: ExprKind::PtrCast(ttype, r(expr)) }
+    pub fn make_annotation(ttype: Type, expr: Expr) -> Expr {
+        Expr { id: NodeID::generate(), pos: Pos::empty(), kind: ExprKind::Annotation(ttype, r(expr)) }
     }
 
     #[allow(dead_code)]

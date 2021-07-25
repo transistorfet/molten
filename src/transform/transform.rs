@@ -175,7 +175,7 @@ impl<'sess> Visitor for Transformer<'sess> {
         Ok(vec!(LLExpr::Literal(LLLit::Null(self.transform_value_type(&self.session.get_type(id).unwrap())))))
     }
 
-    fn visit_ptr_cast(&mut self, id: NodeID, _ttype: &Type, code: &Expr) -> Result<Self::Return, Error> {
+    fn visit_annotation(&mut self, id: NodeID, _ttype: &Type, code: &Expr) -> Result<Self::Return, Error> {
         let mut exprs = vec!();
         let ltype = self.transform_value_type(&self.session.get_type(id).unwrap());
         let result = self.transform_as_result(&mut exprs, code).unwrap();

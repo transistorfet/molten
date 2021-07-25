@@ -211,7 +211,7 @@ impl<'sess> Refinery<'sess> {
 
                 let mut args = args.into_iter().map(|arg| self.refine_node(arg)).collect::<Result<Vec<_>, _>>()?;
                 args.insert(0, object);
-                Expr::make_ptr_cast(ttype.clone(),
+                Expr::make_annotation(ttype.clone(),
                     Expr::make_invoke(pos.clone(), Expr::make_resolve_ident(pos.clone(), &classspec.ident, "new"), args))
             },
 
@@ -258,8 +258,8 @@ impl<'sess> Refinery<'sess> {
                 Expr::make_import(pos, ident, decls)
             },
 
-            AST::PtrCast(ttype, value) => {
-                Expr::make_ptr_cast(ttype, self.refine_node(*value)?)
+            AST::Annotation(ttype, value) => {
+                Expr::make_annotation(ttype, self.refine_node(*value)?)
             },
 
             AST::Nil => { Expr::make_nil() },

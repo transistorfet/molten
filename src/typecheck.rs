@@ -375,7 +375,7 @@ impl<'sess> Visitor for TypeChecker<'sess> {
         scope.make_obj(self.session, "()", vec!())
     }
 
-    fn visit_ptr_cast(&mut self, refid: NodeID, _ttype: &Type, code: &Expr) -> Result<Self::Return, Error> {
+    fn visit_annotation(&mut self, refid: NodeID, _ttype: &Type, code: &Expr) -> Result<Self::Return, Error> {
         let ttype = self.session.get_type(refid);
         let ctype = self.visit_node_or_error(code);
         debug!("PTRCAST: {:?} <- {:?}", ttype, ctype);

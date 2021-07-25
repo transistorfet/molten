@@ -446,7 +446,7 @@ named!(annotation(Span) -> AST,
         e: atomic >>
         wscom!(complete!(tag!(":"))) >>
         t: type_description >>
-        (AST::PtrCast(t, r(e)))
+        (AST::Annotation(t, r(e)))
     )
 );
 
