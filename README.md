@@ -20,18 +20,18 @@ Installing
 ----------
 
 You will need `rustc` and `cargo` installed.  It's recommended that you use
-`rustup` to install these.  I've most recently tested it with rustc version 1.28.
-You will also need LLVM 7 installed, as well as libgc (Boehm-Demers-Weiser's
+`rustup` to install these.  I've most recently tested it with rustc version 1.52.
+You will also need LLVM 11 installed, as well as libgc (Boehm-Demers-Weiser's
 Garbage Collector), and clang, although clang can be replace with gcc by editing
 the `molten` python script.
 
 On Debian/Ubuntu, run:
-`sudo apt-get install llvm-7 llvm-7-runtime llvm-7-dev clang libgc-dev`
+`sudo apt-get install llvm-11 llvm-11-runtime llvm-11-dev clang libgc-dev`
 
 On macOS, run:
-`brew install llvm@7`
+`brew install llvm@11`
 
-You may need to add /usr/local/opt/llvm@7/bin to your path, and you will probably
+You may need to add /usr/local/opt/llvm@11/bin to your path, and you will probably
 need to install libgc separately
 
 Running
@@ -47,7 +47,7 @@ This will run cargo to build the compiler if needed, then compile the fac.mol
 file, as well as all of its dependencies (in this case, the libcore.mol library),
 link them together using clang, along with libgc, and then run the binary.  It
 can also compile to LLVM IR, and run LLVM bitcode by using the `-S` flag.  The
-resulting .bc file can be run using `lli-7`.
+resulting .bc file can be run using `lli-11`.
 
 
 Example

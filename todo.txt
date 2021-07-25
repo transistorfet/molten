@@ -1,6 +1,14 @@
 
-* should we change classspec into a type and be done with it?  We can decompose the type later
+* change PtrCast to Annotate to match pattern's Annotate
+* can we change the way types are stored in expr? I want to get rid of the mut bind_type_names stuff somehow, and it'd be nice to not have types in Expr at all
+* shouldn't "always_new" in bind_type_names always be false?!? Or maybe it's only lib.rs that needs it and bindings.rs uses all false
+* should you make a trait object's data be the first pointer (always a pointer), so that a double deref will get it, rather than an indexed deref?
+* should all universal variables be trait objects, with or without a vtable?
+* for calling a function without it being a method call, you can parse "(" expression ")" into a special AST::BracketExpr or something, which can pass through the expr
+  but can still be checked by the refinery and converted into an Expr::MethodInvoke or however you'll do that
 * I'd really like to change the way method calls are done.  It's annoying having all these definitions and blocks for every call
+
+* should we change classspec into a type and be done with it?  We can decompose the type later
 * reduce the number of clone()s
 * maybe require an ignore type function call for statements that don't return unit (ie.  disallow having comparisons and math functions where the return value is ignored and the code will be optimized away,
   since it could be unintended)
@@ -26,9 +34,10 @@ TRAITS/TYPECLASSES:
 
 * So... a constraint would need to be a Vec<(NodeID, Type)> such that each NodeID is the ID of a placeholder or universal that the constraint applies to, and the Type must
   unify (with the update arg in check_type being false) in order for the constraint to hold, for each constraint
+* how do we actually represent a trait though.  'b: Debug <--- Debug here isn't a valid type if traits are always constraints...
 
-* for traits, you still need to fix the passing of the object to the trait methods, which currently passes the trait object but the function expects the actual concrete type, and segfaults
-* you could insert some code to do the argument unboxing inside each function being implemented, and make the body of the func use the unboxed reference, but that might not be trivial
+* going from an object type to a trait object type would require automatically inserting a conversion, which we sort of do for type variables/generics in a really hacky way, with
+  the codegen build_cast function which will automagically box any non-pointer types
 
 * currently you have function overloading, and class method overloading, which are forms of ad-hoc polymorphism.  Should all function overloading instead require a trait
   implementation (eg. all the infix operator functions and str functions would become traits which would be implemented for different types instead of being overloaded funcs).
@@ -45,14 +54,10 @@ TRAITS/TYPECLASSES:
   have multiple dependent traits to work
 * can you assume that all dependent traits are implemented for the same type, or could they be different types and thus the object/self that is passed to subtraits might need to be different???
 
-* add typeclasses
-* going from an object type to a trait object type would require automatically inserting a conversion, which we sort of do for type variables/generics in a really hacky way, with
-  the codegen build_cast function which will automagically box any non-pointer types
 * we could possibly implement traits statically, so the object would always be typed (no trait objects, and thus no generics with traits unless you switch to monomorphizing... or
   trait objects), but having static traits would allow the implementation to be separated from the class definition
 * non boxed types should be able to use static traits too. I suppose all traits can have a static reference to the trait vtable rather than searching through the object's vtable,
   but we'd have to make function lookup a lot more complicated (search scope, then search for a trait impl for that type that contains that function?)
-* how would the need to restrict traits to non typevars affect things? Would that be hard to change, just for traits
 
 
 
