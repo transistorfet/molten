@@ -8,11 +8,11 @@ pub mod types;
 pub mod classes;
 pub mod variables;
 pub mod functions;
-//pub mod traits;
+pub mod traits;
 
 use defs::enums::{ EnumDefRef };
 use defs::types::{ TypeAliasDefRef };
-//use defs::traits::{ TraitDefRef, TraitImplRef };
+use defs::traits::{ TraitDefRef, TraitImplRef };
 use defs::classes::{ ClassDefRef, StructDefRef };
 use defs::variables::{ VarDefRef, ArgDefRef, FieldDefRef };
 use defs::functions::{ OverloadDefRef, ClosureDefRef, MethodDefRef, CFuncDefRef };
@@ -32,8 +32,8 @@ pub enum Def {
     Closure(ClosureDefRef),
     Method(MethodDefRef),
     CFunc(CFuncDefRef),
-    //Trait(TraitDefRef),
-    //TraitImpl(TraitImplRef),
+    TraitDef(TraitDefRef),
+    TraitImpl(TraitImplRef),
 }
 
 
@@ -60,12 +60,27 @@ impl Def {
         }
     }
 
+    pub fn as_trait_def(&self) -> Result<TraitDefRef, Error> {
+        match *self {
+            Def::TraitDef(ref def) => Ok(def.clone()),
+            _ => Err(Error::new(format!("DefError: expected trait def but found {:#?}", self))),
+        }
+    }
+
+    pub fn as_trait_impl(&self) -> Result<TraitImplRef, Error> {
+        match *self {
+            Def::TraitImpl(ref def) => Ok(def.clone()),
+            _ => Err(Error::new(format!("DefError: expected trait impl but found {:#?}", self))),
+        }
+    }
+
     pub fn get_vars(&self) -> Result<ScopeRef, Error> {
         match *self {
             Def::Class(ref class) => Ok(class.structdef.vars.clone()),
             Def::Struct(ref structdef) => Ok(structdef.vars.clone()),
             Def::Enum(ref enumdef) => Ok(enumdef.vars.clone()),
-            _ => Err(Error::new(format!("DefError: expected class, struct, or enum but found {:#?}", self))),
+            Def::TraitDef(ref traitdef) => Ok(traitdef.vars.clone()),
+            _ => Err(Error::new(format!("DefError: expected class, struct, enum, or trait def but found {:#?}", self))),
         }
     }
 

@@ -54,6 +54,8 @@ pub enum AST {
     Class(Pos, ClassSpec, Option<ClassSpec>, Vec<AST>),
     TypeAlias(Pos, ClassSpec, Type),
     Enum(Pos, ClassSpec, Vec<(Pos, Ident, Option<Type>)>),
+    TraitDef(Pos, ClassSpec, Vec<AST>),
+    TraitImpl(Pos, ClassSpec, Type, Vec<AST>),
 
     Import(Pos, Ident, Vec<AST>),
     Definition(Pos, Mutability, Ident, Option<Type>, R<AST>),

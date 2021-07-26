@@ -198,6 +198,21 @@ impl<'sess> Refinery<'sess> {
                 Expr::make_enum(pos, classspec, variants)
             },
 
+            AST::TraitDef(pos, traitspec, body) => {
+                for node in body.iter() {
+                    match node {
+                        AST::Declare(_, _, _, _) => { },
+                        node @ _ => return Err(Error::new(format!("SyntaxError: only decls are allowed in trait definitions, found {:?}", node))),
+                    }
+                }
+                Expr::new(pos, ExprKind::TraitDef(traitspec, self.refine_vec(body)))
+            },
+
+            AST::TraitImpl(pos, traitspec, impltype, body) => {
+                //Expr::new(pos, ExprKind::TraitImpl(traitspec, impltype, self.refine_vec(body)))
+                self.desugar_trait_impl(pos, traitspec, impltype, body)?
+            },
+
             AST::List(pos, items) => {
                 self.desugar_list(pos, items)?
             },
@@ -402,6 +417,34 @@ impl<'sess> Refinery<'sess> {
         }
         block.push(AST::Identifier(pos.clone(), Ident::new(tmplist.clone())));
         Ok(Expr::make_block(pos.clone(), self.refine_vec(block)))
+    }
+
+    pub fn desugar_trait_impl(&self, pos: Pos, traitspec: ClassSpec, impltype: Type, body: Vec<AST>) -> Result<Expr, Error> {
+        let mut newbody = vec!();
+        for node in body {
+            match node {
+                AST::Function(pos, _vis, ident, mut args, ret, body, abi) if ident.is_some() => {
+                    let vis = Visibility::Public;
+
+                    let mut body = self.with_context(CodeContext::Func(abi), || {
+                        Ok(self.refine_vec(body))
+                    })?;
+
+                    for i in 0..args.len() {
+                        if &args[i].ident.name[..] == "self" {
+                            body.insert(0,
+                                Expr::make_def(args[i].pos.clone(), Mutability::Immutable, args[i].ident.clone(), None,
+                                    Expr::make_unpack_trait_obj(args[i].pos.clone(), impltype.clone(), Expr::make_ident_from_str(args[i].pos.clone(), "self_boxed"))));
+                            args[i].ident.name = "self_boxed".to_string();
+                        }
+                    }
+
+                    newbody.push(Expr::new(pos, ExprKind::Function(vis, ident, args, ret, body, abi)));
+                },
+                node @ _ => return Err(Error::new(format!("SyntaxError: only functions are allowed in trait impls, found {:?}", node))),
+            }
+        }
+        Ok(Expr::new(pos, ExprKind::TraitImpl(traitspec, impltype, newbody)))
     }
 }
 

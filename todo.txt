@@ -8,7 +8,13 @@
   but can still be checked by the refinery and converted into an Expr::MethodInvoke or however you'll do that
 * I'd really like to change the way method calls are done.  It's annoying having all these definitions and blocks for every call
 
-* is there anywhere that transform_as_result doesn't just unwrap the result??? I can get rid of the Option
+* in typecheck invoke, you have dtype, before mapping, which has the universals.  You can save that as fid instead of the post-checked ftype to get the universals during transform
+  or an independent stage before transform, or even save both and compare them after typechecking to see where the typevar boxing or trait object conversion is needed.  I think every other location
+  currently wont allow a conversion, even annotate, because they don't map the typevars and universals wont unify against anything but other universals, so typechecking fails
+* are there many function calls for which ftype, after invoke resolution, is incomplete and possibly will need further resolving??? maybe not
+
+* remove BindInfo and make it just NodeID (not even option)
+* move llcode file to llvm
 
 * should we change classspec into a type and be done with it?  We can decompose the type later
 * reduce the number of clone()s

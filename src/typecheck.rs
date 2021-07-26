@@ -4,7 +4,7 @@ use defs::Def;
 use session::{ Session, Error };
 use scope::{ ScopeRef };
 use hir::{ NodeID, Visibility, Mutability, AssignType, Literal, Ident, Argument, ClassSpec, MatchCase, EnumVariant, Pattern, Expr, ExprKind };
-use types::{ Type, Check, ABI, expect_type, resolve_type, check_type_params };
+use types::{ Type, Check, ABI, expect_type, check_type, resolve_type, check_type_params, check_trait_cast };
 use misc::{ r };
 use visitor::{ self, Visitor, ScopeStack };
 
@@ -125,7 +125,7 @@ impl<'sess> Visitor for TypeChecker<'sess> {
             //let vtype = arg.default.clone().map(|ref vexpr| self.visit_node_or_error(vexpr));
             //atype = expect_type(self.session, scope.clone(), atype, vtype, Check::Def)?;
 
-            if &arg.ident.name[..] == "self" {
+            if &arg.ident.name[..] == "self" || &arg.ident.name[..] == "self_boxed" {
                 let stype = fscope.find_type(self.session, "Self").ok_or(Error::new(format!("NameError: undefined type \"Self\" in the current scope\n")))?;
                 atype = expect_type(self.session, Some(atype), Some(stype), Check::Def)?;
             }
@@ -169,10 +169,7 @@ impl<'sess> Visitor for TypeChecker<'sess> {
 
         let dtype = self.session_find_variant(refid, fexpr, &atypes)?;
         debug!("INVOKE TYPE: {:?} has type {:?}", refid, dtype);
-        let etype = match dtype {
-            dtype @ Type::Variable(_) => dtype,
-            dtype @ _ => Type::map_all_typevars(self.session, dtype),
-        };
+        let etype = Type::map_all_typevars(self.session, dtype);
 
         let ftype = match etype {
             Type::Function(args, rettype, abi) => {
@@ -375,12 +372,60 @@ impl<'sess> Visitor for TypeChecker<'sess> {
         scope.make_obj(self.session, "()", vec!())
     }
 
+    fn visit_trait_def(&mut self, _id: NodeID, _traitspec: &ClassSpec, _body: &Vec<Expr>) -> Result<Self::Return, Error> {
+        // Nothing to do because only decls are allowed in the trait body, so all the type information is present
+        let scope = self.stack.get_scope();
+        scope.make_obj(self.session, "()", vec!())
+    }
+
+    fn visit_trait_impl(&mut self, id: NodeID, _traitspec: &ClassSpec, _impltype: &Type, body: &Vec<Expr>) -> Result<Self::Return, Error> {
+        let impl_id = self.session.get_ref(id)?;
+
+        // TODO this gets the impl-specific tscope and not the trait def tscope
+        let tscope = self.session.map.get(&impl_id);
+        self.with_scope(tscope.clone(), |visitor| {
+            visitor.visit_vec(body)
+        })?;
+
+        // Check the functions in the body and make sure all the functions defined in the trait def are defined with the same types, and no additional functions are present
+        let traitdef = self.session.get_def(self.session.get_ref(impl_id)?)?.as_trait_def()?;
+        let mut names = traitdef.vars.get_names();
+        for node in body {
+            match &node.kind {
+                ExprKind::Function(_, ident, _, _, _, _) => {
+                    let ident = ident.as_ref().unwrap();  // NOTE this should have already been checked by refinery
+                    let defid = *names.get(&ident.name).ok_or(Error::new(format!("TraitError: function not declared in the trait def, but found in the trait impl, {:?}", ident.name)))?;
+                    let deftype = self.session.get_type(defid);
+                    let impltype = self.session.get_type(node.id);
+                    check_type(self.session, deftype, impltype, Check::Def, false)?;
+                    names.remove(&ident.name);
+                }
+                _ => panic!("InternalError: expected function definition, found {:?}", node),
+            }
+        }
+
+        if names.len() > 0 {
+            return Err(Error::new(format!("TraitError: impl doesn't define the following: {:?}", names.keys().collect::<Vec<&String>>())));
+        }
+
+        let scope = self.stack.get_scope();
+        scope.make_obj(self.session, "()", vec!())
+    }
+
+    fn visit_unpack_trait_obj(&mut self, id: NodeID, _impltype: &Type, expr: &Expr) -> Result<Self::Return, Error> {
+        self.visit_node(expr)?;
+        Ok(self.session.get_type(id).unwrap())
+    }
+
     fn visit_annotation(&mut self, refid: NodeID, _ttype: &Type, code: &Expr) -> Result<Self::Return, Error> {
-        let ttype = self.session.get_type(refid);
+        let ttype = self.session.get_type(refid).unwrap();
         let ctype = self.visit_node_or_error(code);
         debug!("PTRCAST: {:?} <- {:?}", ttype, ctype);
-        expect_type(self.session, ttype.clone(), Some(ctype), Check::List)?;
-        Ok(ttype.unwrap())
+        expect_type(self.session, Some(ttype.clone()), Some(ctype.clone()), Check::List).or_else(|_| {
+            // Special case for trait object casting
+            check_trait_cast(self.session, &ttype.clone(), &ctype)
+        })?;
+        Ok(ttype)
     }
 
     fn visit_alloc_object(&mut self, refid: NodeID, _ttype: &Type) -> Result<Self::Return, Error> {

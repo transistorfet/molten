@@ -159,6 +159,18 @@ pub trait Visitor: Sized {
         Ok(self.default_return())
     }
 
+    fn visit_trait_def(&mut self, _id: NodeID, _traitspec: &ClassSpec, body: &Vec<Expr>) -> Result<Self::Return, Error> {
+        self.visit_vec(body)
+    }
+
+    fn visit_trait_impl(&mut self, _id: NodeID, _traitspec: &ClassSpec, _impltype: &Type, body: &Vec<Expr>) -> Result<Self::Return, Error> {
+        self.visit_vec(body)
+    }
+
+    fn visit_unpack_trait_obj(&mut self, _id: NodeID, _impltype: &Type, expr: &Expr) -> Result<Self::Return, Error> {
+        self.visit_node(expr)
+    }
+
 
     fn visit_import(&mut self, _id: NodeID, _ident: &Ident, decls: &Vec<Expr>) -> Result<Self::Return, Error> {
         self.visit_vec(decls)
@@ -452,6 +464,18 @@ pub fn walk_node<R, V: Visitor<Return = R>>(visitor: &mut V, node: &Expr) -> Res
 
         ExprKind::Enum(classspec, variants) => {
             visitor.visit_enum(node.id, classspec, variants)
+        },
+
+        ExprKind::TraitDef(traitspec, body) => {
+            visitor.visit_trait_def(node.id, traitspec, body)
+        },
+
+        ExprKind::TraitImpl(traitspec, impltype, body) => {
+            visitor.visit_trait_impl(node.id, traitspec, impltype, body)
+        },
+
+        ExprKind::UnpackTraitObject(impltype, expr) => {
+            visitor.visit_unpack_trait_obj(node.id, impltype, expr)
         },
 
 

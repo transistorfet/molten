@@ -11,15 +11,6 @@ use session::{ Session, Error };
 pub use abi::ABI;
 
 
-/*
-#[derive(Clone, Debug, PartialEq)]
-struct Constraint {
-    name: String,
-    params: Vec<Type>,
-}
-*/
-
-
 #[derive(Clone, Debug, PartialEq)]
 pub enum Type {
     Object(String, UniqueID, Vec<Type>),
@@ -208,6 +199,7 @@ impl Type {
                     Some(ptype) => ptype,
                     None => {
                         let maptype = session.new_typevar();
+                        //session.get_constraint(id).map(|c| session.set_constraint(maptype.get_id().unwrap(), c));
                         varmap.insert(id, maptype.clone());
                         maptype
                     }
@@ -271,14 +263,18 @@ pub fn check_type(session: &Session, odtype: Option<Type>, octype: Option<Type>,
         }
 
         match (&dtype, &ctype) {
-            (Type::Variable(_), Type::Variable(ref id)) => {
-                if update { session.set_type(*id, dtype.clone()); }
+            (Type::Variable(ref _aid), Type::Variable(ref bid)) => {
+                if update {
+                    session.set_type(*bid, dtype.clone());
+                }
                 Ok(resolve_type(session, dtype, false)?)
             },
 
             (Type::Variable(ref id), ntype) |
             (ntype, Type::Variable(ref id)) => {
-                if update { session.update_type(*id, ntype.clone())?; }
+                if update {
+                    session.update_type(*id, ntype.clone())?;
+                }
                 Ok(resolve_type(session, ntype.clone(), false)?)
             }
 
@@ -371,19 +367,21 @@ fn is_subclass_of(session: &Session, sdef: (&String, UniqueID, &Vec<Type>), pdef
             return Ok(rtype);
         }
 
-        let classdef = session.get_def(sdef.1)?.as_class()?;
-        if classdef.parenttype.is_none() {
-            return Err(Error::new(format!("TypeError: type mismatch, expected {} but found {}", Type::Object(pdef.0.clone(), pdef.1, pdef.2.clone()), Type::Object(sdef.0.clone(), sdef.1, sdef.2))));
-        }
-        let parent = classdef.parenttype.clone().unwrap();
-        let parent = if update {
-            Type::map_typevars(session, &mut names, parent)
-        } else {
-            parent
-        };
-        match resolve_type(session, parent, false)? {
-            Type::Object(name, id, params) => sdef = (name, id, params),
-            ttype @ _ => return Err(Error::new(format!("TypeError: expected Object but found {}", ttype))),
+        match session.get_def(sdef.1)? {
+            Def::Class(classdef) if classdef.parenttype.is_some() => {
+                let parent = if update {
+                    Type::map_typevars(session, &mut names, classdef.parenttype.clone().unwrap())
+                } else {
+                    classdef.parenttype.clone().unwrap()
+                };
+                match resolve_type(session, parent, false)? {
+                    Type::Object(name, id, params) => sdef = (name, id, params),
+                    ttype @ _ => return Err(Error::new(format!("TypeError: expected Object but found {}", ttype))),
+                }
+            },
+            _ => {
+                return Err(Error::new(format!("TypeError: type mismatch, expected {} but found {}", Type::Object(pdef.0.clone(), pdef.1, pdef.2.clone()), Type::Object(sdef.0.clone(), sdef.1, sdef.2))));
+            }
         }
     }
 }
@@ -398,6 +396,23 @@ pub fn check_type_params(session: &Session, dtypes: &Vec<Type>, ctypes: &Vec<Typ
         }
         Ok(ptypes)
     }
+}
+
+pub fn check_trait_cast(session: &Session, dtype: &Type, ctype: &Type) -> Result<Type, Error> {
+    let trait_id = dtype.get_id()?;
+
+    // If the class matching doesn't work, then try checking for trait matching, but this is a bad hack.  We should use universals with constraints instead of Type::Object
+    match session.get_def(trait_id)? {
+        Def::TraitDef(traitdef) => {
+            for traitimpl in traitdef.impls.borrow().iter() {
+                if let Ok(ttype) = check_type(session, Some(traitimpl.impltype.clone()), Some(ctype.clone()), Check::Def, false) {
+                    return Ok(ttype);
+                }
+            }
+        },
+        _ => { },
+    }
+    return Err(Error::new(format!("TypeError: type mismatch, expected {} but found {}", dtype, ctype)));
 }
 
 pub fn resolve_type(session: &Session, ttype: Type, require_resolve: bool) -> Result<Type, Error> {

@@ -133,6 +133,9 @@ pub enum ExprKind {
     Class(ClassSpec, Option<ClassSpec>, Vec<Expr>),
     TypeAlias(ClassSpec, Type),
     Enum(ClassSpec, Vec<EnumVariant>),
+    TraitDef(ClassSpec, Vec<Expr>),
+    TraitImpl(ClassSpec, Type, Vec<Expr>),
+    UnpackTraitObject(Type, R<Expr>),
 
     Import(Ident, Vec<Expr>),
     Definition(Mutability, Ident, Option<Type>, R<Expr>),
@@ -409,6 +412,21 @@ impl Expr {
     #[allow(dead_code)]
     pub fn make_enum(pos: Pos, classspec: ClassSpec, variants: Vec<EnumVariant>) -> Expr {
         Expr { id: NodeID::generate(), pos: pos, kind: ExprKind::Enum(classspec, variants) }
+    }
+
+    #[allow(dead_code)]
+    pub fn make_trait_def(pos: Pos, traitspec: ClassSpec, body: Vec<Expr>) -> Expr {
+        Expr { id: NodeID::generate(), pos: pos, kind: ExprKind::TraitDef(traitspec, body) }
+    }
+
+    #[allow(dead_code)]
+    pub fn make_trait_impl(pos: Pos, traitspec: ClassSpec, impltype: Type, body: Vec<Expr>) -> Expr {
+        Expr { id: NodeID::generate(), pos: pos, kind: ExprKind::TraitImpl(traitspec, impltype, body) }
+    }
+
+    #[allow(dead_code)]
+    pub fn make_unpack_trait_obj(pos: Pos, impltype: Type, node: Expr) -> Expr {
+        Expr { id: NodeID::generate(), pos: pos, kind: ExprKind::UnpackTraitObject(impltype, r(node)) }
     }
 
     #[allow(dead_code)]

@@ -9,12 +9,12 @@ use std::io::prelude::*;
 use std::collections::HashMap;
 
 use parser;
-use types::Type;
-use config::Options;
-use ast::{ Pos, AST };
-use hir::{ NodeID };
 use defs::{ Def };
+use config::Options;
+use hir::{ NodeID };
+use ast::{ Pos, AST };
 use scope::{ ScopeMapRef };
+use types::{ Type };
 
 
 #[derive(Clone, Debug, PartialEq)]
@@ -27,6 +27,7 @@ pub struct Session {
     pub defs: RefCell<HashMap<NodeID, Def>>,
     pub refs: RefCell<HashMap<NodeID, NodeID>>,
     pub types: RefCell<HashMap<NodeID, Type>>,
+    //pub constraints: RefCell<HashMap<NodeID, Vec<NodeID>>>,
 }
 
 
@@ -41,6 +42,7 @@ impl Session {
             defs: RefCell::new(HashMap::new()),
             refs: RefCell::new(HashMap::new()),
             types: RefCell::new(HashMap::new()),
+            //constraints: RefCell::new(HashMap::new()),
         }
     }
 
@@ -208,6 +210,17 @@ impl Session {
             }
         }
     }
+
+    /*
+    pub fn set_constraint(&self, id: NodeID, constraints: Vec<NodeID>) {
+        debug!("SET CONSTRAINT: {:?} <= {:?} (previously {:?})", id, ttype, self.types.borrow().get(&id));
+        self.constraints.borrow_mut().insert(id, constraints);
+    }
+
+    pub fn get_constraint(&self, id: NodeID) -> Option<Vec<NodeID>> {
+        self.constraints.borrow().get(&id).map(|constraints| constraints.clone())
+    }
+    */
 }
 
 

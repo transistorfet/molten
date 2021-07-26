@@ -149,6 +149,14 @@ impl Scope {
         })
     }
 
+    pub fn get_names(&self) -> HashMap<String, NodeID> {
+        let mut map = HashMap::new();
+        for (name, bind) in self.names.borrow().iter() {
+            map.insert(name.clone(), bind.defid.unwrap());
+        }
+        map
+    }
+
 
     ///// Type Functions /////
 
@@ -208,7 +216,6 @@ impl Scope {
     pub fn find_type_def(&self, session: &Session, name: &str) -> Result<Def, Error> {
         session.get_def(self.get_type_def(&name).ok_or(Error::new(format!("TypeError: definition not set for {:?}", name)))?)
     }
-
 
 
     pub fn make_obj(&self, session: &Session, name: &str, params: Vec<Type>) -> Result<Type, Error> {

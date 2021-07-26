@@ -52,7 +52,7 @@ impl<'sess> Transformer<'sess> {
 
     pub fn init_exception_point(&mut self, exprs: &mut Vec<LLExpr>, exp_id: NodeID) -> LLExpr {
         let ret_id = NodeID::generate();
-        exprs.push(LLExpr::SetValue(ret_id, r(LLExpr::CallC(r(LLExpr::GetNamed("setjmp".to_string())), vec!(LLExpr::GetValue(exp_id)), LLCC::CCC))));
+        exprs.push(LLExpr::SetValue(ret_id, r(LLExpr::CallC(r(LLExpr::GetNamed("setjmp".to_string())), vec!(LLExpr::Cast(LLType::Ptr(r(LLType::I8)), r(LLExpr::GetValue(exp_id)))), LLCC::CCC))));
         LLExpr::GetValue(ret_id)
     }
 
@@ -69,7 +69,7 @@ impl<'sess> Transformer<'sess> {
         let value = self.transform_as_result(&mut exprs, valexpr);
 
         exprs.push(LLExpr::StoreRef(r(LLExpr::AccessRef(r(LLExpr::GetValue(exp_id)), vec!(LLRef::Field(1)))), r(LLExpr::Cast(LLType::Var, r(value)))));
-        exprs.push(LLExpr::CallC(r(LLExpr::GetNamed("longjmp".to_string())), vec!(LLExpr::GetValue(exp_id), LLExpr::Literal(LLLit::I32(1))), LLCC::CCC));
+        exprs.push(LLExpr::CallC(r(LLExpr::GetNamed("longjmp".to_string())), vec!(LLExpr::Cast(LLType::Ptr(r(LLType::I8)), r(LLExpr::GetValue(exp_id))), LLExpr::Literal(LLLit::I32(1))), LLCC::CCC));
 
         exprs.push(LLExpr::Literal(LLLit::I32(0)));
         exprs

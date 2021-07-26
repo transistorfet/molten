@@ -61,7 +61,10 @@ impl<'sess> Transformer<'sess> {
                         let ttype = transform.session.get_type_from_ref(node.id).unwrap();
                         exprs.extend(transform.transform_func_decl(ttype.get_abi().unwrap(), node.id, *vis, &ident.name, &ttype));
                     },
+
+                    // TODO this is the only reason we use this instead of just .visit_vec()
                     ExprKind::Definition(_, _, _, _) => { },
+
                     _ => panic!("Not Implemented: {:?}", node),
                 }
             }
@@ -77,19 +80,19 @@ impl<'sess> Transformer<'sess> {
         exprs
     }
 
-    pub fn transform_access_method(&mut self, classdef: ClassDefRef, objval: LLExpr, field_id: NodeID) -> Vec<LLExpr> {
+    pub fn transform_class_access_method(&mut self, classdef: ClassDefRef, objval: LLExpr, field_id: NodeID) -> Vec<LLExpr> {
         let vindex = classdef.get_struct_vtable_index().unwrap();
         let index = classdef.vtable.get_index_by_id(field_id).unwrap();
         let vtable = LLExpr::LoadRef(r(LLExpr::AccessRef(r(objval), vec!(LLRef::Field(vindex)))));
         vec!(LLExpr::LoadRef(r(LLExpr::AccessRef(r(vtable), vec!(LLRef::Field(index))))))
     }
 
-    pub fn transform_access_field(&mut self, structdef: StructDefRef, objval: LLExpr, field_id: NodeID) -> Vec<LLExpr> {
+    pub fn transform_class_access_field(&mut self, structdef: StructDefRef, objval: LLExpr, field_id: NodeID) -> Vec<LLExpr> {
         let (index, _) = structdef.find_field_by_id(field_id).unwrap();
         vec!(LLExpr::LoadRef(r(LLExpr::AccessRef(r(objval), vec!(LLRef::Field(index))))))
     }
 
-    pub fn transform_resolve_method(&mut self, classdef: ClassDefRef, field_id: NodeID) -> Vec<LLExpr> {
+    pub fn transform_class_resolve_method(&mut self, classdef: ClassDefRef, field_id: NodeID) -> Vec<LLExpr> {
         let index = classdef.vtable.get_index_by_id(field_id).unwrap();
         vec!(LLExpr::LoadRef(r(LLExpr::AccessRef(r(LLExpr::GetGlobal(classdef.vtable.id)), vec!(LLRef::Field(index))))))
     }

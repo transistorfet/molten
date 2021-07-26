@@ -118,6 +118,28 @@ impl<'sess> Visitor for ExportsCollector<'sess> {
         Ok(())
     }
 
+    fn visit_trait_def(&mut self, _id: NodeID, traitspec: &ClassSpec, body: &Vec<Expr>) -> Result<Self::Return, Error> {
+        let namespec = unparse_type(self.session, Type::from(traitspec));
+
+        self.declarations.push_str(format!("trait {} {{\n", namespec).as_str());
+        for node in body {
+            match &node.kind {
+                ExprKind::Declare(_, ident, _) => {
+                    let defid = self.session.get_ref(node.id)?;
+                    self.declarations.push_str("    ");
+                    self.declarations.push_str(&emit_declaration(self.session, defid, Visibility::Public, &ident.name));
+                },
+                _ => {  },
+            }
+        }
+        self.declarations.push_str(format!("}}\n").as_str());
+        Ok(())
+    }
+
+    fn visit_trait_impl(&mut self, _id: NodeID, _traitspec: &ClassSpec, _impltype: &Type, _body: &Vec<Expr>) -> Result<Self::Return, Error> {
+        // TODO we need something to cause the implementation vtable to be declared external when importing (so that a trait object of that type can be created external)
+        Ok(())
+    }
 }
 
 fn emit_declaration(session: &Session, id: NodeID, vis: Visibility, name: &str) -> String {

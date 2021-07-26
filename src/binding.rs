@@ -11,6 +11,7 @@ use defs::classes::ClassDef;
 use defs::functions::{ AnyFunc, ClosureDef };
 use defs::types::TypeAliasDef;
 use defs::variables::{ AnyVar, VarDef, ArgDef };
+use defs::traits::{ TraitDef, TraitImpl };
 
 use visitor::{ self, Visitor, ScopeStack };
 
@@ -248,6 +249,54 @@ impl<'sess> Visitor for NameBinder<'sess> {
         }
         Ok(())
     }
+
+    fn visit_trait_def(&mut self, id: NodeID, traitspec: &ClassSpec, body: &Vec<Expr>) -> Result<Self::Return, Error> {
+        let defid = self.session.new_def_id(id);
+        let scope = self.stack.get_scope();
+        let tscope = self.session.map.get_or_add(defid, Some(scope.clone()));
+
+        let mut traitspec = traitspec.clone();
+        bind_classspec_type_names(self.session, tscope.clone(), &mut traitspec, true)?;
+
+        TraitDef::define(self.session, scope.clone(), defid, traitspec)?;
+
+        self.with_scope(tscope, |visitor| {
+            visitor.visit_vec(body)
+        })
+    }
+
+    fn visit_trait_impl(&mut self, id: NodeID, traitspec: &ClassSpec, impltype: &Type, body: &Vec<Expr>) -> Result<Self::Return, Error> {
+        let impl_id = self.session.new_def_id(id);
+        let scope = self.stack.get_scope();
+        let defid = match scope.get_type_def(&traitspec.ident.name) {
+            Some(defid) => defid,
+            None => return Err(Error::new(format!("NameError: undefined type {:?}", traitspec.ident.name)))
+        };
+        self.session.set_ref(id, impl_id);
+        self.session.set_ref(impl_id, defid);
+
+        let mut traitspec = traitspec.clone();
+        bind_classspec_type_names(self.session, scope.clone(), &mut traitspec, false)?;
+
+        let mut impltype = impltype.clone();
+        bind_type_names(self.session, scope.clone(), Some(&mut impltype), false)?;
+
+        TraitImpl::define(self.session, scope.clone(), impl_id, defid, impltype)?;
+
+        let tscope = self.session.map.get_or_add(impl_id, Some(scope.clone()));
+        self.with_scope(tscope, |visitor| {
+            visitor.visit_vec(body)
+        })
+    }
+
+    fn visit_unpack_trait_obj(&mut self, id: NodeID, impltype: &Type, expr: &Expr) -> Result<Self::Return, Error> {
+        let scope = self.stack.get_scope();
+        let mut impltype = impltype.clone();
+        bind_type_names(self.session, scope.clone(), Some(&mut impltype), false)?;
+        self.session.set_type(id, impltype);
+        self.visit_node(expr)
+    }
+
 
     fn visit_resolver(&mut self, _node: &Expr, left: &Expr, _right: &Ident, oid: NodeID) -> Result<Self::Return, Error> {
         let scope = self.stack.get_scope();

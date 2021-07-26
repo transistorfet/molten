@@ -358,9 +358,9 @@ impl<'sess> LLVM<'sess> {
 
     pub unsafe fn cast_typevars(&self, rtype: LLVMTypeRef, value: LLVMValueRef) -> LLVMValueRef {
         let vtype = LLVMTypeOf(value);
-        let ttype = self.get_type(TYPEVAR_ID).unwrap();
+        let typevar = self.get_type(TYPEVAR_ID).unwrap();
 
-        if rtype != vtype && rtype == ttype || vtype == ttype {
+        if rtype != vtype && (rtype == typevar || vtype == typevar) {
             self.build_cast(rtype, value)
         } else {
             value

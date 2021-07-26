@@ -45,6 +45,7 @@ use hir::{ NodeID, Mutability, Visibility, AssignType, Literal, Ident, Argument,
 
 pub type Span<'a> = LocatedSpan<&'a str>;
 
+
 #[macro_export]
 macro_rules! wscom {
     ($i:expr, $submac:ident!( $($args:tt)* )) => ({
@@ -105,6 +106,7 @@ pub fn parse_or_error(name: &str, text: &str) -> Vec<AST> {
 }
 
 
+//pub fn parse(i: Span) -> IResult<Span, Vec<AST>, NomError<Span>> {
 named!(pub parse(Span) -> Vec<AST>,
     do_parse!(
         e: statement_list >>
@@ -147,6 +149,8 @@ named!(statement(Span) -> AST,
         complete!(class) |
         complete!(typealias) |
         complete!(typeenum) |
+        complete!(traitdef) |
+        complete!(traitimpl) |
         complete!(declare) |
         complete!(raise) |
         complete!(definition) |
@@ -212,16 +216,16 @@ named!(class(Span) -> AST,
         i: class_spec >>
         p: opt!(preceded!(wscom!(tag_word!("extends")), class_spec)) >>
         wscom!(tag!("{")) >>
-        s: many0!(wscom!(alt!(
+        b: many0!(wscom!(alt!(
             typealias |
             definition |
             declare |
             function
         ))) >>
         return_error!(ErrorKind::Tag /*ErrorKind::Custom(ERR_IN_CLASS) */, tag!("}")) >>
-        (AST::Class(Pos::new(pos), i, p, s))
-        )
-    );
+        (AST::Class(Pos::new(pos), i, p, b))
+    )
+);
 
 named!(typealias(Span) -> AST,
     do_parse!(
@@ -255,6 +259,35 @@ named!(enum_variant(Span) -> (Pos, Ident, Option<Type>),
     )
 );
 
+named!(traitdef(Span) -> AST,
+    do_parse!(
+        pos: position!() >>
+        wscom!(tag_word!("trait")) >>
+        c: class_spec >>
+        wscom!(tag!("{")) >>
+        b: many0!(wscom!(
+            declare
+        )) >>
+        return_error!(ErrorKind::Tag /*ErrorKind::Custom(ERR_IN_CLASS) */, tag!("}")) >>
+        (AST::TraitDef(Pos::new(pos), c, b))
+    )
+);
+
+named!(traitimpl(Span) -> AST,
+    do_parse!(
+        pos: position!() >>
+        wscom!(tag_word!("impl")) >>
+        c: class_spec >>
+        wscom!(tag_word!("for")) >>
+        t: type_description >>
+        wscom!(tag!("{")) >>
+        b: many0!(wscom!(
+            function
+        )) >>
+        return_error!(ErrorKind::Tag /*ErrorKind::Custom(ERR_IN_CLASS) */, tag!("}")) >>
+        (AST::TraitImpl(Pos::new(pos), c, t, b))
+    )
+);
 
 
 named!(expression_list(Span) -> Vec<AST>,
@@ -619,6 +652,8 @@ impl AST {
 
 named!(subatomic(Span) -> AST,
     alt!(
+        // TODO if you map this to its own AST element, you can maybe remove it during refining while being able to use it to resolve whether it's a method call or not
+        //      ie. AST::SeparatedExpr as the fexpr for AST::Invoke means it's not a method call, otherwise if AST::Access then it is a method call
         delimited!(tag!("("), wscom!(expression), tag!(")")) |
         record_update |
         block |

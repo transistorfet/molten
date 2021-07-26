@@ -65,8 +65,8 @@ impl<'sess> Transformer<'sess> {
         self.types.insert(id, ltype);
     }
 
-    pub fn get_type(&self, id: NodeID) -> Option<LLType> {
-        self.types.get(&id).map(|ltype| ltype.clone())
+    pub fn get_type(&self, id: NodeID) -> Result<LLType, Error> {
+        self.types.get(&id).map(|ltype| ltype.clone()).ok_or(Error::new(format!("Transform Type Unset: {}", id)))
     }
 
     pub fn add_global(&mut self, global: LLGlobal) {
@@ -178,7 +178,9 @@ impl<'sess> Visitor for Transformer<'sess> {
     fn visit_annotation(&mut self, id: NodeID, _ttype: &Type, code: &Expr) -> Result<Self::Return, Error> {
         let mut exprs = vec!();
         let ltype = self.transform_value_type(&self.session.get_type(id).unwrap());
-        let result = self.transform_as_result(&mut exprs, code);
+        //let result = self.transform_as_result(&mut exprs, code).unwrap();
+        exprs.extend(self.check_convert_to_trait(self.session.get_type(id).unwrap(), code));
+        let result = exprs.pop().unwrap();
         exprs.push(LLExpr::Cast(ltype, r(result)));
         Ok(exprs)
     }
@@ -283,6 +285,19 @@ impl<'sess> Visitor for Transformer<'sess> {
 
     fn visit_enum(&mut self, id: NodeID, classspec: &ClassSpec, _variants: &Vec<EnumVariant>) -> Result<Self::Return, Error> {
         Ok(self.transform_enum_def(id, &classspec.ident.name))
+    }
+
+    fn visit_trait_def(&mut self, id: NodeID, traitspec: &ClassSpec, body: &Vec<Expr>) -> Result<Self::Return, Error> {
+        let defid = self.session.get_ref(id).unwrap();
+        Ok(self.transform_trait_def(defid, &traitspec.ident.name, body))
+    }
+
+    fn visit_trait_impl(&mut self, id: NodeID, _traitspec: &ClassSpec, _impltype: &Type, body: &Vec<Expr>) -> Result<Self::Return, Error> {
+        Ok(self.transform_trait_impl(id, body))
+    }
+
+    fn visit_unpack_trait_obj(&mut self, _id: NodeID, _impltype: &Type, expr: &Expr) -> Result<Self::Return, Error> {
+        Ok(self.transform_unpack_trait_obj(expr))
     }
 
 
@@ -591,12 +606,17 @@ impl<'sess> Transformer<'sess> {
                 let objdef = self.session.get_def(objid).unwrap();
                 match self.session.get_def(defid) {
                     Ok(Def::Method(_)) => {
-                        let classdef = objdef.as_class().unwrap();
-                        exprs.extend(self.transform_access_method(classdef, objval, defid));
+                        match objdef {
+                            Def::Class(classdef) =>
+                                exprs.extend(self.transform_class_access_method(classdef, objval, defid)),
+                            Def::TraitDef(traitdef) =>
+                                exprs.extend(self.transform_trait_access_method(traitdef, objval, defid)),
+                            _ => panic!("Not Implemented: {:?}", objdef),
+                        }
                     },
                     Ok(Def::Field(_)) => {
                         let structdef = objdef.as_struct().unwrap();
-                        exprs.extend(self.transform_access_field(structdef, objval, defid));
+                        exprs.extend(self.transform_class_access_field(structdef, objval, defid));
                     },
                     result @ _ => panic!("Not Implemented: {:?}", result),
                 }
@@ -617,8 +637,8 @@ impl<'sess> Transformer<'sess> {
     pub fn transform_resolve(&mut self, id: NodeID, _path: &Expr, _field: &str, object_id: NodeID) -> Vec<LLExpr> {
         let defid = self.session.get_ref(id).unwrap();
         match self.session.get_def(object_id).unwrap() {
-            Def::Class(classdef) => self.transform_resolve_method(classdef, defid),
-            Def::Enum(enumdef) => self.transform_resolve_enum(id, enumdef, defid),
+            Def::Class(classdef) => self.transform_class_resolve_method(classdef, defid),
+            Def::Enum(enumdef) => self.transform_enum_resolve(id, enumdef, defid),
             def @ _ => panic!("DefError: expected class or enum but found {:?}", def),
         }
     }
@@ -727,7 +747,7 @@ impl<'sess> Transformer<'sess> {
                 //      can thus be indexed as one.  This might change if enums are made into references always
                 let tmp_id = NodeID::generate();
                 let ltype = self.get_type(variant_id).unwrap();
-                exprs.push(LLExpr::DefLocal(tmp_id, tmp_id.to_string(), ltype.clone(), r(LLExpr::GetValue(value_id))));
+                exprs.push(LLExpr::DefLocal(tmp_id, tmp_id.to_string(), ltype.clone(), r(LLExpr::Cast(ltype.clone(), r(LLExpr::GetValue(value_id))))));
 
                 exprs.push(LLExpr::SetValue(item_id, r(
                     LLExpr::LoadRef(r(
