@@ -8,7 +8,7 @@ use visitor::{ Visitor };
 
 use transform::transform::{ CodeContext, Transformer };
 use transform::classes::{ VtableTransform };
-use transform::llcode::{ LLType, LLRef, LLExpr };
+use llvm::llcode::{ LLType, LLRef, LLExpr };
 
 
 impl<'sess> Transformer<'sess> {

@@ -21,9 +21,9 @@ use misc::{ r, UniqueID };
 use defs::classes::{ ClassDef, Define };
 use defs::functions::{ AnyFunc };
 
-use transform::llcode::{ LLType, LLLink };
 use transform::transform::Transformer;
 
+use llvm::llcode::{ LLType, LLLink };
 use llvm::codegen::{ LLVM, cstr };
 
 pub type ObjectFunction = unsafe fn(&LLVM, LLVMTypeRef, Vec<LLVMValueRef>) -> LLVMValueRef;

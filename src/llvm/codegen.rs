@@ -24,7 +24,7 @@ use config::Options;
 use misc::{ UniqueID };
 use session::{ Session, Error };
 
-use transform::llcode::{ LLType, LLLit, LLRef, LLCmpType, LLLink, LLCC, LLExpr, LLGlobal, LLBlock };
+use llvm::llcode::{ LLType, LLLit, LLRef, LLCmpType, LLLink, LLCC, LLExpr, LLGlobal, LLBlock };
 
 
 #[derive(Clone)]

@@ -6,7 +6,7 @@ use defs::classes::{ ClassDefRef, StructDef, StructDefRef, Vtable };
 
 use misc::{ r };
 use transform::transform::{ Transformer, CodeContext };
-use transform::llcode::{ LLType, LLRef, LLLink, LLExpr, LLGlobal };
+use llvm::llcode::{ LLType, LLRef, LLLink, LLExpr, LLGlobal };
 
 
 impl<'sess> Transformer<'sess> {

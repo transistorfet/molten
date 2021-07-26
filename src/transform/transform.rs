@@ -11,8 +11,8 @@ use ast::{ Pos };
 use hir::{ NodeID, Visibility, Mutability, AssignType, Literal, Ident, Argument, ClassSpec, MatchCase, EnumVariant, Pattern, PatKind, Expr, ExprKind };
 
 use misc::{ r };
-use transform::llcode::{ LLType, LLLit, LLRef, LLCmpType, LLLink, LLCC, LLExpr, LLGlobal };
 use transform::functions::{ ClosureTransform };
+use llvm::llcode::{ LLType, LLLit, LLRef, LLCmpType, LLLink, LLCC, LLExpr, LLGlobal };
 
 use visitor::{ Visitor, ScopeStack };
 

@@ -5,7 +5,7 @@ use visitor::{ Visitor };
 
 use misc::{ r };
 use transform::transform::{ Transformer };
-use transform::llcode::{ LLType, LLLit, LLRef, LLCC, LLCmpType, LLLink, LLExpr, LLGlobal };
+use llvm::llcode::{ LLType, LLLit, LLRef, LLCC, LLCmpType, LLLink, LLExpr, LLGlobal };
 
 
 pub static EXCEPTION_POINT_NAME: &str = "__ExceptionPoint__";

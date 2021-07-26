@@ -11,7 +11,7 @@ use visitor::{ Visitor };
 use misc::{ r };
 use transform::transform::{ Transformer, CodeContext };
 use transform::classes::{ StructTransform };
-use transform::llcode::{ LLType, LLLink, LLCC, LLExpr, LLGlobal };
+use llvm::llcode::{ LLType, LLLink, LLCC, LLExpr, LLGlobal };
 
 
 

@@ -7,7 +7,7 @@ use defs::enums::EnumDefRef;
 
 use transform::transform::{ Transformer };
 use transform::functions::{ CFuncTransform };
-use transform::llcode::{ LLType, LLLit, LLCC, LLLink, LLExpr, LLGlobal };
+use llvm::llcode::{ LLType, LLLit, LLCC, LLLink, LLExpr, LLGlobal };
 
 
 impl<'sess> Transformer<'sess> {
