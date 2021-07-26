@@ -500,7 +500,7 @@ impl<'sess> Transformer<'sess> {
         let defid = NodeID::generate();
         let compiled_func_id = NodeID::generate();
         let scope = self.stack.get_scope();
-        let ttype = Type::Function(r(Type::Tuple(vec!())), r(scope.make_obj(self.session, "Bool", vec!()).unwrap()), ABI::Molten);
+        let ttype = Type::Function(r(Type::Tuple(vec!())), r(scope.find_type(self.session, "Bool").unwrap()), ABI::Molten);
         let lltype = ClosureTransform::convert_to_def_type(LLType::Function(vec!(), r(LLType::I1)));
         self.session.set_type(defid, ttype.clone());
         self.set_type(compiled_func_id, lltype.clone());

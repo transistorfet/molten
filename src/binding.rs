@@ -63,10 +63,10 @@ impl<'sess> Visitor for NameBinder<'sess> {
         let scope = self.stack.get_scope();
 
         let memo_name = format!("memo.{}", name);
-        VarDef::define(self.session, scope.clone(), memo_id, Mutability::Mutable, &memo_name, Some(scope.make_obj(self.session, "Bool", vec!())?))?;
+        VarDef::define(self.session, scope.clone(), memo_id, Mutability::Mutable, &memo_name, Some(scope.find_type(self.session, "Bool")?))?;
 
         let defid = self.session.new_def_id(id);
-        let ttype = Type::Function(r(Type::Tuple(vec!())), r(scope.make_obj(self.session, "Bool", vec!())?), ABI::Molten);
+        let ttype = Type::Function(r(Type::Tuple(vec!())), r(scope.find_type(self.session, "Bool")?), ABI::Molten);
         self.session.map.set(defid, scope.clone());
         self.session.set_type(defid, ttype.clone());
 
@@ -202,7 +202,14 @@ impl<'sess> Visitor for NameBinder<'sess> {
 
         let classtype = Type::Object(classspec.ident.name, defid, classspec.types);
         let parenttype = match parentspec {
-            Some(p) => Some(scope.make_obj(self.session, p.ident.as_str(), p.types.clone())?),
+            Some(parentspec) => {
+                match scope.find_type(self.session, &parentspec.ident.as_str()) {
+                    Ok(Type::Object(_, id, types)) if types.len() == parentspec.types.len() => Ok(Some(Type::Object(parentspec.ident.name.clone(), id, parentspec.types.clone()))),
+                    Ok(Type::Object(_, _, types)) => Err(Error::new(format!("TypeError: type parameters don't match.  Expected {:?} but found {:?}", types, parentspec.types))),
+                    Ok(ttype) => Err(Error::new(format!("TypeError: expected object type but found {:?}", ttype))),
+                    Err(err) => Err(err),
+                }?
+            },
             None => None
         };
         //let classtype = Type::from_spec(classspec.clone());
@@ -388,16 +395,16 @@ pub fn bind_type_names(session: &Session, scope: ScopeRef, ttype: Option<&mut Ty
             },
             &mut Type::Universal(ref name, ref mut id) => {
                 match scope.find_type(session, name) {
-                    Some(Type::Universal(_, ref eid)) => {
+                    Ok(Type::Universal(_, ref eid)) => {
                         *id = *eid;
                     },
-                    None => {
+                    Err(_) => {
                         *id = UniqueID::generate();
                         let ttype = Type::Universal(name.clone(), *id);
                         scope.define_type(name, *id)?;
                         session.set_type(*id, ttype);
                     }
-                    Some(ttype) => return Err(Error::new(format!("NameError: expected Universal type with name {:?}, but found {:?}", name, ttype))),
+                    Ok(ttype) => return Err(Error::new(format!("NameError: expected Universal type with name {:?}, but found {:?}", name, ttype))),
                 }
             },
             &mut Type::Ref(ref mut ttype) => {
