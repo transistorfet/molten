@@ -1,0 +1,39 @@
+
+//! Hey
+//! true
+//! 15
+//! false
+
+trait TraitTest {
+    decl thing(Self) -> Bool
+}
+
+impl TraitTest for String {
+    fn thing(self) {
+        println(self)
+        true
+    }
+}
+
+fn test_trait(t: TraitTest) {
+    println(str(t.thing()))
+}
+
+test_trait(("Hey" : TraitTest))
+
+impl TraitTest for Int {
+    fn thing(self) {
+        println(str(self))
+        false
+    }
+}
+
+fn test_trait_unpack(t: TraitTest) {
+    let f = t.thing
+    println(str(f(t)))
+}
+
+test_trait_unpack((15 : TraitTest))
+
+let trait: TraitTest = ("Hey" : TraitTest)
+
