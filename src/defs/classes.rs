@@ -53,15 +53,15 @@ impl ClassDef {
         tscope.set_basename(name);
 
         // Define Self and Super, and check for typevars in the type params
-        tscope.define_type("Self", Some(id))?;
+        tscope.define_type("Self", id)?;
         if let Some(ref ptype) = parenttype {
-            tscope.define_type("Super", scope.get_type_def(&ptype.get_name()?))?;
+            tscope.define_type("Super", scope.get_type_def(&ptype.get_name()?).unwrap())?;
         }
 
         let classdef = Self::create_class(session, scope.clone(), id, classtype.clone(), parenttype)?;
 
         // Define the class in the local scope
-        scope.define_type(name, Some(id))?;
+        scope.define_type(name, id)?;
         session.set_def(id, Def::Class(classdef.clone()));
         session.set_type(id, classtype);
 

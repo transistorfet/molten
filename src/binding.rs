@@ -394,7 +394,7 @@ pub fn bind_type_names(session: &Session, scope: ScopeRef, ttype: Option<&mut Ty
                     None => {
                         *id = UniqueID::generate();
                         let ttype = Type::Universal(name.clone(), *id);
-                        scope.define_type(name, Some(*id))?;
+                        scope.define_type(name, *id)?;
                         session.set_type(*id, ttype);
                     }
                     Some(ttype) => return Err(Error::new(format!("NameError: expected Universal type with name {:?}, but found {:?}", name, ttype))),

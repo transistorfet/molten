@@ -15,7 +15,7 @@ impl<'sess> Transformer<'sess> {
         let global = self.session.map.get_global();
 
         let expoint_id = NodeID::generate();
-        global.define_type(EXCEPTION_POINT_NAME, Some(expoint_id)).unwrap();
+        global.define_type(EXCEPTION_POINT_NAME, expoint_id).unwrap();
         self.session.set_type(expoint_id, Type::Object(String::from(EXCEPTION_POINT_NAME), expoint_id, vec!()));
         self.set_type(expoint_id, LLType::Ptr(r(LLType::ExceptionPoint)));
     }

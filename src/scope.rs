@@ -20,18 +20,12 @@ pub enum Context {
     Block,
 }
 
-
-#[derive(Clone, Debug, PartialEq)]
-pub struct BindInfo {
-    pub defid: Option<NodeID>,
-}
-
 #[derive(Clone, Debug, PartialEq)]
 pub struct Scope {
     pub context: Cell<Context>,
     pub basename: RefCell<String>,
-    pub names: RefCell<HashMap<String, BindInfo>>,
-    pub types: RefCell<HashMap<String, BindInfo>>,
+    pub names: RefCell<HashMap<String, NodeID>>,
+    pub types: RefCell<HashMap<String, NodeID>>,
     pub parent: Option<ScopeRef>,
 }
 
@@ -82,29 +76,27 @@ impl Scope {
     ///// Variable Functions /////
 
     #[must_use]
-    pub fn define(&self, name: &str, defid: Option<NodeID>) -> Result<(), Error> {
+    pub fn define(&self, name: &str, defid: NodeID) -> Result<(), Error> {
         let mut names = self.names.borrow_mut();
         match names.contains_key(name) {
             true => Err(Error::new(format!("NameError: variable is already defined; {:?}", name))),
             false => {
-                names.insert(name.to_string(), BindInfo {
-                    defid: defid,
-                });
+                names.insert(name.to_string(), defid);
                 Ok(())
             },
         }
     }
 
-    pub fn modify_local<F>(&self, name: &str, mut f: F) -> () where F: FnMut(&mut BindInfo) -> () {
+    pub fn modify_local<F>(&self, name: &str, mut f: F) -> () where F: FnMut(&mut NodeID) -> () {
         match self.names.borrow_mut().get_mut(name) {
             None => panic!("NameError: variable is undefined in this scope; {:?}", name),
             Some(entry) => f(entry),
         }
     }
 
-    pub fn _search<F, U>(&self, name: &str, f: F) -> Option<U> where F: Fn(&BindInfo) -> Option<U> {
+    pub fn _search<F, U>(&self, name: &str, f: F) -> Option<U> where F: Fn(NodeID) -> Option<U> {
         if let Some(sym) = self.names.borrow().get(name) {
-            f(sym)
+            f(*sym)
         } else if let Some(ref parent) = self.parent {
             parent._search(name, f)
         } else {
@@ -136,45 +128,33 @@ impl Scope {
     }
 
     pub fn set_var_def(&self, name: &str, defid: NodeID) {
-        self.modify_local(name, move |sym| { sym.defid = Some(defid.clone()); })
+        self.modify_local(name, move |sym| { *sym = defid; })
     }
 
     pub fn get_var_def(&self, name: &str) -> Option<NodeID> {
-        self._search(name, |sym| {
-            match sym.defid.as_ref() {
-                Some(defid) => Some(defid.clone()),
-                //None => Err(Error::new(format!("VarError: definition not set for {:?}", name))),
-                None => None,
-            }
-        })
+        self._search(name, |id| Some(id))
     }
 
     pub fn get_names(&self) -> HashMap<String, NodeID> {
-        let mut map = HashMap::new();
-        for (name, bind) in self.names.borrow().iter() {
-            map.insert(name.clone(), bind.defid.unwrap());
-        }
-        map
+        self.names.borrow().clone()
     }
 
 
     ///// Type Functions /////
 
     #[must_use]
-    pub fn define_type(&self, name: &str, defid: Option<NodeID>) -> Result<(), Error> {
+    pub fn define_type(&self, name: &str, defid: NodeID) -> Result<(), Error> {
         let mut types = self.types.borrow_mut();
         match types.contains_key(name) {
             true => Err(Error::new(format!("NameError: type is already defined; {:?}", name))),
             false => {
-                types.insert(name.to_string(), BindInfo {
-                    defid: defid,
-                });
+                types.insert(name.to_string(), defid);
                 Ok(())
             },
         }
     }
 
-    pub fn _modify_type<F>(&self, name: &str, f: F) where F: Fn(&mut BindInfo) -> () {
+    pub fn _modify_type<F>(&self, name: &str, f: F) where F: Fn(&mut NodeID) -> () {
         match self.types.borrow_mut().get_mut(name) {
             Some(entry) => f(entry),
             _ => match self.parent {
@@ -186,9 +166,9 @@ impl Scope {
         }
     }
 
-    fn _search_type<F, U>(&self, name: &str, f: F) -> Option<U> where F: Fn(&BindInfo) -> Option<U> {
-        if let Some(ref info) = self.types.borrow().get(name) {
-            f(info)
+    fn _search_type<F, U>(&self, name: &str, f: F) -> Option<U> where F: Fn(NodeID) -> Option<U> {
+        if let Some(id) = self.types.borrow().get(name) {
+            f(*id)
         } else if let Some(ref parent) = self.parent {
             parent._search_type(name, f)
         } else {
@@ -204,13 +184,7 @@ impl Scope {
     }
 
     pub fn get_type_def(&self, name: &str) -> Option<NodeID> {
-        self._search_type(name, |info| {
-            match info.defid.as_ref() {
-                Some(defid) => Some(defid.clone()),
-                //None => Err(Error::new(format!("TypeError: definition not set for {:?}", name))),
-                None => None,
-            }
-        })
+        self._search_type(name, |id| Some(id))
     }
 
     pub fn find_type_def(&self, session: &Session, name: &str) -> Result<Def, Error> {

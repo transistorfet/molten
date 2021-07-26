@@ -43,7 +43,7 @@ impl AnyFunc {
             if let Some(previd) = dscope.get_var_def(&name) {
                 OverloadDef::define(session, scope.clone(), &name, id, previd, ttype)?;
             } else {
-                dscope.define(name, Some(id))?;
+                dscope.define(name, id)?;
             }
         }
         Ok(())
@@ -93,7 +93,7 @@ impl OverloadDef {
             }
         } else {
             let defid = OverloadDef::create(session, Some(previd), vec!(id));
-            dscope.define(name, Some(defid))?;
+            dscope.define(name, defid)?;
         }
         Ok(())
     }
@@ -272,7 +272,7 @@ impl CFuncDef {
             vis: vis,
         }));
 
-        scope.define(name, Some(id))?;
+        scope.define(name, id)?;
         session.set_def(id, def.clone());
         if let Some(ttype) = ttype {
             session.set_type(id, ttype);

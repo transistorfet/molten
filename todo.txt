@@ -13,7 +13,6 @@
   currently wont allow a conversion, even annotate, because they don't map the typevars and universals wont unify against anything but other universals, so typechecking fails
 * are there many function calls for which ftype, after invoke resolution, is incomplete and possibly will need further resolving??? maybe not
 
-* remove BindInfo and make it just NodeID (not even option)
 * move llcode file to llvm
 
 * should we change classspec into a type and be done with it?  We can decompose the type later

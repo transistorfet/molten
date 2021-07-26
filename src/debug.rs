@@ -39,13 +39,13 @@ pub fn print_types_node(session: &Session, scope: ScopeRef, node: &Expr) {
 
 pub fn print_types_scope(session: &Session, scope: ScopeRef) {
     println!("\nNames:");
-    for (ref name, ref sym) in scope.names.borrow().iter() {
-        println!("{:?} {:?} {:?}", name, sym.defid.map(|defid| session.get_type(defid)), sym.defid);
+    for (name, id) in scope.names.borrow().iter() {
+        println!("{:?} {:?} {:?}", name, session.get_type(*id), *id);
     }
 
     println!("\nTypes:");
-    for (ref name, ref info) in scope.types.borrow().iter() {
-        println!("{:?} {:?}", name, info.defid.map(|defid| session.get_type(defid)));
+    for (name, id) in scope.types.borrow().iter() {
+        println!("{:?} {:?}", name, session.get_type(*id));
     }
 }
 

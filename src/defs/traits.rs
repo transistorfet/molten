@@ -42,7 +42,7 @@ impl TraitDef {
         let tscope = session.map.get_or_add(defid, Some(scope.clone()));
         tscope.set_redirect(true);
         tscope.set_basename(name);
-        tscope.define_type("Self", Some(defid))?;
+        tscope.define_type("Self", defid)?;
 
         let vars = Scope::new_ref(None);
         vars.set_basename(name);
@@ -50,7 +50,7 @@ impl TraitDef {
         let deftype = Type::Object(traitspec.ident.name.clone(), defid, traitspec.types);
         let vtable = Vtable::create(session, NodeID::generate(), format!("{}_vtable", name.clone()))?;
         let traitdef = Self::new_ref(defid, vars, deftype.clone(), vtable);
-        scope.define_type(name, Some(defid))?;
+        scope.define_type(name, defid)?;
         session.set_def(defid, Def::TraitDef(traitdef.clone()));
         session.set_type(defid, deftype);
 
@@ -101,11 +101,11 @@ impl TraitImpl {
         let name = format!("{}_{}", deftype.get_name()?, impltype.get_name()?);
         let tscope = session.map.get_or_add(impl_id, Some(scope.clone()));
         tscope.set_basename(&name);
-        tscope.define_type("Self", Some(trait_id))?;
+        tscope.define_type("Self", trait_id)?;
 
         let vtable = Vtable::create(session, NodeID::generate(), format!("{}_vtable", name.clone()))?;
         let traitimpl = Self::new_ref(impl_id, trait_id, impltype.clone(), vtable);
-        scope.define_type(&name, Some(impl_id))?;
+        scope.define_type(&name, impl_id)?;
         session.set_def(impl_id, Def::TraitImpl(traitimpl.clone()));
         session.set_type(impl_id, impltype);
 
