@@ -178,7 +178,7 @@ impl<'sess> Visitor for Transformer<'sess> {
     fn visit_annotation(&mut self, id: NodeID, _ttype: &Type, code: &Expr) -> Result<Self::Return, Error> {
         let mut exprs = vec!();
         let ltype = self.transform_value_type(&self.session.get_type(id).unwrap());
-        let result = self.transform_as_result(&mut exprs, code).unwrap();
+        let result = self.transform_as_result(&mut exprs, code);
         exprs.push(LLExpr::Cast(ltype, r(result)));
         Ok(exprs)
     }
@@ -398,9 +398,9 @@ impl<'sess> Transformer<'sess> {
         self.add_global(LLGlobal::DefCFunc(main_id, LLLink::Public, String::from("main"), main_ltype, vec!(), main_body, LLCC::CCC));
     }
 
-    pub fn transform_as_result(&mut self, exprs: &mut Vec<LLExpr>, node: &Expr) -> Option<LLExpr> {
+    pub fn transform_as_result(&mut self, exprs: &mut Vec<LLExpr>, node: &Expr) -> LLExpr {
         let mut newexprs = self.visit_node(node).unwrap();
-        let last = newexprs.pop();
+        let last = newexprs.pop().unwrap();
         exprs.extend(newexprs);
         last
     }
@@ -408,7 +408,7 @@ impl<'sess> Transformer<'sess> {
     pub fn transform_as_args(&mut self, exprs: &mut Vec<LLExpr>, args: &Vec<Expr>) -> Vec<LLExpr> {
         let mut fargs = vec!();
         for arg in args {
-            fargs.push(self.transform_as_result(exprs, arg).unwrap());
+            fargs.push(self.transform_as_result(exprs, arg));
         }
         fargs
     }
@@ -441,7 +441,7 @@ impl<'sess> Transformer<'sess> {
         let mut exprs = vec!();
         let mut litems = vec!();
         for item in items {
-            litems.push(self.transform_as_result(&mut exprs, item).unwrap());
+            litems.push(self.transform_as_result(&mut exprs, item));
         }
         let ltype = self.transform_value_type(&self.session.get_type(id).unwrap());
         exprs.push(LLExpr::DefStruct(id, ltype, litems));
@@ -453,11 +453,11 @@ impl<'sess> Transformer<'sess> {
         let mut litems = vec!();
 
         let ttype = &self.session.get_type(id).unwrap();
-        let valexpr = self.transform_as_result(&mut exprs, record).unwrap();
+        let valexpr = self.transform_as_result(&mut exprs, record);
 
         for (ref name, _) in ttype.get_record_types().unwrap() {
             let item = match items.iter().find(|(ident, _)| &ident.name == name) {
-                Some((_, expr)) => self.transform_as_result(&mut exprs, expr).unwrap(),
+                Some((_, expr)) => self.transform_as_result(&mut exprs, expr),
                 None => LLExpr::GetItem(r(valexpr.clone()), litems.len()),
             };
             litems.push(item);
@@ -474,7 +474,7 @@ impl<'sess> Transformer<'sess> {
     pub fn transform_def_local(&mut self, id: NodeID, name: &str, value: &Expr) -> Vec<LLExpr> {
         let defid = self.session.get_ref(id).unwrap();
         let mut exprs = vec!();
-        let valexpr = self.transform_as_result(&mut exprs, value).unwrap();
+        let valexpr = self.transform_as_result(&mut exprs, value);
         exprs.extend(self.create_def_local(defid, name, valexpr));
         exprs
     }
@@ -548,7 +548,7 @@ impl<'sess> Transformer<'sess> {
 
     pub fn transform_alloc_ref(&mut self, id: NodeID, value: &Expr) -> Vec<LLExpr> {
         let mut exprs = vec!();
-        let valexpr = self.transform_as_result(&mut exprs, value).unwrap();
+        let valexpr = self.transform_as_result(&mut exprs, value);
         let ltype = self.transform_value_type(&self.session.get_type(id).unwrap());
         exprs.push(LLExpr::AllocRef(id, ltype, Some(r(valexpr))));
         exprs
@@ -556,7 +556,7 @@ impl<'sess> Transformer<'sess> {
 
     pub fn transform_deref_ref(&mut self, value: &Expr) -> Vec<LLExpr> {
         let mut exprs = vec!();
-        let valexpr = self.transform_as_result(&mut exprs, value).unwrap();
+        let valexpr = self.transform_as_result(&mut exprs, value);
         exprs.push(LLExpr::LoadRef(r(valexpr)));
         exprs
     }
@@ -579,7 +579,7 @@ impl<'sess> Transformer<'sess> {
     pub fn transform_accessor(&mut self, id: NodeID, obj: &Expr, field: &str, otype: Type) -> Vec<LLExpr> {
         let mut exprs = vec!();
         let defid = self.session.get_ref(id).unwrap();
-        let objval = self.transform_as_result(&mut exprs, obj).unwrap();
+        let objval = self.transform_as_result(&mut exprs, obj);
         exprs.extend(self.convert_accessor(defid, objval, field, otype));
         exprs
     }
@@ -626,10 +626,10 @@ impl<'sess> Transformer<'sess> {
     pub fn transform_assignment(&mut self, _id: NodeID, left: &Expr, right: &Expr) -> Vec<LLExpr> {
         let mut exprs = vec!();
 
-        let value = self.transform_as_result(&mut exprs, right).unwrap();
+        let value = self.transform_as_result(&mut exprs, right);
         match &left.kind {
             ExprKind::Accessor(obj, _, oid) => {
-                let objval = self.transform_as_result(&mut exprs, obj).unwrap();
+                let objval = self.transform_as_result(&mut exprs, obj);
                 let field_id = self.session.get_ref(left.id).unwrap();
                 let objdef = self.session.get_def(self.session.get_type(*oid).unwrap().get_id().unwrap()).unwrap();
                 let (index, _) = objdef.as_struct().unwrap().find_field_by_id(field_id).unwrap();
@@ -640,7 +640,7 @@ impl<'sess> Transformer<'sess> {
                 exprs.push(LLExpr::StoreRef(r(LLExpr::GetValue(defid)), r(value)));
             },
             ExprKind::Deref(node) => {
-                let result = self.transform_as_result(&mut exprs, node).unwrap();
+                let result = self.transform_as_result(&mut exprs, node);
                 exprs.push(LLExpr::StoreRef(r(result), r(value)));
             },
             _ => panic!("InternalError: attempting to assign to an invalid pattern, {:?}", left),
@@ -683,7 +683,7 @@ impl<'sess> Transformer<'sess> {
 
     pub fn transform_match(&mut self, cond: &Expr, cases: &Vec<MatchCase>) -> Vec<LLExpr> {
         let mut exprs = vec!();
-        let condval = self.transform_as_result(&mut exprs, cond).unwrap();
+        let condval = self.transform_as_result(&mut exprs, cond);
         exprs.extend(self.create_match(condval, cases));
         exprs
     }
@@ -695,7 +695,7 @@ impl<'sess> Transformer<'sess> {
         match &pat.kind {
             PatKind::Wild => exprs.push(LLExpr::Literal(LLLit::I1(true))),
             PatKind::Literal(lit) => {
-                let compfunc = self.transform_as_result(&mut exprs, &Expr::new_with_id(pat.id, Pos::empty(), ExprKind::Identifier(Ident::from_str("==")))).unwrap();
+                let compfunc = self.transform_as_result(&mut exprs, &Expr::new_with_id(pat.id, Pos::empty(), ExprKind::Identifier(Ident::from_str("=="))));
                 let compabi = self.session.get_type(pat.id).unwrap().get_abi().unwrap();
                 let result = LLExpr::Literal(self.transform_lit(lit));
                 exprs.extend(self.create_func_invoke(compabi, compfunc, vec!(LLExpr::GetValue(value_id), result)));

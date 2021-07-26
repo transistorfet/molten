@@ -137,7 +137,7 @@ impl CFuncTransform {
 
         let fargs = transform.transform_as_args(&mut exprs, args);
 
-        let funcresult = transform.transform_as_result(&mut exprs, func).unwrap();
+        let funcresult = transform.transform_as_result(&mut exprs, func);
 
         exprs.extend(CFuncTransform::create_invoke(transform, funcresult, fargs));
         exprs
@@ -290,7 +290,7 @@ impl ClosureTransform {
 
         let fargs = transform.transform_as_args(&mut exprs, args);
 
-        let funcresult = transform.transform_as_result(&mut exprs, func).unwrap();
+        let funcresult = transform.transform_as_result(&mut exprs, func);
         exprs.extend(ClosureTransform::create_invoke(transform, funcresult, fargs));
         exprs
     }

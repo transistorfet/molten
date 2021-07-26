@@ -8,6 +8,8 @@
   but can still be checked by the refinery and converted into an Expr::MethodInvoke or however you'll do that
 * I'd really like to change the way method calls are done.  It's annoying having all these definitions and blocks for every call
 
+* is there anywhere that transform_as_result doesn't just unwrap the result??? I can get rid of the Option
+
 * should we change classspec into a type and be done with it?  We can decompose the type later
 * reduce the number of clone()s
 * maybe require an ignore type function call for statements that don't return unit (ie.  disallow having comparisons and math functions where the return value is ignored and the code will be optimized away,
@@ -15,6 +17,10 @@
 
 
 TRAITS/TYPECLASSES:
+
+* If you use universals with constraints, you might want to have constraints be a trait (name or id) or list of traits and not a type (since you can just specify the type directly
+  like: "let func: ('b, 'b) -> 'b where 'b: Debug = value"  there's no need for multiple layers of indirection
+  If you use Object types, then you should remove the constraints
 
 * you could store constraints for universal variables in a global table in session, since all the copies of a single universal variable will have the same constraints, however
   universal variables cannot be mapped to placeholder variables unless the placeholders also record the constraints, which would then need to combine when the placeholder variables
@@ -35,6 +41,13 @@ TRAITS/TYPECLASSES:
 * So... a constraint would need to be a Vec<(NodeID, Type)> such that each NodeID is the ID of a placeholder or universal that the constraint applies to, and the Type must
   unify (with the update arg in check_type being false) in order for the constraint to hold, for each constraint
 * how do we actually represent a trait though.  'b: Debug <--- Debug here isn't a valid type if traits are always constraints...
+
+* an alternate alternate would be that each variable can only have one constraint
+  If you have: fn foo('a) where 'a: ('b) -> 'b, 'b: Debug + Add
+  then variable 'a has id 101, 'b has id 102
+  getting the constraint for id 101 would give "('b) -> 'b" and the constraint for 102 would be "Debug + Add"
+  you only need to compare one constraint, and then in the check_type of 'a vs (Int) -> Int would get the constraint of 'a and try to unify ('b) -> 'b with (Int) -> Int
+  and so recursively it will check 'b against Int and check the constraint "Debug + Add" against "Int" and succeed with Int as the mgu
 
 * going from an object type to a trait object type would require automatically inserting a conversion, which we sort of do for type variables/generics in a really hacky way, with
   the codegen build_cast function which will automagically box any non-pointer types
