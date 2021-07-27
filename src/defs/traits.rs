@@ -38,7 +38,7 @@ impl TraitDef {
 
     #[must_use]
     pub fn define(session: &Session, scope: ScopeRef, defid: NodeID, traitspec: ClassSpec) -> Result<TraitDefRef, Error> {
-        let name = traitspec.ident.name.as_str();
+        let name = traitspec.name.as_str();
         let tscope = session.map.get_or_add(defid, Some(scope.clone()));
         tscope.set_redirect(true);
         tscope.set_basename(name);
@@ -47,7 +47,7 @@ impl TraitDef {
         let vars = Scope::new_ref(None);
         vars.set_basename(name);
 
-        let deftype = Type::Object(traitspec.ident.name.clone(), defid, traitspec.types);
+        let deftype = Type::Object(traitspec.name.clone(), defid, traitspec.types);
         let vtable = Vtable::create(session, NodeID::generate(), format!("{}_vtable", name.clone()))?;
         let traitdef = Self::new_ref(defid, vars, deftype.clone(), vtable);
         scope.define_type(name, defid)?;

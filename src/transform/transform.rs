@@ -8,7 +8,7 @@ use config::Options;
 use scope::{ Scope, ScopeRef };
 use session::{ Session, Error };
 use ast::{ Pos };
-use hir::{ NodeID, Visibility, Mutability, AssignType, Literal, Ident, Argument, ClassSpec, MatchCase, EnumVariant, Pattern, PatKind, Expr, ExprKind };
+use hir::{ NodeID, Visibility, Mutability, AssignType, Literal, Argument, ClassSpec, MatchCase, EnumVariant, Pattern, PatKind, Expr, ExprKind };
 
 use misc::{ r };
 use transform::functions::{ ClosureTransform };
@@ -152,7 +152,7 @@ impl<'sess> Visitor for Transformer<'sess> {
     }
 
     fn handle_error(&mut self, node: &Expr, err: Error) -> Result<Self::Return, Error> {
-        self.session.print_error(&err.add_pos(&node.get_pos()));
+        self.session.print_error(&err.add_pos(node.get_pos()));
         Ok(vec!())
     }
 
@@ -197,7 +197,7 @@ impl<'sess> Visitor for Transformer<'sess> {
         Ok(self.transform_tuple_lit(id, &items))
     }
 
-    fn visit_record(&mut self, id: NodeID, items: &Vec<(Ident, Expr)>) -> Result<Self::Return, Error> {
+    fn visit_record(&mut self, id: NodeID, items: &Vec<(String, Expr)>) -> Result<Self::Return, Error> {
         let mut nitems = vec!();
         for item in items {
             nitems.push(item.1.clone());
@@ -205,23 +205,23 @@ impl<'sess> Visitor for Transformer<'sess> {
         Ok(self.transform_tuple_lit(id, &nitems))
     }
 
-    fn visit_record_update(&mut self, id: NodeID, record: &Expr, items: &Vec<(Ident, Expr)>) -> Result<Self::Return, Error> {
+    fn visit_record_update(&mut self, id: NodeID, record: &Expr, items: &Vec<(String, Expr)>) -> Result<Self::Return, Error> {
         Ok(self.transform_record_update(id, &record, &items))
     }
 
-    fn visit_identifier(&mut self, id: NodeID, ident: &Ident) -> Result<Self::Return, Error> {
+    fn visit_identifier(&mut self, id: NodeID, name: &str) -> Result<Self::Return, Error> {
         let defid = self.session.get_ref(id).unwrap();
-        Ok(self.transform_reference(defid, &ident.name))
+        Ok(self.transform_reference(defid, name))
     }
 
-    fn visit_resolver(&mut self, node: &Expr, left: &Expr, right: &Ident, oid: NodeID) -> Result<Self::Return, Error> {
+    fn visit_resolver(&mut self, node: &Expr, left: &Expr, right: &str, oid: NodeID) -> Result<Self::Return, Error> {
         let object_id = self.session.get_type_from_ref(oid).unwrap().get_id().unwrap();
-        Ok(self.transform_resolve(node.id, left, &right.name, object_id))
+        Ok(self.transform_resolve(node.id, left, right, object_id))
     }
 
-    fn visit_accessor(&mut self, node: &Expr, left: &Expr, right: &Ident, oid: NodeID) -> Result<Self::Return, Error> {
+    fn visit_accessor(&mut self, node: &Expr, left: &Expr, right: &str, oid: NodeID) -> Result<Self::Return, Error> {
         let otype = self.session.get_type(oid).unwrap();
-        Ok(self.transform_accessor(node.id, left, &right.name, otype))
+        Ok(self.transform_accessor(node.id, left, right, otype))
     }
 
 
@@ -231,8 +231,8 @@ impl<'sess> Visitor for Transformer<'sess> {
     }
 
 
-    fn visit_side_effect(&mut self, _id: NodeID, op: &Ident, args: &Vec<Expr>) -> Result<Self::Return, Error> {
-        Ok(self.transform_side_effect(op.name.as_str(), args))
+    fn visit_side_effect(&mut self, _id: NodeID, op: &str, args: &Vec<Expr>) -> Result<Self::Return, Error> {
+        Ok(self.transform_side_effect(op, args))
     }
 
 
@@ -257,14 +257,14 @@ impl<'sess> Visitor for Transformer<'sess> {
     }
 
 
-    fn visit_declare(&mut self, id: NodeID, vis: Visibility, ident: &Ident, _ttype: &Type) -> Result<Self::Return, Error> {
+    fn visit_declare(&mut self, id: NodeID, vis: Visibility, name: &str, _ttype: &Type) -> Result<Self::Return, Error> {
         let ttype = self.session.get_type_from_ref(id).unwrap();
         let abi = ttype.get_abi().unwrap();
-        Ok(self.transform_func_decl(abi, id, vis, &ident.name, &ttype))
+        Ok(self.transform_func_decl(abi, id, vis, name, &ttype))
     }
 
-    fn visit_function(&mut self, id: NodeID, vis: Visibility, ident: &Option<Ident>, args: &Vec<Argument>, _rettype: &Option<Type>, body: &Vec<Expr>, abi: ABI) -> Result<Self::Return, Error> {
-        Ok(self.transform_func_def(abi, id, vis, ident.as_ref().map(|ident| ident.name.as_str()), args, body))
+    fn visit_function(&mut self, id: NodeID, vis: Visibility, name: Option<&str>, args: &Vec<Argument>, _rettype: &Option<Type>, body: &Vec<Expr>, abi: ABI) -> Result<Self::Return, Error> {
+        Ok(self.transform_func_def(abi, id, vis, name, args, body))
     }
 
     fn visit_alloc_object(&mut self, id: NodeID, _ttype: &Type) -> Result<Self::Return, Error> {
@@ -284,12 +284,12 @@ impl<'sess> Visitor for Transformer<'sess> {
     }
 
     fn visit_enum(&mut self, id: NodeID, classspec: &ClassSpec, _variants: &Vec<EnumVariant>) -> Result<Self::Return, Error> {
-        Ok(self.transform_enum_def(id, &classspec.ident.name))
+        Ok(self.transform_enum_def(id, &classspec.name))
     }
 
     fn visit_trait_def(&mut self, id: NodeID, traitspec: &ClassSpec, body: &Vec<Expr>) -> Result<Self::Return, Error> {
         let defid = self.session.get_ref(id).unwrap();
-        Ok(self.transform_trait_def(defid, &traitspec.ident.name, body))
+        Ok(self.transform_trait_def(defid, &traitspec.name, body))
     }
 
     fn visit_trait_impl(&mut self, id: NodeID, _traitspec: &ClassSpec, _impltype: &Type, body: &Vec<Expr>) -> Result<Self::Return, Error> {
@@ -301,12 +301,12 @@ impl<'sess> Visitor for Transformer<'sess> {
     }
 
 
-    fn visit_import(&mut self, _id: NodeID, ident: &Ident, decls: &Vec<Expr>) -> Result<Self::Return, Error> {
-        Ok(self.transform_import(&ident.name, decls))
+    fn visit_import(&mut self, _id: NodeID, name: &str, decls: &Vec<Expr>) -> Result<Self::Return, Error> {
+        Ok(self.transform_import(name, decls))
     }
 
-    fn visit_definition(&mut self, id: NodeID, _mutable: Mutability, ident: &Ident, _ttype: &Option<Type>, expr: &Expr) -> Result<Self::Return, Error> {
-        Ok(self.transform_def_local(id, &ident.name, expr))
+    fn visit_definition(&mut self, id: NodeID, _mutable: Mutability, name: &str, _ttype: &Option<Type>, expr: &Expr) -> Result<Self::Return, Error> {
+        Ok(self.transform_def_local(id, name, expr))
     }
 
     fn visit_assignment(&mut self, id: NodeID, left: &Expr, right: &Expr, _ty: AssignType) -> Result<Self::Return, Error> {
@@ -318,7 +318,7 @@ impl<'sess> Visitor for Transformer<'sess> {
     }
 
     /*
-    fn visit_pattern_binding(&mut self, _id: NodeID, _ident: &Ident) -> Result<Self::Return, Error> {
+    fn visit_pattern_binding(&mut self, _id: NodeID, _name: &str) -> Result<Self::Return, Error> {
         Ok(self.default_return())
     }
 
@@ -326,7 +326,7 @@ impl<'sess> Visitor for Transformer<'sess> {
         self.visit_pattern(subpat)
     }
 
-    fn visit_pattern_resolve(&mut self, _id: NodeID, left: &Pattern, _field: &Ident, _oid: NodeID) -> Result<Self::Return, Error> {
+    fn visit_pattern_resolve(&mut self, _id: NodeID, left: &Pattern, _field: &str, _oid: NodeID) -> Result<Self::Return, Error> {
         self.visit_pattern(left)
     }
 
@@ -338,7 +338,7 @@ impl<'sess> Visitor for Transformer<'sess> {
         walk_pattern_tuple(self, id, items)
     }
 
-    fn visit_pattern_record(&mut self, id: NodeID, items: &Vec<(Ident, Pattern)>) -> Result<Self::Return, Error> {
+    fn visit_pattern_record(&mut self, id: NodeID, items: &Vec<(String, Pattern)>) -> Result<Self::Return, Error> {
         walk_pattern_record(self, id, items)
     }
 
@@ -350,7 +350,7 @@ impl<'sess> Visitor for Transformer<'sess> {
         self.visit_literal(id, lit)
     }
 
-    fn visit_pattern_identifier(&mut self, _id: NodeID, _ident: &Ident) -> Result<Self::Return, Error> {
+    fn visit_pattern_identifier(&mut self, _id: NodeID, _name: &str) -> Result<Self::Return, Error> {
         Ok(self.default_return())
     }
     */
@@ -463,7 +463,7 @@ impl<'sess> Transformer<'sess> {
         exprs
     }
 
-    pub fn transform_record_update(&mut self, id: NodeID, record: &Expr, items: &Vec<(Ident, Expr)>) -> Vec<LLExpr> {
+    pub fn transform_record_update(&mut self, id: NodeID, record: &Expr, items: &Vec<(String, Expr)>) -> Vec<LLExpr> {
         let mut exprs = vec!();
         let mut litems = vec!();
 
@@ -471,7 +471,7 @@ impl<'sess> Transformer<'sess> {
         let valexpr = self.transform_as_result(&mut exprs, record);
 
         for (ref name, _) in ttype.get_record_types().unwrap() {
-            let item = match items.iter().find(|(ident, _)| &ident.name == name) {
+            let item = match items.iter().find(|(ident, _)| ident == name) {
                 Some((_, expr)) => self.transform_as_result(&mut exprs, expr),
                 None => LLExpr::GetItem(r(valexpr.clone()), litems.len()),
             };
@@ -715,14 +715,14 @@ impl<'sess> Transformer<'sess> {
         match &pat.kind {
             PatKind::Wild => exprs.push(LLExpr::Literal(LLLit::I1(true))),
             PatKind::Literal(lit) => {
-                let compfunc = self.transform_as_result(&mut exprs, &Expr::new_with_id(pat.id, Pos::empty(), ExprKind::Identifier(Ident::from_str("=="))));
+                let compfunc = self.transform_as_result(&mut exprs, &Expr::new_with_id(pat.id, Pos::empty(), ExprKind::Identifier("==".to_string())));
                 let compabi = self.session.get_type(pat.id).unwrap().get_abi().unwrap();
                 let result = LLExpr::Literal(self.transform_lit(lit));
                 exprs.extend(self.create_func_invoke(compabi, compfunc, vec!(LLExpr::GetValue(value_id), result)));
             },
-            PatKind::Binding(ident) => {
+            PatKind::Binding(name) => {
                 let defid = self.session.get_ref(pat.id).unwrap();
-                exprs.extend(self.create_def_local(defid, &ident.name, LLExpr::GetValue(value_id)));
+                exprs.extend(self.create_def_local(defid, name, LLExpr::GetValue(value_id)));
                 exprs.push(LLExpr::Literal(LLLit::I1(true)));
             },
             PatKind::Annotation(_, subpat) => {

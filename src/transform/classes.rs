@@ -54,12 +54,12 @@ impl<'sess> Transformer<'sess> {
         self.with_scope(tscope, |transform| {
             for node in body {
                 match &node.kind {
-                    ExprKind::Function(vis, ident, args, _, body, abi) => {
-                        exprs.extend(transform.transform_func_def(*abi, node.id, *vis, ident.as_ref().map(|ident| ident.name.as_str()), args, body));
+                    ExprKind::Function(vis, name, args, _, body, abi) => {
+                        exprs.extend(transform.transform_func_def(*abi, node.id, *vis, name.as_ref().map(|name| name.as_str()), args, body));
                     },
-                    ExprKind::Declare(vis, ident, _) => {
+                    ExprKind::Declare(vis, name, _) => {
                         let ttype = transform.session.get_type_from_ref(node.id).unwrap();
-                        exprs.extend(transform.transform_func_decl(ttype.get_abi().unwrap(), node.id, *vis, &ident.name, &ttype));
+                        exprs.extend(transform.transform_func_decl(ttype.get_abi().unwrap(), node.id, *vis, name.as_str(), &ttype));
                     },
 
                     // TODO this is the only reason we use this instead of just .visit_vec()

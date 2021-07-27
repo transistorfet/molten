@@ -36,15 +36,10 @@ pub enum Literal {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct Ident {
-    pub name: String,
-}
-
-#[derive(Clone, Debug, PartialEq)]
 pub struct Argument {
     pub id: NodeID,
     pub pos: Pos,
-    pub ident: Ident,
+    pub name: String,
     pub ttype: Option<Type>,
     pub default: Option<Expr>
 }
@@ -52,7 +47,7 @@ pub struct Argument {
 #[derive(Clone, Debug, PartialEq)]
 pub struct ClassSpec {
     pub pos: Pos,
-    pub ident: Ident,
+    pub name: String,
     pub types: Vec<Type>,
 }
 
@@ -67,7 +62,7 @@ pub struct MatchCase {
 pub struct EnumVariant {
     pub id: NodeID,
     pub pos: Pos,
-    pub ident: Ident,
+    pub name: String,
     pub ttype: Option<Type>,
 }
 
@@ -83,13 +78,13 @@ pub struct Pattern {
 pub enum PatKind {
     Wild,
     Literal(Literal),
-    Binding(Ident),
+    Binding(String),
     Annotation(Type, R<Pattern>),
-    Identifier(Ident),
-    Resolve(R<Pattern>, Ident, NodeID),
+    Identifier(String),
+    Resolve(R<Pattern>, String, NodeID),
     EnumArgs(R<Pattern>, Vec<Pattern>),
     Tuple(Vec<Pattern>),
-    Record(Vec<(Ident, Pattern)>),
+    Record(Vec<(String, Pattern)>),
 }
 
 
@@ -110,25 +105,25 @@ pub enum ExprKind {
     Annotation(Type, R<Expr>),
 
     Tuple(Vec<Expr>),
-    Record(Vec<(Ident, Expr)>),
-    RecordUpdate(R<Expr>, Vec<(Ident, Expr)>),
+    Record(Vec<(String, Expr)>),
+    RecordUpdate(R<Expr>, Vec<(String, Expr)>),
 
-    Identifier(Ident),
-    Resolver(R<Expr>, Ident, NodeID),
-    Accessor(R<Expr>, Ident, NodeID),
+    Identifier(String),
+    Resolver(R<Expr>, String, NodeID),
+    Accessor(R<Expr>, String, NodeID),
 
     Block(Vec<Expr>),
     Invoke(R<Expr>, Vec<Expr>, NodeID),
 
-    SideEffect(Ident, Vec<Expr>),
+    SideEffect(String, Vec<Expr>),
     If(R<Expr>, R<Expr>, R<Expr>),
     Raise(R<Expr>),
     Try(R<Expr>, Vec<MatchCase>),
     Match(R<Expr>, Vec<MatchCase>),
     While(R<Expr>, R<Expr>),
 
-    Declare(Visibility, Ident, Type),
-    Function(Visibility, Option<Ident>, Vec<Argument>, Option<Type>, Vec<Expr>, ABI),
+    Declare(Visibility, String, Type),
+    Function(Visibility, Option<String>, Vec<Argument>, Option<Type>, Vec<Expr>, ABI),
     AllocObject(Type),
     Class(ClassSpec, Option<ClassSpec>, Vec<Expr>),
     TypeAlias(ClassSpec, Type),
@@ -137,39 +132,19 @@ pub enum ExprKind {
     TraitImpl(ClassSpec, Type, Vec<Expr>),
     UnpackTraitObject(Type, R<Expr>),
 
-    Import(Ident, Vec<Expr>),
-    Definition(Mutability, Ident, Option<Type>, R<Expr>),
+    Import(String, Vec<Expr>),
+    Definition(Mutability, String, Option<Type>, R<Expr>),
     Assignment(R<Expr>, R<Expr>, AssignType),
 
     Module(String, Vec<Expr>, NodeID),
 }
 
-
-impl Ident {
-    pub fn new(name: String) -> Self {
-        Ident {
-            name: name
-        }
-    }
-
-    pub fn from_str(name: &str) -> Ident {
-        Ident {
-            name: String::from(name),
-        }
-    }
-
-    pub fn as_str(&self) -> &str {
-        self.name.as_str()
-    }
-}
-
-
 impl Argument {
-    pub fn new(pos: Pos, ident: Ident, ttype: Option<Type>, default: Option<Expr>) -> Self {
+    pub fn new(pos: Pos, name: String, ttype: Option<Type>, default: Option<Expr>) -> Self {
         Argument {
             id: NodeID::generate(),
             pos: pos,
-            ident: ident,
+            name: name,
             ttype: ttype,
             default: default
         }
@@ -177,10 +152,10 @@ impl Argument {
 }
 
 impl ClassSpec {
-    pub fn new(pos: Pos, ident: Ident, types: Vec<Type>) -> Self {
+    pub fn new(pos: Pos, name: String, types: Vec<Type>) -> Self {
         ClassSpec {
             pos: pos,
-            ident: ident,
+            name: name,
             types: types
         }
     }
@@ -198,11 +173,11 @@ impl MatchCase {
 
 
 impl EnumVariant {
-    pub fn new(pos: Pos, ident: Ident, ttype: Option<Type>) -> Self {
+    pub fn new(pos: Pos, name: String, ttype: Option<Type>) -> Self {
         Self {
             id: NodeID::generate(),
             pos: pos,
-            ident: ident,
+            name: name,
             ttype: ttype,
         }
     }
@@ -260,7 +235,7 @@ impl Expr {
 
     #[allow(dead_code)]
     pub fn get_pos(&self) -> Pos {
-        self.pos.clone()
+        self.pos
     }
 
     #[allow(dead_code)]
@@ -300,32 +275,32 @@ impl Expr {
     }
 
     #[allow(dead_code)]
-    pub fn make_record(pos: Pos, items: Vec<(Ident, Expr)>) -> Expr {
+    pub fn make_record(pos: Pos, items: Vec<(String, Expr)>) -> Expr {
         Expr { id: NodeID::generate(), pos: pos, kind: ExprKind::Record(items) }
     }
 
     #[allow(dead_code)]
-    pub fn make_record_update(pos: Pos, record: Expr, items: Vec<(Ident, Expr)>) -> Expr {
+    pub fn make_record_update(pos: Pos, record: Expr, items: Vec<(String, Expr)>) -> Expr {
         Expr { id: NodeID::generate(), pos: pos, kind: ExprKind::RecordUpdate(r(record), items) }
     }
 
     #[allow(dead_code)]
-    pub fn make_ident(pos: Pos, ident: Ident) -> Expr {
+    pub fn make_ident(pos: Pos, ident: String) -> Expr {
         Expr { id: NodeID::generate(), pos: pos, kind: ExprKind::Identifier(ident) }
     }
 
     #[allow(dead_code)]
     pub fn make_ident_from_str(pos: Pos, name: &str) -> Expr {
-        Expr { id: NodeID::generate(), pos: pos, kind: ExprKind::Identifier(Ident::from_str(name)) }
+        Expr { id: NodeID::generate(), pos: pos, kind: ExprKind::Identifier(name.to_string()) }
     }
 
     #[allow(dead_code)]
-    pub fn make_resolve(pos: Pos, object: Expr, ident: Ident) -> Expr {
+    pub fn make_resolve(pos: Pos, object: Expr, ident: String) -> Expr {
         Expr { id: NodeID::generate(), pos: pos, kind: ExprKind::Resolver(r(object), ident, NodeID::generate()) }
     }
 
     #[allow(dead_code)]
-    pub fn make_access(pos: Pos, object: Expr, ident: Ident) -> Expr {
+    pub fn make_access(pos: Pos, object: Expr, ident: String) -> Expr {
         Expr { id: NodeID::generate(), pos: pos, kind: ExprKind::Accessor(r(object), ident, NodeID::generate()) }
     }
 
@@ -335,7 +310,7 @@ impl Expr {
     }
 
     #[allow(dead_code)]
-    pub fn make_side_effect(pos: Pos, ident: Ident, args: Vec<Expr>) -> Expr {
+    pub fn make_side_effect(pos: Pos, ident: String, args: Vec<Expr>) -> Expr {
         Expr { id: NodeID::generate(), pos: pos, kind: ExprKind::SideEffect(ident, args) }
     }
 
@@ -365,12 +340,12 @@ impl Expr {
     }
 
     #[allow(dead_code)]
-    pub fn make_decl(pos: Pos, vis: Visibility, ident: Ident, ttype: Type) -> Expr {
+    pub fn make_decl(pos: Pos, vis: Visibility, ident: String, ttype: Type) -> Expr {
         Expr { id: NodeID::generate(), pos: pos, kind: ExprKind::Declare(vis, ident, ttype) }
     }
 
     #[allow(dead_code)]
-    pub fn make_func(pos: Pos, vis: Visibility, ident: Option<Ident>, args: Vec<Argument>, rtype: Option<Type>, body: Vec<Expr>, abi: ABI) -> Expr {
+    pub fn make_func(pos: Pos, vis: Visibility, ident: Option<String>, args: Vec<Argument>, rtype: Option<Type>, body: Vec<Expr>, abi: ABI) -> Expr {
         Expr { id: NodeID::generate(), pos: pos, kind: ExprKind::Function(vis, ident, args, rtype, body, abi) }
     }
 
@@ -385,12 +360,12 @@ impl Expr {
     }
 
     #[allow(dead_code)]
-    pub fn make_import(pos: Pos, ident: Ident, decls: Vec<Expr>) -> Expr {
+    pub fn make_import(pos: Pos, ident: String, decls: Vec<Expr>) -> Expr {
         Expr { id: NodeID::generate(), pos: pos, kind: ExprKind::Import(ident, decls) }
     }
 
     #[allow(dead_code)]
-    pub fn make_def(pos: Pos, mutable: Mutability, ident: Ident, ttype: Option<Type>, value: Expr) -> Expr {
+    pub fn make_def(pos: Pos, mutable: Mutability, ident: String, ttype: Option<Type>, value: Expr) -> Expr {
         Expr { id: NodeID::generate(), pos: pos, kind: ExprKind::Definition(mutable, ident, ttype, r(value)) }
     }
 
@@ -436,8 +411,8 @@ impl Expr {
 
 
     #[allow(dead_code)]
-    pub fn make_resolve_ident(pos: Pos, object: &Ident, name: &str) -> Expr {
-        Expr::make_resolve(pos.clone(), Expr::make_ident(pos, object.clone()), Ident::from_str(name))
+    pub fn make_resolve_ident(pos: Pos, object: &String, name: &str) -> Expr {
+        Expr::make_resolve(pos, Expr::make_ident(pos, object.clone()), name.to_string())
     }
 }
 

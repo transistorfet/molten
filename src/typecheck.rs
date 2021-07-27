@@ -3,7 +3,7 @@
 use defs::Def;
 use session::{ Session, Error };
 use scope::{ ScopeRef };
-use hir::{ NodeID, Visibility, Mutability, AssignType, Literal, Ident, Argument, ClassSpec, MatchCase, EnumVariant, Pattern, Expr, ExprKind };
+use hir::{ NodeID, Visibility, Mutability, AssignType, Literal, Argument, ClassSpec, MatchCase, EnumVariant, Pattern, Expr, ExprKind };
 use types::{ Type, Check, ABI, expect_type, check_type, resolve_type, check_type_params, check_trait_cast };
 use misc::{ r };
 use visitor::{ self, Visitor, ScopeStack };
@@ -57,7 +57,7 @@ impl<'sess> Visitor for TypeChecker<'sess> {
     }
 
     fn handle_error(&mut self, node: &Expr, err: Error) -> Result<Self::Return, Error> {
-        self.session.print_error(&err.add_pos(&node.get_pos()));
+        self.session.print_error(&err.add_pos(node.get_pos()));
         Ok(self.default_return())
     }
 
@@ -77,7 +77,7 @@ impl<'sess> Visitor for TypeChecker<'sess> {
 
                 match self.session.update_type(node.id, ttype.clone()) {
                     Ok(_) => { },
-                    Err(err) => { self.session.print_error(&err.add_pos(&node.get_pos())); },
+                    Err(err) => { self.session.print_error(&err.add_pos(node.get_pos())); },
                 }
                 Ok(ttype)
             },
@@ -92,7 +92,7 @@ impl<'sess> Visitor for TypeChecker<'sess> {
                 Ok(ttype)
             },
             Err(err) => {
-                self.session.print_error(&err.add_pos(&pat.pos));
+                self.session.print_error(&err.add_pos(pat.pos));
                 Ok(self.default_return())
             },
         }
@@ -110,7 +110,7 @@ impl<'sess> Visitor for TypeChecker<'sess> {
         }
     }
 
-    fn visit_function(&mut self, refid: NodeID, _vis: Visibility, ident: &Option<Ident>, args: &Vec<Argument>, _rettype: &Option<Type>, body: &Vec<Expr>, abi: ABI) -> Result<Self::Return, Error> {
+    fn visit_function(&mut self, refid: NodeID, _vis: Visibility, name: Option<&str>, args: &Vec<Argument>, _rettype: &Option<Type>, body: &Vec<Expr>, abi: ABI) -> Result<Self::Return, Error> {
         let defid = self.session.get_ref(refid)?;
         let fscope = self.session.map.get(&defid);
         let dftype = self.session.get_type(defid).unwrap();
@@ -125,7 +125,7 @@ impl<'sess> Visitor for TypeChecker<'sess> {
             //let vtype = arg.default.clone().map(|ref vexpr| self.visit_node_or_error(vexpr));
             //atype = expect_type(self.session, scope.clone(), atype, vtype, Check::Def)?;
 
-            if &arg.ident.name[..] == "self" || &arg.ident.name[..] == "self_boxed" {
+            if &arg.name[..] == "self" || &arg.name[..] == "self_boxed" {
                 let stype = fscope.find_type(self.session, "Self")?;
                 atype = expect_type(self.session, Some(atype), Some(stype), Check::Def)?;
             }
@@ -150,7 +150,7 @@ impl<'sess> Visitor for TypeChecker<'sess> {
             let (mut found, _) = ol.find_local_variants(self.session, tupleargs.clone());
             found = found.into_iter().filter(|(fid, _)| defid != *fid).collect();
             if found.len() > 0 {
-                return Err(Error::new(format!("OverloadError: things {:?}\nvariants found [{}]", ident, found.iter().map(|(_, t)| format!("{}", t)).collect::<Vec<String>>().join(", "))));
+                return Err(Error::new(format!("OverloadError: things {:?}\nvariants found [{}]", name, found.iter().map(|(_, t)| format!("{}", t)).collect::<Vec<String>>().join(", "))));
             }
         }
 
@@ -193,7 +193,7 @@ impl<'sess> Visitor for TypeChecker<'sess> {
         Ok(rtype)
     }
 
-    fn visit_side_effect(&mut self, _id: NodeID, _op: &Ident, args: &Vec<Expr>) -> Result<Self::Return, Error> {
+    fn visit_side_effect(&mut self, _id: NodeID, _op: &str, args: &Vec<Expr>) -> Result<Self::Return, Error> {
         let mut ltype = None;
         for ref expr in args {
             ltype = Some(expect_type(self.session, ltype.clone(), Some(self.visit_node_or_error(expr)), Check::List)?);
@@ -201,7 +201,7 @@ impl<'sess> Visitor for TypeChecker<'sess> {
         Ok(ltype.unwrap())
     }
 
-    fn visit_definition(&mut self, refid: NodeID, _mutable: Mutability, _ident: &Ident, _ttype: &Option<Type>, expr: &Expr) -> Result<Self::Return, Error> {
+    fn visit_definition(&mut self, refid: NodeID, _mutable: Mutability, _name: &str, _ttype: &Option<Type>, expr: &Expr) -> Result<Self::Return, Error> {
         let defid = self.session.get_ref(refid)?;
         let dtype = self.session.get_type(defid);
         let btype = expect_type(self.session, dtype.clone(), Some(self.visit_node_or_error(expr)), Check::Def)?;
@@ -210,22 +210,22 @@ impl<'sess> Visitor for TypeChecker<'sess> {
         Ok(btype)
     }
 
-    fn visit_declare(&mut self, _refid: NodeID, _vis: Visibility, _ident: &Ident, _ttype: &Type) -> Result<Self::Return, Error> {
+    fn visit_declare(&mut self, _refid: NodeID, _vis: Visibility, _name: &str, _ttype: &Type) -> Result<Self::Return, Error> {
         let scope = self.stack.get_scope();
         scope.find_type(self.session, "()")
     }
 
-    fn visit_identifier(&mut self, refid: NodeID, ident: &Ident) -> Result<Self::Return, Error> {
+    fn visit_identifier(&mut self, refid: NodeID, name: &str) -> Result<Self::Return, Error> {
         let scope = self.stack.get_scope();
         if let Ok(ttype) = self.session.get_type_from_ref(refid) {
             Ok(ttype)
         } else {
-            match scope.get_var_def(&ident.name) {
+            match scope.get_var_def(name) {
                 Some(defid) => match self.session.get_type(defid) {
                     Some(ttype) => Ok(ttype),
-                    None => return Err(Error::new(format!("TypeError: the reference {:?} has no type or has an ambiguous type", ident.name))),
+                    None => return Err(Error::new(format!("TypeError: the reference {:?} has no type or has an ambiguous type", name))),
                 }
-                None => panic!("InternalError: ident {:?} is undefined, but should have been caught in the name binding phase", ident.name),
+                None => panic!("InternalError: name {:?} is undefined, but should have been caught in the name binding phase", name),
             }
         }
     }
@@ -341,20 +341,20 @@ impl<'sess> Visitor for TypeChecker<'sess> {
         Ok(Type::Tuple(types))
     }
 
-    fn visit_record(&mut self, refid: NodeID, items: &Vec<(Ident, Expr)>) -> Result<Self::Return, Error> {
+    fn visit_record(&mut self, refid: NodeID, items: &Vec<(String, Expr)>) -> Result<Self::Return, Error> {
         let mut types = vec!();
-        for (ref ident, ref expr) in items {
-            types.push((ident.name.clone(), self.visit_node_or_error(expr)));
+        for (name, expr) in items {
+            types.push((name.clone(), self.visit_node_or_error(expr)));
         }
         self.session.set_type(refid, Type::Record(types.clone()));
         Ok(Type::Record(types))
     }
 
-    fn visit_record_update(&mut self, refid: NodeID, record: &Expr, items: &Vec<(Ident, Expr)>) -> Result<Self::Return, Error> {
+    fn visit_record_update(&mut self, refid: NodeID, record: &Expr, items: &Vec<(String, Expr)>) -> Result<Self::Return, Error> {
         let rtype = self.visit_node_or_error(record);
 
-        for (ref ident, ref expr) in items {
-            let ftype = rtype.get_record_field(ident.name.as_str())?;
+        for (name, expr) in items {
+            let ftype = rtype.get_record_field(name)?;
             let itype = self.visit_node_or_error(expr);
             expect_type(self.session, Some(ftype.clone()), Some(itype), Check::Def)?;
         }
@@ -392,13 +392,13 @@ impl<'sess> Visitor for TypeChecker<'sess> {
         let mut names = traitdef.vars.get_names();
         for node in body {
             match &node.kind {
-                ExprKind::Function(_, ident, _, _, _, _) => {
-                    let ident = ident.as_ref().unwrap();  // NOTE this should have already been checked by refinery
-                    let defid = *names.get(&ident.name).ok_or(Error::new(format!("TraitError: function not declared in the trait def, but found in the trait impl, {:?}", ident.name)))?;
+                ExprKind::Function(_, name, _, _, _, _) => {
+                    let name = name.as_ref().unwrap();  // NOTE this should have already been checked by refinery
+                    let defid = *names.get(name).ok_or(Error::new(format!("TraitError: function not declared in the trait def, but found in the trait impl, {:?}", name)))?;
                     let deftype = self.session.get_type(defid);
                     let impltype = self.session.get_type(node.id);
                     check_type(self.session, deftype, impltype, Check::Def, false)?;
-                    names.remove(&ident.name);
+                    names.remove(name.as_str());
                 }
                 _ => panic!("InternalError: expected function definition, found {:?}", node),
             }
@@ -446,11 +446,11 @@ impl<'sess> Visitor for TypeChecker<'sess> {
         scope.find_type(self.session, "()")
     }
 
-    fn visit_resolver(&mut self, node: &Expr, left: &Expr, right: &Ident, oid: NodeID) -> Result<Self::Return, Error> {
+    fn visit_resolver(&mut self, node: &Expr, left: &Expr, right: &str, oid: NodeID) -> Result<Self::Return, Error> {
         self.visit_accessor(node, left, right, oid)
     }
 
-    fn visit_accessor(&mut self, node: &Expr, _left: &Expr, _right: &Ident, _oid: NodeID) -> Result<Self::Return, Error> {
+    fn visit_accessor(&mut self, node: &Expr, _left: &Expr, _right: &str, _oid: NodeID) -> Result<Self::Return, Error> {
         let (refid, defid) = self.get_access_ids(node)?.unwrap();
         self.session.set_ref(refid, defid);
         Ok(self.get_type_or_new_typevar(defid))
@@ -472,7 +472,7 @@ impl<'sess> Visitor for TypeChecker<'sess> {
         expect_type(self.session, Some(ltype), Some(rtype), Check::Def)
     }
 
-    fn visit_import(&mut self, _id: NodeID, _ident: &Ident, decls: &Vec<Expr>) -> Result<Self::Return, Error> {
+    fn visit_import(&mut self, _id: NodeID, _ident: &str, decls: &Vec<Expr>) -> Result<Self::Return, Error> {
         let scope = self.stack.get_scope();
         self.visit_vec(decls)?;
         scope.find_type(self.session, "()")
@@ -489,7 +489,7 @@ impl<'sess> Visitor for TypeChecker<'sess> {
         Ok(ltype)
     }
 
-    fn visit_pattern_binding(&mut self, id: NodeID, _ident: &Ident) -> Result<Self::Return, Error> {
+    fn visit_pattern_binding(&mut self, id: NodeID, _name: &str) -> Result<Self::Return, Error> {
         let defid = self.session.get_ref(id)?;
         let btype = self.session.get_type(defid).unwrap_or_else(|| self.session.new_typevar());
         self.session.update_type(defid, btype.clone())?;
@@ -503,11 +503,11 @@ impl<'sess> Visitor for TypeChecker<'sess> {
         expect_type(self.session, ttype, Some(etype), Check::Def)
     }
 
-    fn visit_pattern_resolve(&mut self, id: NodeID, _left: &Pattern, field: &Ident, oid: NodeID) -> Result<Self::Return, Error> {
+    fn visit_pattern_resolve(&mut self, id: NodeID, _left: &Pattern, field: &str, oid: NodeID) -> Result<Self::Return, Error> {
         let ltype = self.session.get_type_from_ref(oid).unwrap();
 
         let vars = self.session.get_def(ltype.get_id()?)?.get_vars()?;
-        let defid = vars.get_var_def(&field.name).ok_or(Error::new(format!("VarError: definition not set for {:?}", field.name)))?;
+        let defid = vars.get_var_def(&field).ok_or(Error::new(format!("VarError: definition not set for {:?}", field)))?;
         self.session.set_ref(id, defid);
         let ttype = self.session.get_type(defid).ok_or(Error::new(format!("TypeError: no type set for id {:?}", defid)))?;
         let ttype = Type::map_all_typevars(self.session, ttype);
@@ -546,7 +546,7 @@ impl<'sess> Visitor for TypeChecker<'sess> {
     }
 
     //fn visit_pattern_tuple(&mut self, id: NodeID, items: &Vec<Pattern>) -> Result<Self::Return, Error> {
-    //fn visit_pattern_record(&mut self, id: NodeID, items: &Vec<(Ident, Pattern)>) -> Result<Self::Return, Error> {
+    //fn visit_pattern_record(&mut self, id: NodeID, items: &Vec<(String, Pattern)>) -> Result<Self::Return, Error> {
 }
 
 impl<'sess> TypeChecker<'sess> {
@@ -573,7 +573,7 @@ impl<'sess> TypeChecker<'sess> {
                 let ltype = self.session.get_type_from_ref(*oid).unwrap();
 
                 let vars = self.session.get_def(ltype.get_id()?)?.get_vars()?;
-                Ok(Some((node.id, vars.get_var_def(&field.name).ok_or(Error::new(format!("VarError: definition not set for {:?}", field.name)))?)))
+                Ok(Some((node.id, vars.get_var_def(field).ok_or(Error::new(format!("VarError: definition not set for {:?}", field)))?)))
             },
             ExprKind::Accessor(left, field, oid) => {
                 let ltype = resolve_type(self.session, self.visit_node_or_error(left), false)?;
@@ -582,17 +582,17 @@ impl<'sess> TypeChecker<'sess> {
                 match ltype {
                     Type::Object(_, _, _) => {
                         let vars = self.session.get_def(ltype.get_id()?)?.get_vars()?;
-                        Ok(Some((node.id, vars.get_var_def(&field.name).ok_or(Error::new(format!("VarError: definition not set for {:?}", field.name)))?)))
+                        Ok(Some((node.id, vars.get_var_def(field).ok_or(Error::new(format!("VarError: definition not set for {:?}", field)))?)))
                     },
                     Type::Record(items) => {
                         let defid = NodeID::generate();
-                        let index = items.iter().position(|(name, _)| *name == field.name).unwrap();
+                        let index = items.iter().position(|(name, _)| name == field).unwrap();
                         self.session.set_type(defid, items[index].1.clone());
                         Ok(Some((node.id, defid)))
                     },
                     Type::Tuple(items) => {
                         let defid = NodeID::generate();
-                        let index = field.name.parse::<usize>().unwrap();
+                        let index = field.parse::<usize>().unwrap();
                         self.session.set_type(defid, items[index].clone());
                         Ok(Some((node.id, defid)))
                     },

@@ -7,7 +7,7 @@ use types::Type;
 use scope::{ Scope, ScopeRef };
 use session::{ Session, Error };
 use types::{ check_type, Check };
-use hir::{ NodeID, Mutability, Ident, Expr, ExprKind };
+use hir::{ NodeID, Mutability, Expr, ExprKind };
 
 use defs::variables::FieldDef;
 
@@ -120,9 +120,9 @@ impl ClassDef {
         }
         for ref node in body.iter() {
             match &node.kind {
-                ExprKind::Definition(ref mutable, ref ident, _, _) => {
+                ExprKind::Definition(mutable, name, _, _) => {
                     let defid = session.get_ref(node.id).unwrap();
-                    self.structdef.add_field(session, defid, *mutable, ident.name.as_str(), session.get_type(defid).unwrap(), Define::IfNotExists);
+                    self.structdef.add_field(session, defid, *mutable, name.as_str(), session.get_type(defid).unwrap(), Define::IfNotExists);
                 },
                 _ => { }
             }
@@ -231,18 +231,18 @@ impl Vtable {
     pub fn build_vtable(&self, session: &Session, body: &Vec<Expr>) {
         for ref node in body.iter() {
             match &node.kind {
-                ExprKind::Function(_, ref ident, _, _, _, _) => {
-                    if let Some(Ident { ref name, .. }) = ident {
+                ExprKind::Function(_, name, _, _, _, _) => {
+                    if let Some(name) = name.as_ref() {
                         let defid = session.get_ref(node.id).unwrap();
-                        self.add_entry(session, defid, name.as_str(), session.get_type(defid).unwrap());
+                        self.add_entry(session, defid, name, session.get_type(defid).unwrap());
                     }
                 },
-                ExprKind::Declare(_, ref ident, _) => {
+                ExprKind::Declare(_, name, _) => {
                     let defid = session.get_ref(node.id).unwrap();
                     let ttype = session.get_type(defid).unwrap();
                     match ttype {
                         Type::Function(_, _, _) => {
-                            self.add_entry(session, defid, ident.as_str(), ttype);
+                            self.add_entry(session, defid, name.as_str(), ttype);
                         },
                         _ => { },
                     }

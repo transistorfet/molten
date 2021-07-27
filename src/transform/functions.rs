@@ -5,7 +5,7 @@ use typecheck;
 use abi::ABI;
 use types::Type;
 use ast::{ Pos };
-use hir::{ NodeID, Visibility, Mutability, Ident, Argument, Expr, ExprKind };
+use hir::{ NodeID, Visibility, Mutability, Argument, Expr, ExprKind };
 use visitor::{ Visitor };
 
 use misc::{ r };
@@ -108,7 +108,7 @@ impl CFuncTransform {
     }
 
     pub fn transform_def_args(transform: &mut Transformer, args: &Vec<Argument>) -> Vec<(NodeID, String)> {
-        args.iter().map(|arg| (transform.session.get_ref(arg.id).unwrap(), arg.ident.name.clone())).collect()
+        args.iter().map(|arg| (transform.session.get_ref(arg.id).unwrap(), arg.name.clone())).collect()
     }
 
     pub fn transform_def(transform: &mut Transformer, defid: NodeID, vis: Visibility, name: Option<&str>, args: &Vec<Argument>, body: &Vec<Expr>) -> Vec<LLExpr> {
@@ -235,7 +235,7 @@ impl ClosureTransform {
         cl.context_struct.foreach_field(|defid, field, _| {
             let rid = NodeID::generate();
             transform.session.set_ref(rid, defid);
-            fields.push((Ident::from_str(field), Expr::new_with_id(rid, Pos::empty(), ExprKind::Identifier(Ident::from_str(field)))));
+            fields.push((field.to_string(), Expr::new_with_id(rid, Pos::empty(), ExprKind::Identifier(field.to_string()))));
         });
 
         let mut code = vec!();
@@ -244,7 +244,7 @@ impl ClosureTransform {
         // TODO if you could make this create and set the struct with the fptr and allocated context set before it then populates the context, then
         //      you wouldn't need the special recursive case in transform_reference.  It should be represented as an object, since the closure has a
         //      struct already, but it will take some refactoring first
-        code.push(Expr::new_with_id(did_context, Pos::empty(), ExprKind::Definition(Mutability::Mutable, Ident::new(context_name.clone()), None, r(
+        code.push(Expr::new_with_id(did_context, Pos::empty(), ExprKind::Definition(Mutability::Mutable, context_name.clone(), None, r(
             Expr::make_ref(Pos::empty(), Expr::make_record(Pos::empty(), fields))
         ))));
 

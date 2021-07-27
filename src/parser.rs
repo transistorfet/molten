@@ -38,7 +38,7 @@ use abi::ABI;
 use types::Type;
 use misc::{ r, UniqueID };
 use ast::{ Pos, AST };
-use hir::{ NodeID, Mutability, Visibility, AssignType, Literal, Ident, Argument, ClassSpec, Pattern, PatKind };
+use hir::{ NodeID, Mutability, Visibility, AssignType, Literal, Argument, ClassSpec, Pattern, PatKind };
 
 
 ///// Parsing Macros /////
@@ -250,7 +250,7 @@ named!(typeenum(Span) -> AST,
     )
 );
 
-named!(enum_variant(Span) -> (Pos, Ident, Option<Type>),
+named!(enum_variant(Span) -> (Pos, String, Option<Type>),
     do_parse!(
         pos: position!() >>
         i: identifier >>
@@ -495,7 +495,7 @@ named!(argument_list(Span) -> Vec<Argument>,
 );
 
 
-named!(infix_op(Span) -> Ident,
+named!(infix_op(Span) -> String,
     map_ident!(
         alt!(
             tag!("*") |
@@ -538,9 +538,9 @@ impl AST {
         }
     }
 
-    fn fold_op(left: AST, operations: Vec<(Span, Ident, AST)>) -> Self {
+    fn fold_op(left: AST, operations: Vec<(Span, String, AST)>) -> Self {
         let mut operands: Vec<AST> = vec!();
-        let mut operators: Vec<(Pos, Ident, i32)> = vec!();
+        let mut operators: Vec<(Pos, String, i32)> = vec!();
         operands.push(left);
 
         for (span, next_op, next_ast) in operations {
@@ -570,12 +570,12 @@ impl AST {
         operands.pop().unwrap()
     }
 
-    fn make_op(pos: Pos, op: Ident, r1: AST, r2: AST) -> AST {
+    fn make_op(pos: Pos, op: String, r1: AST, r2: AST) -> AST {
         match op.as_str() {
             "and" | "or" => AST::SideEffect(pos, op, vec!(r1, r2)),
             _ =>
             //AST::Infix(pos, op, r(r1), r(r2))
-            AST::Invoke(pos.clone(), r(AST::Identifier(pos, op)), vec!(r1, r2))
+            AST::Invoke(pos, r(AST::Identifier(pos, op)), vec!(r1, r2))
             //AST::Invoke(pos, AST::Access(pos, r1, op), vec!(r2))
         }
     }
@@ -597,7 +597,7 @@ named!(atomic(Span) -> AST,
     )
 );
 
-named!(prefix_op(Span) -> Ident,
+named!(prefix_op(Span) -> String,
     map_ident!(alt!(
         tag_word!("not") |
         tag!("~")
@@ -631,8 +631,8 @@ named!(subatomic_operation(Span) -> AST,
 enum SubOP {
     Index(Pos, AST),
     Invoke(Pos, Vec<AST>),
-    Accessor(Pos, Ident),
-    Resolver(Pos, Ident),
+    Accessor(Pos, String),
+    Resolver(Pos, String),
 }
 
 impl AST {
@@ -694,7 +694,7 @@ named!(identifier_node(Span) -> AST,
     )
 );
 
-named!(identifier(Span) -> Ident,
+named!(identifier(Span) -> String,
     do_parse!(
         not_reserved >>
         s: recognize!(preceded!(
@@ -714,7 +714,7 @@ named!(class_spec(Span) -> ClassSpec,
     )
 );
 
-named!(identifier_typed(Span) -> (Pos, Ident, Option<Type>),
+named!(identifier_typed(Span) -> (Pos, String, Option<Type>),
     do_parse!(
         pos: position!() >>
         i: identifier >>
@@ -723,7 +723,7 @@ named!(identifier_typed(Span) -> (Pos, Ident, Option<Type>),
     )
 );
 
-named!(any_op(Span) -> Ident,
+named!(any_op(Span) -> String,
     alt!(infix_op | prefix_op | map_ident!(alt!(tag!("[]") | tag!("::"))))
 );
 
@@ -784,12 +784,12 @@ named!(type_unit(Span) -> Type,
 named!(type_object(Span) -> Type,
     do_parse!(
         cs: class_spec >>
-        (Type::Object(cs.ident.name.clone(), UniqueID(0), cs.types.clone()))
+        (Type::Object(cs.name, UniqueID(0), cs.types))
     )
 );
 
 named!(type_variable(Span) -> Type,
-    map!(preceded!(tag!("'"), identifier), |s| Type::Universal(s.name.clone(), UniqueID(0)))
+    map!(preceded!(tag!("'"), identifier), move |s| Type::Universal(s, UniqueID(0)))
 );
 
 named!(type_tuple(Span) -> Type,
@@ -807,7 +807,7 @@ named!(type_record(Span) -> Type,
                 i: identifier >>
                 wscom!(tag!(":")) >>
                 t: type_description >>
-                ((i.name, t))
+                ((i, t))
             ))),
             tag!("}")
         ) >>
@@ -837,7 +837,7 @@ named!(type_function(Span) -> Type,
 named!(abi_specifier(Span) -> ABI,
     map!(
         opt!(complete!(preceded!(wscom!(tag!("/")), identifier))),
-        |s| ABI::from_ident(&s)
+        |s| ABI::from_str(&s)
     )
 );
 
@@ -989,7 +989,7 @@ named!(record(Span) -> AST,
     )
 );
 
-named!(record_field_assignments(Span) -> Vec<(Ident, AST)>,
+named!(record_field_assignments(Span) -> Vec<(String, AST)>,
     separated_list0!(wscom!(tag!(",")), do_parse!(
         i: identifier >>
         wscom!(tag!("=")) >>
@@ -1120,7 +1120,7 @@ named!(pattern_record(Span) -> Pattern,
     )
 );
 
-named!(pattern_record_field_assignments(Span) -> Vec<(Ident, Pattern)>,
+named!(pattern_record_field_assignments(Span) -> Vec<(String, Pattern)>,
     separated_list0!(wscom!(tag!(",")), do_parse!(
         i: identifier >>
         wscom!(tag!("=")) >>
@@ -1178,10 +1178,8 @@ pub fn is_alphanumeric_underscore(ch: char) -> bool {
     ch == '_' || is_alphanumeric(ch as u8)
 }
 
-pub fn ident_from_span(span: &Span) -> Ident {
-    Ident {
-        name: span.fragment().to_string(),
-    }
+pub fn ident_from_span(span: &Span) -> String {
+    span.fragment().to_string()
 }
 
 

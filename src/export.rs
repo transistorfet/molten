@@ -8,7 +8,7 @@ use config::Options;
 use scope::{ ScopeRef };
 use session::{ Session, Error };
 use visitor::{ Visitor, ScopeStack };
-use hir::{ NodeID, Visibility, Mutability, Ident, ClassSpec, Argument, Expr, ExprKind };
+use hir::{ NodeID, Visibility, Mutability, ClassSpec, Argument, Expr, ExprKind };
 
 
 pub fn write_exports(session: &Session, scope: ScopeRef, filename: &str, code: &Vec<Expr>) {
@@ -57,25 +57,25 @@ impl<'sess> Visitor for ExportsCollector<'sess> {
     }
 
     fn handle_error(&mut self, node: &Expr, err: Error) -> Result<(), Error> {
-        self.session.print_error(&err.add_pos(&node.get_pos()));
+        self.session.print_error(&err.add_pos(node.get_pos()));
         Ok(())
     }
 
-    fn visit_import(&mut self, _id: NodeID, _ident: &Ident, _decls: &Vec<Expr>) -> Result<Self::Return, Error> {
+    fn visit_import(&mut self, _id: NodeID, _ident: &str, _decls: &Vec<Expr>) -> Result<Self::Return, Error> {
         // Don't traverse imports
         Ok(())
     }
 
-    fn visit_declare(&mut self, id: NodeID, vis: Visibility, ident: &Ident, _ttype: &Type) -> Result<Self::Return, Error> {
+    fn visit_declare(&mut self, id: NodeID, vis: Visibility, name: &str, _ttype: &Type) -> Result<Self::Return, Error> {
         let defid = self.session.get_ref(id)?;
-        self.declarations.push_str(&emit_declaration(self.session, defid, vis, &ident.name));
+        self.declarations.push_str(&emit_declaration(self.session, defid, vis, name));
         Ok(())
     }
 
-    fn visit_function(&mut self, id: NodeID, vis: Visibility, ident: &Option<Ident>, _args: &Vec<Argument>, _rettype: &Option<Type>, _body: &Vec<Expr>, _abi: ABI) -> Result<Self::Return, Error> {
-        if let Some(ref ident) = *ident {
+    fn visit_function(&mut self, id: NodeID, vis: Visibility, name: Option<&str>, _args: &Vec<Argument>, _rettype: &Option<Type>, _body: &Vec<Expr>, _abi: ABI) -> Result<Self::Return, Error> {
+        if let Some(name) = name {
             let defid = self.session.get_ref(id)?;
-            self.declarations.push_str(&emit_declaration(self.session, defid, vis, &ident.name));
+            self.declarations.push_str(&emit_declaration(self.session, defid, vis, name));
         }
         // TODO we would walk the body here to search everything that's publically visable, but currently only top level functions are exported
         Ok(())
@@ -94,21 +94,21 @@ impl<'sess> Visitor for ExportsCollector<'sess> {
         //self.declarations.push_str(format!("    decl __init__({}) -> Nil\n", namespec).as_str());
         for node in body {
             match &node.kind {
-                ExprKind::Definition(mutable, ident, _, _) => {
+                ExprKind::Definition(mutable, name, _, _) => {
                     let defid = self.session.get_ref(node.id)?;
                     self.declarations.push_str("    ");
-                    self.declarations.push_str(&emit_field(self.session, defid, *mutable, &ident.name));
+                    self.declarations.push_str(&emit_field(self.session, defid, *mutable, name));
                 },
-                ExprKind::Declare(vis, ident, _) => {
+                ExprKind::Declare(vis, name, _) => {
                     let defid = self.session.get_ref(node.id)?;
                     self.declarations.push_str("    ");
-                    self.declarations.push_str(&emit_declaration(self.session, defid, *vis, &ident.name));
+                    self.declarations.push_str(&emit_declaration(self.session, defid, *vis, name));
                 },
-                ExprKind::Function(vis, ident, _, _, _, _) => {
-                    if let Some(ref ident) = *ident {
+                ExprKind::Function(vis, name, _, _, _, _) => {
+                    if let Some(name) = name {
                         let defid = self.session.get_ref(node.id)?;
                         self.declarations.push_str("    ");
-                        self.declarations.push_str(&emit_declaration(self.session, defid, *vis, &ident.name));
+                        self.declarations.push_str(&emit_declaration(self.session, defid, *vis, name));
                     }
                 },
                 _ => {  },
@@ -124,10 +124,10 @@ impl<'sess> Visitor for ExportsCollector<'sess> {
         self.declarations.push_str(format!("trait {} {{\n", namespec).as_str());
         for node in body {
             match &node.kind {
-                ExprKind::Declare(_, ident, _) => {
+                ExprKind::Declare(_, name, _) => {
                     let defid = self.session.get_ref(node.id)?;
                     self.declarations.push_str("    ");
-                    self.declarations.push_str(&emit_declaration(self.session, defid, Visibility::Public, &ident.name));
+                    self.declarations.push_str(&emit_declaration(self.session, defid, Visibility::Public, name));
                 },
                 _ => {  },
             }

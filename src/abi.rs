@@ -3,7 +3,6 @@
 use std::fmt;
 use std::str;
 
-use hir::Ident;
 use types::Type;
 
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -17,7 +16,7 @@ pub enum ABI {
 
 
 impl ABI {
-    pub fn from_ident(name: &Option<Ident>) -> ABI {
+    pub fn from_str(name: &Option<String>) -> ABI {
         match *name {
             None => ABI::Molten,
             Some(ref name) => match name.as_str() {

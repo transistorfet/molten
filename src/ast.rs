@@ -6,10 +6,10 @@ use abi::ABI;
 use types::Type;
 use parser::Span;
 use misc::{ R, r };
-use hir::{ Visibility, Mutability, AssignType, Literal, Ident, Argument, ClassSpec, Pattern };
+use hir::{ Visibility, Mutability, AssignType, Literal, Argument, ClassSpec, Pattern };
 
 
-#[derive(Clone, PartialEq)]
+#[derive(Copy, Clone, PartialEq)]
 pub struct Pos {
     pub offset: usize,
     pub column: usize,
@@ -27,38 +27,38 @@ pub enum AST {
 
     List(Pos, Vec<AST>),
     Tuple(Pos, Vec<AST>),
-    Record(Pos, Vec<(Ident, AST)>),
-    RecordUpdate(Pos, R<AST>, Vec<(Ident, AST)>),
+    Record(Pos, Vec<(String, AST)>),
+    RecordUpdate(Pos, R<AST>, Vec<(String, AST)>),
 
-    Identifier(Pos, Ident),
+    Identifier(Pos, String),
     Index(Pos, R<AST>, R<AST>),
-    Resolver(Pos, R<AST>, Ident),
-    Accessor(Pos, R<AST>, Ident),
+    Resolver(Pos, R<AST>, String),
+    Accessor(Pos, R<AST>, String),
 
     Block(Pos, Vec<AST>),
     Invoke(Pos, R<AST>, Vec<AST>),
-    //Prefix(Pos, Ident, R<AST>),
-    //Infix(Pos, Ident, R<AST>, R<AST>),
+    //Prefix(Pos, String, R<AST>),
+    //Infix(Pos, String, R<AST>, R<AST>),
 
-    SideEffect(Pos, Ident, Vec<AST>),
+    SideEffect(Pos, String, Vec<AST>),
     If(Pos, R<AST>, R<AST>, R<AST>),
     Raise(Pos, R<AST>),
     Try(Pos, R<AST>, Vec<(Pattern, AST)>),
     Match(Pos, R<AST>, Vec<(Pattern, AST)>),
-    For(Pos, Ident, R<AST>, R<AST>),
+    For(Pos, String, R<AST>, R<AST>),
     While(Pos, R<AST>, R<AST>),
 
-    Declare(Pos, Visibility, Ident, Type),
-    Function(Pos, Visibility, Option<Ident>, Vec<Argument>, Option<Type>, Vec<AST>, ABI),
+    Declare(Pos, Visibility, String, Type),
+    Function(Pos, Visibility, Option<String>, Vec<Argument>, Option<Type>, Vec<AST>, ABI),
     New(Pos, ClassSpec, Vec<AST>),
     Class(Pos, ClassSpec, Option<ClassSpec>, Vec<AST>),
     TypeAlias(Pos, ClassSpec, Type),
-    Enum(Pos, ClassSpec, Vec<(Pos, Ident, Option<Type>)>),
+    Enum(Pos, ClassSpec, Vec<(Pos, String, Option<Type>)>),
     TraitDef(Pos, ClassSpec, Vec<AST>),
     TraitImpl(Pos, ClassSpec, Type, Vec<AST>),
 
-    Import(Pos, Ident, Vec<AST>),
-    Definition(Pos, Mutability, Ident, Option<Type>, R<AST>),
+    Import(Pos, String, Vec<AST>),
+    Definition(Pos, Mutability, String, Option<Type>, R<AST>),
     Assignment(Pos, R<AST>, R<AST>, AssignType),
 }
 
@@ -99,34 +99,34 @@ impl fmt::Debug for Pos {
 impl AST {
     pub fn get_pos(&self) -> Pos {
         match *self {
-            AST::Ref(ref pos, _) |
-            AST::Deref(ref pos, _) |
-            AST::List(ref pos, _) |
-            AST::Tuple(ref pos, _) |
-            AST::Record(ref pos, _) |
-            AST::RecordUpdate(ref pos, _, _) |
-            AST::Identifier(ref pos, _) |
-            AST::Index(ref pos, _, _) |
-            AST::Resolver(ref pos, _, _) |
-            AST::Accessor(ref pos, _, _) |
-            AST::Invoke(ref pos, _, _) |
-            AST::SideEffect(ref pos, _, _) |
-            AST::Block(ref pos, _) |
-            AST::If(ref pos, _, _, _) |
-            AST::Raise(ref pos, _) |
-            AST::Try(ref pos, _, _) |
-            AST::Match(ref pos, _, _) |
-            AST::For(ref pos, _, _, _) |
-            AST::Declare(ref pos, _, _, _) |
-            AST::Function(ref pos, _, _, _, _, _, _) |
-            AST::New(ref pos, _, _) |
-            AST::Class(ref pos, _, _, _) |
-            AST::Import(ref pos, _, _) |
-            AST::Definition(ref pos, _, _, _, _) |
-            AST::Assignment(ref pos, _, _, _) |
-            AST::While(ref pos, _, _) |
-            AST::TypeAlias(ref pos, _, _) |
-            AST::Enum(ref pos, _, _) => { pos.clone() }
+            AST::Ref(pos, _) |
+            AST::Deref(pos, _) |
+            AST::List(pos, _) |
+            AST::Tuple(pos, _) |
+            AST::Record(pos, _) |
+            AST::RecordUpdate(pos, _, _) |
+            AST::Identifier(pos, _) |
+            AST::Index(pos, _, _) |
+            AST::Resolver(pos, _, _) |
+            AST::Accessor(pos, _, _) |
+            AST::Invoke(pos, _, _) |
+            AST::SideEffect(pos, _, _) |
+            AST::Block(pos, _) |
+            AST::If(pos, _, _, _) |
+            AST::Raise(pos, _) |
+            AST::Try(pos, _, _) |
+            AST::Match(pos, _, _) |
+            AST::For(pos, _, _, _) |
+            AST::Declare(pos, _, _, _) |
+            AST::Function(pos, _, _, _, _, _, _) |
+            AST::New(pos, _, _) |
+            AST::Class(pos, _, _, _) |
+            AST::Import(pos, _, _) |
+            AST::Definition(pos, _, _, _, _) |
+            AST::Assignment(pos, _, _, _) |
+            AST::While(pos, _, _) |
+            AST::TypeAlias(pos, _, _) |
+            AST::Enum(pos, _, _) => { pos }
             _ => Pos::empty(),
         }
     }
@@ -139,11 +139,11 @@ impl AST {
     }
 
     pub fn make_ident_from_str(pos: Pos, name: &str) -> AST {
-        AST::Identifier(pos, Ident::from_str(name))
+        AST::Identifier(pos, name.to_string())
     }
 
-    pub fn make_resolve_ident(pos: Pos, ident: Ident, field: &str) -> AST {
-        AST::Resolver(pos.clone(), r(AST::Identifier(pos, ident)), Ident::from_str(field))
+    pub fn make_resolve_ident(pos: Pos, ident: String, field: &str) -> AST {
+        AST::Resolver(pos, r(AST::Identifier(pos, ident)), field.to_string())
     }
 }
 

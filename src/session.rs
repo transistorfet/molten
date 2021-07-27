@@ -91,7 +91,7 @@ impl Session {
     pub fn print_error(&self, err: &Error) {
         self.errors.set(self.errors.get() + 1);
         let fborrow = self.files.borrow();
-        if let Some(ref pos) = err.pos {
+        if let Some(pos) = err.pos {
             let filename = &fborrow[pos.filenum as usize].0;
             let exerpt = pos.exerpt(fborrow[pos.filenum as usize].1.as_bytes());
             println!("\x1B[1;31m{}:{:?}: {}\n\tat {}\x1B[0m", filename, pos, err.msg, exerpt);
@@ -101,7 +101,7 @@ impl Session {
     }
 
     #[allow(dead_code)]
-    pub fn raise_error(&self, pos: &Pos, msg: String) -> Error {
+    pub fn raise_error(&self, pos: Pos, msg: String) -> Error {
         let err = Error::new_pos(pos, msg);
         self.print_error(&err);
         err
@@ -236,12 +236,12 @@ impl Error {
         Error { pos: None, msg: msg }
     }
 
-    pub fn new_pos(pos: &Pos, msg: String) -> Error {
-        Error { pos: Some(pos.clone()), msg: msg }
+    pub fn new_pos(pos: Pos, msg: String) -> Error {
+        Error { pos: Some(pos), msg: msg }
     }
 
-    pub fn add_pos(mut self, pos: &Pos) -> Error {
-        self.pos = Some(pos.clone());
+    pub fn add_pos(mut self, pos: Pos) -> Error {
+        self.pos = Some(pos);
         self
     }
 }

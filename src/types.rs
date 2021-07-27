@@ -146,7 +146,7 @@ impl Type {
 
 impl From<&ClassSpec> for Type {
     fn from(item: &ClassSpec) -> Self {
-        Type::Object(item.ident.name.clone(), UniqueID(0), item.types.clone())
+        Type::Object(item.name.clone(), UniqueID(0), item.types.clone())
     }
 }
 

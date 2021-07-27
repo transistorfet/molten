@@ -52,7 +52,7 @@ impl EnumDef {
 
     #[must_use]
     pub fn add_variant(&self, session: &Session, variant: EnumVariant) -> Result<(), Error> {
-        self.vars.define(&variant.ident.name, variant.id)?;
+        self.vars.define(&variant.name, variant.id)?;
         session.set_ref(variant.id, self.id);
         match variant.ttype {
             Some(ref ttype) => session.set_type(variant.id, Type::Function(r(ttype.clone()), r(self.deftype.clone()), ABI::C)),

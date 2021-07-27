@@ -21,7 +21,7 @@ impl<'sess> Transformer<'sess> {
 
         let mut types = vec!();
         for (i, variant) in enumdef.variants.borrow().iter().enumerate() {
-            let name = format!("{}_{}", name, variant.ident.name);
+            let name = format!("{}_{}", name, variant.name);
             self.transform_enum_variant(defid, variant.id, i as i8, name, selector.clone(), variant.ttype.clone());
             if variant.ttype.is_some() {
                 types.push(self.transform_value_type(variant.ttype.as_ref().unwrap()));
