@@ -9,12 +9,13 @@ use self::llvm::prelude::*;
 use self::llvm::core::*;
 
 use abi::ABI;
+use ast::Pos;
 use types::Type;
 use session::Session;
 use parser::{ parse_type };
-use hir::{ NodeID, Mutability, Visibility };
+use hir::{ NodeID, Mutability, Visibility, ClassSpec };
 use scope::{ Scope, ScopeRef, ScopeMapRef, Context };
-use binding::{ bind_type_names };
+use binding::{ bind_type_names, bind_classspec_type_names };
 use config::Options;
 use misc::{ r, UniqueID };
 
@@ -71,16 +72,16 @@ pub fn declare_builtins_node<'sess>(session: &Session, scope: ScopeRef, node: &B
             };
 
             let mut ftype = parse_type(ftype);
-            bind_type_names(session, tscope.clone(), ftype.as_mut(), false).unwrap();
+            bind_type_names(session, tscope.clone(), ftype.as_mut()).unwrap();
             debug!("BUILTIN TYPE: {:?}", ftype);
             let abi = ftype.as_ref().map(|t| t.get_abi().unwrap()).unwrap_or(ABI::Molten);
             AnyFunc::define(session, scope.clone(), *id, Visibility::Global, Some(name), abi, ftype.clone()).unwrap();
         },
         BuiltinDef::Class(id, name, params, _, entries) => {
             let tscope = session.map.get_or_add(*id, Some(scope.clone()));
-            let mut ttype = Type::Object(String::from(*name), *id, params.clone());
-            bind_type_names(session, tscope.clone(), Some(&mut ttype), true).unwrap();
-            ClassDef::define(session, scope.clone(), *id, ttype, None).unwrap();
+            let mut classspec = ClassSpec::new(Pos::empty(), name.to_string(), params.clone());
+            bind_classspec_type_names(session, tscope.clone(), &mut classspec).unwrap();
+            ClassDef::define(session, scope.clone(), *id, Type::Object(classspec.name, *id, classspec.types), None).unwrap();
 
             declare_builtins_vec(session, tscope.clone(), entries);
         },

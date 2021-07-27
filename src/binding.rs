@@ -95,13 +95,13 @@ impl<'sess> Visitor for NameBinder<'sess> {
             };
 
             let mut ttype = arg.ttype.clone();
-            bind_type_names(self.session, fscope.clone(), ttype.as_mut(), false)?;
+            bind_type_names(self.session, fscope.clone(), ttype.as_mut())?;
             // TODO this is assumed to be always immutable, but maybe shouldn't be
             ArgDef::define(self.session, fscope.clone(), arg_defid, Mutability::Immutable, &arg.name, ttype.clone())?;
             argtypes.push(ttype.unwrap_or_else(|| self.session.new_typevar()));
         }
         let mut rettype = rettype.clone();
-        bind_type_names(self.session, fscope.clone(), rettype.as_mut(), false)?;
+        bind_type_names(self.session, fscope.clone(), rettype.as_mut())?;
 
         // Build type according to the definition, using typevars for missing types
         let nftype = Type::Function(r(Type::Tuple(argtypes)), r(rettype.unwrap_or_else(|| self.session.new_typevar())), abi);
@@ -119,7 +119,7 @@ impl<'sess> Visitor for NameBinder<'sess> {
 
         let scope = self.stack.get_scope();
         let mut ttype = ttype.clone();
-        bind_type_names(self.session, scope.clone(), ttype.as_mut(), false)?;
+        bind_type_names(self.session, scope.clone(), ttype.as_mut())?;
         AnyVar::define(self.session, scope.clone(), defid, mutable, name, ttype)?;
         self.visit_node(expr)
     }
@@ -129,7 +129,7 @@ impl<'sess> Visitor for NameBinder<'sess> {
 
         let scope = self.stack.get_scope();
         let mut ttype = ttype.clone();
-        bind_type_names(self.session, scope.clone(), Some(&mut ttype), false)?;
+        bind_type_names(self.session, scope.clone(), Some(&mut ttype))?;
         let abi = ttype.get_abi().unwrap_or(ABI::Molten);
         AnyFunc::define(self.session, scope.clone(), defid, vis, Some(name), abi, Some(ttype))?;
         Ok(())
@@ -168,7 +168,7 @@ impl<'sess> Visitor for NameBinder<'sess> {
     fn visit_annotation(&mut self, id: NodeID, ttype: &Type, code: &Expr) -> Result<Self::Return, Error> {
         let scope = self.stack.get_scope();
         let mut ttype = ttype.clone();
-        bind_type_names(self.session, scope.clone(), Some(&mut ttype), false)?;
+        bind_type_names(self.session, scope.clone(), Some(&mut ttype))?;
         self.session.set_type(id, ttype);
         self.visit_node(code)
     }
@@ -177,7 +177,7 @@ impl<'sess> Visitor for NameBinder<'sess> {
         let scope = self.stack.get_scope();
         let name = ttype.get_name()?;
         let mut ttype = ttype.clone();
-        bind_type_names(self.session, scope.clone(), Some(&mut ttype), false)?;
+        bind_type_names(self.session, scope.clone(), Some(&mut ttype))?;
         self.session.set_type(id, ttype);
         match scope.get_type_def(&name) {
             Some(defid) => self.session.set_ref(id, defid),
@@ -195,9 +195,9 @@ impl<'sess> Visitor for NameBinder<'sess> {
         // Check for typevars in the type params
         let mut classspec = classspec.clone();
         let mut parentspec = parentspec.clone();
-        bind_classspec_type_names(self.session, tscope.clone(), &mut classspec, true)?;
+        bind_classspec_type_names(self.session, tscope.clone(), &mut classspec)?;
         if let &mut Some(ref mut pspec) = &mut parentspec {
-            bind_classspec_type_names(self.session, tscope.clone(), pspec, false)?;
+            bind_classspec_type_names(self.session, tscope.clone(), pspec)?;
         }
 
         let classtype = Type::Object(classspec.name, defid, classspec.types);
@@ -228,8 +228,8 @@ impl<'sess> Visitor for NameBinder<'sess> {
         let scope = self.stack.get_scope();
         let mut ttype = ttype.clone();
         let mut classspec = classspec.clone();
-        bind_classspec_type_names(self.session, scope.clone(), &mut classspec, true)?;
-        bind_type_names(self.session, scope.clone(), Some(&mut ttype), false)?;
+        bind_classspec_type_names(self.session, scope.clone(), &mut classspec)?;
+        bind_type_names(self.session, scope.clone(), Some(&mut ttype))?;
 
         let deftype = Type::Object(classspec.name, defid, classspec.types);
         TypeAliasDef::define(self.session, scope.clone(), defid, deftype, ttype)?;
@@ -243,14 +243,14 @@ impl<'sess> Visitor for NameBinder<'sess> {
 
         let scope = self.stack.get_scope();
         let mut classspec = classspec.clone();
-        bind_classspec_type_names(self.session, scope.clone(), &mut classspec, true)?;
+        bind_classspec_type_names(self.session, scope.clone(), &mut classspec)?;
         let deftype = Type::Object(classspec.name, defid, classspec.types);
         let enumdef = EnumDef::define(self.session, scope.clone(), defid, deftype)?;
 
         for variant in variants.iter() {
             // TODO this still requires mut
             let mut variant = variant.clone();
-            bind_type_names(self.session, scope.clone(), variant.ttype.as_mut(), false)?;
+            bind_type_names(self.session, scope.clone(), variant.ttype.as_mut())?;
             check_recursive_type(&variant.ttype.as_ref(), defid)?;
             enumdef.add_variant(self.session, variant)?;
         }
@@ -263,7 +263,7 @@ impl<'sess> Visitor for NameBinder<'sess> {
         let tscope = self.session.map.get_or_add(defid, Some(scope.clone()));
 
         let mut traitspec = traitspec.clone();
-        bind_classspec_type_names(self.session, tscope.clone(), &mut traitspec, true)?;
+        bind_classspec_type_names(self.session, tscope.clone(), &mut traitspec)?;
 
         TraitDef::define(self.session, scope.clone(), defid, traitspec)?;
 
@@ -283,10 +283,10 @@ impl<'sess> Visitor for NameBinder<'sess> {
         self.session.set_ref(impl_id, defid);
 
         let mut traitspec = traitspec.clone();
-        bind_classspec_type_names(self.session, scope.clone(), &mut traitspec, false)?;
+        bind_classspec_type_names(self.session, scope.clone(), &mut traitspec)?;
 
         let mut impltype = impltype.clone();
-        bind_type_names(self.session, scope.clone(), Some(&mut impltype), false)?;
+        bind_type_names(self.session, scope.clone(), Some(&mut impltype))?;
 
         TraitImpl::define(self.session, scope.clone(), impl_id, defid, impltype)?;
 
@@ -299,7 +299,7 @@ impl<'sess> Visitor for NameBinder<'sess> {
     fn visit_unpack_trait_obj(&mut self, id: NodeID, impltype: &Type, expr: &Expr) -> Result<Self::Return, Error> {
         let scope = self.stack.get_scope();
         let mut impltype = impltype.clone();
-        bind_type_names(self.session, scope.clone(), Some(&mut impltype), false)?;
+        bind_type_names(self.session, scope.clone(), Some(&mut impltype))?;
         self.session.set_type(id, impltype);
         self.visit_node(expr)
     }
@@ -333,7 +333,7 @@ impl<'sess> Visitor for NameBinder<'sess> {
     fn visit_pattern_annotation(&mut self, id: NodeID, ttype: &Type, pat: &Pattern) -> Result<Self::Return, Error> {
         let scope = self.stack.get_scope();
         let mut ttype = ttype.clone();
-        bind_type_names(self.session, scope.clone(), Some(&mut ttype), false)?;
+        bind_type_names(self.session, scope.clone(), Some(&mut ttype))?;
         self.session.set_type(id, ttype);
         self.visit_pattern(pat)
     }
@@ -355,37 +355,33 @@ impl<'sess> Visitor for NameBinder<'sess> {
 
 
 #[must_use]
-pub fn bind_type_names(session: &Session, scope: ScopeRef, ttype: Option<&mut Type>, always_new: bool) -> Result<(), Error> {
+pub fn bind_type_names(session: &Session, scope: ScopeRef, ttype: Option<&mut Type>) -> Result<(), Error> {
     match ttype {
         Some(ttype) => match ttype {
             &mut Type::Object(ref name, ref mut id, ref mut types) => {
                 match scope.get_type_def(name) {
                     Some(defid) => *id = defid,
-                    None => if !always_new {
-                        panic!("UndefinedType: {:?}", name)
-                    } else if *id == UniqueID(0) {
-                        *id = UniqueID::generate();
-                    },
+                    None => panic!("UndefinedType: {:?}", name),
                 }
 
                 for ttype in types.iter_mut() {
-                    bind_type_names(session, scope.clone(), Some(ttype), always_new)?;
+                    bind_type_names(session, scope.clone(), Some(ttype))?;
                 }
             },
             &mut Type::Tuple(ref mut types) => {
                 for ttype in types.iter_mut() {
-                    bind_type_names(session, scope.clone(), Some(ttype), always_new)?;
+                    bind_type_names(session, scope.clone(), Some(ttype))?;
                 }
             },
             &mut Type::Record(ref mut types) => {
                 types.sort_unstable_by(|a, b| a.0.cmp(&b.0));
                 for (_, ttype) in types.iter_mut() {
-                    bind_type_names(session, scope.clone(), Some(ttype), always_new)?;
+                    bind_type_names(session, scope.clone(), Some(ttype))?;
                 }
             },
             &mut Type::Function(ref mut args, ref mut ret, _) => {
-                bind_type_names(session, scope.clone(), Some(args.as_mut()), always_new)?;
-                bind_type_names(session, scope, Some(ret.as_mut()), always_new)?;
+                bind_type_names(session, scope.clone(), Some(args.as_mut()))?;
+                bind_type_names(session, scope, Some(ret.as_mut()))?;
             },
             &mut Type::Variable(ref mut id) => {
                 if *id == UniqueID(0) {
@@ -408,7 +404,7 @@ pub fn bind_type_names(session: &Session, scope: ScopeRef, ttype: Option<&mut Ty
                 }
             },
             &mut Type::Ref(ref mut ttype) => {
-                bind_type_names(session, scope.clone(), Some(ttype), always_new)?;
+                bind_type_names(session, scope.clone(), Some(ttype))?;
             },
         },
         None => { },
@@ -417,9 +413,9 @@ pub fn bind_type_names(session: &Session, scope: ScopeRef, ttype: Option<&mut Ty
 }
 
 #[must_use]
-pub fn bind_classspec_type_names(session: &Session, scope: ScopeRef, classspec: &mut ClassSpec, always_new: bool) -> Result<(), Error> {
+pub fn bind_classspec_type_names(session: &Session, scope: ScopeRef, classspec: &mut ClassSpec) -> Result<(), Error> {
     let &mut ClassSpec { ref mut types, .. } = classspec;
-    types.iter_mut().map(|ref mut ttype| bind_type_names(session, scope.clone(), Some(ttype), always_new)).count();
+    types.iter_mut().map(|ref mut ttype| bind_type_names(session, scope.clone(), Some(ttype))).count();
     Ok(())
 }
 
