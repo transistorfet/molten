@@ -5,6 +5,7 @@
 //! It's totally Variant 3 with Hey and Ho
 //! 1 \+ 2 \+ 3
 //! 21
+//! look we both know it's 21
 
 import lib.libcore
 
@@ -78,4 +79,9 @@ match a {
     OptionTest::Some(x) => println(str(x))
 }
 
+match a {
+    OptionTest::None => println("None")
+    OptionTest::Some(21) => println("look we both know it's 21")
+    OptionTest::Some(x) => println(str(x))
+}
 

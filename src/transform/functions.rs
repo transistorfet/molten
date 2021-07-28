@@ -63,12 +63,18 @@ impl<'sess> Transformer<'sess> {
         }
     }
 
-    pub fn transform_func_invoke(&mut self, abi: ABI, id: NodeID, func: &Expr, args: &Vec<Expr>) -> Vec<LLExpr> {
-        match abi {
-            ABI::C => CFuncTransform::transform_invoke(self, id, func, args),
-            ABI::Molten | ABI::Unknown => ClosureTransform::transform_invoke(self, id, func, args),
-            _ => panic!("Not Implemented: {:?}", abi),
-        }
+    pub fn transform_func_invoke(&mut self, abi: ABI, _id: NodeID, func: &Expr, args: &Vec<Expr>, ftype: Type, rettype: Type) -> Vec<LLExpr> {
+        let mut exprs = vec!();
+
+        let argtypes = ftype.get_argtypes().unwrap().as_vec();
+        let src_type = ftype.get_rettype().unwrap();
+        let fargs = self.transform_as_typed_args(&mut exprs, argtypes, args);
+        let funcresult = self.transform_as_result(&mut exprs, func);
+        exprs.extend(self.create_func_invoke(abi, funcresult, fargs));
+        let last = exprs.pop().unwrap();
+        let result = self.check_convert_to_trait(&mut exprs, &rettype, src_type, last);
+        exprs.push(result);
+        exprs
     }
 
     pub fn create_func_invoke(&mut self, abi: ABI, func: LLExpr, fargs: Vec<LLExpr>) -> Vec<LLExpr> {
@@ -130,17 +136,6 @@ impl CFuncTransform {
         });
         transform.stack.pop_scope();
         vec!(LLExpr::GetValue(defid))
-    }
-
-    pub fn transform_invoke(transform: &mut Transformer, _id: NodeID, func: &Expr, args: &Vec<Expr>) -> Vec<LLExpr> {
-        let mut exprs = vec!();
-
-        let fargs = transform.transform_as_args(&mut exprs, args);
-
-        let funcresult = transform.transform_as_result(&mut exprs, func);
-
-        exprs.extend(CFuncTransform::create_invoke(transform, funcresult, fargs));
-        exprs
     }
 
     pub fn create_invoke(_transform: &mut Transformer, func: LLExpr, fargs: Vec<LLExpr>) -> Vec<LLExpr> {
@@ -283,16 +278,6 @@ impl ClosureTransform {
         LLExpr::DefStruct(id, lltype, vec!(
             LLExpr::GetValue(compiled_func_id), LLExpr::Cast(LLType::Ptr(r(LLType::I8)), r(context))
         ))
-    }
-
-    pub fn transform_invoke(transform: &mut Transformer, _id: NodeID, func: &Expr, args: &Vec<Expr>) -> Vec<LLExpr> {
-        let mut exprs = vec!();
-
-        let fargs = transform.transform_as_args(&mut exprs, args);
-
-        let funcresult = transform.transform_as_result(&mut exprs, func);
-        exprs.extend(ClosureTransform::create_invoke(transform, funcresult, fargs));
-        exprs
     }
 
     pub fn create_invoke(transform: &mut Transformer, func: LLExpr, mut fargs: Vec<LLExpr>) -> Vec<LLExpr> {

@@ -47,12 +47,13 @@ impl TraitDef {
         let vars = Scope::new_ref(None);
         vars.set_basename(name);
 
-        let deftype = Type::Object(traitspec.name.clone(), defid, traitspec.types);
+        let deftype = Type::Universal(traitspec.name.clone(), defid);
         let vtable = Vtable::create(session, NodeID::generate(), format!("{}_vtable", name.clone()))?;
         let traitdef = Self::new_ref(defid, vars, deftype.clone(), vtable);
         scope.define_type(name, defid)?;
         session.set_def(defid, Def::TraitDef(traitdef.clone()));
         session.set_type(defid, deftype);
+        session.set_constraints(defid, vec!(defid));
 
         Ok(traitdef)
     }
@@ -61,7 +62,7 @@ impl TraitDef {
         self.impls.borrow_mut().push(traitimpl);
     }
 
-    pub fn find_impl(&self, session: &Session, ttype: Type) -> Result<TraitImplRef, Error> {
+    pub fn find_impl(&self, session: &Session, ttype: &Type) -> Result<TraitImplRef, Error> {
         for traitimpl in self.impls.borrow().iter() {
             if check_type(session, Some(traitimpl.impltype.clone()), Some(ttype.clone()), Check::Def, false).is_ok() {
                 return Ok(traitimpl.clone());

@@ -1,22 +1,27 @@
 
-* change PtrCast to Annotate to match pattern's Annotate
-* can we change the way types are stored in expr? I want to get rid of the mut bind_type_names stuff somehow, and it'd be nice to not have types in Expr at all
-* shouldn't "always_new" in bind_type_names always be false?!? Or maybe it's only lib.rs that needs it and bindings.rs uses all false
-* should you make a trait object's data be the first pointer (always a pointer), so that a double deref will get it, rather than an indexed deref?
-* should all universal variables be trait objects, with or without a vtable?
 * for calling a function without it being a method call, you can parse "(" expression ")" into a special AST::BracketExpr or something, which can pass through the expr
   but can still be checked by the refinery and converted into an Expr::MethodInvoke or however you'll do that
 * I'd really like to change the way method calls are done.  It's annoying having all these definitions and blocks for every call
 
-* in typecheck invoke, you have dtype, before mapping, which has the universals.  You can save that as fid instead of the post-checked ftype to get the universals during transform
-  or an independent stage before transform, or even save both and compare them after typechecking to see where the typevar boxing or trait object conversion is needed.  I think every other location
-  currently wont allow a conversion, even annotate, because they don't map the typevars and universals wont unify against anything but other universals, so typechecking fails
-* are there many function calls for which ftype, after invoke resolution, is incomplete and possibly will need further resolving??? maybe not
+* should you make a trait object's data be the first pointer (always a pointer), so that a double deref will get it, rather than an indexed deref?
+* should you use a different format for trait objects vs unbound universals?
+* you need to add where clauses to classes, enums
 
-* should we change classspec into a type and be done with it?  We can decompose the type later
+* minor issue: when a trait is not implemented, it will produce an unhelpful type error that it expected random variable, but found unimplemented type
+* change check_type/expect_type to take &Type instead of Type
+* can you split AST and Expr pattern matching to make the expr stuff easier to use?  The identifier and resolve patterns are kind of clunky and there's a syntax error in bindings which
+  should be in refinery if possible
+* when you had a match expr but the enum def name was left out, or was incorrect, I was getting a parse error, which totally shouldn't happen.  It should give some othe kind of error
+* can we change the way types are stored in expr? I want to get rid of the mut bind_type_names stuff somehow, and it'd be nice to not have types in Expr at all
+* should we change classspec into a type and be done with it?  We can decompose the type later?  Or can you make exprs mutable?
 * reduce the number of clone()s
-* maybe require an ignore type function call for statements that don't return unit (ie.  disallow having comparisons and math functions where the return value is ignored and the code will be optimized away,
-  since it could be unintended)
+* implement the record and tuple pattern matching
+
+* can you make it so that only functions/classes/enumdefs/etc can create a universal, and other places like new/definition/etc will raise an error if they are undefined, is this useful?
+* there is an issue with accessors, such that accessing a field on a class that has a universal type, the type wont be mapped.  I don't think this is an issue for methods
+  since we need the definition type and the invoke type can be determined by arguments, but println(str(assign.thing)) where assign: Assign<Int> will not work (assign.thing: 'item)
+* maybe require an ignore type function call for statements that don't return unit (ie.  disallow having comparisons and math functions where the return
+  value is ignored and the code will be optimized away, since it could be unintended)
 
 
 TRAITS/TYPECLASSES:

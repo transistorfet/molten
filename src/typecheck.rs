@@ -3,8 +3,8 @@
 use defs::Def;
 use session::{ Session, Error };
 use scope::{ ScopeRef };
-use hir::{ NodeID, Visibility, Mutability, AssignType, Literal, Argument, ClassSpec, MatchCase, EnumVariant, Pattern, Expr, ExprKind };
-use types::{ Type, Check, ABI, expect_type, check_type, resolve_type, check_type_params, check_trait_cast };
+use hir::{ NodeID, Visibility, Mutability, AssignType, Literal, Argument, ClassSpec, MatchCase, EnumVariant, WhereClause, Pattern, Expr, ExprKind };
+use types::{ Type, Check, ABI, expect_type, check_type, resolve_type, check_type_params };
 use misc::{ r };
 use visitor::{ self, Visitor, ScopeStack };
 
@@ -110,7 +110,7 @@ impl<'sess> Visitor for TypeChecker<'sess> {
         }
     }
 
-    fn visit_function(&mut self, refid: NodeID, _vis: Visibility, name: Option<&str>, args: &Vec<Argument>, _rettype: &Option<Type>, body: &Vec<Expr>, abi: ABI) -> Result<Self::Return, Error> {
+    fn visit_function(&mut self, refid: NodeID, _vis: Visibility, name: Option<&str>, args: &Vec<Argument>, _rettype: &Option<Type>, body: &Vec<Expr>, abi: ABI, _whereclause: &WhereClause) -> Result<Self::Return, Error> {
         let defid = self.session.get_ref(refid)?;
         let fscope = self.session.map.get(&defid);
         let dftype = self.session.get_type(defid).unwrap();
@@ -169,7 +169,7 @@ impl<'sess> Visitor for TypeChecker<'sess> {
 
         let dtype = self.session_find_variant(refid, fexpr, &atypes)?;
         debug!("INVOKE TYPE: {:?} has type {:?}", refid, dtype);
-        let etype = Type::map_all_typevars(self.session, dtype);
+        let etype = Type::map_all_typevars(self.session, dtype.clone());
 
         let ftype = match etype {
             Type::Function(args, rettype, abi) => {
@@ -188,7 +188,7 @@ impl<'sess> Visitor for TypeChecker<'sess> {
         };
 
         let rtype = ftype.get_rettype()?.clone();
-        self.session.set_type(fid, ftype);
+        self.session.set_type(fid, dtype);
         self.session.update_type(refid, rtype.clone())?;
         Ok(rtype)
     }
@@ -210,7 +210,7 @@ impl<'sess> Visitor for TypeChecker<'sess> {
         Ok(btype)
     }
 
-    fn visit_declare(&mut self, _refid: NodeID, _vis: Visibility, _name: &str, _ttype: &Type) -> Result<Self::Return, Error> {
+    fn visit_declare(&mut self, _refid: NodeID, _vis: Visibility, _name: &str, _ttype: &Type, _whereclause: &WhereClause) -> Result<Self::Return, Error> {
         let scope = self.stack.get_scope();
         scope.find_type(self.session, "()")
     }
@@ -389,10 +389,11 @@ impl<'sess> Visitor for TypeChecker<'sess> {
 
         // Check the functions in the body and make sure all the functions defined in the trait def are defined with the same types, and no additional functions are present
         let traitdef = self.session.get_def(self.session.get_ref(impl_id)?)?.as_trait_def()?;
+
         let mut names = traitdef.vars.get_names();
         for node in body {
             match &node.kind {
-                ExprKind::Function(_, name, _, _, _, _) => {
+                ExprKind::Function(_, name, _, _, _, _, _) => {
                     let name = name.as_ref().unwrap();  // NOTE this should have already been checked by refinery
                     let defid = *names.get(name).ok_or(Error::new(format!("TraitError: function not declared in the trait def, but found in the trait impl, {:?}", name)))?;
                     let deftype = self.session.get_type(defid);
@@ -421,10 +422,7 @@ impl<'sess> Visitor for TypeChecker<'sess> {
         let ttype = self.session.get_type(refid).unwrap();
         let ctype = self.visit_node_or_error(code);
         debug!("PTRCAST: {:?} <- {:?}", ttype, ctype);
-        expect_type(self.session, Some(ttype.clone()), Some(ctype.clone()), Check::List).or_else(|_| {
-            // Special case for trait object casting
-            check_trait_cast(self.session, &ttype.clone(), &ctype)
-        })?;
+        expect_type(self.session, Some(ttype.clone()), Some(ctype.clone()), Check::List)?;
         Ok(ttype)
     }
 
@@ -436,7 +434,7 @@ impl<'sess> Visitor for TypeChecker<'sess> {
         Ok(classtype)
     }
 
-    fn visit_class(&mut self, refid: NodeID, _classspec: &ClassSpec, _parentspec: &Option<ClassSpec>, body: &Vec<Expr>) -> Result<Self::Return, Error> {
+    fn visit_class(&mut self, refid: NodeID, _classspec: &ClassSpec, _parentspec: &Option<ClassSpec>, _whereclause: &WhereClause, body: &Vec<Expr>) -> Result<Self::Return, Error> {
         let scope = self.stack.get_scope();
         let defid = self.session.get_ref(refid)?;
         let tscope = self.session.map.get(&defid);
@@ -446,13 +444,15 @@ impl<'sess> Visitor for TypeChecker<'sess> {
         scope.find_type(self.session, "()")
     }
 
-    fn visit_resolver(&mut self, node: &Expr, left: &Expr, right: &str, oid: NodeID) -> Result<Self::Return, Error> {
-        self.visit_accessor(node, left, right, oid)
+    fn visit_resolver(&mut self, id: NodeID, left: &Expr, field: &str, oid: NodeID) -> Result<Self::Return, Error> {
+        let defid = self.check_resolve_field(left, field, oid)?;
+        self.session.set_ref(id, defid);
+        Ok(self.get_type_or_new_typevar(defid))
     }
 
-    fn visit_accessor(&mut self, node: &Expr, _left: &Expr, _right: &str, _oid: NodeID) -> Result<Self::Return, Error> {
-        let (refid, defid) = self.get_access_ids(node)?.unwrap();
-        self.session.set_ref(refid, defid);
+    fn visit_accessor(&mut self, id: NodeID, left: &Expr, field: &str, oid: NodeID) -> Result<Self::Return, Error> {
+        let defid = self.check_access_field(left, field, oid)?;
+        self.session.set_ref(id, defid);
         Ok(self.get_type_or_new_typevar(defid))
     }
 
@@ -514,14 +514,15 @@ impl<'sess> Visitor for TypeChecker<'sess> {
         expect_type(self.session, Some(ttype), self.session.get_type(id), Check::Def)
     }
 
-    fn visit_pattern_enum_args(&mut self, id: NodeID, left: &Pattern, args: &Vec<Pattern>) -> Result<Self::Return, Error> {
+    fn visit_pattern_enum_args(&mut self, id: NodeID, left: &Pattern, args: &Vec<Pattern>, eid: NodeID) -> Result<Self::Return, Error> {
         let ltype = self.visit_pattern(left)?;
-        let variant_id = self.session.get_ref(left.get_id())?;
+        let variant_id = self.session.get_ref(left.id)?;
         self.session.set_ref(id, variant_id);
         let enumdef = self.session.get_def(self.session.get_ref(variant_id)?)?.as_enum()?;
         match enumdef.get_variant_type_by_id(variant_id) {
             None => return Err(Error::new(format!("TypeError: enum variant doesn't expect any arguments, but found {:?}", args))),
             Some(ttype) => {
+                self.session.set_type(eid, ttype.clone());
                 // Map the typevars from the enum type params into the enum variant's types, in order to use type hint from 'expected'
                 let mut typevars = Type::map_new();
                 let vtype = Type::map_typevars(self.session, &mut typevars, enumdef.deftype.clone());
@@ -569,37 +570,54 @@ impl<'sess> TypeChecker<'sess> {
             ExprKind::Identifier(_) => {
                 Ok(Some((node.id, self.session.get_ref(node.id)?)))
             },
-            ExprKind::Resolver(_, field, oid) => {
-                let ltype = self.session.get_type_from_ref(*oid).unwrap();
-
-                let vars = self.session.get_def(ltype.get_id()?)?.get_vars()?;
-                Ok(Some((node.id, vars.get_var_def(field).ok_or(Error::new(format!("VarError: definition not set for {:?}", field)))?)))
+            ExprKind::Resolver(left, field, oid) => {
+                Ok(Some((node.id, self.check_resolve_field(left, field, *oid)?)))
             },
             ExprKind::Accessor(left, field, oid) => {
-                let ltype = resolve_type(self.session, self.visit_node_or_error(left), false)?;
-                self.session.set_type(*oid, ltype.clone());
-
-                match ltype {
-                    Type::Object(_, _, _) => {
-                        let vars = self.session.get_def(ltype.get_id()?)?.get_vars()?;
-                        Ok(Some((node.id, vars.get_var_def(field).ok_or(Error::new(format!("VarError: definition not set for {:?}", field)))?)))
-                    },
-                    Type::Record(items) => {
-                        let defid = NodeID::generate();
-                        let index = items.iter().position(|(name, _)| name == field).unwrap();
-                        self.session.set_type(defid, items[index].1.clone());
-                        Ok(Some((node.id, defid)))
-                    },
-                    Type::Tuple(items) => {
-                        let defid = NodeID::generate();
-                        let index = field.parse::<usize>().unwrap();
-                        self.session.set_type(defid, items[index].clone());
-                        Ok(Some((node.id, defid)))
-                    },
-                    _ => Err(Error::new(format!("TypeError: attempting to access within a non-accessible value: {:?}", ltype)))
-                }
+                Ok(Some((node.id, self.check_access_field(left, field, *oid)?)))
             },
             _ => { Ok(None) },
+        }
+    }
+
+    pub fn check_resolve_field(&mut self, _left: &Expr, field: &str, oid: NodeID) -> Result<NodeID, Error> {
+        let ltype = self.session.get_type_from_ref(oid).unwrap();
+        let vars = self.session.get_def(ltype.get_id()?)?.get_vars()?;
+        Ok(vars.get_var_def(field).ok_or(Error::new(format!("VarError: definition not set for {:?}", field)))?)
+    }
+
+    pub fn check_access_field(&mut self, left: &Expr, field: &str, oid: NodeID) -> Result<NodeID, Error> {
+        let ltype = resolve_type(self.session, self.visit_node_or_error(left), false)?;
+        self.session.set_type(oid, ltype.clone());
+
+        match ltype {
+            Type::Object(_, _, _) => {
+                let vars = self.session.get_def(ltype.get_id()?)?.get_vars()?;
+                Ok(vars.get_var_def(field).ok_or(Error::new(format!("VarError: definition not set for {:?}", field)))?)
+            },
+            Type::Record(items) => {
+                let defid = NodeID::generate();
+                let index = items.iter().position(|(name, _)| name == field).unwrap();
+                self.session.set_type(defid, items[index].1.clone());
+                Ok(defid)
+            },
+            Type::Tuple(items) => {
+                let defid = NodeID::generate();
+                let index = field.parse::<usize>().unwrap();
+                self.session.set_type(defid, items[index].clone());
+                Ok(defid)
+            },
+            Type::Universal(_, id) => {
+                for trait_id in self.session.get_constraints(id) {
+                    let vars = self.session.get_def(trait_id)?.get_vars()?;
+                    if let Some(defid) = vars.get_var_def(field) {
+                        self.session.set_ref(oid, trait_id);
+                        return Ok(defid);
+                    }
+                }
+                return Err(Error::new(format!("VarError: definition not set for {:?}", field)))
+            },
+            _ => Err(Error::new(format!("TypeError: attempting to access within a non-accessible value: {:?}", ltype)))
         }
     }
 

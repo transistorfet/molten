@@ -231,13 +231,13 @@ impl Vtable {
     pub fn build_vtable(&self, session: &Session, body: &Vec<Expr>) {
         for ref node in body.iter() {
             match &node.kind {
-                ExprKind::Function(_, name, _, _, _, _) => {
+                ExprKind::Function(_, name, _, _, _, _, _) => {
                     if let Some(name) = name.as_ref() {
                         let defid = session.get_ref(node.id).unwrap();
                         self.add_entry(session, defid, name, session.get_type(defid).unwrap());
                     }
                 },
-                ExprKind::Declare(_, name, _) => {
+                ExprKind::Declare(_, name, _, _) => {
                     let defid = session.get_ref(node.id).unwrap();
                     let ttype = session.get_type(defid).unwrap();
                     match ttype {

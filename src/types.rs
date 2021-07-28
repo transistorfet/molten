@@ -4,8 +4,8 @@ use std::convert::From;
 use std::collections::HashMap;
 
 use defs::Def;
-use hir::ClassSpec;
 use misc::{ R, r, UniqueID };
+use hir::{ NodeID, ClassSpec };
 use session::{ Session, Error };
 
 pub use abi::ABI;
@@ -26,6 +26,7 @@ impl Type {
     pub fn get_name<'a>(&'a self) -> Result<&'a str, Error> {
         match &self {
             Type::Object(name, _, _) => Ok(name),
+            Type::Universal(name, _) => Ok(name),
             _ => Err(Error::new(format!("TypeError: expected a class or concrete type, found {:?}", self))),
         }
     }
@@ -199,7 +200,7 @@ impl Type {
                     Some(ptype) => ptype,
                     None => {
                         let maptype = session.new_typevar();
-                        //session.get_constraint(id).map(|c| session.set_constraint(maptype.get_id().unwrap(), c));
+                        session.set_constraints(maptype.get_id().unwrap(), session.get_constraints(id));
                         varmap.insert(id, maptype.clone());
                         maptype
                     }
@@ -263,15 +264,21 @@ pub fn check_type(session: &Session, odtype: Option<Type>, octype: Option<Type>,
         }
 
         match (&dtype, &ctype) {
-            (Type::Variable(ref _aid), Type::Variable(ref bid)) => {
+            (Type::Variable(aid), Type::Variable(bid)) => {
                 if update {
+                    let mut constraints = session.get_constraints(*aid);
+                    constraints.extend(session.get_constraints(*bid));
+                    constraints.sort();
+                    constraints.dedup();
+                    session.set_constraints(*aid, constraints.clone());
+                    session.set_constraints(*bid, constraints);
                     session.set_type(*bid, dtype.clone());
                 }
                 Ok(resolve_type(session, dtype, false)?)
             },
 
             (Type::Variable(ref id), ntype) |
-            (ntype, Type::Variable(ref id)) => {
+            (ntype, Type::Variable(ref id)) if check_trait_constraints(session, *id, ntype) => {
                 if update {
                     session.update_type(*id, ntype.clone())?;
                 }
@@ -279,7 +286,7 @@ pub fn check_type(session: &Session, odtype: Option<Type>, octype: Option<Type>,
             }
 
             (Type::Universal(_, ref aid), Type::Universal(_, ref bid)) if aid == bid => {
-                Ok(dtype.clone())
+                Ok(ctype.clone())
             },
 
             (Type::Function(ref aargs, ref aret, ref aabi), Type::Function(ref bargs, ref bret, ref babi)) => {
@@ -398,21 +405,28 @@ pub fn check_type_params(session: &Session, dtypes: &Vec<Type>, ctypes: &Vec<Typ
     }
 }
 
-pub fn check_trait_cast(session: &Session, dtype: &Type, ctype: &Type) -> Result<Type, Error> {
-    let trait_id = dtype.get_id()?;
+pub fn check_trait_constraints(session: &Session, var_id: NodeID, ctype: &Type) -> bool {
+    for trait_id in session.get_constraints(var_id) {
+        if !check_trait_is_implemented(session, trait_id, ctype) {
+            return false;
+        }
+    }
+    return true;
+}
 
+pub fn check_trait_is_implemented(session: &Session, trait_id: NodeID, ctype: &Type) -> bool {
     // If the class matching doesn't work, then try checking for trait matching, but this is a bad hack.  We should use universals with constraints instead of Type::Object
-    match session.get_def(trait_id)? {
-        Def::TraitDef(traitdef) => {
+    match session.get_def(trait_id).and_then(|def| def.as_trait_def()) {
+        Ok(traitdef) => {
             for traitimpl in traitdef.impls.borrow().iter() {
-                if let Ok(ttype) = check_type(session, Some(traitimpl.impltype.clone()), Some(ctype.clone()), Check::Def, false) {
-                    return Ok(ttype);
+                if let Ok(_) = check_type(session, Some(traitimpl.impltype.clone()), Some(ctype.clone()), Check::Def, false) {
+                    return true;
                 }
             }
         },
-        _ => { },
+        _ => panic!("InternalError: trait is not defined, but should be by this point {:?}", trait_id),
     }
-    return Err(Error::new(format!("TypeError: type mismatch, expected {} but found {}", dtype, ctype)));
+    return false;
 }
 
 pub fn resolve_type(session: &Session, ttype: Type, require_resolve: bool) -> Result<Type, Error> {
@@ -425,8 +439,9 @@ pub fn resolve_type(session: &Session, ttype: Type, require_resolve: bool) -> Re
                     Ok(alias.resolve(session, params).unwrap())
                 },
                 _ => match session.get_type(*id) {
-                    // TODO we are purposely returning the original type here so as not to over-resolve types... but we should probably still fully resolve for checking purposes
-                    Some(_) => Ok(Type::Object(name.clone(), *id, params)),
+                    // NOTE we have a special case for objects because we want to return the resolved parameters and not the parameters the type was defined with
+                    Some(Type::Object(_, _, _)) => Ok(Type::Object(name.clone(), *id, params)),
+                    Some(stype) => Ok(stype),
                     None => Err(Error::new(format!("TypeError: undefined type {:?}", name))).unwrap(),
                 },
             }

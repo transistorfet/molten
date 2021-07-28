@@ -15,11 +15,11 @@ impl TraitTest for String {
     }
 }
 
-fn test_trait(t: TraitTest) {
+fn test_trait(t: 'a) where a: TraitTest {
     println(str(t.thing()))
 }
 
-test_trait(("Hey" : TraitTest))
+test_trait("Hey")
 
 impl TraitTest for Int {
     fn thing(self) {
@@ -28,12 +28,12 @@ impl TraitTest for Int {
     }
 }
 
-fn test_trait_unpack(t: TraitTest) {
+fn test_trait_unpack(t: 'a) where a: TraitTest {
     let f = t.thing
     println(str(f(t)))
 }
 
-test_trait_unpack((15 : TraitTest))
+test_trait_unpack(15)
 
-let trait: TraitTest = ("Hey" : TraitTest)
+//let trait: TraitTest = "Hey"
 

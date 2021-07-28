@@ -339,3 +339,26 @@ fn universal(a: 'a) -> 'a {
 println(str(universal("Hey")))
 */
 
+/*
+enum BrokenTest<'a> =
+| Variant1
+| Variant2('a)
+
+let broken = BrokenTest::Variant2(5)
+
+match broken {
+    BrokenTest::Variant2(x) => println("stuff")
+    _ => ()
+}
+*/
+
+
+// Test that you can pass different universals between functions, since the invoke will be mapped
+fn moo1(t: 'a) {
+    println("yay")
+}
+
+fn moo2(t: 'b) {
+    moo1(t)
+}
+

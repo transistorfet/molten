@@ -5,7 +5,7 @@ use abi::ABI;
 use types::Type;
 use session::Error;
 use scope::ScopeRef;
-use hir::{ NodeID, Visibility, Mutability, AssignType, Literal, Argument, ClassSpec, MatchCase, EnumVariant, Pattern, PatKind, Expr, ExprKind };
+use hir::{ NodeID, Visibility, Mutability, AssignType, Literal, Argument, ClassSpec, MatchCase, EnumVariant, WhereClause, Pattern, PatKind, Expr, ExprKind };
 
 
 #[derive(Clone, Debug, PartialEq)]
@@ -91,11 +91,11 @@ pub trait Visitor: Sized {
         Ok(self.default_return())
     }
 
-    fn visit_resolver(&mut self, _node: &Expr, left: &Expr, _right: &str, _oid: NodeID) -> Result<Self::Return, Error> {
+    fn visit_resolver(&mut self, _id: NodeID, left: &Expr, _right: &str, _oid: NodeID) -> Result<Self::Return, Error> {
         self.visit_node(left)
     }
 
-    fn visit_accessor(&mut self, _node: &Expr, left: &Expr, _right: &str, _oid: NodeID) -> Result<Self::Return, Error> {
+    fn visit_accessor(&mut self, _id: NodeID, left: &Expr, _right: &str, _oid: NodeID) -> Result<Self::Return, Error> {
         self.visit_node(left)
     }
 
@@ -135,20 +135,20 @@ pub trait Visitor: Sized {
     }
 
 
-    fn visit_declare(&mut self, _id: NodeID, _vis: Visibility, _name: &str, _ttype: &Type) -> Result<Self::Return, Error> {
+    fn visit_declare(&mut self, _id: NodeID, _vis: Visibility, _name: &str, _ttype: &Type, whereclause: &WhereClause) -> Result<Self::Return, Error> {
         Ok(self.default_return())
     }
 
-    fn visit_function(&mut self, id: NodeID, vis: Visibility, name: Option<&str>, args: &Vec<Argument>, rettype: &Option<Type>, body: &Vec<Expr>, abi: ABI) -> Result<Self::Return, Error> {
-        walk_function(self, id, vis, name, args, rettype, body, abi)
+    fn visit_function(&mut self, id: NodeID, vis: Visibility, name: Option<&str>, args: &Vec<Argument>, rettype: &Option<Type>, body: &Vec<Expr>, abi: ABI, whereclause: &WhereClause) -> Result<Self::Return, Error> {
+        walk_function(self, id, vis, name, args, rettype, body, abi, whereclause)
     }
 
     fn visit_alloc_object(&mut self, _id: NodeID, _ttype: &Type) -> Result<Self::Return, Error> {
         Ok(self.default_return())
     }
 
-    fn visit_class(&mut self, id: NodeID, classspec: &ClassSpec, parentspec: &Option<ClassSpec>, body: &Vec<Expr>) -> Result<Self::Return, Error> {
-        walk_class(self, id, classspec, parentspec, body)
+    fn visit_class(&mut self, id: NodeID, classspec: &ClassSpec, parentspec: &Option<ClassSpec>, whereclause: &WhereClause, body: &Vec<Expr>) -> Result<Self::Return, Error> {
+        walk_class(self, id, classspec, parentspec, whereclause, body)
     }
 
     fn visit_type_alias(&mut self, _id: NodeID, _classspec: &ClassSpec, _ttype: &Type) -> Result<Self::Return, Error> {
@@ -201,7 +201,7 @@ pub trait Visitor: Sized {
         self.visit_pattern(left)
     }
 
-    fn visit_pattern_enum_args(&mut self, id: NodeID, left: &Pattern, args: &Vec<Pattern>) -> Result<Self::Return, Error> {
+    fn visit_pattern_enum_args(&mut self, id: NodeID, left: &Pattern, args: &Vec<Pattern>, _eid: NodeID) -> Result<Self::Return, Error> {
         walk_pattern_enum_args(self, id, left, args)
     }
 
@@ -305,7 +305,7 @@ pub fn walk_while<R, V: Visitor<Return = R>>(visitor: &mut V, _id: NodeID, cond:
     Ok(visitor.default_return())
 }
 
-pub fn walk_function<R, V: Visitor<Return = R>>(visitor: &mut V, id: NodeID, _vis: Visibility, _ident: Option<&str>, _args: &Vec<Argument>, _rettype: &Option<Type>, body: &Vec<Expr>, _abi: ABI) -> Result<R, Error> {
+pub fn walk_function<R, V: Visitor<Return = R>>(visitor: &mut V, id: NodeID, _vis: Visibility, _ident: Option<&str>, _args: &Vec<Argument>, _rettype: &Option<Type>, body: &Vec<Expr>, _abi: ABI, _whereclause: &WhereClause) -> Result<R, Error> {
     let fscope = visitor.get_scope_by_id(id);
     // TODO visit arguments
     visitor.with_scope(fscope, |visitor| {
@@ -314,7 +314,7 @@ pub fn walk_function<R, V: Visitor<Return = R>>(visitor: &mut V, id: NodeID, _vi
     Ok(visitor.default_return())
 }
 
-pub fn walk_class<R, V: Visitor<Return = R>>(visitor: &mut V, id: NodeID, _classspec: &ClassSpec, _parentspec: &Option<ClassSpec>, body: &Vec<Expr>) -> Result<R, Error> {
+pub fn walk_class<R, V: Visitor<Return = R>>(visitor: &mut V, id: NodeID, _classspec: &ClassSpec, _parentspec: &Option<ClassSpec>, _whereclause: &WhereClause, body: &Vec<Expr>) -> Result<R, Error> {
     let tscope = visitor.get_scope_by_id(id);
     visitor.with_scope(tscope, |visitor| {
         visitor.visit_vec(body)
@@ -400,11 +400,11 @@ pub fn walk_node<R, V: Visitor<Return = R>>(visitor: &mut V, node: &Expr) -> Res
         },
 
         ExprKind::Resolver(left, right, oid) => {
-            visitor.visit_resolver(node, left, right.as_str(), *oid)
+            visitor.visit_resolver(node.id, left, right.as_str(), *oid)
         },
 
         ExprKind::Accessor(left, right, oid) => {
-            visitor.visit_accessor(node, left, right.as_str(), *oid)
+            visitor.visit_accessor(node.id, left, right.as_str(), *oid)
         },
 
 
@@ -442,20 +442,20 @@ pub fn walk_node<R, V: Visitor<Return = R>>(visitor: &mut V, node: &Expr) -> Res
         },
 
 
-        ExprKind::Declare(vis, name, ttype) => {
-            visitor.visit_declare(node.id, *vis, name, ttype)
+        ExprKind::Declare(vis, name, ttype, whereclause) => {
+            visitor.visit_declare(node.id, *vis, name, ttype, whereclause)
         },
 
-        ExprKind::Function(vis, name, args, rettype, body, abi) => {
-            visitor.visit_function(node.id, *vis, name.as_ref().map(|s| s.as_str()), args, rettype, body, *abi)
+        ExprKind::Function(vis, name, args, rettype, body, abi, whereclause) => {
+            visitor.visit_function(node.id, *vis, name.as_ref().map(|s| s.as_str()), args, rettype, body, *abi, whereclause)
         },
 
         ExprKind::AllocObject(ttype) => {
             visitor.visit_alloc_object(node.id, ttype)
         },
 
-        ExprKind::Class(classspec, parentspec, body) => {
-            visitor.visit_class(node.id, classspec, parentspec, body)
+        ExprKind::Class(classspec, parentspec, whereclause, body) => {
+            visitor.visit_class(node.id, classspec, parentspec, whereclause, body)
         },
 
         ExprKind::TypeAlias(classspec, ttype) => {
@@ -511,8 +511,8 @@ pub fn walk_pattern<R, V: Visitor<Return = R>>(visitor: &mut V, pat: &Pattern) -
             visitor.visit_pattern_resolve(pat.id, left, name.as_str(), *oid)
         },
 
-        PatKind::EnumArgs(left, args) => {
-            visitor.visit_pattern_enum_args(pat.id, left, args)
+        PatKind::EnumArgs(left, args, eid) => {
+            visitor.visit_pattern_enum_args(pat.id, left, args, *eid)
         },
 
         PatKind::Tuple(items) => {

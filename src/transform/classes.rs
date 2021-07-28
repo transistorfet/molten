@@ -54,10 +54,10 @@ impl<'sess> Transformer<'sess> {
         self.with_scope(tscope, |transform| {
             for node in body {
                 match &node.kind {
-                    ExprKind::Function(vis, name, args, _, body, abi) => {
+                    ExprKind::Function(vis, name, args, _, body, abi, _) => {
                         exprs.extend(transform.transform_func_def(*abi, node.id, *vis, name.as_ref().map(|name| name.as_str()), args, body));
                     },
-                    ExprKind::Declare(vis, name, _) => {
+                    ExprKind::Declare(vis, name, _, _) => {
                         let ttype = transform.session.get_type_from_ref(node.id).unwrap();
                         exprs.extend(transform.transform_func_decl(ttype.get_abi().unwrap(), node.id, *vis, name.as_str(), &ttype));
                     },

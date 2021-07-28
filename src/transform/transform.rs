@@ -8,7 +8,7 @@ use config::Options;
 use scope::{ Scope, ScopeRef };
 use session::{ Session, Error };
 use ast::{ Pos };
-use hir::{ NodeID, Visibility, Mutability, AssignType, Literal, Argument, ClassSpec, MatchCase, EnumVariant, Pattern, PatKind, Expr, ExprKind };
+use hir::{ NodeID, Visibility, Mutability, AssignType, Literal, Argument, ClassSpec, MatchCase, EnumVariant, WhereClause, Pattern, PatKind, Expr, ExprKind };
 
 use misc::{ r };
 use transform::functions::{ ClosureTransform };
@@ -178,9 +178,8 @@ impl<'sess> Visitor for Transformer<'sess> {
     fn visit_annotation(&mut self, id: NodeID, _ttype: &Type, code: &Expr) -> Result<Self::Return, Error> {
         let mut exprs = vec!();
         let ltype = self.transform_value_type(&self.session.get_type(id).unwrap());
-        //let result = self.transform_as_result(&mut exprs, code).unwrap();
-        exprs.extend(self.check_convert_to_trait(self.session.get_type(id).unwrap(), code));
-        let result = exprs.pop().unwrap();
+        let result = self.transform_as_result(&mut exprs, code);
+        //let result = self.check_convert_to_trait(&mut exprs, self.session.get_type(id).unwrap(), code);
         exprs.push(LLExpr::Cast(ltype, r(result)));
         Ok(exprs)
     }
@@ -214,20 +213,21 @@ impl<'sess> Visitor for Transformer<'sess> {
         Ok(self.transform_reference(defid, name))
     }
 
-    fn visit_resolver(&mut self, node: &Expr, left: &Expr, right: &str, oid: NodeID) -> Result<Self::Return, Error> {
+    fn visit_resolver(&mut self, id: NodeID, left: &Expr, right: &str, oid: NodeID) -> Result<Self::Return, Error> {
         let object_id = self.session.get_type_from_ref(oid).unwrap().get_id().unwrap();
-        Ok(self.transform_resolve(node.id, left, right, object_id))
+        Ok(self.transform_resolve(id, left, right, object_id))
     }
 
-    fn visit_accessor(&mut self, node: &Expr, left: &Expr, right: &str, oid: NodeID) -> Result<Self::Return, Error> {
-        let otype = self.session.get_type(oid).unwrap();
-        Ok(self.transform_accessor(node.id, left, right, otype))
+    fn visit_accessor(&mut self, id: NodeID, left: &Expr, right: &str, oid: NodeID) -> Result<Self::Return, Error> {
+        Ok(self.transform_accessor(id, left, right, oid))
     }
 
 
     fn visit_invoke(&mut self, id: NodeID, func: &Expr, args: &Vec<Expr>, fid: NodeID) -> Result<Self::Return, Error> {
-        let abi = self.session.get_type(fid).unwrap().get_abi().unwrap();
-        Ok(self.transform_func_invoke(abi, id, func, args))
+        let rettype = self.session.get_type(id).unwrap();
+        let deftype = self.session.get_type(fid).unwrap();
+        let abi = deftype.get_abi().unwrap();
+        Ok(self.transform_func_invoke(abi, id, func, args, deftype, rettype))
     }
 
 
@@ -257,13 +257,13 @@ impl<'sess> Visitor for Transformer<'sess> {
     }
 
 
-    fn visit_declare(&mut self, id: NodeID, vis: Visibility, name: &str, _ttype: &Type) -> Result<Self::Return, Error> {
+    fn visit_declare(&mut self, id: NodeID, vis: Visibility, name: &str, _ttype: &Type, _whereclause: &WhereClause) -> Result<Self::Return, Error> {
         let ttype = self.session.get_type_from_ref(id).unwrap();
         let abi = ttype.get_abi().unwrap();
         Ok(self.transform_func_decl(abi, id, vis, name, &ttype))
     }
 
-    fn visit_function(&mut self, id: NodeID, vis: Visibility, name: Option<&str>, args: &Vec<Argument>, _rettype: &Option<Type>, body: &Vec<Expr>, abi: ABI) -> Result<Self::Return, Error> {
+    fn visit_function(&mut self, id: NodeID, vis: Visibility, name: Option<&str>, args: &Vec<Argument>, _rettype: &Option<Type>, body: &Vec<Expr>, abi: ABI, _whereclause: &WhereClause) -> Result<Self::Return, Error> {
         Ok(self.transform_func_def(abi, id, vis, name, args, body))
     }
 
@@ -271,7 +271,7 @@ impl<'sess> Visitor for Transformer<'sess> {
         Ok(self.transform_alloc_object(id))
     }
 
-    fn visit_class(&mut self, id: NodeID, _classspec: &ClassSpec, _parentspec: &Option<ClassSpec>, body: &Vec<Expr>) -> Result<Self::Return, Error> {
+    fn visit_class(&mut self, id: NodeID, _classspec: &ClassSpec, _parentspec: &Option<ClassSpec>, _whereclause: &WhereClause, body: &Vec<Expr>) -> Result<Self::Return, Error> {
         let mut exprs = self.transform_class_body(id, body);
         exprs.push(LLExpr::Literal(self.transform_lit(&Literal::Unit)));
         Ok(exprs)
@@ -296,8 +296,8 @@ impl<'sess> Visitor for Transformer<'sess> {
         Ok(self.transform_trait_impl(id, body))
     }
 
-    fn visit_unpack_trait_obj(&mut self, _id: NodeID, _impltype: &Type, expr: &Expr) -> Result<Self::Return, Error> {
-        Ok(self.transform_unpack_trait_obj(expr))
+    fn visit_unpack_trait_obj(&mut self, _id: NodeID, _impltype: &Type, code: &Expr) -> Result<Self::Return, Error> {
+        Ok(self.transform_unpack_trait_obj(code))
     }
 
 
@@ -420,10 +420,10 @@ impl<'sess> Transformer<'sess> {
         last
     }
 
-    pub fn transform_as_args(&mut self, exprs: &mut Vec<LLExpr>, args: &Vec<Expr>) -> Vec<LLExpr> {
+    pub fn transform_as_typed_args(&mut self, exprs: &mut Vec<LLExpr>, argtypes: Vec<Type>, args: &Vec<Expr>) -> Vec<LLExpr> {
         let mut fargs = vec!();
-        for arg in args {
-            fargs.push(self.transform_as_result(exprs, arg));
+        for (atype, arg) in argtypes.iter().zip(args.iter()) {
+            fargs.push(self.check_transform_to_trait(exprs, atype, arg));
         }
         fargs
     }
@@ -591,16 +591,18 @@ impl<'sess> Transformer<'sess> {
         exprs
     }
 
-    pub fn transform_accessor(&mut self, id: NodeID, obj: &Expr, field: &str, otype: Type) -> Vec<LLExpr> {
+    pub fn transform_accessor(&mut self, id: NodeID, obj: &Expr, field: &str, oid: NodeID) -> Vec<LLExpr> {
         let mut exprs = vec!();
         let defid = self.session.get_ref(id).unwrap();
         let objval = self.transform_as_result(&mut exprs, obj);
-        exprs.extend(self.convert_accessor(defid, objval, field, otype));
+        exprs.extend(self.convert_accessor(defid, objval, field, oid));
         exprs
     }
 
-    pub fn convert_accessor(&mut self, defid: NodeID, objval: LLExpr, field: &str, otype: Type) -> Vec<LLExpr> {
+    pub fn convert_accessor(&mut self, defid: NodeID, objval: LLExpr, field: &str, oid: NodeID) -> Vec<LLExpr> {
         let mut exprs = vec!();
+
+        let otype = self.session.get_type(oid).unwrap();
         match otype {
             Type::Object(_, objid, _) => {
                 let objdef = self.session.get_def(objid).unwrap();
@@ -628,6 +630,11 @@ impl<'sess> Transformer<'sess> {
             Type::Tuple(_) => {
                 let index = field.parse::<usize>().unwrap();
                 exprs.push(LLExpr::GetItem(r(objval), index));
+            },
+            Type::Universal(_, _) => {
+                let trait_id = self.session.get_ref(oid).unwrap();
+                let traitdef = self.session.get_def(trait_id).unwrap().as_trait_def().unwrap();
+                exprs.extend(self.transform_trait_access_method(traitdef, objval, defid))
             },
             _ => panic!("Not Implemented: {:?}", otype),
         }
@@ -734,9 +741,10 @@ impl<'sess> Transformer<'sess> {
                 let defid = self.session.get_ref(pat.id).unwrap();
                 let enumdef = self.session.get_def_from_ref(*oid).unwrap().as_enum().unwrap();
                 let variant = enumdef.get_variant_by_id(defid).unwrap();
+                // TODO we aren't doing a trait object cast here because we're assuming we can't unpack the value
                 exprs.push(LLExpr::Cmp(LLCmpType::Equal, r(LLExpr::GetItem(r(LLExpr::GetValue(value_id)), 0)), r(LLExpr::Literal(LLLit::I8(variant as i8)))));
             },
-            PatKind::EnumArgs(left, args) => {
+            PatKind::EnumArgs(left, args, eid) => {
                 let variant_id = self.session.get_ref(pat.id).unwrap();
                 let item_id = NodeID::generate();
                 //exprs.push(LLExpr::SetValue(item_id, r(LLExpr::GetItem(r(LLExpr::Cast(self.get_type(variant_id).unwrap(), r(LLExpr::GetValue(value_id)))), 1))));
@@ -757,10 +765,12 @@ impl<'sess> Transformer<'sess> {
                     ))
                 )));
 
-                for (i, arg) in args.iter().enumerate() {
-                    let arg_id = NodeID::generate();
-                    exprs.push(LLExpr::SetValue(arg_id, r(LLExpr::GetItem(r(LLExpr::GetValue(item_id)), i))));
-                    exprs.extend(self.transform_pattern(&arg, arg_id));
+                let argtypes = self.session.get_type(*eid).unwrap().as_vec();
+                for ((i, arg), packed_type) in args.iter().enumerate().zip(argtypes.iter()) {
+                    let unpacked_type = self.session.get_type(arg.id).unwrap();
+                    let value = self.check_convert_to_trait(&mut exprs, &unpacked_type, packed_type, LLExpr::GetItem(r(LLExpr::GetValue(item_id)), i));
+                    exprs.push(LLExpr::SetValue(arg.id, r(value)));
+                    exprs.extend(self.transform_pattern(&arg, arg.id));
                 }
                 //let result = exprs.pop();
                 exprs.extend(self.transform_pattern(left, value_id));

@@ -1,9 +1,9 @@
 
 use abi::ABI;
-use types::Type;
 use session::{ Session, Error };
 use scope::{ ScopeRef, Context };
-use hir::{ NodeID, Visibility, Mutability, Argument, ClassSpec, MatchCase, EnumVariant, Pattern, PatKind, Expr, ExprKind };
+use types::{ Type, resolve_type };
+use hir::{ NodeID, Visibility, Mutability, Argument, ClassSpec, MatchCase, EnumVariant, WhereClause, Pattern, PatKind, Expr, ExprKind };
 use misc::{ UniqueID, r };
 
 use defs::enums::EnumDef;
@@ -74,7 +74,7 @@ impl<'sess> Visitor for NameBinder<'sess> {
         self.visit_vec(code)
     }
 
-    fn visit_function(&mut self, id: NodeID, vis: Visibility, name: Option<&str>, args: &Vec<Argument>, rettype: &Option<Type>, body: &Vec<Expr>, abi: ABI) -> Result<Self::Return, Error> {
+    fn visit_function(&mut self, id: NodeID, vis: Visibility, name: Option<&str>, args: &Vec<Argument>, rettype: &Option<Type>, body: &Vec<Expr>, abi: ABI, whereclause: &WhereClause) -> Result<Self::Return, Error> {
         let defid = self.session.new_def_id(id);
 
         let scope = self.stack.get_scope();
@@ -102,6 +102,7 @@ impl<'sess> Visitor for NameBinder<'sess> {
         }
         let mut rettype = rettype.clone();
         bind_type_names(self.session, fscope.clone(), rettype.as_mut())?;
+        bind_where_constraints(self.session, fscope.clone(), whereclause)?;
 
         // Build type according to the definition, using typevars for missing types
         let nftype = Type::Function(r(Type::Tuple(argtypes)), r(rettype.unwrap_or_else(|| self.session.new_typevar())), abi);
@@ -124,12 +125,15 @@ impl<'sess> Visitor for NameBinder<'sess> {
         self.visit_node(expr)
     }
 
-    fn visit_declare(&mut self, id: NodeID, vis: Visibility, name: &str, ttype: &Type) -> Result<Self::Return, Error> {
+    fn visit_declare(&mut self, id: NodeID, vis: Visibility, name: &str, ttype: &Type, whereclause: &WhereClause) -> Result<Self::Return, Error> {
         let defid = self.session.new_def_id(id);
 
         let scope = self.stack.get_scope();
         let mut ttype = ttype.clone();
         bind_type_names(self.session, scope.clone(), Some(&mut ttype))?;
+        bind_where_constraints(self.session, scope.clone(), whereclause)?;
+        // NOTE we resolve the type here to allow the resolution of aliases before this type becomes the cannonical type of this definition
+        let ttype = resolve_type(self.session, ttype, false)?;
         let abi = ttype.get_abi().unwrap_or(ABI::Molten);
         AnyFunc::define(self.session, scope.clone(), defid, vis, Some(name), abi, Some(ttype))?;
         Ok(())
@@ -186,7 +190,7 @@ impl<'sess> Visitor for NameBinder<'sess> {
         Ok(())
     }
 
-    fn visit_class(&mut self, id: NodeID, classspec: &ClassSpec, parentspec: &Option<ClassSpec>, body: &Vec<Expr>) -> Result<Self::Return, Error> {
+    fn visit_class(&mut self, id: NodeID, classspec: &ClassSpec, parentspec: &Option<ClassSpec>, whereclause: &WhereClause, body: &Vec<Expr>) -> Result<Self::Return, Error> {
         let defid = self.session.new_def_id(id);
 
         let scope = self.stack.get_scope();
@@ -199,6 +203,7 @@ impl<'sess> Visitor for NameBinder<'sess> {
         if let &mut Some(ref mut pspec) = &mut parentspec {
             bind_classspec_type_names(self.session, tscope.clone(), pspec)?;
         }
+        bind_where_constraints(self.session, tscope.clone(), whereclause)?;
 
         let classtype = Type::Object(classspec.name, defid, classspec.types);
         let parenttype = match parentspec {
@@ -242,15 +247,17 @@ impl<'sess> Visitor for NameBinder<'sess> {
         let defid = self.session.new_def_id(id);
 
         let scope = self.stack.get_scope();
+        let tscope = self.session.map.get_or_add(defid, Some(scope.clone()));
+
         let mut classspec = classspec.clone();
-        bind_classspec_type_names(self.session, scope.clone(), &mut classspec)?;
+        bind_classspec_type_names(self.session, tscope.clone(), &mut classspec)?;
         let deftype = Type::Object(classspec.name, defid, classspec.types);
         let enumdef = EnumDef::define(self.session, scope.clone(), defid, deftype)?;
 
         for variant in variants.iter() {
             // TODO this still requires mut
             let mut variant = variant.clone();
-            bind_type_names(self.session, scope.clone(), variant.ttype.as_mut())?;
+            bind_type_names(self.session, tscope.clone(), variant.ttype.as_mut())?;
             check_recursive_type(&variant.ttype.as_ref(), defid)?;
             enumdef.add_variant(self.session, variant)?;
         }
@@ -279,14 +286,15 @@ impl<'sess> Visitor for NameBinder<'sess> {
             Some(defid) => defid,
             None => return Err(Error::new(format!("NameError: undefined type {:?}", traitspec.name)))
         };
+        let tscope = self.session.map.get_or_add(impl_id, Some(scope.clone()));
         self.session.set_ref(id, impl_id);
         self.session.set_ref(impl_id, defid);
 
         let mut traitspec = traitspec.clone();
-        bind_classspec_type_names(self.session, scope.clone(), &mut traitspec)?;
+        bind_classspec_type_names(self.session, tscope.clone(), &mut traitspec)?;
 
         let mut impltype = impltype.clone();
-        bind_type_names(self.session, scope.clone(), Some(&mut impltype))?;
+        bind_type_names(self.session, tscope.clone(), Some(&mut impltype))?;
 
         TraitImpl::define(self.session, scope.clone(), impl_id, defid, impltype)?;
 
@@ -305,7 +313,7 @@ impl<'sess> Visitor for NameBinder<'sess> {
     }
 
 
-    fn visit_resolver(&mut self, _node: &Expr, left: &Expr, _right: &str, oid: NodeID) -> Result<Self::Return, Error> {
+    fn visit_resolver(&mut self, _id: NodeID, left: &Expr, _right: &str, oid: NodeID) -> Result<Self::Return, Error> {
         let scope = self.stack.get_scope();
         // TODO should this always work on a type reference, or should classes be added as values as well as types?
         //self.visit_node(left);
@@ -416,6 +424,20 @@ pub fn bind_type_names(session: &Session, scope: ScopeRef, ttype: Option<&mut Ty
 pub fn bind_classspec_type_names(session: &Session, scope: ScopeRef, classspec: &mut ClassSpec) -> Result<(), Error> {
     let &mut ClassSpec { ref mut types, .. } = classspec;
     types.iter_mut().map(|ref mut ttype| bind_type_names(session, scope.clone(), Some(ttype))).count();
+    Ok(())
+}
+
+fn bind_where_constraints(session: &Session, scope: ScopeRef, whereclause: &WhereClause) -> Result<(), Error> {
+    for (varname, traitname) in &whereclause.constraints {
+        let var_id = scope.get_type_def(varname.as_str()).ok_or_else(|| Error::new(format!("TypeError: definition not set for {:?}", varname)))?;
+        let trait_id = scope.get_type_def(traitname.as_str()).ok_or_else(|| Error::new(format!("TypeError: definition not set for {:?}", traitname)))?;
+        let mut constraints = session.get_constraints(var_id);
+        if constraints.len() > 0 {
+            panic!("We're only allowing 1 trait constraint per universal at the moment");
+        }
+        constraints.push(trait_id);
+        session.set_constraints(var_id, constraints);
+    }
     Ok(())
 }
 

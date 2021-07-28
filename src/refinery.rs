@@ -6,7 +6,7 @@ use types::Type;
 use ast::{ Pos, AST };
 use misc::{ r, UniqueID };
 use session::{ Session, Error };
-use hir::{ NodeID, Visibility, Mutability, AssignType, Literal, Argument, ClassSpec, MatchCase, EnumVariant, Pattern, Expr, ExprKind };
+use hir::{ NodeID, Visibility, Mutability, AssignType, Literal, Argument, ClassSpec, MatchCase, EnumVariant, WhereClause, Pattern, Expr, ExprKind };
 
 
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -99,11 +99,11 @@ impl<'sess> Refinery<'sess> {
                 Expr::make_def(pos, mutable, ident, ttype, self.refine_node(*code)?)
             },
 
-            AST::Declare(pos, vis, ident, ttype) => {
-                Expr::make_decl(pos, vis, ident, ttype)
+            AST::Declare(pos, vis, ident, ttype, whereclause) => {
+                Expr::make_decl(pos, vis, ident, ttype, whereclause)
             },
 
-            AST::Function(pos, _vis, ident, args, ret, body, abi) => {
+            AST::Function(pos, _vis, ident, args, ret, body, abi, whereclause) => {
                 // TODO visibility is forced here so I don't have to add 'pub' keywords yet
                 let vis = if self.top_level() {
                     Visibility::Public
@@ -112,7 +112,7 @@ impl<'sess> Refinery<'sess> {
                 };
 
                 self.with_context(CodeContext::Func(abi), || {
-                    Ok(Expr::make_func(pos, vis, ident, args, ret, self.refine_vec(body), abi))
+                    Ok(Expr::make_func(pos, vis, ident, args, ret, self.refine_vec(body), abi, whereclause))
                 })?
             },
 
@@ -201,7 +201,7 @@ impl<'sess> Refinery<'sess> {
             AST::TraitDef(pos, traitspec, body) => {
                 for node in body.iter() {
                     match node {
-                        AST::Declare(_, _, _, _) => { },
+                        AST::Declare(_, _, _, _, _) => { },
                         node @ _ => return Err(Error::new(format!("SyntaxError: only decls are allowed in trait definitions, found {:?}", node))),
                     }
                 }
@@ -230,8 +230,8 @@ impl<'sess> Refinery<'sess> {
                     Expr::make_invoke(pos, Expr::make_resolve_ident(pos, &classspec.name, "new"), args))
             },
 
-            AST::Class(pos, classspec, parentspec, body) => {
-                self.desugar_class(pos, classspec, parentspec, body)?
+            AST::Class(pos, classspec, parentspec, whereclause, body) => {
+                self.desugar_class(pos, classspec, parentspec, whereclause, body)?
             },
 
             AST::Index(pos, base, index) => {
@@ -336,14 +336,14 @@ impl<'sess> Refinery<'sess> {
         Ok(Expr::make_block(pos, block))
     }
 
-    pub fn desugar_class(&self, pos: Pos, classspec: ClassSpec, parentspec: Option<ClassSpec>, body: Vec<AST>) -> Result<Expr, Error> {
+    pub fn desugar_class(&self, pos: Pos, classspec: ClassSpec, parentspec: Option<ClassSpec>, whereclause: WhereClause, body: Vec<AST>) -> Result<Expr, Error> {
         // Make sure constructors take "self" as the first argument, and return "self" at the end
         let mut has_new = false;
         let mut has_init = false;
         let mut newbody = vec!();
         for node in body {
             let node = match node {
-                AST::Function(pos, vis, name, args, ret, mut body, abi) => {
+                AST::Function(pos, vis, name, args, ret, mut body, abi, whereclause) => {
                     if name.as_ref().map(|s| s.as_str()) == Some("new") {
                         has_new = true;
                         if args.len() > 0 && args[0].name.as_str() == "self" {
@@ -353,21 +353,21 @@ impl<'sess> Refinery<'sess> {
                         }
                     }
                     name.as_ref().map(|ref name| if name.as_str() == "__init__" { has_init = true; });
-                    AST::Function(pos, vis, name, args, ret, body, abi)
+                    AST::Function(pos, vis, name, args, ret, body, abi, whereclause)
                 },
-                AST::Declare(pos, vis, name, ttype) => {
+                AST::Declare(pos, vis, name, ttype, whereclause) => {
                     if name.as_str() == "new" {
                         has_new = true;
                     }
                     if name.as_str() == "__init__" { has_init = true; }
-                    AST::Declare(pos, vis, name, ttype)
+                    AST::Declare(pos, vis, name, ttype, whereclause)
                 },
                 _ => node
             };
             newbody.push(node);
         }
         if !has_new {
-            //newbody.insert(0, Expr::new(pos, ExprKind::Function(Some(String::from("new")), vec!((String::from("self"), None, None)), None, r(AST::Identifier(id, pos, String::from("self"))), UniqueID::generate(), ABI::Molten)));
+            //newbody.insert(0, Expr::new(pos, ExprKind::Function(Some(String::from("new")), vec!((String::from("self"), None, None)), None, r(AST::Identifier(id, pos, String::from("self"))), UniqueID::generate(), ABI::Molten, WhereClause::empty())));
             //return Err(Error::new(format!("SyntaxError: you must declare a \"new\" method on a class")));
         }
 
@@ -393,14 +393,14 @@ impl<'sess> Refinery<'sess> {
                     vec!(AST::Identifier(pos, "self".to_string()))));
             }
             init.push(AST::make_ident_from_str(pos, "self"));
-            let initcode = AST::Function(pos, Visibility::Public, Some("__init__".to_string()), iargs, None, init, ABI::Molten);
+            let initcode = AST::Function(pos, Visibility::Public, Some("__init__".to_string()), iargs, None, init, ABI::Molten, WhereClause::empty());
             newbody.push(initcode);
         }
 
         let body = self.with_context(CodeContext::ClassBody, || {
             self.refine_vec(newbody)
         });
-        Ok(Expr::make_class(pos, classspec, parentspec, body))
+        Ok(Expr::make_class(pos, classspec, parentspec, whereclause, body))
     }
 
     pub fn desugar_list(&self, pos: Pos, items: Vec<AST>) -> Result<Expr, Error> {
@@ -423,7 +423,7 @@ impl<'sess> Refinery<'sess> {
         let mut newbody = vec!();
         for node in body {
             match node {
-                AST::Function(pos, _vis, name, mut args, ret, body, abi) if name.is_some() => {
+                AST::Function(pos, _vis, name, mut args, ret, body, abi, whereclause) if name.is_some() => {
                     let vis = Visibility::Public;
 
                     let mut body = self.with_context(CodeContext::Func(abi), || {
@@ -439,7 +439,7 @@ impl<'sess> Refinery<'sess> {
                         }
                     }
 
-                    newbody.push(Expr::new(pos, ExprKind::Function(vis, name, args, ret, body, abi)));
+                    newbody.push(Expr::new(pos, ExprKind::Function(vis, name, args, ret, body, abi, whereclause)));
                 },
                 node @ _ => return Err(Error::new(format!("SyntaxError: only functions are allowed in trait impls, found {:?}", node))),
             }

@@ -6,7 +6,7 @@ use abi::ABI;
 use types::Type;
 use parser::Span;
 use misc::{ R, r };
-use hir::{ Visibility, Mutability, AssignType, Literal, Argument, ClassSpec, Pattern };
+use hir::{ Visibility, Mutability, AssignType, Literal, Argument, ClassSpec, WhereClause, Pattern };
 
 
 #[derive(Copy, Clone, PartialEq)]
@@ -48,10 +48,10 @@ pub enum AST {
     For(Pos, String, R<AST>, R<AST>),
     While(Pos, R<AST>, R<AST>),
 
-    Declare(Pos, Visibility, String, Type),
-    Function(Pos, Visibility, Option<String>, Vec<Argument>, Option<Type>, Vec<AST>, ABI),
+    Declare(Pos, Visibility, String, Type, WhereClause),
+    Function(Pos, Visibility, Option<String>, Vec<Argument>, Option<Type>, Vec<AST>, ABI, WhereClause),
     New(Pos, ClassSpec, Vec<AST>),
-    Class(Pos, ClassSpec, Option<ClassSpec>, Vec<AST>),
+    Class(Pos, ClassSpec, Option<ClassSpec>, WhereClause, Vec<AST>),
     TypeAlias(Pos, ClassSpec, Type),
     Enum(Pos, ClassSpec, Vec<(Pos, String, Option<Type>)>),
     TraitDef(Pos, ClassSpec, Vec<AST>),
@@ -117,10 +117,10 @@ impl AST {
             AST::Try(pos, _, _) |
             AST::Match(pos, _, _) |
             AST::For(pos, _, _, _) |
-            AST::Declare(pos, _, _, _) |
-            AST::Function(pos, _, _, _, _, _, _) |
+            AST::Declare(pos, _, _, _, _) |
+            AST::Function(pos, _, _, _, _, _, _, _) |
             AST::New(pos, _, _) |
-            AST::Class(pos, _, _, _) |
+            AST::Class(pos, _, _, _, _) |
             AST::Import(pos, _, _) |
             AST::Definition(pos, _, _, _, _) |
             AST::Assignment(pos, _, _, _) |

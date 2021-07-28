@@ -66,6 +66,12 @@ pub struct EnumVariant {
     pub ttype: Option<Type>,
 }
 
+#[derive(Clone, Debug, PartialEq)]
+pub struct WhereClause {
+    pub pos: Pos,
+    pub constraints: Vec<(String, String)>,
+}
+
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Pattern {
@@ -82,7 +88,7 @@ pub enum PatKind {
     Annotation(Type, R<Pattern>),
     Identifier(String),
     Resolve(R<Pattern>, String, NodeID),
-    EnumArgs(R<Pattern>, Vec<Pattern>),
+    EnumArgs(R<Pattern>, Vec<Pattern>, NodeID),
     Tuple(Vec<Pattern>),
     Record(Vec<(String, Pattern)>),
 }
@@ -122,10 +128,10 @@ pub enum ExprKind {
     Match(R<Expr>, Vec<MatchCase>),
     While(R<Expr>, R<Expr>),
 
-    Declare(Visibility, String, Type),
-    Function(Visibility, Option<String>, Vec<Argument>, Option<Type>, Vec<Expr>, ABI),
+    Declare(Visibility, String, Type, WhereClause),
+    Function(Visibility, Option<String>, Vec<Argument>, Option<Type>, Vec<Expr>, ABI, WhereClause),
     AllocObject(Type),
-    Class(ClassSpec, Option<ClassSpec>, Vec<Expr>),
+    Class(ClassSpec, Option<ClassSpec>, WhereClause, Vec<Expr>),
     TypeAlias(ClassSpec, Type),
     Enum(ClassSpec, Vec<EnumVariant>),
     TraitDef(ClassSpec, Vec<Expr>),
@@ -146,7 +152,7 @@ impl Argument {
             pos: pos,
             name: name,
             ttype: ttype,
-            default: default
+            default: default,
         }
     }
 }
@@ -156,7 +162,7 @@ impl ClassSpec {
         ClassSpec {
             pos: pos,
             name: name,
-            types: types
+            types: types,
         }
     }
 }
@@ -183,6 +189,22 @@ impl EnumVariant {
     }
 }
 
+impl WhereClause {
+    pub fn new(pos: Pos, constraints: Vec<(String, String)>) -> Self {
+        WhereClause {
+            pos: pos,
+            constraints: constraints,
+        }
+    }
+
+    pub fn empty() -> Self {
+        WhereClause {
+            pos: Pos::empty(),
+            constraints: vec!(),
+        }
+    }
+}
+
 
 impl Pattern {
     pub fn new(pos: Pos, kind: PatKind) -> Self {
@@ -191,10 +213,6 @@ impl Pattern {
             pos: pos,
             kind: kind,
         }
-    }
-
-    pub fn get_id(&self) -> NodeID {
-        self.id
     }
 
     #[allow(dead_code)]
@@ -220,17 +238,6 @@ impl Expr {
             pos: pos,
             kind: kind,
         }
-    }
-
-    #[allow(dead_code)]
-    pub fn get_id(&self) -> NodeID {
-        self.id
-    }
-
-    #[allow(dead_code)]
-    pub fn set_id(mut self, id: NodeID) -> Self {
-        self.id = id;
-        self
     }
 
     #[allow(dead_code)]
@@ -340,13 +347,13 @@ impl Expr {
     }
 
     #[allow(dead_code)]
-    pub fn make_decl(pos: Pos, vis: Visibility, ident: String, ttype: Type) -> Expr {
-        Expr { id: NodeID::generate(), pos: pos, kind: ExprKind::Declare(vis, ident, ttype) }
+    pub fn make_decl(pos: Pos, vis: Visibility, ident: String, ttype: Type, whereclause: WhereClause) -> Expr {
+        Expr { id: NodeID::generate(), pos: pos, kind: ExprKind::Declare(vis, ident, ttype, whereclause) }
     }
 
     #[allow(dead_code)]
-    pub fn make_func(pos: Pos, vis: Visibility, ident: Option<String>, args: Vec<Argument>, rtype: Option<Type>, body: Vec<Expr>, abi: ABI) -> Expr {
-        Expr { id: NodeID::generate(), pos: pos, kind: ExprKind::Function(vis, ident, args, rtype, body, abi) }
+    pub fn make_func(pos: Pos, vis: Visibility, ident: Option<String>, args: Vec<Argument>, rtype: Option<Type>, body: Vec<Expr>, abi: ABI, whereclause: WhereClause) -> Expr {
+        Expr { id: NodeID::generate(), pos: pos, kind: ExprKind::Function(vis, ident, args, rtype, body, abi, whereclause) }
     }
 
     #[allow(dead_code)]
@@ -355,8 +362,8 @@ impl Expr {
     }
 
     #[allow(dead_code)]
-    pub fn make_class(pos: Pos, classspec: ClassSpec, parentspec: Option<ClassSpec>, body: Vec<Expr>) -> Expr {
-        Expr { id: NodeID::generate(), pos: pos, kind: ExprKind::Class(classspec, parentspec, body) }
+    pub fn make_class(pos: Pos, classspec: ClassSpec, parentspec: Option<ClassSpec>, whereclause: WhereClause, body: Vec<Expr>) -> Expr {
+        Expr { id: NodeID::generate(), pos: pos, kind: ExprKind::Class(classspec, parentspec, whereclause, body) }
     }
 
     #[allow(dead_code)]

@@ -27,7 +27,7 @@ pub struct Session {
     pub defs: RefCell<HashMap<NodeID, Def>>,
     pub refs: RefCell<HashMap<NodeID, NodeID>>,
     pub types: RefCell<HashMap<NodeID, Type>>,
-    //pub constraints: RefCell<HashMap<NodeID, Vec<NodeID>>>,
+    pub constraints: RefCell<HashMap<NodeID, Vec<NodeID>>>,
 }
 
 
@@ -42,7 +42,7 @@ impl Session {
             defs: RefCell::new(HashMap::new()),
             refs: RefCell::new(HashMap::new()),
             types: RefCell::new(HashMap::new()),
-            //constraints: RefCell::new(HashMap::new()),
+            constraints: RefCell::new(HashMap::new()),
         }
     }
 
@@ -211,16 +211,14 @@ impl Session {
         }
     }
 
-    /*
-    pub fn set_constraint(&self, id: NodeID, constraints: Vec<NodeID>) {
-        debug!("SET CONSTRAINT: {:?} <= {:?} (previously {:?})", id, ttype, self.types.borrow().get(&id));
+    pub fn set_constraints(&self, id: NodeID, constraints: Vec<NodeID>) {
+        debug!("SET CONSTRAINTS: {:?} <= {:?} (previously {:?})", id, constraints, self.constraints.borrow().get(&id));
         self.constraints.borrow_mut().insert(id, constraints);
     }
 
-    pub fn get_constraint(&self, id: NodeID) -> Option<Vec<NodeID>> {
-        self.constraints.borrow().get(&id).map(|constraints| constraints.clone())
+    pub fn get_constraints(&self, id: NodeID) -> Vec<NodeID> {
+        self.constraints.borrow().get(&id).and_then(|constraints| Some(constraints.clone())).unwrap_or(vec!())
     }
-    */
 }
 
 

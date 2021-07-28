@@ -91,7 +91,11 @@ impl<'sess> LLVM<'sess> {
         unsafe {
             self.initialize_target();
 
-            self.set_type(TYPEVAR_ID, LLVMPointerType(LLVMStructCreateNamed(self.context, cstr("TypeVar")), 0));
+            //self.set_type(TYPEVAR_ID, LLVMPointerType(LLVMStructCreateNamed(self.context, cstr("TypeVar")), 0));
+            let typevar = LLVMStructCreateNamed(self.context, cstr("TypeVar"));
+            let mut typevar_body = vec!(self.str_type(), self.str_type());
+            LLVMStructSetBody(typevar, typevar_body.as_mut_ptr(), typevar_body.len() as u32, 0);
+            self.set_type(TYPEVAR_ID, typevar);
 
             // TODO this buffer size is tricky... I had it set for 8 but got a bunch of segfaults in the testsuite.
             //      The correct value is probably platform specific but I don't know how to find that out.  Oddly enough

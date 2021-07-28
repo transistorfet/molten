@@ -8,7 +8,7 @@ use config::Options;
 use scope::{ ScopeRef };
 use session::{ Session, Error };
 use visitor::{ Visitor, ScopeStack };
-use hir::{ NodeID, Visibility, Mutability, ClassSpec, Argument, Expr, ExprKind };
+use hir::{ NodeID, Visibility, Mutability, ClassSpec, Argument, WhereClause, Expr, ExprKind };
 
 
 pub fn write_exports(session: &Session, scope: ScopeRef, filename: &str, code: &Vec<Expr>) {
@@ -66,30 +66,31 @@ impl<'sess> Visitor for ExportsCollector<'sess> {
         Ok(())
     }
 
-    fn visit_declare(&mut self, id: NodeID, vis: Visibility, name: &str, _ttype: &Type) -> Result<Self::Return, Error> {
+    fn visit_declare(&mut self, id: NodeID, vis: Visibility, name: &str, _ttype: &Type, whereclause: &WhereClause) -> Result<Self::Return, Error> {
         let defid = self.session.get_ref(id)?;
-        self.declarations.push_str(&emit_declaration(self.session, defid, vis, name));
+        self.declarations.push_str(&emit_declaration(self.session, defid, vis, name, &whereclause.constraints));
         Ok(())
     }
 
-    fn visit_function(&mut self, id: NodeID, vis: Visibility, name: Option<&str>, _args: &Vec<Argument>, _rettype: &Option<Type>, _body: &Vec<Expr>, _abi: ABI) -> Result<Self::Return, Error> {
+    fn visit_function(&mut self, id: NodeID, vis: Visibility, name: Option<&str>, _args: &Vec<Argument>, _rettype: &Option<Type>, _body: &Vec<Expr>, _abi: ABI, whereclause: &WhereClause) -> Result<Self::Return, Error> {
         if let Some(name) = name {
             let defid = self.session.get_ref(id)?;
-            self.declarations.push_str(&emit_declaration(self.session, defid, vis, name));
+            self.declarations.push_str(&emit_declaration(self.session, defid, vis, name, &whereclause.constraints));
         }
         // TODO we would walk the body here to search everything that's publically visable, but currently only top level functions are exported
         Ok(())
     }
 
-    fn visit_class(&mut self, _id: NodeID, classspec: &ClassSpec, parentspec: &Option<ClassSpec>, body: &Vec<Expr>) -> Result<Self::Return, Error> {
-        let namespec = unparse_type(self.session, Type::from(classspec));
-        let fullspec = if parentspec.is_some() {
-            format!("{} extends {}", namespec, unparse_type(self.session, Type::from(parentspec.as_ref().unwrap())))
-        } else {
-            namespec.clone()
-        };
+    fn visit_class(&mut self, _id: NodeID, classspec: &ClassSpec, parentspec: &Option<ClassSpec>, whereclause: &WhereClause, body: &Vec<Expr>) -> Result<Self::Return, Error> {
+        let mut namespec = unparse_type(self.session, Type::from(classspec));
+        if parentspec.is_some() {
+            namespec = format!("{} extends {}", namespec, unparse_type(self.session, Type::from(parentspec.as_ref().unwrap())))
+        }
+        if whereclause.constraints.len() > 0 {
+            namespec += &emit_where_clause(&whereclause.constraints);
+        }
 
-        self.declarations.push_str(format!("class {} {{\n", fullspec).as_str());
+        self.declarations.push_str(format!("class {} {{\n", namespec).as_str());
         //self.declarations.push_str(format!("    decl __alloc__() -> {}\n", namespec).as_str());
         //self.declarations.push_str(format!("    decl __init__({}) -> Nil\n", namespec).as_str());
         for node in body {
@@ -99,16 +100,16 @@ impl<'sess> Visitor for ExportsCollector<'sess> {
                     self.declarations.push_str("    ");
                     self.declarations.push_str(&emit_field(self.session, defid, *mutable, name));
                 },
-                ExprKind::Declare(vis, name, _) => {
+                ExprKind::Declare(vis, name, _, whereclause) => {
                     let defid = self.session.get_ref(node.id)?;
                     self.declarations.push_str("    ");
-                    self.declarations.push_str(&emit_declaration(self.session, defid, *vis, name));
+                    self.declarations.push_str(&emit_declaration(self.session, defid, *vis, name, &whereclause.constraints));
                 },
-                ExprKind::Function(vis, name, _, _, _, _) => {
+                ExprKind::Function(vis, name, _, _, _, _, whereclause) => {
                     if let Some(name) = name {
                         let defid = self.session.get_ref(node.id)?;
                         self.declarations.push_str("    ");
-                        self.declarations.push_str(&emit_declaration(self.session, defid, *vis, name));
+                        self.declarations.push_str(&emit_declaration(self.session, defid, *vis, name, &whereclause.constraints));
                     }
                 },
                 _ => {  },
@@ -124,10 +125,10 @@ impl<'sess> Visitor for ExportsCollector<'sess> {
         self.declarations.push_str(format!("trait {} {{\n", namespec).as_str());
         for node in body {
             match &node.kind {
-                ExprKind::Declare(_, name, _) => {
+                ExprKind::Declare(_, name, _, whereclause) => {
                     let defid = self.session.get_ref(node.id)?;
                     self.declarations.push_str("    ");
-                    self.declarations.push_str(&emit_declaration(self.session, defid, Visibility::Public, name));
+                    self.declarations.push_str(&emit_declaration(self.session, defid, Visibility::Public, name, &whereclause.constraints));
                 },
                 _ => {  },
             }
@@ -142,11 +143,16 @@ impl<'sess> Visitor for ExportsCollector<'sess> {
     }
 }
 
-fn emit_declaration(session: &Session, id: NodeID, vis: Visibility, name: &str) -> String {
+fn emit_declaration(session: &Session, id: NodeID, vis: Visibility, name: &str, constraints: &Vec<(String, String)>) -> String {
     if vis == Visibility::Public {
         //let name = get_mangled_name(session, &ident.name, *id);
         let ttype = session.get_type(id).unwrap();
-        format!("decl {}{}\n", name, unparse_type(session, ttype))
+        let wherestr = if constraints.len() > 0 {
+            emit_where_clause(constraints)
+        } else {
+            "".to_string()
+        };
+        format!("decl {}{}{}\n", name, unparse_type(session, ttype), wherestr)
     } else {
         String::from("")
     }
@@ -156,6 +162,10 @@ fn emit_field(session: &Session, id: NodeID, mutable: Mutability, name: &str) ->
     let ttype = session.get_type(id).unwrap();
     let mutable_str = if let Mutability::Mutable = mutable { "mut " } else { "" };
     format!("let {}{}: {}\n", mutable_str, name, unparse_type(session, ttype))
+}
+
+fn emit_where_clause(constraints: &Vec<(String, String)>) -> String {
+    format!(" where {}", constraints.iter().map(|(var, cons)| format!("{}: {}", var, cons)).collect::<Vec<String>>().join(", "))
 }
 
 pub fn unparse_type(session: &Session, ttype: Type) -> String {

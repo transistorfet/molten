@@ -12,7 +12,7 @@ pub fn r<T>(t: T) -> R<T> {
 
 // UniqueID
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct UniqueID(pub usize);
 
 static mut _NEXT_ID: usize = 10;

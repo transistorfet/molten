@@ -38,7 +38,7 @@ use abi::ABI;
 use types::Type;
 use misc::{ r, UniqueID };
 use ast::{ Pos, AST };
-use hir::{ NodeID, Mutability, Visibility, AssignType, Literal, Argument, ClassSpec, Pattern, PatKind };
+use hir::{ NodeID, Mutability, Visibility, AssignType, Literal, Argument, ClassSpec, WhereClause, Pattern, PatKind };
 
 
 ///// Parsing Macros /////
@@ -215,6 +215,7 @@ named!(class(Span) -> AST,
         wscom!(tag_word!("class")) >>
         i: class_spec >>
         p: opt!(preceded!(wscom!(tag_word!("extends")), class_spec)) >>
+        w: opt_where_clause >>
         wscom!(tag!("{")) >>
         b: many0!(wscom!(alt!(
             typealias |
@@ -223,7 +224,7 @@ named!(class(Span) -> AST,
             function
         ))) >>
         return_error!(ErrorKind::Tag /*ErrorKind::Custom(ERR_IN_CLASS) */, tag!("}")) >>
-        (AST::Class(Pos::new(pos), i, p, b))
+        (AST::Class(Pos::new(pos), i, p, w, b))
     )
 );
 
@@ -432,9 +433,10 @@ named!(declare(Span) -> AST,
         pos: position!() >>
         vis: visibility >>
         wscom!(tag_word!("decl")) >>
-        n: alt!(identifier | any_op) >>
+        n: alt!(identifier | operator_func_identifier) >>
         t: type_function >>
-        (AST::Declare(Pos::new(pos), vis, n, t))
+        w: opt_where_clause >>
+        (AST::Declare(Pos::new(pos), vis, n, t, w))
     )
 );
 
@@ -443,11 +445,9 @@ named!(function(Span) -> AST,
         pos: position!() >>
         vis: visibility >>
         wscom!(tag_word!("fn")) >>
-        //n: opt!(identifier) >>
         l: alt!(
             do_parse!(
-                n: opt!(alt!(identifier | any_op)) >>
-                //n: opt!(identifier) >>
+                n: opt!(alt!(identifier | operator_func_identifier)) >>
                 l: delimited!(tag!("("), argument_list, tag!(")")) >>
                 ((n, l))
             ) |
@@ -455,13 +455,14 @@ named!(function(Span) -> AST,
         ) >>
         rt: opt!(preceded!(wscom!(tag!("->")), type_description)) >>
         a: abi_specifier >>
+        w: opt_where_clause >>
         e: alt!(
             preceded!(wscom!(tag!("=>")), return_error!(ErrorKind::Tag /*ErrorKind::Custom(ERR_IN_FUNC) */,
                 map!(expression, |s| vec!(s)))) |
             return_error!(ErrorKind::Tag /*ErrorKind::Custom(ERR_IN_FUNC) */,
                 wscoml!(block_vec))
         ) >>
-        (AST::Function(Pos::new(pos), vis, l.0, l.1, rt, e, a))
+        (AST::Function(Pos::new(pos), vis, l.0, l.1, rt, e, a, w))
     )
 );
 
@@ -492,6 +493,26 @@ named!(argument_list(Span) -> Vec<Argument>,
             (Argument::new(i.0, i.1, i.2, None))
         )
     )
+);
+
+named!(where_clause(Span) -> WhereClause,
+    do_parse!(
+        pos: position!() >>
+        wscom!(tag_word!("where")) >>
+        c: separated_list1!(wscom!(tag!(",")),
+            do_parse!(
+                v: identifier >>
+                wscom!(tag!(":")) >>
+                c: identifier >>
+                ((v, c))
+            )
+        ) >>
+        (WhereClause::new(Pos::new(pos), c))
+    )
+);
+
+named!(opt_where_clause(Span) -> WhereClause,
+    map!(opt!(where_clause), |w| w.unwrap_or(WhereClause::empty()))
 );
 
 
@@ -723,7 +744,7 @@ named!(identifier_typed(Span) -> (Pos, String, Option<Type>),
     )
 );
 
-named!(any_op(Span) -> String,
+named!(operator_func_identifier(Span) -> String,
     alt!(infix_op | prefix_op | map_ident!(alt!(tag!("[]") | tag!("::"))))
 );
 
@@ -1091,7 +1112,7 @@ named!(pattern_enum_variant(Span) -> Pattern,
         )) >>
         (match o {
             None => p,
-            Some(l) => Pattern::new(Pos::new(pos), PatKind::EnumArgs(r(p), l))
+            Some(l) => Pattern::new(Pos::new(pos), PatKind::EnumArgs(r(p), l, NodeID::generate()))
         })
     )
 );

@@ -2,21 +2,15 @@
 use misc::r;
 use types::Type;
 use hir::{ NodeID, Expr };
-use defs::{ Def };
 use defs::traits::{ TraitDefRef };
 use visitor::{ Visitor };
 
 use transform::transform::{ CodeContext, Transformer };
 use transform::classes::{ VtableTransform };
-use llvm::llcode::{ LLType, LLRef, LLExpr };
+use llvm::llcode::{ LLType, LLLit, LLRef, LLExpr };
 
 
 impl<'sess> Transformer<'sess> {
-    pub fn transform_trait_def_type(&mut self, traitdef: TraitDefRef) -> LLType {
-        let vttype = self.get_type(traitdef.vtable.id).unwrap();
-        LLType::Struct(vec!(vttype, LLType::Ptr(r(LLType::I8))))
-    }
-
     pub fn transform_trait_def(&mut self, defid: NodeID, traitname: &str, body: &Vec<Expr>) -> Vec<LLExpr> {
         let traitdef = self.session.get_def(defid).unwrap().as_trait_def().unwrap();
         traitdef.vtable.build_vtable(self.session, body);
@@ -59,62 +53,74 @@ impl<'sess> Transformer<'sess> {
         exprs
     }
 
-    pub fn transform_unpack_trait_obj(&mut self, expr: &Expr) -> Vec<LLExpr> {
-        let mut exprs = vec!();
+    pub fn transform_trait_def_type(&mut self, traitdef: TraitDefRef) -> LLType {
+        let vttype = self.get_type(traitdef.vtable.id).unwrap();
+        LLType::Struct(vec!(vttype, LLType::Ptr(r(LLType::I8))))
+    }
 
-        let objval = self.transform_as_result(&mut exprs, expr);
-        exprs.push(LLExpr::GetItem(r(objval), 1));
+    pub fn transform_unpack_trait_obj(&mut self, code: &Expr) -> Vec<LLExpr> {
+        let mut exprs = vec!();
+        let value = self.transform_as_result(&mut exprs, code);
+        let result = self.convert_unpack_trait_obj(value);
+        exprs.push(result);
         exprs
+    }
+
+    pub fn convert_pack_trait_obj(&mut self, _exprs: &mut Vec<LLExpr>, traitdef: Option<TraitDefRef>, src_type: &Type, value: LLExpr) -> LLExpr {
+        let (lltype, vtable) = match traitdef {
+            Some(traitdef) => {
+                let lltype = self.transform_trait_def_type(traitdef.clone());
+                let traitimpl = traitdef.find_impl(self.session, &src_type).unwrap();
+                let vtable = LLExpr::GetLocal(traitimpl.vtable.id);
+                (lltype, vtable)
+            },
+            None => {
+                let ptr_type = LLType::Ptr(r(LLType::I8));
+                (LLType::Struct(vec!(ptr_type.clone(), ptr_type.clone())), LLExpr::Literal(LLLit::Null(ptr_type.clone())))
+            },
+        };
+
+        let id = NodeID::generate();
+        LLExpr::DefStruct(id, lltype, vec!(
+            vtable, LLExpr::Cast(LLType::Ptr(r(LLType::I8)), r(value))
+        ))
+    }
+
+    pub fn convert_unpack_trait_obj(&mut self, value: LLExpr) -> LLExpr {
+        LLExpr::GetItem(r(value), 1)
     }
 
     pub fn transform_trait_access_method(&mut self, traitdef: TraitDefRef, objval: LLExpr, field_id: NodeID) -> Vec<LLExpr> {
         // TODO this works to get the vtable method, but the object also needs to be converted for traits, unlike with classes which takes the same object value
         let index = traitdef.vtable.get_index_by_id(field_id).unwrap();
-        let vtable = LLExpr::GetItem(r(objval), 0);
+        let vtable = LLExpr::Cast(self.get_type(traitdef.vtable.id).unwrap(), r(LLExpr::GetItem(r(objval), 0)));
         vec!(LLExpr::LoadRef(r(LLExpr::AccessRef(r(vtable), vec!(LLRef::Field(index))))))
     }
 
-    // TODO how will the trait object data pointer be accessed?  Do you pass in the trait object itself into the trait implementation
-    //      functions, or do you get the second element (the data) and cast and pass that into the implementation function?  The second
-    //      would make more sense, since it's type should be known to the implementation-specific function, but that means the method
-    //      call would need to be transformed a bit differently (the first argument is currently the same as the object that we access
-    //      the method on, but we need instead to pass in the second element of that object...
+    pub fn check_transform_to_trait(&mut self, exprs: &mut Vec<LLExpr>, dest_type: &Type, src: &Expr) -> LLExpr {
+        let src_type = self.session.get_type(src.id).unwrap();
+        let value = self.transform_as_result(exprs, src);
+        self.check_convert_to_trait(exprs, dest_type, &src_type, value)
+    }
 
-
-    // TODO for converting from a concrete type to a trait object, perhaps you only need to check in certain places, like def, invoke, and annotations
-
-    pub fn check_convert_to_trait(&mut self, dest_type: Type, src: &Expr) -> Vec<LLExpr> {
-        let def = dest_type.get_id().map(|id| self.session.get_def(id));
-        match def {
-            Ok(Ok(Def::TraitDef(traitdef))) => {
-                let src_type = self.session.get_type(src.id).unwrap();
-                match src_type.get_id() {
-                    Ok(id) if id != traitdef.id =>
-                        return self.convert_to_trait(traitdef, src),
-                    _ => { },
-                }
+    pub fn check_convert_to_trait(&mut self, exprs: &mut Vec<LLExpr>, dest_type: &Type, src_type: &Type, value: LLExpr) -> LLExpr {
+        match (&dest_type, &src_type) {
+            // If the source of data is also a universal, then don't convert
+            (Type::Universal(_, _), Type::Universal(_, _)) => { },
+            (Type::Universal(_, id), _) => {
+                let constraints = self.session.get_constraints(*id);
+                let opt_traitdef = match constraints.len() > 0 {
+                    true => Some(self.session.get_def(constraints[0]).unwrap().as_trait_def().unwrap()),
+                    false => None,
+                };
+                return self.convert_pack_trait_obj(exprs, opt_traitdef, &src_type, value)
+            },
+            (_, Type::Universal(_, _)) => {
+                return self.convert_unpack_trait_obj(value);
             },
             _ => { },
         }
-        return self.visit_node(src).unwrap();
-    }
-
-    pub fn convert_to_trait(&mut self, traitdef: TraitDefRef, expr: &Expr) -> Vec<LLExpr> {
-        let mut exprs = vec!();
-
-        let lltype = self.transform_trait_def_type(traitdef.clone());
-
-        let expr_type = self.session.get_type(expr.id).unwrap();
-        let traitimpl = traitdef.find_impl(self.session, expr_type).unwrap();
-        let vtable_id = traitimpl.vtable.id;
-
-        let id = NodeID::generate();
-        let object = self.transform_as_result(&mut exprs, expr);
-        exprs.push(LLExpr::DefStruct(id, lltype, vec!(
-            LLExpr::GetLocal(vtable_id), LLExpr::Cast(LLType::Ptr(r(LLType::I8)), r(object))
-        )));
-
-        exprs
+        return value;
     }
 }
 
