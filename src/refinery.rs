@@ -205,11 +205,10 @@ impl<'sess> Refinery<'sess> {
                         node @ _ => return Err(Error::new(format!("SyntaxError: only decls are allowed in trait definitions, found {:?}", node))),
                     }
                 }
-                Expr::new(pos, ExprKind::TraitDef(traitspec, self.refine_vec(body)))
+                Expr::make_trait_def(pos, traitspec, self.refine_vec(body))
             },
 
             AST::TraitImpl(pos, traitspec, impltype, body) => {
-                //Expr::new(pos, ExprKind::TraitImpl(traitspec, impltype, self.refine_vec(body)))
                 self.desugar_trait_impl(pos, traitspec, impltype, body)?
             },
 
@@ -367,7 +366,7 @@ impl<'sess> Refinery<'sess> {
             newbody.push(node);
         }
         if !has_new {
-            //newbody.insert(0, Expr::new(pos, ExprKind::Function(Some(String::from("new")), vec!((String::from("self"), None, None)), None, r(AST::Identifier(id, pos, String::from("self"))), UniqueID::generate(), ABI::Molten, WhereClause::empty())));
+            //newbody.insert(0, Expr::make_func(pos, Some(String::from("new")), vec!((String::from("self"), None, None)), None, r(AST::Identifier(id, pos, String::from("self"))), UniqueID::generate(), ABI::Molten, WhereClause::empty()));
             //return Err(Error::new(format!("SyntaxError: you must declare a \"new\" method on a class")));
         }
 
@@ -439,12 +438,12 @@ impl<'sess> Refinery<'sess> {
                         }
                     }
 
-                    newbody.push(Expr::new(pos, ExprKind::Function(vis, name, args, ret, body, abi, whereclause)));
+                    newbody.push(Expr::make_func(pos, vis, name, args, ret, body, abi, whereclause));
                 },
                 node @ _ => return Err(Error::new(format!("SyntaxError: only functions are allowed in trait impls, found {:?}", node))),
             }
         }
-        Ok(Expr::new(pos, ExprKind::TraitImpl(traitspec, impltype, newbody)))
+        Ok(Expr::make_trait_impl(pos, traitspec, impltype, newbody))
     }
 }
 

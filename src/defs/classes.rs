@@ -231,8 +231,8 @@ impl Vtable {
     pub fn build_vtable(&self, session: &Session, body: &Vec<Expr>) {
         for ref node in body.iter() {
             match &node.kind {
-                ExprKind::Function(_, name, _, _, _, _, _) => {
-                    if let Some(name) = name.as_ref() {
+                ExprKind::Function(func) => {
+                    if let Some(name) = func.name.as_ref() {
                         let defid = session.get_ref(node.id).unwrap();
                         self.add_entry(session, defid, name, session.get_type(defid).unwrap());
                     }

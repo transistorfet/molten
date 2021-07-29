@@ -3,7 +3,7 @@
 use defs::Def;
 use session::{ Session, Error };
 use scope::{ ScopeRef };
-use hir::{ NodeID, Visibility, Mutability, AssignType, Literal, Argument, ClassSpec, MatchCase, EnumVariant, WhereClause, Pattern, Expr, ExprKind };
+use hir::{ NodeID, Visibility, Mutability, AssignType, Literal, ClassSpec, MatchCase, EnumVariant, WhereClause, Function, Pattern, Expr, ExprKind };
 use types::{ Type, Check, ABI, expect_type, check_type, resolve_type, check_type_params };
 use misc::{ r };
 use visitor::{ self, Visitor, ScopeStack };
@@ -110,14 +110,14 @@ impl<'sess> Visitor for TypeChecker<'sess> {
         }
     }
 
-    fn visit_function(&mut self, refid: NodeID, _vis: Visibility, name: Option<&str>, args: &Vec<Argument>, _rettype: &Option<Type>, body: &Vec<Expr>, abi: ABI, _whereclause: &WhereClause) -> Result<Self::Return, Error> {
+    fn visit_function(&mut self, refid: NodeID, func: &Function) -> Result<Self::Return, Error> {
         let defid = self.session.get_ref(refid)?;
         let fscope = self.session.map.get(&defid);
         let dftype = self.session.get_type(defid).unwrap();
         let rtype = dftype.get_rettype()?;
 
         let mut argtypes = vec!();
-        for ref arg in args.iter() {
+        for ref arg in func.args.iter() {
             let arg_defid = self.session.get_ref(arg.id)?;
             let mut atype = self.session.get_type(arg_defid).unwrap_or_else(|| self.session.new_typevar());
 
@@ -134,23 +134,23 @@ impl<'sess> Visitor for TypeChecker<'sess> {
         }
 
         let rettype = self.with_scope(fscope.clone(), |visitor| {
-            expect_type(visitor.session, Some(rtype.clone()), Some(visitor.visit_vec(body)?), Check::Def)
+            expect_type(visitor.session, Some(rtype.clone()), Some(visitor.visit_vec(&func.body)?), Check::Def)
         })?;
 
         // Resolve type variables that can be
         for i in 0 .. argtypes.len() {
             argtypes[i] = resolve_type(self.session, argtypes[i].clone(), false)?;
-            self.session.update_type(args[i].id, argtypes[i].clone())?;
+            self.session.update_type(func.args[i].id, argtypes[i].clone())?;
         }
 
         let tupleargs = Type::Tuple(argtypes);
-        let nftype = Type::Function(r(tupleargs.clone()), r(rettype), abi);
+        let nftype = Type::Function(r(tupleargs.clone()), r(rettype), func.abi);
 
         if let Ok(Def::Overload(ol)) = self.session.get_def_from_ref(defid) {
             let (mut found, _) = ol.find_local_variants(self.session, tupleargs.clone());
             found = found.into_iter().filter(|(fid, _)| defid != *fid).collect();
             if found.len() > 0 {
-                return Err(Error::new(format!("OverloadError: things {:?}\nvariants found [{}]", name, found.iter().map(|(_, t)| format!("{}", t)).collect::<Vec<String>>().join(", "))));
+                return Err(Error::new(format!("OverloadError: things {:?}\nvariants found [{}]", func.name, found.iter().map(|(_, t)| format!("{}", t)).collect::<Vec<String>>().join(", "))));
             }
         }
 
@@ -393,8 +393,8 @@ impl<'sess> Visitor for TypeChecker<'sess> {
         let mut names = traitdef.vars.get_names();
         for node in body {
             match &node.kind {
-                ExprKind::Function(_, name, _, _, _, _, _) => {
-                    let name = name.as_ref().unwrap();  // NOTE this should have already been checked by refinery
+                ExprKind::Function(func) => {
+                    let name = func.name.as_ref().unwrap();  // NOTE this should have already been checked by refinery
                     let defid = *names.get(name).ok_or(Error::new(format!("TraitError: function not declared in the trait def, but found in the trait impl, {:?}", name)))?;
                     let deftype = self.session.get_type(defid);
                     let impltype = self.session.get_type(node.id);

@@ -3,7 +3,7 @@ use abi::ABI;
 use session::{ Session, Error };
 use scope::{ ScopeRef, Context };
 use types::{ Type, resolve_type };
-use hir::{ NodeID, Visibility, Mutability, Argument, ClassSpec, MatchCase, EnumVariant, WhereClause, Pattern, PatKind, Expr, ExprKind };
+use hir::{ NodeID, Visibility, Mutability, ClassSpec, MatchCase, EnumVariant, WhereClause, Function, Pattern, PatKind, Expr, ExprKind };
 use misc::{ UniqueID, r };
 
 use defs::enums::EnumDef;
@@ -74,16 +74,16 @@ impl<'sess> Visitor for NameBinder<'sess> {
         self.visit_vec(code)
     }
 
-    fn visit_function(&mut self, id: NodeID, vis: Visibility, name: Option<&str>, args: &Vec<Argument>, rettype: &Option<Type>, body: &Vec<Expr>, abi: ABI, whereclause: &WhereClause) -> Result<Self::Return, Error> {
+    fn visit_function(&mut self, id: NodeID, func: &Function) -> Result<Self::Return, Error> {
         let defid = self.session.new_def_id(id);
 
         let scope = self.stack.get_scope();
         let fscope = self.session.map.add(defid, Some(scope.clone()));
-        fscope.set_basename(name.unwrap_or(&format!("anon{}", defid)));
+        fscope.set_basename(func.name.as_ref().unwrap_or(&format!("anon{}", defid)));
 
         // Check for typevars in the type params
         let mut argtypes = vec!();
-        for ref arg in args.iter() {
+        for ref arg in func.args.iter() {
             //let arg_defid = self.session.new_def_id(arg.id);
             // TODO this is a hack because the arguments are being cloned in the class desugaring in refinery, and that means the id is duplicated rather
             //      when a class has a lambda style method defined and assigned to a class field, the refinery will include the class field initializer (the function)
@@ -100,18 +100,18 @@ impl<'sess> Visitor for NameBinder<'sess> {
             ArgDef::define(self.session, fscope.clone(), arg_defid, Mutability::Immutable, &arg.name, ttype.clone())?;
             argtypes.push(ttype.unwrap_or_else(|| self.session.new_typevar()));
         }
-        let mut rettype = rettype.clone();
+        let mut rettype = func.rettype.clone();
         bind_type_names(self.session, fscope.clone(), rettype.as_mut())?;
-        bind_where_constraints(self.session, fscope.clone(), whereclause)?;
+        bind_where_constraints(self.session, fscope.clone(), &func.whereclause)?;
 
         // Build type according to the definition, using typevars for missing types
-        let nftype = Type::Function(r(Type::Tuple(argtypes)), r(rettype.unwrap_or_else(|| self.session.new_typevar())), abi);
+        let nftype = Type::Function(r(Type::Tuple(argtypes)), r(rettype.unwrap_or_else(|| self.session.new_typevar())), func.abi);
 
         // Define the function variable and it's arguments variables
-        AnyFunc::define(self.session, scope.clone(), defid, vis, name, abi, Some(nftype))?;
+        AnyFunc::define(self.session, scope.clone(), defid, func.vis, func.name.as_deref(), func.abi, Some(nftype))?;
 
         self.with_scope(fscope, |visitor| {
-            visitor.visit_vec(body)
+            visitor.visit_vec(&func.body)
         })
     }
 

@@ -2,13 +2,12 @@
 use std::fs::File;
 use std::io::prelude::*;
 
-use abi::ABI;
 use types::Type;
 use config::Options;
 use scope::{ ScopeRef };
 use session::{ Session, Error };
 use visitor::{ Visitor, ScopeStack };
-use hir::{ NodeID, Visibility, Mutability, ClassSpec, Argument, WhereClause, Expr, ExprKind };
+use hir::{ NodeID, Visibility, Mutability, ClassSpec, WhereClause, Function, Expr, ExprKind };
 
 
 pub fn write_exports(session: &Session, scope: ScopeRef, filename: &str, code: &Vec<Expr>) {
@@ -72,10 +71,10 @@ impl<'sess> Visitor for ExportsCollector<'sess> {
         Ok(())
     }
 
-    fn visit_function(&mut self, id: NodeID, vis: Visibility, name: Option<&str>, _args: &Vec<Argument>, _rettype: &Option<Type>, _body: &Vec<Expr>, _abi: ABI, whereclause: &WhereClause) -> Result<Self::Return, Error> {
-        if let Some(name) = name {
+    fn visit_function(&mut self, id: NodeID, func: &Function) -> Result<Self::Return, Error> {
+        if let Some(name) = &func.name {
             let defid = self.session.get_ref(id)?;
-            self.declarations.push_str(&emit_declaration(self.session, defid, vis, name, &whereclause.constraints));
+            self.declarations.push_str(&emit_declaration(self.session, defid, func.vis, name.as_str(), &func.whereclause.constraints));
         }
         // TODO we would walk the body here to search everything that's publically visable, but currently only top level functions are exported
         Ok(())
@@ -105,11 +104,11 @@ impl<'sess> Visitor for ExportsCollector<'sess> {
                     self.declarations.push_str("    ");
                     self.declarations.push_str(&emit_declaration(self.session, defid, *vis, name, &whereclause.constraints));
                 },
-                ExprKind::Function(vis, name, _, _, _, _, whereclause) => {
-                    if let Some(name) = name {
+                ExprKind::Function(func) => {
+                    if let Some(name) = &func.name {
                         let defid = self.session.get_ref(node.id)?;
                         self.declarations.push_str("    ");
-                        self.declarations.push_str(&emit_declaration(self.session, defid, *vis, name, &whereclause.constraints));
+                        self.declarations.push_str(&emit_declaration(self.session, defid, func.vis, name.as_str(), &func.whereclause.constraints));
                     }
                 },
                 _ => {  },

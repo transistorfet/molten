@@ -8,7 +8,7 @@ use config::Options;
 use scope::{ Scope, ScopeRef };
 use session::{ Session, Error };
 use ast::{ Pos };
-use hir::{ NodeID, Visibility, Mutability, AssignType, Literal, Argument, ClassSpec, MatchCase, EnumVariant, WhereClause, Pattern, PatKind, Expr, ExprKind };
+use hir::{ NodeID, Visibility, Mutability, AssignType, Literal, ClassSpec, MatchCase, EnumVariant, WhereClause, Function, Pattern, PatKind, Expr, ExprKind };
 
 use misc::{ r };
 use transform::functions::{ ClosureTransform };
@@ -263,8 +263,8 @@ impl<'sess> Visitor for Transformer<'sess> {
         Ok(self.transform_func_decl(abi, id, vis, name, &ttype))
     }
 
-    fn visit_function(&mut self, id: NodeID, vis: Visibility, name: Option<&str>, args: &Vec<Argument>, _rettype: &Option<Type>, body: &Vec<Expr>, abi: ABI, _whereclause: &WhereClause) -> Result<Self::Return, Error> {
-        Ok(self.transform_func_def(abi, id, vis, name, args, body))
+    fn visit_function(&mut self, id: NodeID, func: &Function) -> Result<Self::Return, Error> {
+        Ok(self.transform_func_def(id, func))
     }
 
     fn visit_alloc_object(&mut self, id: NodeID, _ttype: &Type) -> Result<Self::Return, Error> {

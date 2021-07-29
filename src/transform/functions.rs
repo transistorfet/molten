@@ -5,7 +5,7 @@ use typecheck;
 use abi::ABI;
 use types::Type;
 use ast::{ Pos };
-use hir::{ NodeID, Visibility, Mutability, Argument, Expr, ExprKind };
+use hir::{ NodeID, Visibility, Mutability, Argument, Function, Expr, ExprKind };
 use visitor::{ Visitor };
 
 use misc::{ r };
@@ -54,12 +54,12 @@ impl<'sess> Transformer<'sess> {
         }
     }
 
-    pub fn transform_func_def(&mut self, abi: ABI, id: NodeID, vis: Visibility, name: Option<&str>, args: &Vec<Argument>, body: &Vec<Expr>) -> Vec<LLExpr> {
+    pub fn transform_func_def(&mut self, id: NodeID, func: &Function) -> Vec<LLExpr> {
         let defid = self.session.get_ref(id).unwrap();
-        match abi {
-            ABI::C => CFuncTransform::transform_def(self, defid, vis, name, args, body),
-            ABI::Molten | ABI::Unknown => ClosureTransform::transform_def(self, defid, vis, name, args, body),
-            _ => panic!("Not Implemented: {:?}", abi),
+        match func.abi {
+            ABI::C => CFuncTransform::transform_def(self, defid, func.vis, func.name.as_deref(), &func.args, &func.body),
+            ABI::Molten | ABI::Unknown => ClosureTransform::transform_def(self, defid, func.vis, func.name.as_deref(), &func.args, &func.body),
+            _ => panic!("Not Implemented: {:?}", func.abi),
         }
     }
 

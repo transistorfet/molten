@@ -1,11 +1,10 @@
 
 use std::cell::RefCell;
 
-use abi::ABI;
 use types::Type;
 use session::Error;
 use scope::ScopeRef;
-use hir::{ NodeID, Visibility, Mutability, AssignType, Literal, Argument, ClassSpec, MatchCase, EnumVariant, WhereClause, Pattern, PatKind, Expr, ExprKind };
+use hir::{ NodeID, Visibility, Mutability, AssignType, Literal, ClassSpec, MatchCase, EnumVariant, WhereClause, Function, Pattern, PatKind, Expr, ExprKind };
 
 
 #[derive(Clone, Debug, PartialEq)]
@@ -135,12 +134,12 @@ pub trait Visitor: Sized {
     }
 
 
-    fn visit_declare(&mut self, _id: NodeID, _vis: Visibility, _name: &str, _ttype: &Type, whereclause: &WhereClause) -> Result<Self::Return, Error> {
+    fn visit_declare(&mut self, _id: NodeID, _vis: Visibility, _name: &str, _ttype: &Type, _whereclause: &WhereClause) -> Result<Self::Return, Error> {
         Ok(self.default_return())
     }
 
-    fn visit_function(&mut self, id: NodeID, vis: Visibility, name: Option<&str>, args: &Vec<Argument>, rettype: &Option<Type>, body: &Vec<Expr>, abi: ABI, whereclause: &WhereClause) -> Result<Self::Return, Error> {
-        walk_function(self, id, vis, name, args, rettype, body, abi, whereclause)
+    fn visit_function(&mut self, id: NodeID, func: &Function) -> Result<Self::Return, Error> {
+        walk_function(self, id, func)
     }
 
     fn visit_alloc_object(&mut self, _id: NodeID, _ttype: &Type) -> Result<Self::Return, Error> {
@@ -305,11 +304,11 @@ pub fn walk_while<R, V: Visitor<Return = R>>(visitor: &mut V, _id: NodeID, cond:
     Ok(visitor.default_return())
 }
 
-pub fn walk_function<R, V: Visitor<Return = R>>(visitor: &mut V, id: NodeID, _vis: Visibility, _ident: Option<&str>, _args: &Vec<Argument>, _rettype: &Option<Type>, body: &Vec<Expr>, _abi: ABI, _whereclause: &WhereClause) -> Result<R, Error> {
+pub fn walk_function<R, V: Visitor<Return = R>>(visitor: &mut V, id: NodeID, func: &Function) -> Result<R, Error> {
     let fscope = visitor.get_scope_by_id(id);
     // TODO visit arguments
     visitor.with_scope(fscope, |visitor| {
-        visitor.visit_vec(body)
+        visitor.visit_vec(&func.body)
     })?;
     Ok(visitor.default_return())
 }
@@ -446,8 +445,8 @@ pub fn walk_node<R, V: Visitor<Return = R>>(visitor: &mut V, node: &Expr) -> Res
             visitor.visit_declare(node.id, *vis, name, ttype, whereclause)
         },
 
-        ExprKind::Function(vis, name, args, rettype, body, abi, whereclause) => {
-            visitor.visit_function(node.id, *vis, name.as_ref().map(|s| s.as_str()), args, rettype, body, *abi, whereclause)
+        ExprKind::Function(func) => {
+            visitor.visit_function(node.id, func)
         },
 
         ExprKind::AllocObject(ttype) => {

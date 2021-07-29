@@ -72,6 +72,16 @@ pub struct WhereClause {
     pub constraints: Vec<(String, String)>,
 }
 
+#[derive(Clone, Debug, PartialEq)]
+pub struct Function {
+    pub vis: Visibility,
+    pub name: Option<String>,
+    pub args: Vec<Argument>,
+    pub rettype: Option<Type>,
+    pub body: Vec<Expr>,
+    pub abi: ABI,
+    pub whereclause: WhereClause,
+}
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Pattern {
@@ -129,7 +139,7 @@ pub enum ExprKind {
     While(R<Expr>, R<Expr>),
 
     Declare(Visibility, String, Type, WhereClause),
-    Function(Visibility, Option<String>, Vec<Argument>, Option<Type>, Vec<Expr>, ABI, WhereClause),
+    Function(Function),
     AllocObject(Type),
     Class(ClassSpec, Option<ClassSpec>, WhereClause, Vec<Expr>),
     TypeAlias(ClassSpec, Type),
@@ -352,8 +362,8 @@ impl Expr {
     }
 
     #[allow(dead_code)]
-    pub fn make_func(pos: Pos, vis: Visibility, ident: Option<String>, args: Vec<Argument>, rtype: Option<Type>, body: Vec<Expr>, abi: ABI, whereclause: WhereClause) -> Expr {
-        Expr { id: NodeID::generate(), pos: pos, kind: ExprKind::Function(vis, ident, args, rtype, body, abi, whereclause) }
+    pub fn make_func(pos: Pos, vis: Visibility, name: Option<String>, args: Vec<Argument>, rettype: Option<Type>, body: Vec<Expr>, abi: ABI, whereclause: WhereClause) -> Expr {
+        Expr { id: NodeID::generate(), pos: pos, kind: ExprKind::Function(Function { vis, name, args, rettype, body, abi, whereclause }) }
     }
 
     #[allow(dead_code)]
