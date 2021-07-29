@@ -110,7 +110,7 @@ impl ClassDef {
             self.structdef.inherit(&cls.structdef);
         }
 
-        let vtype = session.get_type(self.vtable.id).unwrap();
+        let vtype = session.get_type(self.vtable.id).unwrap().clone();
         if self.has_vtable() {
             if let Some(index) = self.get_struct_vtable_index() {
                 self.structdef.fields.borrow_mut()[index].2 = vtype;
@@ -122,7 +122,7 @@ impl ClassDef {
             match &node.kind {
                 ExprKind::Definition(mutable, name, _, _) => {
                     let defid = session.get_ref(node.id).unwrap();
-                    self.structdef.add_field(session, defid, *mutable, &name, session.get_type(defid).unwrap(), Define::IfNotExists);
+                    self.structdef.add_field(session, defid, *mutable, &name, session.get_type(defid).unwrap().clone(), Define::IfNotExists);
                 },
                 _ => { }
             }
@@ -234,7 +234,7 @@ impl Vtable {
                 ExprKind::Function(func) => {
                     if let Some(name) = func.name.as_ref() {
                         let defid = session.get_ref(node.id).unwrap();
-                        self.add_entry(session, defid, name, session.get_type(defid).unwrap());
+                        self.add_entry(session, defid, name, session.get_type(defid).unwrap().clone());
                     }
                 },
                 ExprKind::Declare(_, name, _, _) => {
@@ -242,7 +242,7 @@ impl Vtable {
                     let ttype = session.get_type(defid).unwrap();
                     match ttype {
                         Type::Function(_, _, _) => {
-                            self.add_entry(session, defid, &name, ttype);
+                            self.add_entry(session, defid, &name, ttype.clone());
                         },
                         _ => { },
                     }
@@ -263,7 +263,7 @@ impl Vtable {
 
     pub fn get_index(&self, session: &Session, name: &str, ftype: &Type) -> Option<usize> {
         self.table.borrow().iter().position(|(_, ename, etype)| {
-            ename == name && check_type(session, Some(etype.clone()), Some(ftype.clone()), Check::Def, false).is_ok()
+            ename == name && check_type(session, Some(etype), Some(ftype), Check::Def, false).is_ok()
         })
     }
 

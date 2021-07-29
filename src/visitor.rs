@@ -28,7 +28,7 @@ impl ScopeStack {
     }
 
     pub fn get_scope(&self) -> ScopeRef {
-        self.stack.borrow().last().map(|s| s.clone()).unwrap()
+        self.stack.borrow().last().cloned().unwrap()
     }
 }
 

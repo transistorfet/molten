@@ -39,7 +39,7 @@ impl TypeAliasDef {
         Ok(typealiasdef)
     }
 
-    pub fn resolve(&self, session: &Session, params: Vec<Type>) -> Result<Type, Error> {
+    pub fn resolve(&self, session: &Session, params: &Vec<Type>) -> Result<Type, Error> {
         let etype = session.get_type(self.id).ok_or(Error::new(format!("TypeError: no type set for id {:?}", self.id)))?;
 
         let defparams = self.deftype.get_params()?;
@@ -48,13 +48,13 @@ impl TypeAliasDef {
         }
 
         let mut map = Type::map_new();
-        for (def, param) in defparams.iter().zip(params) {
+        for (def, param) in defparams.iter().zip(params.iter()) {
             match def {
-                Type::Universal(_, id) => { map.insert(*id, param); },
+                Type::Universal(_, id) => { map.insert(*id, param.clone()); },
                 _ => return Err(Error::new(format!("UnsupportedError: currently only universal type variables are supported as type parameters in type aliases"))),
             }
         }
-        Ok(Type::map_typevars(session, &mut map, etype))
+        Ok(Type::map_typevars(session, &mut map, etype.clone()))
     }
 }
 

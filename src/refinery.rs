@@ -156,7 +156,7 @@ impl<'sess> Refinery<'sess> {
                 match self.get_context() {
                     Some(CodeContext::ClassBody) |
                     Some(CodeContext::Func(ABI::C)) =>
-                        return Err(Error::new(format!("SyntaxError: raise keyword cannot appear in this context"))),
+                        return Err(Error::new("SyntaxError: raise keyword cannot appear in this context".to_string())),
                     _ => { },
                 }
                 Expr::make_raise(pos, self.refine_node(*expr)?)
@@ -202,7 +202,7 @@ impl<'sess> Refinery<'sess> {
                 for node in body.iter() {
                     match node {
                         AST::Declare(_, _, _, _, _) => { },
-                        node @ _ => return Err(Error::new(format!("SyntaxError: only decls are allowed in trait definitions, found {:?}", node))),
+                        node => return Err(Error::new(format!("SyntaxError: only decls are allowed in trait definitions, found {:?}", node))),
                     }
                 }
                 Expr::make_trait_def(pos, traitspec, self.refine_vec(body))
@@ -225,7 +225,7 @@ impl<'sess> Refinery<'sess> {
 
                 let mut args = args.into_iter().map(|arg| self.refine_node(arg)).collect::<Result<Vec<_>, _>>()?;
                 args.insert(0, object);
-                Expr::make_annotation(ttype.clone(),
+                Expr::make_annotation(ttype,
                     Expr::make_invoke(pos, Expr::make_resolve_ident(pos, &classspec.name, "new"), args))
             },
 
@@ -241,7 +241,7 @@ impl<'sess> Refinery<'sess> {
                 // TODO should this also allow a non-type specifier?
                 match *left {
                     AST::Identifier(_, _) => { },
-                    _ => return Err(Error::new(format!("SyntaxError: left-hand side of scope resolver must be identifier"))),
+                    _ => return Err(Error::new("SyntaxError: left-hand side of scope resolver must be identifier".to_string())),
                 }
                 Expr::make_resolve(pos, self.refine_node(*left)?, right)
             },
@@ -322,7 +322,7 @@ impl<'sess> Refinery<'sess> {
             vec!(access_iter(), invoke(r(access_list_field("len")), vec!()))))?);
 
         // assign the next value to the item variable
-        body_block.push(Expr::make_def(pos, Mutability::Immutable, ident.clone(), None,
+        body_block.push(Expr::make_def(pos, Mutability::Immutable, ident, None,
             self.refine_node(invoke(r(access_list_field("get")), vec!(access_iter())))?));
 
         body_block.push(self.refine_node(body)?);
@@ -348,7 +348,7 @@ impl<'sess> Refinery<'sess> {
                         if args.len() > 0 && &args[0].name == "self" {
                             body.push(AST::Identifier(pos, "self".to_string()));
                         } else {
-                            return Err(Error::new(format!("SyntaxError: the \"new\" method on a class must have \"self\" as its first parameter")));
+                            return Err(Error::new("SyntaxError: the \"new\" method on a class must have \"self\" as its first parameter".to_string()));
                         }
                     }
                     name.as_ref().map(|name| if name == "__init__" { has_init = true; });
@@ -374,14 +374,11 @@ impl<'sess> Refinery<'sess> {
         if !has_init {
             let mut init = vec!();
             for node in &newbody {
-                match node {
-                    AST::Definition(_, _, name, _, value) => {
-                        init.push(AST::Assignment(pos,
-                            r(AST::Accessor(pos, r(AST::make_ident_from_str(pos, "self")), name.clone())),
-                            r(*value.clone()),
-                            AssignType::Initialize));
-                    },
-                    _ => { },
+                if let AST::Definition(_, _, name, _, value) = node {
+                    init.push(AST::Assignment(pos,
+                        r(AST::Accessor(pos, r(AST::make_ident_from_str(pos, "self")), name.clone())),
+                        r(*value.clone()),
+                        AssignType::Initialize));
                 }
             }
 
@@ -440,7 +437,7 @@ impl<'sess> Refinery<'sess> {
 
                     newbody.push(Expr::make_func(pos, vis, name, args, ret, body, abi, whereclause));
                 },
-                node @ _ => return Err(Error::new(format!("SyntaxError: only functions are allowed in trait impls, found {:?}", node))),
+                node => return Err(Error::new(format!("SyntaxError: only functions are allowed in trait impls, found {:?}", node))),
             }
         }
         Ok(Expr::make_trait_impl(pos, traitspec, impltype, newbody))

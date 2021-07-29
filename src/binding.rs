@@ -63,10 +63,10 @@ impl<'sess> Visitor for NameBinder<'sess> {
         let scope = self.stack.get_scope();
 
         let memo_name = format!("memo.{}", name);
-        VarDef::define(self.session, scope.clone(), memo_id, Mutability::Mutable, &memo_name, Some(scope.find_type(self.session, "Bool")?))?;
+        VarDef::define(self.session, scope.clone(), memo_id, Mutability::Mutable, &memo_name, Some(scope.find_type(self.session, "Bool")?.clone()))?;
 
         let defid = self.session.new_def_id(id);
-        let ttype = Type::Function(r(Type::Tuple(vec!())), r(scope.find_type(self.session, "Bool")?), ABI::Molten);
+        let ttype = Type::Function(r(Type::Tuple(vec!())), r(scope.find_type(self.session, "Bool")?.clone()), ABI::Molten);
         self.session.map.set(defid, scope.clone());
         self.session.set_type(defid, ttype.clone());
 

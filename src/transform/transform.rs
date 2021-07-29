@@ -227,7 +227,7 @@ impl<'sess> Visitor for Transformer<'sess> {
         let rettype = self.session.get_type(id).unwrap();
         let deftype = self.session.get_type(fid).unwrap();
         let abi = deftype.get_abi().unwrap();
-        Ok(self.transform_func_invoke(abi, id, func, args, deftype, rettype))
+        Ok(self.transform_func_invoke(abi, id, func, args, &deftype, &rettype))
     }
 
 
@@ -500,7 +500,7 @@ impl<'sess> Transformer<'sess> {
         let defid = NodeID::generate();
         let compiled_func_id = NodeID::generate();
         let scope = self.stack.get_scope();
-        let ttype = Type::Function(r(Type::Tuple(vec!())), r(scope.find_type(self.session, "Bool").unwrap()), ABI::Molten);
+        let ttype = Type::Function(r(Type::Tuple(vec!())), r(scope.find_type(self.session, "Bool").unwrap().clone()), ABI::Molten);
         let lltype = ClosureTransform::convert_to_def_type(LLType::Function(vec!(), r(LLType::I1)));
         self.session.set_type(defid, ttype.clone());
         self.set_type(compiled_func_id, lltype.clone());
@@ -547,7 +547,7 @@ impl<'sess> Transformer<'sess> {
                         //vec!(LLExpr::Cast(LLType::Alias(cl.context_type_id), r(LLExpr::GetValue(cl.context_arg_id))))
                         vec!(ClosureTransform::make_closure_value(self, NodeID::generate(), cl.compiled_func_id, LLExpr::GetValue(cl.context_arg_id)))
                     } else {
-                        let index = cl.find_or_add_field(self.session, defid, name, self.session.get_type(defid).unwrap());
+                        let index = cl.find_or_add_field(self.session, defid, name, &self.session.get_type(defid).unwrap());
                         let context = LLExpr::Cast(LLType::Alias(cl.context_type_id), r(LLExpr::GetValue(cl.context_arg_id)));
                         vec!(LLExpr::LoadRef(r(LLExpr::AccessRef(r(context), vec!(LLRef::Field(index))))))
                     }
@@ -620,7 +620,7 @@ impl<'sess> Transformer<'sess> {
                         let structdef = objdef.as_struct().unwrap();
                         exprs.extend(self.transform_class_access_field(structdef, objval, defid));
                     },
-                    result @ _ => panic!("Not Implemented: {:?}", result),
+                    result => panic!("Not Implemented: {:?}", result),
                 }
             },
             Type::Record(items) => {
@@ -646,7 +646,7 @@ impl<'sess> Transformer<'sess> {
         match self.session.get_def(object_id).unwrap() {
             Def::Class(classdef) => self.transform_class_resolve_method(classdef, defid),
             Def::Enum(enumdef) => self.transform_enum_resolve(id, enumdef, defid),
-            def @ _ => panic!("DefError: expected class or enum but found {:?}", def),
+            def => panic!("DefError: expected class or enum but found {:?}", def),
         }
     }
 

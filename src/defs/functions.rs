@@ -35,7 +35,7 @@ impl AnyFunc {
         session.set_def(id, def.clone());
 
         if let Some(ttype) = &ttype {
-            session.update_type(id, ttype.clone())?;
+            session.update_type(id, ttype)?;
         }
 
         if let Some(name) = name {
@@ -120,8 +120,8 @@ impl OverloadDef {
         }
     }
 
-    pub fn find_variant(&self, session: &Session, atypes: Type) -> Result<(NodeID, Type), Error> {
-        let (mut found, variant_types) = self.find_all_variants(session, atypes.clone());
+    pub fn find_variant(&self, session: &Session, atypes: &Type) -> Result<(NodeID, Type), Error> {
+        let (mut found, variant_types) = self.find_all_variants(session, atypes);
 
         match found.len() {
             0 => Err(Error::new(format!("OverloadError: No valid variant found for {}\n\tout of [{}]", atypes, Type::display_vec(&variant_types)))),
@@ -130,17 +130,17 @@ impl OverloadDef {
         }
     }
 
-    pub fn find_all_variants(&self, session: &Session, atypes: Type) -> (Vec<(NodeID, Type)>, Vec<Type>) {
+    pub fn find_all_variants(&self, session: &Session, atypes: &Type) -> (Vec<(NodeID, Type)>, Vec<Type>) {
         let variants = self.get_variants(session);
         self.find_variants_of(variants, session, atypes)
     }
 
-    pub fn find_local_variants(&self, session: &Session, atypes: Type) -> (Vec<(NodeID, Type)>, Vec<Type>) {
+    pub fn find_local_variants(&self, session: &Session, atypes: &Type) -> (Vec<(NodeID, Type)>, Vec<Type>) {
         let variants = self.variants.borrow().clone();
         self.find_variants_of(variants, session, atypes)
     }
 
-    pub fn find_variants_of(&self, variants: Vec<NodeID>, session: &Session, atypes: Type) -> (Vec<(NodeID, Type)>, Vec<Type>) {
+    pub fn find_variants_of(&self, variants: Vec<NodeID>, session: &Session, atypes: &Type) -> (Vec<(NodeID, Type)>, Vec<Type>) {
         let mut found = vec!();
         let mut variant_types = vec!();
         for id in variants {
@@ -148,7 +148,7 @@ impl OverloadDef {
 
             // Fetch the variant's type and map its typevars if necessary
             let ttype = match session.get_type(id) {
-                Some(ttype) => ttype,
+                Some(ttype) => ttype.clone(),
                 None => {
                     let vtype = session.new_typevar();
                     session.set_type(id, vtype.clone());
@@ -157,7 +157,7 @@ impl OverloadDef {
             };
 
             if let Type::Function(btypes, _, _) = &ttype {
-                if check_type(session, Some(*btypes.clone()), Some(atypes.clone()), Check::Def, false).is_ok() {
+                if check_type(session, Some(btypes), Some(&atypes), Check::Def, false).is_ok() {
                     if found.len() < 1 || self.variants.borrow().iter().position(|lid| *lid == id).is_some() {
                         found.push((id, ttype.clone()));
                     }
@@ -204,12 +204,12 @@ impl ClosureDef {
         self.context_struct.add_field(session, id, Mutability::Mutable, name, ttype, define);
     }
 
-    pub fn find_or_add_field(&self, session: &Session, id: NodeID, name: &str, ttype: Type) -> usize {
+    pub fn find_or_add_field(&self, session: &Session, id: NodeID, name: &str, ttype: &Type) -> usize {
         // TODO you should probably modify this to use the IDs
         match self.context_struct.find_field_by_id(id) {
             Some((index, _)) => index,
             None => {
-                self.add_field(session, id, name, ttype, Define::IfNotExists);
+                self.add_field(session, id, name, ttype.clone(), Define::IfNotExists);
                 self.context_struct.fields.borrow().len() - 1
             }
         }

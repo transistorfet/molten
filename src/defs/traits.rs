@@ -64,7 +64,7 @@ impl TraitDef {
 
     pub fn find_impl(&self, session: &Session, ttype: &Type) -> Result<TraitImplRef, Error> {
         for traitimpl in self.impls.borrow().iter() {
-            if check_type(session, Some(traitimpl.impltype.clone()), Some(ttype.clone()), Check::Def, false).is_ok() {
+            if check_type(session, Some(&traitimpl.impltype), Some(ttype), Check::Def, false).is_ok() {
                 return Ok(traitimpl.clone());
             }
         }

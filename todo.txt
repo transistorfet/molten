@@ -1,13 +1,11 @@
 
-* switch to 2018
-* can you get rid of .as_str() in 2018
 * for calling a function without it being a method call, you can parse "(" expression ")" into a special AST::BracketExpr or something, which can pass through the expr
   but can still be checked by the refinery and converted into an Expr::MethodInvoke or however you'll do that
 * I'd really like to change the way method calls are done.  It's annoying having all these definitions and blocks for every call
 
 * should you make a trait object's data be the first pointer (always a pointer), so that a double deref will get it, rather than an indexed deref?
 * should you use a different format for trait objects vs unbound universals?
-* you need to add where clauses to classes, enums
+* you need to add where clauses to enums, traits as well??
 
 * minor issue: when a trait is not implemented, it will produce an unhelpful type error that it expected random variable, but found unimplemented type
 * change check_type/expect_type to take &Type instead of Type

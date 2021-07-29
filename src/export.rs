@@ -81,9 +81,9 @@ impl<'sess> Visitor for ExportsCollector<'sess> {
     }
 
     fn visit_class(&mut self, _id: NodeID, classspec: &ClassSpec, parentspec: &Option<ClassSpec>, whereclause: &WhereClause, body: &Vec<Expr>) -> Result<Self::Return, Error> {
-        let mut namespec = unparse_type(self.session, Type::from(classspec));
+        let mut namespec = unparse_type(self.session, &Type::from(classspec));
         if parentspec.is_some() {
-            namespec = format!("{} extends {}", namespec, unparse_type(self.session, Type::from(parentspec.as_ref().unwrap())))
+            namespec = format!("{} extends {}", namespec, unparse_type(self.session, &Type::from(parentspec.as_ref().unwrap())))
         }
         if whereclause.constraints.len() > 0 {
             namespec += &emit_where_clause(&whereclause.constraints);
@@ -119,7 +119,7 @@ impl<'sess> Visitor for ExportsCollector<'sess> {
     }
 
     fn visit_trait_def(&mut self, _id: NodeID, traitspec: &ClassSpec, body: &Vec<Expr>) -> Result<Self::Return, Error> {
-        let namespec = unparse_type(self.session, Type::from(traitspec));
+        let namespec = unparse_type(self.session, &Type::from(traitspec));
 
         self.declarations.push_str(&format!("trait {} {{\n", namespec));
         for node in body {
@@ -151,7 +151,7 @@ fn emit_declaration(session: &Session, id: NodeID, vis: Visibility, name: &str, 
         } else {
             "".to_string()
         };
-        format!("decl {}{}{}\n", name, unparse_type(session, ttype), wherestr)
+        format!("decl {}{}{}\n", name, unparse_type(session, &ttype), wherestr)
     } else {
         String::from("")
     }
@@ -160,17 +160,17 @@ fn emit_declaration(session: &Session, id: NodeID, vis: Visibility, name: &str, 
 fn emit_field(session: &Session, id: NodeID, mutable: Mutability, name: &str) -> String {
     let ttype = session.get_type(id).unwrap();
     let mutable_str = if let Mutability::Mutable = mutable { "mut " } else { "" };
-    format!("let {}{}: {}\n", mutable_str, name, unparse_type(session, ttype))
+    format!("let {}{}: {}\n", mutable_str, name, unparse_type(session, &ttype))
 }
 
 fn emit_where_clause(constraints: &Vec<(String, String)>) -> String {
     format!(" where {}", constraints.iter().map(|(var, cons)| format!("{}: {}", var, cons)).collect::<Vec<String>>().join(", "))
 }
 
-pub fn unparse_type(session: &Session, ttype: Type) -> String {
+pub fn unparse_type(session: &Session, ttype: &Type) -> String {
     match ttype {
         Type::Object(name, _, types) => {
-            let params = if types.len() > 0 { format!("<{}>", types.iter().map(|p| unparse_type(session, p.clone())).collect::<Vec<String>>().join(", ")) } else { String::from("") };
+            let params = if types.len() > 0 { format!("<{}>", types.iter().map(|p| unparse_type(session, p)).collect::<Vec<String>>().join(", ")) } else { String::from("") };
             name.clone() + &params
         },
         Type::Variable(id) => {
@@ -180,18 +180,18 @@ pub fn unparse_type(session: &Session, ttype: Type) -> String {
             format!("'{}", name)
         },
         Type::Tuple(types) => {
-            let tuple: Vec<String> = types.iter().map(|t| unparse_type(session, t.clone())).collect();
+            let tuple: Vec<String> = types.iter().map(|t| unparse_type(session, t)).collect();
             format!("({})", tuple.join(", "))
         },
         Type::Record(types) => {
-            let tuple: Vec<String> = types.iter().map(|(n, t)| format!("{}: {}", n, unparse_type(session, t.clone()))).collect();
+            let tuple: Vec<String> = types.iter().map(|(n, t)| format!("{}: {}", n, unparse_type(session, t))).collect();
             format!("{{ {} }}", tuple.join(", "))
         },
         Type::Function(args, ret, abi) => {
-            format!("{} -> {}{}", unparse_type(session, *args), unparse_type(session, *ret), abi)
+            format!("{} -> {}{}", unparse_type(session, args), unparse_type(session, ret), abi)
         },
         Type::Ref(ttype) => {
-            format!("ref {}", unparse_type(session, *ttype))
+            format!("ref {}", unparse_type(session, ttype))
         },
     }
 }

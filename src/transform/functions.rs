@@ -63,7 +63,7 @@ impl<'sess> Transformer<'sess> {
         }
     }
 
-    pub fn transform_func_invoke(&mut self, abi: ABI, _id: NodeID, func: &Expr, args: &Vec<Expr>, ftype: Type, rettype: Type) -> Vec<LLExpr> {
+    pub fn transform_func_invoke(&mut self, abi: ABI, _id: NodeID, func: &Expr, args: &Vec<Expr>, ftype: &Type, rettype: &Type) -> Vec<LLExpr> {
         let mut exprs = vec!();
 
         let argtypes = ftype.get_argtypes().unwrap().as_vec();
@@ -128,7 +128,7 @@ impl CFuncTransform {
 
         let fargs = CFuncTransform::transform_def_args(transform, args);
 
-        transform.stack.push_scope(fscope.clone());
+        transform.stack.push_scope(fscope);
         transform.with_context(CodeContext::Func(ABI::C, defid), |transform| {
             let llvis = transform.transform_vis(vis);
             let llbody = transform.visit_vec(body).unwrap();

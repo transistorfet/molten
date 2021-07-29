@@ -28,7 +28,7 @@ impl<'sess> Transformer<'sess> {
             }
         }
 
-        self.add_global(LLGlobal::SetStructBody(defid, vec!(selector.clone(), LLType::Largest(types)), false));
+        self.add_global(LLGlobal::SetStructBody(defid, vec!(selector, LLType::Largest(types)), false));
         vec!()
     }
 
@@ -66,7 +66,7 @@ impl<'sess> Transformer<'sess> {
             None => { },
         }
 
-        self.add_global(LLGlobal::DefNamedStruct(id, name.clone(), false));
+        self.add_global(LLGlobal::DefNamedStruct(id, name, false));
         self.add_global(LLGlobal::SetStructBody(id, body, false));
         self.set_type(id, LLType::Alias(id));
     }

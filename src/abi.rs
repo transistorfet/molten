@@ -39,11 +39,11 @@ impl ABI {
         }
     }
 
-    pub fn compare(&self, other: &ABI) -> Option<ABI> {
-        if self == &ABI::Unknown {
-            Some(other.clone())
-        } else if other == &ABI::Unknown || self == other {
-            Some(self.clone())
+    pub fn compare(self, other: ABI) -> Option<ABI> {
+        if self == ABI::Unknown {
+            Some(other)
+        } else if other == ABI::Unknown || self == other {
+            Some(self)
         } else {
             None
         }
@@ -80,7 +80,7 @@ pub fn molten_mangle_type(ttype: &Type) -> String {
     match ttype {
         // TODO add type paramaters into name
         Type::Variable(_) => panic!("Placeholder type variables shouldn't appear here"),
-        Type::Universal(_, _) => format!("V"),
+        Type::Universal(_, _) => "V".to_string(),
         Type::Object(name, _, _types) => format!("N{}{}", name.len(), name),
         Type::Tuple(types) => {
             let mut tuple = String::from("");

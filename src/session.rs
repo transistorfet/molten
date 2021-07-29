@@ -167,7 +167,7 @@ impl Session {
     }
 
     pub fn get_type(&self, id: NodeID) -> Option<Type> {
-        self.types.borrow().get(&id).map(|ttype| ttype.clone())
+        self.types.borrow().get(&id).cloned()
     }
 
     pub fn new_typevar(&self) -> Type {
@@ -179,15 +179,15 @@ impl Session {
     }
 
     #[must_use]
-    pub fn update_type(&self, id: NodeID, ttype: Type) -> Result<(), Error> {
+    pub fn update_type(&self, id: NodeID, ttype: &Type) -> Result<(), Error> {
         let etype = self.get_type(id);
-        let ntype = match etype.clone() {
+        let ntype = match &etype {
             // NOTE don't update a variable with itself or it will cause infinite recursion due to the update call in check_type
-            Some(Type::Variable(eid)) if eid == id => ttype,
+            Some(Type::Variable(eid)) if *eid == id => ttype.clone(),
             etype @ Some(_) => {
-                types::check_type(self, etype, Some(ttype.clone()), types::Check::Def, true)?
+                types::check_type(self, etype.as_ref(), Some(ttype), types::Check::Def, true)?
             },
-            None => ttype,
+            None => ttype.clone(),
         };
         debug!("Updating type id {:?} from {:?} -> {:?}", id, etype, ntype);
         self.set_type(id, ntype);

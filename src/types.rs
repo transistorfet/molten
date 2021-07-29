@@ -227,7 +227,7 @@ pub enum Check {
     List,
 }
 
-pub fn expect_type(session: &Session, odtype: Option<Type>, octype: Option<Type>, mode: Check) -> Result<Type, Error> {
+pub fn expect_type(session: &Session, odtype: Option<&Type>, octype: Option<&Type>, mode: Check) -> Result<Type, Error> {
     check_type(session, odtype, octype, mode, true)
 }
 
@@ -236,17 +236,17 @@ pub fn expect_type(session: &Session, odtype: Option<Type>, octype: Option<Type>
 /// If mode is Check::Def, then dtype <: ctype (ie. ctype will be downcast to match dtype, but not the inverse)
 /// If mode is Check::List, dtype <: ctype OR ctype <: dtype (ie. the most general unifier between the two types)
 /// This behavioral difference is limited to object (class) subtyping
-pub fn check_type(session: &Session, odtype: Option<Type>, octype: Option<Type>, mode: Check, update: bool) -> Result<Type, Error> {
+pub fn check_type(session: &Session, odtype: Option<&Type>, octype: Option<&Type>, mode: Check, update: bool) -> Result<Type, Error> {
     if odtype.is_none() {
         match octype {
-            Some(ctype) => Ok(resolve_type(session, ctype, false)?),
+            Some(ctype) => Ok(resolve_type(session, ctype.clone(), false)?),
             None => Ok(session.new_typevar()),
         }
     } else if octype.is_none() {
-        Ok(odtype.unwrap())
+        Ok(odtype.unwrap().clone())
     } else {
-        let dtype = resolve_type(session, odtype.unwrap(), false)?;
-        let ctype = resolve_type(session, octype.unwrap(), false)?;
+        let dtype = resolve_type(session, odtype.unwrap().clone(), false)?;
+        let ctype = resolve_type(session, octype.unwrap().clone(), false)?;
 
         debug!("CHECK TYPE {:?} {:?} {:?} {:?}", dtype, ctype, mode, update);
 
@@ -280,7 +280,7 @@ pub fn check_type(session: &Session, odtype: Option<Type>, octype: Option<Type>,
             (Type::Variable(id), ntype) |
             (ntype, Type::Variable(id)) if check_trait_constraints(session, *id, ntype) => {
                 if update {
-                    session.update_type(*id, ntype.clone())?;
+                    session.update_type(*id, ntype)?;
                 }
                 Ok(resolve_type(session, ntype.clone(), false)?)
             }
@@ -290,10 +290,10 @@ pub fn check_type(session: &Session, odtype: Option<Type>, octype: Option<Type>,
             },
 
             (Type::Function(aargs, aret, aabi), Type::Function(bargs, bret, babi)) => {
-                let oabi = aabi.compare(babi);
+                let oabi = aabi.compare(*babi);
                 if oabi.is_some() {
-                    let argtypes = check_type(session, Some(*aargs.clone()), Some(*bargs.clone()), mode, update)?;
-                    Ok(Type::Function(r(argtypes), r(check_type(session, Some(*aret.clone()), Some(*bret.clone()), mode, update)?), oabi.unwrap()))
+                    let argtypes = check_type(session, Some(aargs), Some(bargs), mode, update)?;
+                    Ok(Type::Function(r(argtypes), r(check_type(session, Some(aret), Some(bret), mode, update)?), oabi.unwrap()))
                 } else {
                     Err(Error::new(format!("TypeError: type mismatch, expected {} but found {}", dtype, ctype)))
                 }
@@ -303,7 +303,7 @@ pub fn check_type(session: &Session, odtype: Option<Type>, octype: Option<Type>,
                 let mut types = vec!();
                 if atypes.len() == btypes.len() {
                     for (atype, btype) in atypes.iter().zip(btypes.iter()) {
-                        types.push(check_type(session, Some(atype.clone()), Some(btype.clone()), mode, update)?);
+                        types.push(check_type(session, Some(atype), Some(btype), mode, update)?);
                     }
                     Ok(Type::Tuple(types))
                 } else {
@@ -318,7 +318,7 @@ pub fn check_type(session: &Session, odtype: Option<Type>, octype: Option<Type>,
                         if aname != bname {
                             return Err(Error::new(format!("TypeError: type mismatch, expected {} but found {}", dtype, ctype)));
                         }
-                        types.push((aname.clone(), check_type(session, Some(atype.clone()), Some(btype.clone()), mode, update)?));
+                        types.push((aname.clone(), check_type(session, Some(atype), Some(btype), mode, update)?));
                     }
                     Ok(Type::Record(types))
                 } else {
@@ -337,7 +337,7 @@ pub fn check_type(session: &Session, odtype: Option<Type>, octype: Option<Type>,
             },
 
             (Type::Ref(atype), Type::Ref(btype)) => {
-                let ttype = check_type(session, Some(*atype.clone()), Some(*btype.clone()), mode, update)?;
+                let ttype = check_type(session, Some(atype), Some(btype), mode, update)?;
                 Ok(Type::Ref(r(ttype)))
             },
 
@@ -356,7 +356,7 @@ fn is_subclass_of(session: &Session, sdef: (&String, UniqueID, &Vec<Type>), pdef
     //let mut deftype = session.get_type(sdef.1)?.get_params()?;
 
     loop {
-        let mut class = session.get_type(sdef.1).unwrap();
+        let mut class = session.get_type(sdef.1).unwrap().clone();
         if update {
             class = Type::map_typevars(session, &mut names, class);
         }
@@ -399,7 +399,7 @@ pub fn check_type_params(session: &Session, dtypes: &Vec<Type>, ctypes: &Vec<Typ
     } else {
         let mut ptypes = vec!();
         for (dtype, ctype) in dtypes.iter().zip(ctypes.iter()) {
-            ptypes.push(check_type(session, Some(dtype.clone()), Some(ctype.clone()), mode, update)?);
+            ptypes.push(check_type(session, Some(dtype), Some(ctype), mode, update)?);
         }
         Ok(ptypes)
     }
@@ -419,7 +419,7 @@ pub fn check_trait_is_implemented(session: &Session, trait_id: NodeID, ctype: &T
     match session.get_def(trait_id).and_then(|def| def.as_trait_def()) {
         Ok(traitdef) => {
             for traitimpl in traitdef.impls.borrow().iter() {
-                if let Ok(_) = check_type(session, Some(traitimpl.impltype.clone()), Some(ctype.clone()), Check::Def, false) {
+                if let Ok(_) = check_type(session, Some(&traitimpl.impltype), Some(ctype), Check::Def, false) {
                     return true;
                 }
             }
@@ -432,16 +432,16 @@ pub fn check_trait_is_implemented(session: &Session, trait_id: NodeID, ctype: &T
 pub fn resolve_type(session: &Session, ttype: Type, require_resolve: bool) -> Result<Type, Error> {
     match ttype {
         Type::Object(name, id, types) => {
-            let params = types.iter().map(|ptype| resolve_type(session, ptype.clone(), require_resolve)).collect::<Result<Vec<Type>, Error>>()?;
+            let params = types.into_iter().map(|ptype| resolve_type(session, ptype, require_resolve)).collect::<Result<Vec<Type>, Error>>()?;
 
             match session.get_def(id) {
                 Ok(Def::TypeAlias(alias)) => {
-                    Ok(alias.resolve(session, params).unwrap())
+                    Ok(alias.resolve(session, &params).unwrap())
                 },
                 _ => match session.get_type(id) {
                     // NOTE we have a special case for objects because we want to return the resolved parameters and not the parameters the type was defined with
-                    Some(Type::Object(_, _, _)) => Ok(Type::Object(name.clone(), id, params)),
-                    Some(stype) => Ok(stype),
+                    Some(Type::Object(_, _, _)) => Ok(Type::Object(name, id, params)),
+                    Some(stype) => Ok(stype.clone()),
                     None => Err(Error::new(format!("TypeError: undefined type {:?}", name))).unwrap(),
                 },
             }
@@ -457,31 +457,31 @@ pub fn resolve_type(session: &Session, ttype: Type, require_resolve: bool) -> Re
                                 Err(Error::new(format!("TypeError: unification variable unresolved: {}", vtype)))
                             }
                         },
-                        _ => resolve_type(session, vtype, require_resolve),
+                        _ => resolve_type(session, vtype.clone(), require_resolve),
                     }
                 },
                 None => Err(Error::new(format!("TypeError: undefined type variable {}", ttype))),
             }
         },
         Type::Universal(name, id) => {
-            Ok(Type::Universal(name.clone(), id))
+            Ok(Type::Universal(name, id))
         },
         Type::Tuple(types) => {
-            let types = types.iter().map(|ttype| resolve_type(session, ttype.clone(), require_resolve)).collect::<Result<Vec<Type>, Error>>()?;
+            let types = types.into_iter().map(|ttype| resolve_type(session, ttype, require_resolve)).collect::<Result<Vec<Type>, Error>>()?;
             Ok(Type::Tuple(types))
         },
         Type::Record(types) => {
-            let types = types.iter().map(|(name, ttype)| {
-                let ttype = resolve_type(session, ttype.clone(), require_resolve)?;
-                Ok((name.clone(), ttype))
+            let types = types.into_iter().map(|(name, ttype)| {
+                let ttype = resolve_type(session, ttype, require_resolve)?;
+                Ok((name, ttype))
             }).collect::<Result<Vec<(String, Type)>, Error>>()?;
             Ok(Type::Record(types))
         },
         Type::Function(args, ret, abi) => {
-            Ok(Type::Function(r(resolve_type(session, *args.clone(), require_resolve)?), r(resolve_type(session, *ret.clone(), require_resolve)?), abi))
+            Ok(Type::Function(r(resolve_type(session, *args, require_resolve)?), r(resolve_type(session, *ret, require_resolve)?), abi))
         },
         Type::Ref(ttype) => {
-            Ok(Type::Ref(r(resolve_type(session, *ttype.clone(), require_resolve)?)))
+            Ok(Type::Ref(r(resolve_type(session, *ttype, require_resolve)?)))
         },
     }
 }

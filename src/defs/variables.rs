@@ -50,7 +50,7 @@ impl VarDef {
         dscope.define(name, id)?;
         session.set_def(id, def.clone());
         if let Some(ttype) = ttype {
-            session.update_type(id, ttype)?;
+            session.update_type(id, &ttype)?;
         }
 
         Ok(())
@@ -96,7 +96,7 @@ impl FieldDef {
 
         }));
 
-        VarDef::set_var_def(session, scope.clone(), id, name, def.clone(), ttype)?;
+        VarDef::set_var_def(session, scope, id, name, def.clone(), ttype)?;
         Ok(def)
     }
 }
