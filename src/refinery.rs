@@ -1,12 +1,12 @@
 
 use std::cell::RefCell;
 
-use abi::ABI;
-use types::Type;
-use ast::{ Pos, AST };
-use misc::{ r, UniqueID };
-use session::{ Session, Error };
-use hir::{ NodeID, Visibility, Mutability, AssignType, Literal, Argument, ClassSpec, MatchCase, EnumVariant, WhereClause, Pattern, Expr, ExprKind };
+use crate::abi::ABI;
+use crate::types::Type;
+use crate::ast::{ Pos, AST };
+use crate::misc::{ r, UniqueID };
+use crate::session::{ Session, Error };
+use crate::hir::{ NodeID, Visibility, Mutability, AssignType, Literal, Argument, ClassSpec, MatchCase, EnumVariant, WhereClause, Pattern, Expr, ExprKind };
 
 
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -267,7 +267,7 @@ impl<'sess> Refinery<'sess> {
 
             AST::Import(pos, ident, _) => {
                 let path = ident.replace(".", "/") + ".dec";
-                let ast = self.session.parse_file(path.as_str(), true);
+                let ast = self.session.parse_file(&path, true);
                 let decls = self.refine_vec(ast);
                 Expr::make_import(pos, ident, decls)
             },
@@ -343,22 +343,22 @@ impl<'sess> Refinery<'sess> {
         for node in body {
             let node = match node {
                 AST::Function(pos, vis, name, args, ret, mut body, abi, whereclause) => {
-                    if name.as_ref().map(|s| s.as_str()) == Some("new") {
+                    if name.as_deref() == Some("new") {
                         has_new = true;
-                        if args.len() > 0 && args[0].name.as_str() == "self" {
+                        if args.len() > 0 && &args[0].name == "self" {
                             body.push(AST::Identifier(pos, "self".to_string()));
                         } else {
                             return Err(Error::new(format!("SyntaxError: the \"new\" method on a class must have \"self\" as its first parameter")));
                         }
                     }
-                    name.as_ref().map(|ref name| if name.as_str() == "__init__" { has_init = true; });
+                    name.as_ref().map(|name| if name == "__init__" { has_init = true; });
                     AST::Function(pos, vis, name, args, ret, body, abi, whereclause)
                 },
                 AST::Declare(pos, vis, name, ttype, whereclause) => {
-                    if name.as_str() == "new" {
+                    if &name == "new" {
                         has_new = true;
                     }
-                    if name.as_str() == "__init__" { has_init = true; }
+                    if &name == "__init__" { has_init = true; }
                     AST::Declare(pos, vis, name, ttype, whereclause)
                 },
                 _ => node

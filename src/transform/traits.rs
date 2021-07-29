@@ -1,13 +1,13 @@
 
-use misc::r;
-use types::Type;
-use hir::{ NodeID, Expr };
-use defs::traits::{ TraitDefRef };
-use visitor::{ Visitor };
+use crate::misc::r;
+use crate::types::Type;
+use crate::hir::{ NodeID, Expr };
+use crate::defs::traits::{ TraitDefRef };
+use crate::visitor::{ Visitor };
 
-use transform::transform::{ CodeContext, Transformer };
-use transform::classes::{ VtableTransform };
-use llvm::llcode::{ LLType, LLLit, LLRef, LLExpr };
+use crate::transform::transform::{ CodeContext, Transformer };
+use crate::transform::classes::{ VtableTransform };
+use crate::llvm::llcode::{ LLType, LLLit, LLRef, LLExpr };
 
 
 impl<'sess> Transformer<'sess> {

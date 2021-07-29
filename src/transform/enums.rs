@@ -1,13 +1,13 @@
 
-use misc::r;
-use types::Type;
-use hir::{ NodeID };
+use crate::misc::r;
+use crate::types::Type;
+use crate::hir::{ NodeID };
 
-use defs::enums::EnumDefRef;
+use crate::defs::enums::EnumDefRef;
 
-use transform::transform::{ Transformer };
-use transform::functions::{ CFuncTransform };
-use llvm::llcode::{ LLType, LLLit, LLCC, LLLink, LLExpr, LLGlobal };
+use crate::transform::transform::{ Transformer };
+use crate::transform::functions::{ CFuncTransform };
+use crate::llvm::llcode::{ LLType, LLLit, LLCC, LLLink, LLExpr, LLGlobal };
 
 
 impl<'sess> Transformer<'sess> {

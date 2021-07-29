@@ -19,12 +19,12 @@ use self::llvm_sys::target_machine::*;
 use self::llvm_sys::transforms::pass_manager_builder::*;
 
 
-use hir::NodeID;
-use config::Options;
-use misc::{ UniqueID };
-use session::{ Session, Error };
+use crate::hir::NodeID;
+use crate::config::Options;
+use crate::misc::{ UniqueID };
+use crate::session::{ Session, Error };
 
-use llvm::llcode::{ LLType, LLLit, LLRef, LLCmpType, LLLink, LLCC, LLExpr, LLGlobal, LLBlock };
+use crate::llvm::llcode::{ LLType, LLLit, LLRef, LLCmpType, LLLink, LLCC, LLExpr, LLGlobal, LLBlock };
 
 
 #[derive(Clone)]
@@ -431,7 +431,7 @@ impl<'sess> LLVM<'sess> {
             LLLit::I64(num) => self.i64_const(*num),
             LLLit::F64(num) => self.f64_const(*num),
             LLLit::Null(ltype) => self.null_const(self.build_type(ltype)),
-            LLLit::ConstStr(string) => self.str_const(string.as_str()),
+            LLLit::ConstStr(string) => self.str_const(&string),
         }
     }
 
@@ -758,7 +758,7 @@ impl<'sess> LLVM<'sess> {
                 LLGlobal::DefGlobal(id, link, name, ltype, should_init) => {
                     let rtype = self.build_type(ltype);
                     let initializer = if *should_init { Some(self.null_const(rtype)) } else { None };
-                    let global = self.build_def_global(name.as_str(), *link, rtype, initializer);
+                    let global = self.build_def_global(&name, *link, rtype, initializer);
                     self.set_value(*id, global);
                 },
 
@@ -766,7 +766,7 @@ impl<'sess> LLVM<'sess> {
                 LLGlobal::DefCFunc(id, _, name, ltype, _, _, cc) => {
                     let ftype = self.build_type(ltype);
                     let mut function = LLVMGetNamedFunction(self.module, cstr(&name));
-                    if function == ptr::null_mut() {
+                    if function.is_null() {
                         function = LLVMAddFunction(self.module, cstr(&name), ftype);
                     }
                     LLVMSetFunctionCallConv(function, self.get_callconv(*cc) as c_uint);
@@ -775,7 +775,7 @@ impl<'sess> LLVM<'sess> {
 
 
                 LLGlobal::DefNamedStruct(id, name, use_ptr) => {
-                    let s = LLVMStructCreateNamed(self.context, cstr(name.as_str()));
+                    let s = LLVMStructCreateNamed(self.context, cstr(&name));
                     self.set_type(*id, if *use_ptr { LLVMPointerType(s, 0) } else { s });
                 },
 

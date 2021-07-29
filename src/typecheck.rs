@@ -1,12 +1,12 @@
 
 
-use defs::Def;
-use session::{ Session, Error };
-use scope::{ ScopeRef };
-use hir::{ NodeID, Visibility, Mutability, AssignType, Literal, ClassSpec, MatchCase, EnumVariant, WhereClause, Function, Pattern, Expr, ExprKind };
-use types::{ Type, Check, ABI, expect_type, check_type, resolve_type, check_type_params };
-use misc::{ r };
-use visitor::{ self, Visitor, ScopeStack };
+use crate::defs::Def;
+use crate::session::{ Session, Error };
+use crate::scope::{ ScopeRef };
+use crate::hir::{ NodeID, Visibility, Mutability, AssignType, Literal, ClassSpec, MatchCase, EnumVariant, WhereClause, Function, Pattern, Expr, ExprKind };
+use crate::types::{ Type, Check, ABI, expect_type, check_type, resolve_type, check_type_params };
+use crate::misc::{ r };
+use crate::visitor::{ self, Visitor, ScopeStack };
 
 
 #[derive(Clone, Debug, PartialEq)]
@@ -117,12 +117,12 @@ impl<'sess> Visitor for TypeChecker<'sess> {
         let rtype = dftype.get_rettype()?;
 
         let mut argtypes = vec!();
-        for ref arg in func.args.iter() {
+        for arg in func.args.iter() {
             let arg_defid = self.session.get_ref(arg.id)?;
             let mut atype = self.session.get_type(arg_defid).unwrap_or_else(|| self.session.new_typevar());
 
             // TODO default args aren't used yet
-            //let vtype = arg.default.clone().map(|ref vexpr| self.visit_node_or_error(vexpr));
+            //let vtype = arg.default.clone().map(|vexpr| self.visit_node_or_error(vexpr));
             //atype = expect_type(self.session, scope.clone(), atype, vtype, Check::Def)?;
 
             if &arg.name[..] == "self" || &arg.name[..] == "self_boxed" {
@@ -162,7 +162,7 @@ impl<'sess> Visitor for TypeChecker<'sess> {
 
     fn visit_invoke(&mut self, refid: NodeID, fexpr: &Expr, args: &Vec<Expr>, fid: NodeID) -> Result<Self::Return, Error> {
         let mut atypes = vec!();
-        for ref mut value in args {
+        for value in args {
             atypes.push(self.visit_node_or_error(value));
         }
         let atypes = Type::Tuple(atypes);
@@ -195,7 +195,7 @@ impl<'sess> Visitor for TypeChecker<'sess> {
 
     fn visit_side_effect(&mut self, _id: NodeID, _op: &str, args: &Vec<Expr>) -> Result<Self::Return, Error> {
         let mut ltype = None;
-        for ref expr in args {
+        for expr in args {
             ltype = Some(expect_type(self.session, ltype.clone(), Some(self.visit_node_or_error(expr)), Check::List)?);
         }
         Ok(ltype.unwrap())
@@ -243,7 +243,7 @@ impl<'sess> Visitor for TypeChecker<'sess> {
         let mut ctype = self.visit_node_or_error(cond);
 
         let mut rtype = None;
-        for ref case in cases {
+        for case in cases {
             let lscope = self.session.map.get(&case.id);
             self.with_scope(lscope.clone(), |visitor| {
                 ctype = expect_type(visitor.session, Some(ctype.clone()), Some(visitor.visit_pattern(&case.pat)?), Check::List)?;
@@ -261,7 +261,7 @@ impl<'sess> Visitor for TypeChecker<'sess> {
         let mut ctype = scope.find_type(self.session, "Exception")?;
 
         let mut rtype = None;
-        for ref case in cases {
+        for case in cases {
             let lscope = self.session.map.get(&case.id);
             self.with_scope(lscope.clone(), |visitor| {
                 ctype = expect_type(visitor.session, Some(ctype.clone()), Some(visitor.visit_pattern(&case.pat)?), Check::List)?;
@@ -324,7 +324,7 @@ impl<'sess> Visitor for TypeChecker<'sess> {
     fn visit_tuple(&mut self, refid: NodeID, items: &Vec<Expr>) -> Result<Self::Return, Error> {
         // TODO would this not be a bug if the expected type was for some reason a variable?
         //let etypes = match self.session.get_type(refid) {
-        //    Some(ref e) => e.get_types()?.iter().map(|i| Some(i.clone())).collect(),
+        //    Some(e) => e.get_types()?.iter().map(|i| Some(i.clone())).collect(),
         //    None => vec![None; items.len()]
         //};
         let etypes = vec![None; items.len()];
@@ -334,7 +334,7 @@ impl<'sess> Visitor for TypeChecker<'sess> {
         }
 
         let mut types = vec!();
-        for (ref expr, etype) in items.iter().zip(etypes.iter()) {
+        for (expr, etype) in items.iter().zip(etypes.iter()) {
             types.push(expect_type(self.session, etype.clone(), Some(self.visit_node_or_error(expr)), Check::List)?);
         }
         self.session.set_type(refid, Type::Tuple(types.clone()));
@@ -399,7 +399,7 @@ impl<'sess> Visitor for TypeChecker<'sess> {
                     let deftype = self.session.get_type(defid);
                     let impltype = self.session.get_type(node.id);
                     check_type(self.session, deftype, impltype, Check::Def, false)?;
-                    names.remove(name.as_str());
+                    names.remove(name);
                 }
                 _ => panic!("InternalError: expected function definition, found {:?}", node),
             }

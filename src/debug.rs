@@ -1,14 +1,14 @@
 
-use session::Session;
-use scope::{ ScopeRef };
-use hir::{ Expr, ExprKind };
+use crate::session::Session;
+use crate::scope::{ ScopeRef };
+use crate::hir::{ Expr, ExprKind };
 
 macro_rules! debug {
     //($fmt:expr, $($arg:expr),*) => {
     //    println!($fmt, $(unsafe_render(&$arg)),*)
     //}
     ($fmt:expr, $($arg:tt)*) => {
-        if ::config::Options::as_ref().debug {
+        if crate::config::Options::as_ref().debug {
             println!($fmt, $($arg)*)
         }
     }

@@ -2,14 +2,14 @@
 use std::rc::Rc;
 use std::cell::RefCell;
 
-use abi::ABI;
-use defs::Def;
-use scope::{ Scope, ScopeRef };
-use session::{ Session, Error };
-use types::{ Type, Check, check_type };
-use hir::{ NodeID, Mutability, Visibility };
+use crate::abi::ABI;
+use crate::defs::Def;
+use crate::scope::{ Scope, ScopeRef };
+use crate::session::{ Session, Error };
+use crate::types::{ Type, Check, check_type };
+use crate::hir::{ NodeID, Mutability, Visibility };
 
-use defs::classes::{ Define, StructDef, StructDefRef };
+use crate::defs::classes::{ Define, StructDef, StructDefRef };
 
 
 pub struct AnyFunc();
@@ -34,7 +34,7 @@ impl AnyFunc {
     pub fn set_func_def(session: &Session, scope: ScopeRef, id: NodeID, name: Option<&str>, def: Def, ttype: Option<Type>) -> Result<(), Error> {
         session.set_def(id, def.clone());
 
-        if let Some(ref ttype) = ttype {
+        if let Some(ttype) = &ttype {
             session.update_type(id, ttype.clone())?;
         }
 
@@ -156,7 +156,7 @@ impl OverloadDef {
                 }
             };
 
-            if let Type::Function(ref btypes, _, _) = ttype {
+            if let Type::Function(btypes, _, _) = &ttype {
                 if check_type(session, Some(*btypes.clone()), Some(atypes.clone()), Check::Def, false).is_ok() {
                     if found.len() < 1 || self.variants.borrow().iter().position(|lid| *lid == id).is_some() {
                         found.push((id, ttype.clone()));

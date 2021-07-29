@@ -2,11 +2,11 @@
 use std::fmt;
 use std::str;
 
-use abi::ABI;
-use types::Type;
-use parser::Span;
-use misc::{ R, r };
-use hir::{ Visibility, Mutability, AssignType, Literal, Argument, ClassSpec, WhereClause, Pattern };
+use crate::abi::ABI;
+use crate::types::Type;
+use crate::parser::Span;
+use crate::misc::{ R, r };
+use crate::hir::{ Visibility, Mutability, AssignType, Literal, Argument, ClassSpec, WhereClause, Pattern };
 
 
 #[derive(Copy, Clone, PartialEq)]

@@ -1,11 +1,11 @@
 
 use std::rc::Rc;
 
-use defs::Def;
-use types::Type;
-use hir::{ NodeID, Mutability };
-use scope::{ Scope, ScopeRef };
-use session::{ Session, Error };
+use crate::defs::Def;
+use crate::types::Type;
+use crate::hir::{ NodeID, Mutability };
+use crate::scope::{ Scope, ScopeRef };
+use crate::session::{ Session, Error };
 
 
 pub struct AnyVar();

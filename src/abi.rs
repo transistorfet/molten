@@ -3,7 +3,7 @@
 use std::fmt;
 use std::str;
 
-use types::Type;
+use crate::types::Type;
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum ABI {
@@ -17,9 +17,9 @@ pub enum ABI {
 
 impl ABI {
     pub fn from_str(name: &Option<String>) -> ABI {
-        match *name {
+        match name.as_deref() {
             None => ABI::Molten,
-            Some(ref name) => match name.as_str() {
+            Some(name) => match name {
                 "" | "Molten" | "M" => ABI::Molten,
                 "C" => ABI::C,
                 "C++" => ABI::Cpp,

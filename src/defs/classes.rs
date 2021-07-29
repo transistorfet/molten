@@ -2,14 +2,14 @@
 use std::rc::Rc;
 use std::cell::RefCell;
 
-use defs::Def;
-use types::Type;
-use scope::{ Scope, ScopeRef };
-use session::{ Session, Error };
-use types::{ check_type, Check };
-use hir::{ NodeID, Mutability, Expr, ExprKind };
+use crate::defs::Def;
+use crate::types::Type;
+use crate::scope::{ Scope, ScopeRef };
+use crate::session::{ Session, Error };
+use crate::types::{ check_type, Check };
+use crate::hir::{ NodeID, Mutability, Expr, ExprKind };
 
-use defs::variables::FieldDef;
+use crate::defs::variables::FieldDef;
 
 
 
@@ -54,7 +54,7 @@ impl ClassDef {
 
         // Define Self and Super, and check for typevars in the type params
         tscope.define_type("Self", id)?;
-        if let Some(ref ptype) = parenttype {
+        if let Some(ptype) = &parenttype {
             tscope.define_type("Super", scope.get_type_def(&ptype.get_name()?).unwrap())?;
         }
 
@@ -72,8 +72,8 @@ impl ClassDef {
         let name = classtype.get_name()?;
 
         // Find the parent class definitions, which the new class will inherit from
-        let parentclass = match parenttype {
-            Some(Type::Object(ref pname, _, _)) => Some(scope.find_type_def(session, &pname)?.as_class()?),
+        let parentclass = match &parenttype {
+            Some(Type::Object(pname, _, _)) => Some(scope.find_type_def(session, pname)?.as_class()?),
             _ => None
         };
 
@@ -82,14 +82,14 @@ impl ClassDef {
         vars.set_basename(name);
 
         session.set_type(id, classtype.clone());
-        let vtable = Vtable::create(session, NodeID::generate(), format!("{}_vtable", name.clone()))?;
+        let vtable = Vtable::create(session, NodeID::generate(), format!("{}_vtable", name))?;
         let classdef = ClassDef::new_ref(id, name.to_string(), classtype, parenttype, vars, vtable);
         Ok(classdef)
     }
 
     fn get_parent_class(&self, session: &Session) -> Option<ClassDefRef> {
         match self.parenttype {
-            Some(Type::Object(_, ref id, _)) => Some(session.get_def(*id).unwrap().as_class().unwrap()),
+            Some(Type::Object(_, id, _)) => Some(session.get_def(id).unwrap().as_class().unwrap()),
             None => None,
             _ => panic!("UnexpectedError: parent class type should be Type:Object()"),
         }
@@ -118,11 +118,11 @@ impl ClassDef {
                 self.structdef.add_field(session, self.vtable.id, Mutability::Immutable, "__vtable__", vtype, Define::IfNotExists);
             }
         }
-        for ref node in body.iter() {
+        for node in body.iter() {
             match &node.kind {
                 ExprKind::Definition(mutable, name, _, _) => {
                     let defid = session.get_ref(node.id).unwrap();
-                    self.structdef.add_field(session, defid, *mutable, name.as_str(), session.get_type(defid).unwrap(), Define::IfNotExists);
+                    self.structdef.add_field(session, defid, *mutable, &name, session.get_type(defid).unwrap(), Define::IfNotExists);
                 },
                 _ => { }
             }
@@ -182,7 +182,7 @@ impl StructDef {
     }
 
     pub fn get_index(&self, field: &str) -> Option<usize> {
-        self.fields.borrow().iter().position(|ref r| r.1.as_str() == field)
+        self.fields.borrow().iter().position(|r| r.1 == field)
     }
 
     pub fn find_field_by_id(&self, id: NodeID) -> Option<(usize, Type)> {
@@ -191,7 +191,7 @@ impl StructDef {
     }
 
     pub fn get_index_by_id(&self, id: NodeID) -> Option<usize> {
-        self.fields.borrow().iter().position(|ref r| r.0 == id)
+        self.fields.borrow().iter().position(|r| r.0 == id)
     }
 
     pub fn foreach_field<F>(&self, mut f: F) where F: FnMut(NodeID, &str, &Type) -> () {
@@ -229,7 +229,7 @@ impl Vtable {
     }
 
     pub fn build_vtable(&self, session: &Session, body: &Vec<Expr>) {
-        for ref node in body.iter() {
+        for node in body.iter() {
             match &node.kind {
                 ExprKind::Function(func) => {
                     if let Some(name) = func.name.as_ref() {
@@ -242,7 +242,7 @@ impl Vtable {
                     let ttype = session.get_type(defid).unwrap();
                     match ttype {
                         Type::Function(_, _, _) => {
-                            self.add_entry(session, defid, name.as_str(), ttype);
+                            self.add_entry(session, defid, &name, ttype);
                         },
                         _ => { },
                     }
@@ -262,13 +262,13 @@ impl Vtable {
     }
 
     pub fn get_index(&self, session: &Session, name: &str, ftype: &Type) -> Option<usize> {
-        self.table.borrow().iter().position(|(_, ref ename, ref etype)| {
-            ename.as_str() == name && check_type(session, Some(etype.clone()), Some(ftype.clone()), Check::Def, false).is_ok()
+        self.table.borrow().iter().position(|(_, ename, etype)| {
+            ename == name && check_type(session, Some(etype.clone()), Some(ftype.clone()), Check::Def, false).is_ok()
         })
     }
 
     pub fn get_index_by_id(&self, id: NodeID) -> Option<usize> {
-        self.table.borrow().iter().position(|ref r| r.0 == id)
+        self.table.borrow().iter().position(|r| r.0 == id)
     }
 
     pub fn len(&self) -> usize {

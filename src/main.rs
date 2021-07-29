@@ -33,7 +33,7 @@ mod llvm;
 
 use regex::{ Regex };
 use clap::{ App, Arg, ArgMatches };
-use config::{ Options, EmitAs };
+use crate::config::{ Options, EmitAs };
 
 fn main() {
     let matches =
@@ -112,7 +112,7 @@ fn compile_file(input: &str, output: Option<&str>) {
     let source = input.rsplitn(2, '.').collect::<Vec<&str>>()[1];
     let re = Regex::new(r"[^A-Za-z0-9_.]").unwrap();
     session.name = re.replace_all(&source.replace("/", "."), "_").to_string();
-    session.target = output.map(|s| String::from(s)).unwrap_or_else(|| String::from(source));
+    session.target = output.map(String::from).unwrap_or_else(|| String::from(source));
 
     let builtins = llvm::lib::get_builtins();
     llvm::lib::make_global(&session, &builtins);
@@ -136,7 +136,7 @@ fn compile_file(input: &str, output: Option<&str>) {
 
     session.resolve_types();
 
-    export::write_exports(&session, session.map.get_global(), format!("{}.dec", session.target).as_str(), &code);
+    export::write_exports(&session, session.map.get_global(), &format!("{}.dec", session.target), &code);
 
     let mut transformer = transform::transform::Transformer::new(&session);
     transformer.initialize();
@@ -155,8 +155,8 @@ fn compile_file(input: &str, output: Option<&str>) {
     llvm.print_module();
 
     match Options::as_ref().format {
-        EmitAs::LLIR => llvm.write_module(format!("{}.ll", session.target).as_str()),
-        EmitAs::Obj => llvm.write_object_file(format!("{}.o", session.target).as_str()),
+        EmitAs::LLIR => llvm.write_module(&format!("{}.ll", session.target)),
+        EmitAs::Obj => llvm.write_object_file(&format!("{}.o", session.target)),
     }
 }
 

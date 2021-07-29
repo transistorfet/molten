@@ -4,11 +4,11 @@ use std::cell::Cell;
 use std::cell::RefCell;
 use std::collections::HashMap;
 
-use types::Type;
-use hir::{ NodeID };
-use session::{ Session, Error };
-use misc::{ UniqueID };
-use defs::Def;
+use crate::types::Type;
+use crate::hir::{ NodeID };
+use crate::session::{ Session, Error };
+use crate::misc::{ UniqueID };
+use crate::defs::Def;
 
 const NAMES: usize = 0;
 const TYPES: usize = 1;
@@ -91,7 +91,7 @@ impl Scope {
     pub fn _search<F, U>(&self, namespace: usize, name: &str, f: F, default: U) -> U where F: Fn(NodeID) -> U {
         if let Some(sym) = self.namespaces[namespace].borrow().get(name) {
             f(*sym)
-        } else if let Some(ref parent) = self.parent {
+        } else if let Some(parent) = &self.parent {
             parent._search(namespace, name, f, default)
         } else {
             default
@@ -136,8 +136,8 @@ impl Scope {
             true
         } else {
             match (self.context.get(), &self.parent) {
-                (Context::Block, Some(ref parent)) |
-                (Context::Object, Some(ref parent)) => parent.contains_context(name),
+                (Context::Block, Some(parent)) |
+                (Context::Object, Some(parent)) => parent.contains_context(name),
                 _ => false
             }
         }
@@ -145,7 +145,7 @@ impl Scope {
 
     pub fn foreach_name<F>(&self, f: F) where F: Fn(&str, NodeID) {
         for (name, id) in self.namespaces[NAMES].borrow().iter() {
-            f(name.as_str(), *id)
+            f(&name, *id)
         }
     }
 
@@ -176,7 +176,7 @@ impl Scope {
 
     pub fn foreach_type<F>(&self, f: F) where F: Fn(&str, NodeID) {
         for (name, id) in self.namespaces[TYPES].borrow().iter() {
-            f(name.as_str(), *id)
+            f(&name, *id)
         }
     }
 
@@ -188,7 +188,7 @@ impl Scope {
 
     pub fn get_full_name(&self, name: Option<String>, id: UniqueID) -> String {
         let mut base = self.get_basename();
-        if base.as_str() != "" {
+        if &base != "" {
             base += "_";
         }
         base + &name.unwrap_or_else(|| format!("anon{}", id))
@@ -196,7 +196,7 @@ impl Scope {
 
     pub fn get_basename(&self) -> String {
         let name = self.parent.as_ref().map_or(String::from(""), |parent| parent.get_basename());
-        if name.as_str() != "" {
+        if &name != "" {
             name +  "_" + &self.basename.borrow()
         } else {
             self.basename.borrow().clone()

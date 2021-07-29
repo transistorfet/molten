@@ -2,12 +2,12 @@
 use std::fs::File;
 use std::io::prelude::*;
 
-use types::Type;
-use config::Options;
-use scope::{ ScopeRef };
-use session::{ Session, Error };
-use visitor::{ Visitor, ScopeStack };
-use hir::{ NodeID, Visibility, Mutability, ClassSpec, WhereClause, Function, Expr, ExprKind };
+use crate::types::Type;
+use crate::config::Options;
+use crate::scope::{ ScopeRef };
+use crate::session::{ Session, Error };
+use crate::visitor::{ Visitor, ScopeStack };
+use crate::hir::{ NodeID, Visibility, Mutability, ClassSpec, WhereClause, Function, Expr, ExprKind };
 
 
 pub fn write_exports(session: &Session, scope: ScopeRef, filename: &str, code: &Vec<Expr>) {
@@ -74,7 +74,7 @@ impl<'sess> Visitor for ExportsCollector<'sess> {
     fn visit_function(&mut self, id: NodeID, func: &Function) -> Result<Self::Return, Error> {
         if let Some(name) = &func.name {
             let defid = self.session.get_ref(id)?;
-            self.declarations.push_str(&emit_declaration(self.session, defid, func.vis, name.as_str(), &func.whereclause.constraints));
+            self.declarations.push_str(&emit_declaration(self.session, defid, func.vis, &name, &func.whereclause.constraints));
         }
         // TODO we would walk the body here to search everything that's publically visable, but currently only top level functions are exported
         Ok(())
@@ -89,9 +89,9 @@ impl<'sess> Visitor for ExportsCollector<'sess> {
             namespec += &emit_where_clause(&whereclause.constraints);
         }
 
-        self.declarations.push_str(format!("class {} {{\n", namespec).as_str());
-        //self.declarations.push_str(format!("    decl __alloc__() -> {}\n", namespec).as_str());
-        //self.declarations.push_str(format!("    decl __init__({}) -> Nil\n", namespec).as_str());
+        self.declarations.push_str(&format!("class {} {{\n", namespec));
+        //self.declarations.push_str(&format!("    decl __alloc__() -> {}\n", namespec));
+        //self.declarations.push_str(&format!("    decl __init__({}) -> Nil\n", namespec));
         for node in body {
             match &node.kind {
                 ExprKind::Definition(mutable, name, _, _) => {
@@ -108,20 +108,20 @@ impl<'sess> Visitor for ExportsCollector<'sess> {
                     if let Some(name) = &func.name {
                         let defid = self.session.get_ref(node.id)?;
                         self.declarations.push_str("    ");
-                        self.declarations.push_str(&emit_declaration(self.session, defid, func.vis, name.as_str(), &func.whereclause.constraints));
+                        self.declarations.push_str(&emit_declaration(self.session, defid, func.vis, &name, &func.whereclause.constraints));
                     }
                 },
                 _ => {  },
             }
         }
-        self.declarations.push_str(format!("}}\n").as_str());
+        self.declarations.push_str(&format!("}}\n"));
         Ok(())
     }
 
     fn visit_trait_def(&mut self, _id: NodeID, traitspec: &ClassSpec, body: &Vec<Expr>) -> Result<Self::Return, Error> {
         let namespec = unparse_type(self.session, Type::from(traitspec));
 
-        self.declarations.push_str(format!("trait {} {{\n", namespec).as_str());
+        self.declarations.push_str(&format!("trait {} {{\n", namespec));
         for node in body {
             match &node.kind {
                 ExprKind::Declare(_, name, _, whereclause) => {
@@ -132,7 +132,7 @@ impl<'sess> Visitor for ExportsCollector<'sess> {
                 _ => {  },
             }
         }
-        self.declarations.push_str(format!("}}\n").as_str());
+        self.declarations.push_str(&format!("}}\n"));
         Ok(())
     }
 

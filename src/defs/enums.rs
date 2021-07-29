@@ -2,13 +2,13 @@
 use std::rc::Rc;
 use std::cell::RefCell;
 
-use misc::r;
-use abi::ABI;
-use defs::Def;
-use types::Type;
-use scope::{ Scope, ScopeRef };
-use session::{ Session, Error };
-use hir::{ NodeID, EnumVariant };
+use crate::misc::r;
+use crate::abi::ABI;
+use crate::defs::Def;
+use crate::types::Type;
+use crate::scope::{ Scope, ScopeRef };
+use crate::session::{ Session, Error };
+use crate::hir::{ NodeID, EnumVariant };
 
 
 #[derive(Clone, Debug, PartialEq)]
@@ -54,8 +54,8 @@ impl EnumDef {
     pub fn add_variant(&self, session: &Session, variant: EnumVariant) -> Result<(), Error> {
         self.vars.define(&variant.name, variant.id)?;
         session.set_ref(variant.id, self.id);
-        match variant.ttype {
-            Some(ref ttype) => session.set_type(variant.id, Type::Function(r(ttype.clone()), r(self.deftype.clone()), ABI::C)),
+        match &variant.ttype {
+            Some(ttype) => session.set_type(variant.id, Type::Function(r(ttype.clone()), r(self.deftype.clone()), ABI::C)),
             None => session.set_type(variant.id, self.deftype.clone()),
         }
         self.variants.borrow_mut().push(variant);
@@ -63,7 +63,7 @@ impl EnumDef {
     }
 
     pub fn get_variant_by_id(&self, id: NodeID) -> Option<usize> {
-        self.variants.borrow().iter().position(|ref variant| variant.id == id)
+        self.variants.borrow().iter().position(|variant| variant.id == id)
     }
 
     pub fn get_variant_type_by_id(&self, id: NodeID) -> Option<Type> {

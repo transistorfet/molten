@@ -1,8 +1,8 @@
 
-use abi::ABI;
-use types::Type;
-use ast::{ Pos };
-use misc::{ r, R, UniqueID };
+use crate::abi::ABI;
+use crate::types::Type;
+use crate::ast::{ Pos };
+use crate::misc::{ r, R, UniqueID };
 
 pub type NodeID = UniqueID;
 

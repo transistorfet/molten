@@ -1,12 +1,12 @@
 
-use hir::{ NodeID, Expr, ExprKind };
-use visitor::{ Visitor };
+use crate::hir::{ NodeID, Expr, ExprKind };
+use crate::visitor::{ Visitor };
 
-use defs::classes::{ ClassDefRef, StructDef, StructDefRef, Vtable };
+use crate::defs::classes::{ ClassDefRef, StructDef, StructDefRef, Vtable };
 
-use misc::{ r };
-use transform::transform::{ Transformer, CodeContext };
-use llvm::llcode::{ LLType, LLRef, LLLink, LLExpr, LLGlobal };
+use crate::misc::{ r };
+use crate::transform::transform::{ Transformer, CodeContext };
+use crate::llvm::llcode::{ LLType, LLRef, LLLink, LLExpr, LLGlobal };
 
 
 impl<'sess> Transformer<'sess> {
@@ -59,7 +59,7 @@ impl<'sess> Transformer<'sess> {
                     },
                     ExprKind::Declare(vis, name, _, _) => {
                         let ttype = transform.session.get_type_from_ref(node.id).unwrap();
-                        exprs.extend(transform.transform_func_decl(ttype.get_abi().unwrap(), node.id, *vis, name.as_str(), &ttype));
+                        exprs.extend(transform.transform_func_decl(ttype.get_abi().unwrap(), node.id, *vis, &name, &ttype));
                     },
 
                     // TODO this is the only reason we use this instead of just .visit_vec()

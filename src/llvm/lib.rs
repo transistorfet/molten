@@ -8,24 +8,24 @@ extern crate llvm_sys as llvm;
 use self::llvm::prelude::*;
 use self::llvm::core::*;
 
-use abi::ABI;
-use ast::Pos;
-use types::Type;
-use session::Session;
-use parser::{ parse_type };
-use hir::{ NodeID, Mutability, Visibility, ClassSpec };
-use scope::{ Scope, ScopeRef, ScopeMapRef, Context };
-use binding::{ bind_type_names, bind_classspec_type_names };
-use config::Options;
-use misc::{ r, UniqueID };
+use crate::abi::ABI;
+use crate::ast::Pos;
+use crate::types::Type;
+use crate::session::Session;
+use crate::parser::{ parse_type };
+use crate::hir::{ NodeID, Mutability, Visibility, ClassSpec };
+use crate::scope::{ Scope, ScopeRef, ScopeMapRef, Context };
+use crate::binding::{ bind_type_names, bind_classspec_type_names };
+use crate::config::Options;
+use crate::misc::{ r, UniqueID };
 
-use defs::classes::{ ClassDef, Define };
-use defs::functions::{ AnyFunc };
+use crate::defs::classes::{ ClassDef, Define };
+use crate::defs::functions::{ AnyFunc };
 
-use transform::transform::Transformer;
+use crate::transform::transform::Transformer;
 
-use llvm::llcode::{ LLType, LLLink };
-use llvm::codegen::{ LLVM, cstr };
+use crate::llvm::llcode::{ LLType, LLLink };
+use crate::llvm::codegen::{ LLVM, cstr };
 
 pub type ObjectFunction = unsafe fn(&LLVM, LLVMTypeRef, Vec<LLVMValueRef>) -> LLVMValueRef;
 pub type PlainFunction = unsafe fn(&LLVM, Vec<LLVMValueRef>) -> LLVMValueRef;
@@ -72,18 +72,18 @@ pub fn declare_builtins_node<'sess>(session: &Session, scope: ScopeRef, node: &B
             };
 
             let mut ftype = parse_type(ftype);
-            bind_type_names(session, tscope.clone(), ftype.as_mut()).unwrap();
+            bind_type_names(session, tscope, ftype.as_mut()).unwrap();
             debug!("BUILTIN TYPE: {:?}", ftype);
             let abi = ftype.as_ref().map(|t| t.get_abi().unwrap()).unwrap_or(ABI::Molten);
-            AnyFunc::define(session, scope.clone(), *id, Visibility::Global, Some(name), abi, ftype.clone()).unwrap();
+            AnyFunc::define(session, scope, *id, Visibility::Global, Some(name), abi, ftype).unwrap();
         },
         BuiltinDef::Class(id, name, params, _, entries) => {
             let tscope = session.map.get_or_add(*id, Some(scope.clone()));
             let mut classspec = ClassSpec::new(Pos::empty(), name.to_string(), params.clone());
             bind_classspec_type_names(session, tscope.clone(), &mut classspec).unwrap();
-            ClassDef::define(session, scope.clone(), *id, Type::Object(classspec.name, *id, classspec.types), None).unwrap();
+            ClassDef::define(session, scope, *id, Type::Object(classspec.name, *id, classspec.types), None).unwrap();
 
-            declare_builtins_vec(session, tscope.clone(), entries);
+            declare_builtins_vec(session, tscope, entries);
         },
     }
 }
@@ -92,7 +92,7 @@ pub fn declare_builtins_node<'sess>(session: &Session, scope: ScopeRef, node: &B
 pub fn initialize_builtins<'sess>(llvm: &LLVM<'sess>, transformer: &mut Transformer, scope: ScopeRef, entries: &Vec<BuiltinDef<'sess>>) {
     unsafe {
         declare_irregular_functions(llvm);
-        define_builtins_vec(llvm, transformer, ptr::null_mut(), scope.clone(), entries);
+        define_builtins_vec(llvm, transformer, ptr::null_mut(), scope, entries);
     }
 }
 
@@ -118,21 +118,21 @@ pub unsafe fn define_builtins_node<'sess>(llvm: &LLVM<'sess>, transformer: &mut 
                     llvm.set_value(*id, func);
                 },
                 FuncKind::Method(func) => {
-                    let function = build_lib_method(llvm, name.as_str(), objtype, &ltype, func);
+                    let function = build_lib_method(llvm, &name, objtype, &ltype, func);
                     llvm.set_value(*id, function);
                 },
                 FuncKind::Function(func) => {
                     if abi == ABI::Molten {
                         let func_id = NodeID::generate();
-                        let function = build_lib_function(llvm, format!("{}_func", name).as_str(), &ltype, func);
+                        let function = build_lib_function(llvm, &format!("{}_func", name), &ltype, func);
                         llvm.set_value(func_id, function);
 
                         let closure = llvm.struct_const(vec!(function, llvm.null_const(llvm.str_type())));
                         let rtype = LLVMTypeOf(closure);
-                        let global = llvm.build_def_global(name.as_str(), LLLink::Once, rtype, Some(closure));
+                        let global = llvm.build_def_global(&name, LLLink::Once, rtype, Some(closure));
                         llvm.set_value(*id, global);
                     } else {
-                        let function = build_lib_function(llvm, name.as_str(), &ltype, func);
+                        let function = build_lib_function(llvm, &name, &ltype, func);
                         llvm.set_value(*id, function);
                     }
                 },
@@ -144,8 +144,8 @@ pub unsafe fn define_builtins_node<'sess>(llvm: &LLVM<'sess>, transformer: &mut 
             let classdef = llvm.session.get_def(*id).unwrap().as_class().unwrap();
             let ltype = transformer.transform_value_type(&llvm.session.get_type(*id).unwrap());
 
-            let lltype = if structdef.len() > 0 {
-                for (ref field, ref ttype) in structdef {
+            let lltype = if !structdef.is_empty() {
+                for (field, ttype) in structdef {
                     classdef.structdef.add_field(llvm.session, NodeID::generate(), Mutability::Mutable, field, ttype.clone(), Define::IfNotExists);
                 }
                 //build_class_type(llvm, scope.clone(), *id, &cname, classdef.clone())
@@ -160,7 +160,7 @@ pub unsafe fn define_builtins_node<'sess>(llvm: &LLVM<'sess>, transformer: &mut 
                 lltype
             };
 
-            define_builtins_vec(llvm, transformer, lltype, tscope.clone(), entries);
+            define_builtins_vec(llvm, transformer, lltype, tscope, entries);
         },
     }
 }
@@ -168,8 +168,7 @@ pub unsafe fn define_builtins_node<'sess>(llvm: &LLVM<'sess>, transformer: &mut 
 
 pub unsafe fn declare_c_function(llvm: &LLVM, name: &str, args: &mut [LLVMTypeRef], ret_type: LLVMTypeRef, vargs: bool) -> LLVMValueRef {
     let ftype = LLVMFunctionType(ret_type, args.as_mut_ptr(), args.len() as u32, vargs as i32);
-    let function = LLVMAddFunction(llvm.module, cstr(name), ftype);
-    function
+    LLVMAddFunction(llvm.module, cstr(name), ftype)
 }
 
 unsafe fn declare_irregular_functions(llvm: &LLVM) {

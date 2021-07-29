@@ -1,11 +1,11 @@
 
 use std::rc::Rc;
 
-use defs::Def;
-use types::Type;
-use scope::ScopeRef;
-use session::{ Session, Error };
-use hir::{ NodeID };
+use crate::defs::Def;
+use crate::types::Type;
+use crate::scope::ScopeRef;
+use crate::session::{ Session, Error };
+use crate::hir::{ NodeID };
 
 
 #[derive(Clone, Debug, PartialEq)]
@@ -50,7 +50,7 @@ impl TypeAliasDef {
         let mut map = Type::map_new();
         for (def, param) in defparams.iter().zip(params) {
             match def {
-                Type::Universal(_, ref id) => { map.insert(*id, param); },
+                Type::Universal(_, id) => { map.insert(*id, param); },
                 _ => return Err(Error::new(format!("UnsupportedError: currently only universal type variables are supported as type parameters in type aliases"))),
             }
         }

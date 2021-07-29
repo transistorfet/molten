@@ -1,19 +1,19 @@
 
-use abi::ABI;
-use session::{ Session, Error };
-use scope::{ ScopeRef, Context };
-use types::{ Type, resolve_type };
-use hir::{ NodeID, Visibility, Mutability, ClassSpec, MatchCase, EnumVariant, WhereClause, Function, Pattern, PatKind, Expr, ExprKind };
-use misc::{ UniqueID, r };
+use crate::abi::ABI;
+use crate::session::{ Session, Error };
+use crate::scope::{ ScopeRef, Context };
+use crate::types::{ Type, resolve_type };
+use crate::hir::{ NodeID, Visibility, Mutability, ClassSpec, MatchCase, EnumVariant, WhereClause, Function, Pattern, PatKind, Expr, ExprKind };
+use crate::misc::{ UniqueID, r };
 
-use defs::enums::EnumDef;
-use defs::classes::ClassDef;
-use defs::functions::{ AnyFunc, ClosureDef };
-use defs::types::TypeAliasDef;
-use defs::variables::{ AnyVar, VarDef, ArgDef };
-use defs::traits::{ TraitDef, TraitImpl };
+use crate::defs::enums::EnumDef;
+use crate::defs::classes::ClassDef;
+use crate::defs::functions::{ AnyFunc, ClosureDef };
+use crate::defs::types::TypeAliasDef;
+use crate::defs::variables::{ AnyVar, VarDef, ArgDef };
+use crate::defs::traits::{ TraitDef, TraitImpl };
 
-use visitor::{ self, Visitor, ScopeStack };
+use crate::visitor::{ self, Visitor, ScopeStack };
 
 
 #[derive(Clone, Debug, PartialEq)]
@@ -83,7 +83,7 @@ impl<'sess> Visitor for NameBinder<'sess> {
 
         // Check for typevars in the type params
         let mut argtypes = vec!();
-        for ref arg in func.args.iter() {
+        for arg in func.args.iter() {
             //let arg_defid = self.session.new_def_id(arg.id);
             // TODO this is a hack because the arguments are being cloned in the class desugaring in refinery, and that means the id is duplicated rather
             //      when a class has a lambda style method defined and assigned to a class field, the refinery will include the class field initializer (the function)
@@ -208,7 +208,7 @@ impl<'sess> Visitor for NameBinder<'sess> {
         let classtype = Type::Object(classspec.name, defid, classspec.types);
         let parenttype = match parentspec {
             Some(parentspec) => {
-                match scope.find_type(self.session, &parentspec.name.as_str()) {
+                match scope.find_type(self.session, &parentspec.name) {
                     Ok(Type::Object(_, id, types)) if types.len() == parentspec.types.len() => Ok(Some(Type::Object(parentspec.name.clone(), id, parentspec.types.clone()))),
                     Ok(Type::Object(_, _, types)) => Err(Error::new(format!("TypeError: type parameters don't match.  Expected {:?} but found {:?}", types, parentspec.types))),
                     Ok(ttype) => Err(Error::new(format!("TypeError: expected object type but found {:?}", ttype))),
@@ -423,14 +423,14 @@ pub fn bind_type_names(session: &Session, scope: ScopeRef, ttype: Option<&mut Ty
 #[must_use]
 pub fn bind_classspec_type_names(session: &Session, scope: ScopeRef, classspec: &mut ClassSpec) -> Result<(), Error> {
     let &mut ClassSpec { ref mut types, .. } = classspec;
-    types.iter_mut().map(|ref mut ttype| bind_type_names(session, scope.clone(), Some(ttype))).count();
+    types.iter_mut().map(|ttype| bind_type_names(session, scope.clone(), Some(ttype))).count();
     Ok(())
 }
 
 fn bind_where_constraints(session: &Session, scope: ScopeRef, whereclause: &WhereClause) -> Result<(), Error> {
     for (varname, traitname) in &whereclause.constraints {
-        let var_id = scope.get_type_def(varname.as_str()).ok_or_else(|| Error::new(format!("TypeError: definition not set for {:?}", varname)))?;
-        let trait_id = scope.get_type_def(traitname.as_str()).ok_or_else(|| Error::new(format!("TypeError: definition not set for {:?}", traitname)))?;
+        let var_id = scope.get_type_def(&varname).ok_or_else(|| Error::new(format!("TypeError: definition not set for {:?}", varname)))?;
+        let trait_id = scope.get_type_def(&traitname).ok_or_else(|| Error::new(format!("TypeError: definition not set for {:?}", traitname)))?;
         let mut constraints = session.get_constraints(var_id);
         if constraints.len() > 0 {
             panic!("We're only allowing 1 trait constraint per universal at the moment");
@@ -445,7 +445,7 @@ fn bind_where_constraints(session: &Session, scope: ScopeRef, whereclause: &Wher
 pub fn check_recursive_type(ttype: &Option<&Type>, forbidden_id: NodeID) -> Result<(), Error> {
     match ttype {
         Some(ttype) => match ttype {
-            Type::Object(ref name, ref id, ref types) => {
+            Type::Object(name, id, types) => {
                 if *id == forbidden_id {
                     return Err(Error::new(format!("TypeError: an enum cannot contain itself in {:?}", name)));
                 }
@@ -454,18 +454,18 @@ pub fn check_recursive_type(ttype: &Option<&Type>, forbidden_id: NodeID) -> Resu
                     check_recursive_type(&Some(ttype), forbidden_id)?;
                 }
             },
-            Type::Tuple(ref types) => {
+            Type::Tuple(types) => {
                 for ttype in types.iter() {
                     check_recursive_type(&Some(ttype), forbidden_id)?;
                 }
             },
-            Type::Record(ref types) => {
+            Type::Record(types) => {
                 for (_, ttype) in types.iter() {
                     check_recursive_type(&Some(ttype), forbidden_id)?;
                 }
             },
-            Type::Universal(_, ref _id) |
-            Type::Variable(ref _id) => {
+            Type::Universal(_, _id) |
+            Type::Variable(_id) => {
                 // TODO this might be an error?
             },
             Type::Ref(_) |

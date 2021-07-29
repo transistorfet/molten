@@ -1,10 +1,10 @@
 
 use std::cell::RefCell;
 
-use types::Type;
-use session::Error;
-use scope::ScopeRef;
-use hir::{ NodeID, Visibility, Mutability, AssignType, Literal, ClassSpec, MatchCase, EnumVariant, WhereClause, Function, Pattern, PatKind, Expr, ExprKind };
+use crate::types::Type;
+use crate::session::Error;
+use crate::scope::ScopeRef;
+use crate::hir::{ NodeID, Visibility, Mutability, AssignType, Literal, ClassSpec, MatchCase, EnumVariant, WhereClause, Function, Pattern, PatKind, Expr, ExprKind };
 
 
 #[derive(Clone, Debug, PartialEq)]
@@ -395,15 +395,15 @@ pub fn walk_node<R, V: Visitor<Return = R>>(visitor: &mut V, node: &Expr) -> Res
 
 
         ExprKind::Identifier(ident) => {
-            visitor.visit_identifier(node.id, ident.as_str())
+            visitor.visit_identifier(node.id, &ident)
         },
 
         ExprKind::Resolver(left, right, oid) => {
-            visitor.visit_resolver(node.id, left, right.as_str(), *oid)
+            visitor.visit_resolver(node.id, left, &right, *oid)
         },
 
         ExprKind::Accessor(left, right, oid) => {
-            visitor.visit_accessor(node.id, left, right.as_str(), *oid)
+            visitor.visit_accessor(node.id, left, &right, *oid)
         },
 
 
@@ -417,7 +417,7 @@ pub fn walk_node<R, V: Visitor<Return = R>>(visitor: &mut V, node: &Expr) -> Res
 
 
         ExprKind::SideEffect(op, args) => {
-            visitor.visit_side_effect(node.id, op.as_str(), args)
+            visitor.visit_side_effect(node.id, &op, args)
         },
 
         ExprKind::If(cond, texpr, fexpr) => {
@@ -479,11 +479,11 @@ pub fn walk_node<R, V: Visitor<Return = R>>(visitor: &mut V, node: &Expr) -> Res
 
 
         ExprKind::Import(ident, decls) => {
-            visitor.visit_import(node.id, ident.as_str(), decls)
+            visitor.visit_import(node.id, &ident, decls)
         },
 
         ExprKind::Definition(mutable, name, ttype, expr) => {
-            visitor.visit_definition(node.id, *mutable, name.as_str(), ttype, expr)
+            visitor.visit_definition(node.id, *mutable, &name, ttype, expr)
         },
 
         ExprKind::Assignment(left, right, ty) => {
@@ -499,7 +499,7 @@ pub fn walk_node<R, V: Visitor<Return = R>>(visitor: &mut V, node: &Expr) -> Res
 pub fn walk_pattern<R, V: Visitor<Return = R>>(visitor: &mut V, pat: &Pattern) -> Result<R, Error> {
     match &pat.kind {
         PatKind::Binding(name) => {
-            visitor.visit_pattern_binding(pat.id, name.as_str())
+            visitor.visit_pattern_binding(pat.id, &name)
         },
 
         PatKind::Annotation(ttype, subpat) => {
@@ -507,7 +507,7 @@ pub fn walk_pattern<R, V: Visitor<Return = R>>(visitor: &mut V, pat: &Pattern) -
         },
 
         PatKind::Resolve(left, name, oid) => {
-            visitor.visit_pattern_resolve(pat.id, left, name.as_str(), *oid)
+            visitor.visit_pattern_resolve(pat.id, left, &name, *oid)
         },
 
         PatKind::EnumArgs(left, args, eid) => {
@@ -531,7 +531,7 @@ pub fn walk_pattern<R, V: Visitor<Return = R>>(visitor: &mut V, pat: &Pattern) -
         },
 
         PatKind::Identifier(name) => {
-            visitor.visit_pattern_identifier(pat.id, name.as_str())
+            visitor.visit_pattern_identifier(pat.id, &name)
         },
     }
 }

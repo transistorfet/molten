@@ -3,12 +3,12 @@ use std::fmt;
 use std::convert::From;
 use std::collections::HashMap;
 
-use defs::Def;
-use misc::{ R, r, UniqueID };
-use hir::{ NodeID, ClassSpec };
-use session::{ Session, Error };
+use crate::defs::Def;
+use crate::misc::{ R, r, UniqueID };
+use crate::hir::{ NodeID, ClassSpec };
+use crate::session::{ Session, Error };
 
-pub use abi::ABI;
+pub use crate::abi::ABI;
 
 
 #[derive(Clone, Debug, PartialEq)]
@@ -24,7 +24,7 @@ pub enum Type {
 
 impl Type {
     pub fn get_name<'a>(&'a self) -> Result<&'a str, Error> {
-        match &self {
+        match self {
             Type::Object(name, _, _) => Ok(name),
             Type::Universal(name, _) => Ok(name),
             _ => Err(Error::new(format!("TypeError: expected a class or concrete type, found {:?}", self))),
@@ -32,15 +32,15 @@ impl Type {
     }
 
     pub fn get_params(&self) -> Result<Vec<Type>, Error> {
-        match *self {
-            Type::Object(_, _, ref params) => Ok(params.clone()),
+        match self {
+            Type::Object(_, _, params) => Ok(params.clone()),
             _ => Err(Error::new(format!("TypeError: expected a class or concrete type, found {:?}", self))),
         }
     }
 
     #[allow(dead_code)]
     pub fn is_tuple(&self) -> bool {
-        match *self {
+        match self {
             Type::Tuple(_) => true,
             _ => false
         }
@@ -49,14 +49,14 @@ impl Type {
     #[allow(dead_code)]
     pub fn as_vec(&self) -> Vec<Type> {
         match self {
-            &Type::Tuple(ref types) => types.clone(),
+            Type::Tuple(types) => types.clone(),
             _ => vec!(self.clone()),
         }
     }
 
     #[allow(dead_code)]
     pub fn is_record(&self) -> bool {
-        match *self {
+        match self {
             Type::Record(_) => true,
             _ => false
         }
@@ -64,16 +64,16 @@ impl Type {
 
     pub fn get_record_types(&self) -> Result<&Vec<(String, Type)>, Error> {
         match self {
-            &Type::Record(ref items) => Ok(items),
+            Type::Record(items) => Ok(items),
             _ => Err(Error::new(format!("TypeError: expected record type, found {:?}", self))),
         }
     }
 
     pub fn get_record_field(&self, name: &str) -> Result<&Type, Error> {
         match self {
-            &Type::Record(ref items) => {
-                for (ref ident, ref ttype) in items {
-                    if ident.as_str() == name {
+            Type::Record(items) => {
+                for (ident, ttype) in items {
+                    if ident == name {
                         return Ok(ttype);
                     }
                 }
@@ -86,7 +86,7 @@ impl Type {
 
     #[allow(dead_code)]
     pub fn is_function(&self) -> bool {
-        match *self {
+        match self {
             Type::Function(_, _, _) => true,
             _ => false
         }
@@ -94,21 +94,21 @@ impl Type {
 
     pub fn get_argtypes(&self) -> Result<&Type, Error> {
         match self {
-            &Type::Function(ref args, _, _) => Ok(args),
+            Type::Function(args, _, _) => Ok(args),
             _ => Err(Error::new(format!("TypeError: expected function type, found {:?}", self))),
         }
     }
 
     pub fn get_rettype(&self) -> Result<&Type, Error> {
         match self {
-            &Type::Function(_, ref ret, _) => Ok(&**ret),
+            Type::Function(_, ret, _) => Ok(&**ret),
             _ => Err(Error::new(format!("TypeError: expected function type, found {:?}", self))),
         }
     }
 
     pub fn get_abi(&self) -> Result<ABI, Error> {
         match self {
-            &Type::Function(_, _, ref abi) => Ok(*abi),
+            Type::Function(_, _, abi) => Ok(*abi),
             _ => Err(Error::new(format!("TypeError: expected function type, found {:?}", self))),
         }
     }
@@ -123,7 +123,7 @@ impl Type {
 
     #[allow(dead_code)]
     pub fn is_variable(&self) -> bool {
-        match *self {
+        match self {
             Type::Universal(_, _) => true,
             Type::Variable(_) => true,
             _ => false
@@ -132,9 +132,9 @@ impl Type {
 
     pub fn get_id(&self) -> Result<UniqueID, Error> {
         match self {
-            &Type::Object(_, ref id, _) => Ok(*id),
-            &Type::Variable(ref id) => Ok(*id),
-            &Type::Universal(_, ref id) => Ok(*id),
+            Type::Object(_, id, _) => Ok(*id),
+            Type::Variable(id) => Ok(*id),
+            Type::Universal(_, id) => Ok(*id),
             _ => Err(Error::new(format!("TypeError: expected object or variable type, found {:?}", self))),
         }
     }
@@ -153,30 +153,30 @@ impl From<&ClassSpec> for Type {
 
 impl fmt::Display for Type {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match *self {
-            Type::Object(ref name, _, ref types) => {
+        match self {
+            Type::Object(name, _, types) => {
                 let params = if types.len() > 0 { format!("<{}>", types.iter().map(|p| format!("{}", p)).collect::<Vec<String>>().join(", ")) } else { String::from("") };
                 write!(f, "{}{}", name, params)
             },
-            Type::Variable(ref id) => {
+            Type::Variable(id) => {
                 write!(f, "?{}", id)
             }
-            Type::Universal(ref name, _) => {
+            Type::Universal(name, _) => {
                 write!(f, "'{}", name)
             }
-            Type::Tuple(ref types) => {
+            Type::Tuple(types) => {
                 let tuple: Vec<String> = types.iter().map(|t| format!("{}", t)).collect();
                 write!(f, "({})", tuple.join(", "))
             }
-            Type::Record(ref types) => {
+            Type::Record(types) => {
                 let tuple: Vec<String> = types.iter().map(|(n, t)| format!("{}: {}", n, t)).collect();
                 write!(f, "{{ {} }}", tuple.join(", "))
             }
-            Type::Function(ref args, ref ret, ref abi) => {
+            Type::Function(args, ret, abi) => {
                 write!(f, "{} -> {}{}", args, *ret, abi)
             }
-            Type::Ref(ref ttype) => {
-                write!(f, "ref {}", ttype)
+            Type::Ref(ttype) => {
+                write!(f, "{}", ttype)
             }
         }
     }
@@ -277,19 +277,19 @@ pub fn check_type(session: &Session, odtype: Option<Type>, octype: Option<Type>,
                 Ok(resolve_type(session, dtype, false)?)
             },
 
-            (Type::Variable(ref id), ntype) |
-            (ntype, Type::Variable(ref id)) if check_trait_constraints(session, *id, ntype) => {
+            (Type::Variable(id), ntype) |
+            (ntype, Type::Variable(id)) if check_trait_constraints(session, *id, ntype) => {
                 if update {
                     session.update_type(*id, ntype.clone())?;
                 }
                 Ok(resolve_type(session, ntype.clone(), false)?)
             }
 
-            (Type::Universal(_, ref aid), Type::Universal(_, ref bid)) if aid == bid => {
+            (Type::Universal(_, aid), Type::Universal(_, bid)) if aid == bid => {
                 Ok(ctype.clone())
             },
 
-            (Type::Function(ref aargs, ref aret, ref aabi), Type::Function(ref bargs, ref bret, ref babi)) => {
+            (Type::Function(aargs, aret, aabi), Type::Function(bargs, bret, babi)) => {
                 let oabi = aabi.compare(babi);
                 if oabi.is_some() {
                     let argtypes = check_type(session, Some(*aargs.clone()), Some(*bargs.clone()), mode, update)?;
@@ -299,7 +299,7 @@ pub fn check_type(session: &Session, odtype: Option<Type>, octype: Option<Type>,
                 }
             },
 
-            (Type::Tuple(ref atypes), Type::Tuple(ref btypes)) => {
+            (Type::Tuple(atypes), Type::Tuple(btypes)) => {
                 let mut types = vec!();
                 if atypes.len() == btypes.len() {
                     for (atype, btype) in atypes.iter().zip(btypes.iter()) {
@@ -311,7 +311,7 @@ pub fn check_type(session: &Session, odtype: Option<Type>, octype: Option<Type>,
                 }
             },
 
-            (Type::Record(ref atypes), Type::Record(ref btypes)) => {
+            (Type::Record(atypes), Type::Record(btypes)) => {
                 let mut types = vec!();
                 if atypes.len() == btypes.len() {
                     for ((aname, atype), (bname, btype)) in atypes.iter().zip(btypes.iter()) {
@@ -326,7 +326,7 @@ pub fn check_type(session: &Session, odtype: Option<Type>, octype: Option<Type>,
                 }
             },
 
-            (Type::Object(ref aname, ref aid, ref atypes), Type::Object(ref bname, ref bid, ref btypes)) => {
+            (Type::Object(aname, aid, atypes), Type::Object(bname, bid, btypes)) => {
                 match is_subclass_of(session, (bname, *bid, btypes), (aname, *aid, atypes), mode, update) {
                     ok @ Ok(_) => ok,
                     err @ Err(_) => match mode {
@@ -336,7 +336,7 @@ pub fn check_type(session: &Session, odtype: Option<Type>, octype: Option<Type>,
                 }
             },
 
-            (Type::Ref(ref atype), Type::Ref(ref btype)) => {
+            (Type::Ref(atype), Type::Ref(btype)) => {
                 let ttype = check_type(session, Some(*atype.clone()), Some(*btype.clone()), mode, update)?;
                 Ok(Type::Ref(r(ttype)))
             },
@@ -431,26 +431,26 @@ pub fn check_trait_is_implemented(session: &Session, trait_id: NodeID, ctype: &T
 
 pub fn resolve_type(session: &Session, ttype: Type, require_resolve: bool) -> Result<Type, Error> {
     match ttype {
-        Type::Object(ref name, ref id, ref types) => {
+        Type::Object(name, id, types) => {
             let params = types.iter().map(|ptype| resolve_type(session, ptype.clone(), require_resolve)).collect::<Result<Vec<Type>, Error>>()?;
 
-            match session.get_def(*id) {
+            match session.get_def(id) {
                 Ok(Def::TypeAlias(alias)) => {
                     Ok(alias.resolve(session, params).unwrap())
                 },
-                _ => match session.get_type(*id) {
+                _ => match session.get_type(id) {
                     // NOTE we have a special case for objects because we want to return the resolved parameters and not the parameters the type was defined with
-                    Some(Type::Object(_, _, _)) => Ok(Type::Object(name.clone(), *id, params)),
+                    Some(Type::Object(_, _, _)) => Ok(Type::Object(name.clone(), id, params)),
                     Some(stype) => Ok(stype),
                     None => Err(Error::new(format!("TypeError: undefined type {:?}", name))).unwrap(),
                 },
             }
         },
-        Type::Variable(ref id) => {
-            match session.get_type(*id) {
+        Type::Variable(id) => {
+            match session.get_type(id) {
                 Some(vtype) => {
                     match vtype {
-                        Type::Variable(ref eid) if eid == id => {
+                        Type::Variable(eid) if eid == id => {
                             if !require_resolve {
                                 Ok(vtype.clone())
                             } else {
@@ -463,24 +463,24 @@ pub fn resolve_type(session: &Session, ttype: Type, require_resolve: bool) -> Re
                 None => Err(Error::new(format!("TypeError: undefined type variable {}", ttype))),
             }
         },
-        Type::Universal(ref name, ref id) => {
-            Ok(Type::Universal(name.clone(), *id))
+        Type::Universal(name, id) => {
+            Ok(Type::Universal(name.clone(), id))
         },
-        Type::Tuple(ref types) => {
+        Type::Tuple(types) => {
             let types = types.iter().map(|ttype| resolve_type(session, ttype.clone(), require_resolve)).collect::<Result<Vec<Type>, Error>>()?;
             Ok(Type::Tuple(types))
         },
-        Type::Record(ref types) => {
+        Type::Record(types) => {
             let types = types.iter().map(|(name, ttype)| {
                 let ttype = resolve_type(session, ttype.clone(), require_resolve)?;
                 Ok((name.clone(), ttype))
             }).collect::<Result<Vec<(String, Type)>, Error>>()?;
             Ok(Type::Record(types))
         },
-        Type::Function(ref args, ref ret, ref abi) => {
-            Ok(Type::Function(r(resolve_type(session, *args.clone(), require_resolve)?), r(resolve_type(session, *ret.clone(), require_resolve)?), *abi))
+        Type::Function(args, ret, abi) => {
+            Ok(Type::Function(r(resolve_type(session, *args.clone(), require_resolve)?), r(resolve_type(session, *ret.clone(), require_resolve)?), abi))
         },
-        Type::Ref(ref ttype) => {
+        Type::Ref(ttype) => {
             Ok(Type::Ref(r(resolve_type(session, *ttype.clone(), require_resolve)?)))
         },
     }

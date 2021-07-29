@@ -1,20 +1,20 @@
 
 use std::collections::HashMap;
 
-use abi::ABI;
-use defs::Def;
-use types::Type;
-use config::Options;
-use scope::{ Scope, ScopeRef };
-use session::{ Session, Error };
-use ast::{ Pos };
-use hir::{ NodeID, Visibility, Mutability, AssignType, Literal, ClassSpec, MatchCase, EnumVariant, WhereClause, Function, Pattern, PatKind, Expr, ExprKind };
+use crate::abi::ABI;
+use crate::defs::Def;
+use crate::types::Type;
+use crate::config::Options;
+use crate::scope::{ Scope, ScopeRef };
+use crate::session::{ Session, Error };
+use crate::ast::{ Pos };
+use crate::hir::{ NodeID, Visibility, Mutability, AssignType, Literal, ClassSpec, MatchCase, EnumVariant, WhereClause, Function, Pattern, PatKind, Expr, ExprKind };
 
-use misc::{ r };
-use transform::functions::{ ClosureTransform };
-use llvm::llcode::{ LLType, LLLit, LLRef, LLCmpType, LLLink, LLCC, LLExpr, LLGlobal };
+use crate::misc::{ r };
+use crate::transform::functions::{ ClosureTransform };
+use crate::llvm::llcode::{ LLType, LLLit, LLRef, LLCmpType, LLLink, LLCC, LLExpr, LLGlobal };
 
-use visitor::{ Visitor, ScopeStack };
+use crate::visitor::{ Visitor, ScopeStack };
 
 
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -397,10 +397,10 @@ impl<'sess> Transformer<'sess> {
         main_body.extend(init_code);
 
         // Try calling the module's run function
-        let mut try = self.with_exception(exp_id, |transform| {
+        let mut tryblock = self.with_exception(exp_id, |transform| {
             ClosureTransform::create_invoke(transform, LLExpr::GetLocal(run_id), vec!())
         });
-        try.push(LLExpr::Literal(LLLit::I64(0)));
+        tryblock.push(LLExpr::Literal(LLLit::I64(0)));
 
         // If an exception occurs, print a message and exit with -1
         let catch = vec!(
@@ -408,7 +408,7 @@ impl<'sess> Transformer<'sess> {
             LLExpr::Literal(LLLit::I64(-1))
         );
 
-        main_body.extend(self.create_exception_block(expoint, try, catch));
+        main_body.extend(self.create_exception_block(expoint, tryblock, catch));
 
         self.add_global(LLGlobal::DefCFunc(main_id, LLLink::Public, String::from("main"), main_ltype, vec!(), main_body, LLCC::CCC));
     }
@@ -470,7 +470,7 @@ impl<'sess> Transformer<'sess> {
         let ttype = &self.session.get_type(id).unwrap();
         let valexpr = self.transform_as_result(&mut exprs, record);
 
-        for (ref name, _) in ttype.get_record_types().unwrap() {
+        for (name, _) in ttype.get_record_types().unwrap() {
             let item = match items.iter().find(|(ident, _)| ident == name) {
                 Some((_, expr)) => self.transform_as_result(&mut exprs, expr),
                 None => LLExpr::GetItem(r(valexpr.clone()), litems.len()),
@@ -541,9 +541,9 @@ impl<'sess> Transformer<'sess> {
             && !self.session.get_def(defid).unwrap().is_globally_accessible()
         {
             match self.get_context() {
-                Some(CodeContext::Func(ABI::Molten, ref cid)) => {
-                    let cl = self.session.get_def(*cid).unwrap().as_closure().unwrap();
-                    if *cid == defid {
+                Some(CodeContext::Func(ABI::Molten, cid)) => {
+                    let cl = self.session.get_def(cid).unwrap().as_closure().unwrap();
+                    if cid == defid {
                         //vec!(LLExpr::Cast(LLType::Alias(cl.context_type_id), r(LLExpr::GetValue(cl.context_arg_id))))
                         vec!(ClosureTransform::make_closure_value(self, NodeID::generate(), cl.compiled_func_id, LLExpr::GetValue(cl.context_arg_id)))
                     } else {

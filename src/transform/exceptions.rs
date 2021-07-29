@@ -1,11 +1,11 @@
 
-use hir::{ NodeID, MatchCase, Expr };
-use types::{ Type };
-use visitor::{ Visitor };
+use crate::hir::{ NodeID, MatchCase, Expr };
+use crate::types::{ Type };
+use crate::visitor::{ Visitor };
 
-use misc::{ r };
-use transform::transform::{ Transformer };
-use llvm::llcode::{ LLType, LLLit, LLRef, LLCC, LLCmpType, LLLink, LLExpr, LLGlobal };
+use crate::misc::{ r };
+use crate::transform::transform::{ Transformer };
+use crate::llvm::llcode::{ LLType, LLLit, LLRef, LLCC, LLCmpType, LLLink, LLExpr, LLGlobal };
 
 
 pub static EXCEPTION_POINT_NAME: &str = "__ExceptionPoint__";
@@ -56,10 +56,10 @@ impl<'sess> Transformer<'sess> {
         LLExpr::GetValue(ret_id)
     }
 
-    pub fn create_exception_block(&mut self, expoint: LLExpr, try: Vec<LLExpr>, catch: Vec<LLExpr>) -> Vec<LLExpr> {
+    pub fn create_exception_block(&mut self, expoint: LLExpr, tryblock: Vec<LLExpr>, catch: Vec<LLExpr>) -> Vec<LLExpr> {
         let mut exprs = vec!();
         let iszero = LLExpr::Cmp(LLCmpType::Equal, r(expoint), r(LLExpr::Literal(LLLit::I32(0))));
-        exprs.push(LLExpr::Phi(vec!(vec!(iszero), vec!(LLExpr::Literal(LLLit::I1(true)))), vec!(try, catch)));
+        exprs.push(LLExpr::Phi(vec!(vec!(iszero), vec!(LLExpr::Literal(LLLit::I1(true)))), vec!(tryblock, catch)));
         exprs
     }
 

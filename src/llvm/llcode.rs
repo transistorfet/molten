@@ -1,6 +1,6 @@
 
-use hir::NodeID;
-use misc::{ R };
+use crate::hir::NodeID;
+use crate::misc::{ R };
 
 
 #[derive(Clone, Debug, PartialEq)]

@@ -2,12 +2,12 @@
 use std::rc::Rc;
 use std::cell::RefCell;
 
-use defs::Def;
-use scope::{ Scope, ScopeRef };
-use session::{ Session, Error };
-use types::{ Type, Check, check_type };
-use hir::{ NodeID, ClassSpec };
-use defs::classes::{ Vtable };
+use crate::defs::Def;
+use crate::scope::{ Scope, ScopeRef };
+use crate::session::{ Session, Error };
+use crate::types::{ Type, Check, check_type };
+use crate::hir::{ NodeID, ClassSpec };
+use crate::defs::classes::{ Vtable };
 
 
 #[derive(Clone, Debug, PartialEq)]
@@ -48,7 +48,7 @@ impl TraitDef {
         vars.set_basename(name);
 
         let deftype = Type::Universal(traitspec.name.clone(), defid);
-        let vtable = Vtable::create(session, NodeID::generate(), format!("{}_vtable", name.clone()))?;
+        let vtable = Vtable::create(session, NodeID::generate(), format!("{}_vtable", name))?;
         let traitdef = Self::new_ref(defid, vars, deftype.clone(), vtable);
         scope.define_type(name, defid)?;
         session.set_def(defid, Def::TraitDef(traitdef.clone()));

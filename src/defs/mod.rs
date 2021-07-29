@@ -1,7 +1,7 @@
 
-use scope::ScopeRef;
-use hir::Mutability;
-use session::{ Error };
+use crate::scope::ScopeRef;
+use crate::hir::Mutability;
+use crate::session::{ Error };
 
 pub mod enums;
 pub mod types;
@@ -10,12 +10,12 @@ pub mod variables;
 pub mod functions;
 pub mod traits;
 
-use defs::enums::{ EnumDefRef };
-use defs::types::{ TypeAliasDefRef };
-use defs::traits::{ TraitDefRef, TraitImplRef };
-use defs::classes::{ ClassDefRef, StructDefRef };
-use defs::variables::{ VarDefRef, ArgDefRef, FieldDefRef };
-use defs::functions::{ OverloadDefRef, ClosureDefRef, MethodDefRef, CFuncDefRef };
+use crate::defs::enums::{ EnumDefRef };
+use crate::defs::types::{ TypeAliasDefRef };
+use crate::defs::traits::{ TraitDefRef, TraitImplRef };
+use crate::defs::classes::{ ClassDefRef, StructDefRef };
+use crate::defs::variables::{ VarDefRef, ArgDefRef, FieldDefRef };
+use crate::defs::functions::{ OverloadDefRef, ClosureDefRef, MethodDefRef, CFuncDefRef };
 
 
 #[derive(Clone, Debug, PartialEq)]

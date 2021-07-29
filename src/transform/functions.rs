@@ -1,17 +1,17 @@
 
-use binding;
-use typecheck;
+use crate::binding;
+use crate::typecheck;
 
-use abi::ABI;
-use types::Type;
-use ast::{ Pos };
-use hir::{ NodeID, Visibility, Mutability, Argument, Function, Expr, ExprKind };
-use visitor::{ Visitor };
+use crate::abi::ABI;
+use crate::types::Type;
+use crate::ast::{ Pos };
+use crate::hir::{ NodeID, Visibility, Mutability, Argument, Function, Expr, ExprKind };
+use crate::visitor::{ Visitor };
 
-use misc::{ r };
-use transform::transform::{ Transformer, CodeContext };
-use transform::classes::{ StructTransform };
-use llvm::llcode::{ LLType, LLLink, LLCC, LLExpr, LLGlobal };
+use crate::misc::{ r };
+use crate::transform::transform::{ Transformer, CodeContext };
+use crate::transform::classes::{ StructTransform };
+use crate::llvm::llcode::{ LLType, LLLink, LLCC, LLExpr, LLGlobal };
 
 
 

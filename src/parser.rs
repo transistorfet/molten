@@ -1,6 +1,5 @@
 
 
-extern crate nom;
 use nom::{
     character::{
         is_alphabetic,
@@ -26,7 +25,6 @@ use nom::{
     },
 };
 
-extern crate nom_locate;
 use nom_locate::LocatedSpan;
 
 use std;
@@ -34,11 +32,11 @@ use std::f64;
 use std::str;
 use std::str::FromStr;
 
-use abi::ABI;
-use types::Type;
-use misc::{ r, UniqueID };
-use ast::{ Pos, AST };
-use hir::{ NodeID, Mutability, Visibility, AssignType, Literal, Argument, ClassSpec, WhereClause, Pattern, PatKind };
+use crate::abi::ABI;
+use crate::types::Type;
+use crate::misc::{ r, UniqueID };
+use crate::ast::{ Pos, AST };
+use crate::hir::{ NodeID, Mutability, Visibility, AssignType, Literal, Argument, ClassSpec, WhereClause, Pattern, PatKind };
 
 
 ///// Parsing Macros /////
@@ -566,7 +564,7 @@ impl AST {
 
         for (span, next_op, next_ast) in operations {
             let pos  = Pos::new(span);
-            let p = AST::precedence(next_op.as_str());
+            let p = AST::precedence(&next_op);
 
             while !operators.is_empty() && operators.last().unwrap().2 <= p {
                 let (pos, op, _) = operators.pop().unwrap();

@@ -8,13 +8,14 @@ use std::cell::RefCell;
 use std::io::prelude::*;
 use std::collections::HashMap;
 
-use parser;
-use defs::{ Def };
-use config::Options;
-use hir::{ NodeID };
-use ast::{ Pos, AST };
-use scope::{ ScopeMapRef };
-use types::{ Type };
+use crate::types;
+use crate::parser;
+use crate::defs::{ Def };
+use crate::config::Options;
+use crate::hir::{ NodeID };
+use crate::ast::{ Pos, AST };
+use crate::scope::{ ScopeMapRef };
+use crate::types::{ Type };
 
 
 #[derive(Clone, Debug, PartialEq)]
@@ -49,7 +50,7 @@ impl Session {
     pub fn find_file(filename: &str, search: bool) -> File {
         let current = vec!(".");
         let locations = if search { &Options::as_ref().libpath } else { &current };
-        for ref path in locations {
+        for path in locations {
             match File::open(Path::new(path).join(filename)) {
                 Ok(f) => return f,
                 Err(_) => { },
@@ -60,7 +61,7 @@ impl Session {
 
     pub fn parse_string(&self, name: &str, contents: String) -> Vec<AST> {
         self.files.borrow_mut().push((String::from(name), contents));
-        parser::parse_or_error(name, self.files.borrow().last().unwrap().1.as_str())
+        parser::parse_or_error(name, &self.files.borrow().last().unwrap().1)
     }
 
     pub fn parse_file(&self, filename: &str, import: bool) -> Vec<AST> {
@@ -77,7 +78,7 @@ impl Session {
 
     pub fn write_link_file(&self) {
         let mut link_text = String::new();
-        for (ref file, _) in self.files.borrow().iter() {
+        for (file, _) in self.files.borrow().iter() {
             let source = file.rsplitn(2, '.').collect::<Vec<&str>>()[1];
             link_text = link_text + source + "\n";
         }
@@ -179,8 +180,6 @@ impl Session {
 
     #[must_use]
     pub fn update_type(&self, id: NodeID, ttype: Type) -> Result<(), Error> {
-        use types;
-
         let etype = self.get_type(id);
         let ntype = match etype.clone() {
             // NOTE don't update a variable with itself or it will cause infinite recursion due to the update call in check_type
@@ -196,8 +195,6 @@ impl Session {
     }
 
     pub fn resolve_types(&self) {
-        use types;
-
         let keys: Vec<NodeID> = self.types.borrow().keys().map(|k| *k).collect();
         for key in keys {
             let ttype = self.get_type(key).unwrap();
