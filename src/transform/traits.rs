@@ -76,7 +76,7 @@ impl<'sess> Transformer<'sess> {
             },
             None => {
                 let ptr_type = LLType::Ptr(r(LLType::I8));
-                (LLType::Struct(vec!(ptr_type.clone(), ptr_type)), LLExpr::Literal(LLLit::Null(ptr_type.clone())))
+                (LLType::Struct(vec!(ptr_type.clone(), ptr_type.clone())), LLExpr::Literal(LLLit::Null(ptr_type)))
             },
         };
 

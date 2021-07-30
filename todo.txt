@@ -1,14 +1,31 @@
 
+* fix method invokes
+* add tests for traits
+* separate trait objects and bare universals
+* implement trait inheritence
+* update documentation
+* write overview
+* fix bind_type_names
+
 * for calling a function without it being a method call, you can parse "(" expression ")" into a special AST::BracketExpr or something, which can pass through the expr
   but can still be checked by the refinery and converted into an Expr::MethodInvoke or however you'll do that
 * I'd really like to change the way method calls are done.  It's annoying having all these definitions and blocks for every call
 
+* write a test for impl TraitTest for 'a { } which always returns a bool
+* also try trait TraitTest for List<'a>
+* does a trait ever take type params? i don't think it makes sense
+* settle the issue with using typealiases for Self in traitdef and impldef (not sure which way I want to go yet)
+* trait impls should be able to have any variable get unboxed, not just ones named 'self' (ie. an Add trait would need fn add(x: Self, y: Self) -> Self, or maybe you can use
 * should you make a trait object's data be the first pointer (always a pointer), so that a double deref will get it, rather than an indexed deref?
 * should you use a different format for trait objects vs unbound universals?
 * you need to add where clauses to enums, traits as well??
 
+* there is an issue with resolve_type where you really should check that a Type::Object and it's stored type have the same ID, but the question is what to do if it's not
+  the same... what do we do with the params?  type alias will do some checks and unify the params with the defined type, which itself might not even be right because what
+  if you want "type Special<'a> = HashMap<Int, 'a>"?? I don't think this is possible atm
+* make sure trait functions can be called via :: resolve, with the first arg passed in
+  fn (x: 'a, y: 'a) -> 'a where a: Self??? not sure I like this
 * minor issue: when a trait is not implemented, it will produce an unhelpful type error that it expected random variable, but found unimplemented type
-* change check_type/expect_type to take &Type instead of Type
 * can you split AST and Expr pattern matching to make the expr stuff easier to use?  The identifier and resolve patterns are kind of clunky and there's a syntax error in bindings which
   should be in refinery if possible
 * when you had a match expr but the enum def name was left out, or was incorrect, I was getting a parse error, which totally shouldn't happen.  It should give some othe kind of error
@@ -26,39 +43,9 @@
 
 TRAITS/TYPECLASSES:
 
-* If you use universals with constraints, you might want to have constraints be a trait (name or id) or list of traits and not a type (since you can just specify the type directly
-  like: "let func: ('b, 'b) -> 'b where 'b: Debug = value"  there's no need for multiple layers of indirection
-  If you use Object types, then you should remove the constraints
-
-* you could store constraints for universal variables in a global table in session, since all the copies of a single universal variable will have the same constraints, however
-  universal variables cannot be mapped to placeholder variables unless the placeholders also record the constraints, which would then need to combine when the placeholder variables
-  are being type checked/unified.  The constraints on universal variables would only need to be used during typechecking when mapping type variables, when they are transferred to
-  the placeholder variables.  The placeholders would then unify against concrete types only if those concrete types implement the required trait constraints.
-  For function bodies that use constrained universals, when a function is called from within that defines it's own universals with constraints, then it would map to placeholders,
-  and the universals from the function body would be compared against placeholders??? wait, how do universals work in this case currently?  A placeholder variable *will* unify with
-  a universal because it unifies with everything (currently)
-  So the universals in the function being called will be mapped to placeholders with constraints, and then when a placeholder is checked with anything else, we'll probably need to
-  treat each "anything else" type differently: for each trait constraint, if object then look for trait impl of that type; if universal then look up its constraints and match them;
-  if ref... then maybe get it's internal type and check that (ie. if X implements constraints then ref X implements them, but maybe this would require treating each as different during
-  transform still, since you'd need to insert an extra dereference?); if record, tuple, function, I'm not sure... for now it might fail if more than one constraint...  These types would
-  need to be translated, such that "?a where ?a: Debug" wouldn't unify with a tuple/record/etc, but "(?a: Debug, ?a: Debug) would unify with (?b: Debug + Add, ?b: Debug + Add)"...
-  In other words, yes, tuple/record/function cannot unify with a placeholder with constraints but it can unify with a placeholder without constraints or a tuple/record/function which
-  contains placeholders with constraints.  If you could specify a type with placholders as an actual constraint, then you can have functions that have arguments that are universals
-  "?a where ?a: ('b, 'b) -> 'b, 'b: Debug" there are two constraints, one on ?a that must be ('b, 'b) -> 'b, and one on 'b that must be Debug
-
-* So... a constraint would need to be a Vec<(NodeID, Type)> such that each NodeID is the ID of a placeholder or universal that the constraint applies to, and the Type must
-  unify (with the update arg in check_type being false) in order for the constraint to hold, for each constraint
-* how do we actually represent a trait though.  'b: Debug <--- Debug here isn't a valid type if traits are always constraints...
-
-* an alternate alternate would be that each variable can only have one constraint
-  If you have: fn foo('a) where 'a: ('b) -> 'b, 'b: Debug + Add
-  then variable 'a has id 101, 'b has id 102
-  getting the constraint for id 101 would give "('b) -> 'b" and the constraint for 102 would be "Debug + Add"
-  you only need to compare one constraint, and then in the check_type of 'a vs (Int) -> Int would get the constraint of 'a and try to unify ('b) -> 'b with (Int) -> Int
-  and so recursively it will check 'b against Int and check the constraint "Debug + Add" against "Int" and succeed with Int as the mgu
-
-* going from an object type to a trait object type would require automatically inserting a conversion, which we sort of do for type variables/generics in a really hacky way, with
-  the codegen build_cast function which will automagically box any non-pointer types
+* traits need inheritence/subtraits, such that the vtable could have pointers to the vtables of the dependents, or they could use a similar kind of inheritence as classes, but you need to
+  have multiple dependent traits to work
+* can you assume that all dependent traits are implemented for the same type, or could they be different types and thus the object/self that is passed to subtraits might need to be different???
 
 * currently you have function overloading, and class method overloading, which are forms of ad-hoc polymorphism.  Should all function overloading instead require a trait
   implementation (eg. all the infix operator functions and str functions would become traits which would be implemented for different types instead of being overloaded funcs).
@@ -67,13 +54,6 @@ TRAITS/TYPECLASSES:
 * would you still be able overload function names and argument numbers?  You could have trait { add('a, 'a) } and also add(String, String, String), since the types of the functions
   don't overlap, but you couldn't also have add(Int, Int) which isn't defined as a trait impl, since it would conflict with add('a, 'a).  This might not be too different from what
   you have now, as long as you make sure to check trait def types when checking for overloading
-
-* traits are currently being defined as object types (bindings:260), and the commented out code for subtyping allows a trait name to be used as an object, but if you switch
-  to traits being constraints on type variables, then this would need to change.  Would you even record traits specially, as in not call define_type() but instead have a third
-  (globally scoped?) map of traits?  Or do you make it a type, but a new special Trait type which can only be used in constraits?
-* traits need inheritence/subtraits, such that the vtable could have pointers to the vtables of the dependents, or they could use a similar kind of inheritence as classes, but you need to
-  have multiple dependent traits to work
-* can you assume that all dependent traits are implemented for the same type, or could they be different types and thus the object/self that is passed to subtraits might need to be different???
 
 * we could possibly implement traits statically, so the object would always be typed (no trait objects, and thus no generics with traits unless you switch to monomorphizing... or
   trait objects), but having static traits would allow the implementation to be separated from the class definition
