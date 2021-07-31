@@ -19,6 +19,7 @@ mod ast;
 mod hir;
 mod misc;
 mod visitor;
+mod mutvisitor;
 mod scope;
 mod types;
 mod config;
@@ -118,7 +119,7 @@ fn compile_file(input: &str, output: Option<&str>) {
     llvm::lib::make_global(&session, &builtins);
 
     let code = session.parse_file(input, false);
-    let code = refinery::Refinery::refine(&session, code);
+    let mut code = refinery::Refinery::refine(&session, code);
     session.write_link_file();
     if Options::as_ref().linkfile_only {
         return;
@@ -137,6 +138,8 @@ fn compile_file(input: &str, output: Option<&str>) {
     session.resolve_types();
 
     export::write_exports(&session, session.map.get_global(), &format!("{}.dec", session.target), &code);
+
+    mutvisitor::ClosureConversion::visit(&session, session.map.get_global(), &mut code);
 
     let mut transformer = transform::transform::Transformer::new(&session);
     transformer.initialize();

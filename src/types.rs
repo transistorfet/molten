@@ -439,8 +439,16 @@ pub fn resolve_type(session: &Session, ttype: Type, require_resolve: bool) -> Re
                     Ok(alias.resolve(session, &params).unwrap())
                 },
                 _ => match session.get_type(id) {
+                    // TODO this the if id == sid will allow n
+
                     // NOTE we have a special case for objects because we want to return the resolved parameters and not the parameters the type was defined with
-                    Some(Type::Object(_, _, _)) => Ok(Type::Object(name, id, params)),
+                    Some(Type::Object(sname, sid, _)) => {
+                        if id != sid {
+                            Err(Error::new(format!("Unexpected type alias used, {} points to {}", name, sname)))
+                        } else {
+                            Ok(Type::Object(name, id, params))
+                        }
+                    },
                     Some(stype) => Ok(stype.clone()),
                     None => Err(Error::new(format!("TypeError: undefined type {:?}", name))).unwrap(),
                 },

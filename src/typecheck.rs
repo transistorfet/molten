@@ -457,9 +457,8 @@ impl<'sess> Visitor for TypeChecker<'sess> {
     }
 
     fn visit_assignment(&mut self, _id: NodeID, left: &Expr, right: &Expr, ty: AssignType) -> Result<Self::Return, Error> {
-        // TODO this is duplicated in check_types_node(left)... can we avoid that
-        match self.get_access_ids(left)? {
-            Some((_refid, defid)) => {
+        match self.get_access_target(left)? {
+            Some(defid) => {
                 if ty == AssignType::Update && !self.session.get_def(defid).map(|d| d.is_mutable()).unwrap_or(false) {
                     return Err(Error::new(format!("MutableError: attempting to assign to an immutable variable")));
                 }
@@ -567,16 +566,16 @@ impl<'sess> TypeChecker<'sess> {
     }
 
 
-    pub fn get_access_ids(&mut self, node: &Expr) -> Result<Option<(NodeID, NodeID)>, Error> {
+    pub fn get_access_target(&mut self, node: &Expr) -> Result<Option<NodeID>, Error> {
         match &node.kind {
             ExprKind::Identifier(_) => {
-                Ok(Some((node.id, self.session.get_ref(node.id)?)))
+                Ok(Some(self.session.get_ref(node.id)?))
             },
             ExprKind::Resolver(left, field, oid) => {
-                Ok(Some((node.id, self.check_resolve_field(left, field, *oid)?)))
+                Ok(Some(self.check_resolve_field(left, field, *oid)?))
             },
             ExprKind::Accessor(left, field, oid) => {
-                Ok(Some((node.id, self.check_access_field(left, field, *oid)?)))
+                Ok(Some(self.check_access_field(left, field, *oid)?))
             },
             _ => { Ok(None) },
         }
@@ -624,14 +623,13 @@ impl<'sess> TypeChecker<'sess> {
     }
 
     pub fn session_find_variant(&mut self, invid: NodeID, fexpr: &Expr, argtypes: &Type) -> Result<Type, Error> {
-        let (refid, defid) = match self.get_access_ids(fexpr)? {
-            Some(ids) => ids,
+        let defid = match self.get_access_target(fexpr)? {
+            Some(id) => id,
             None => { return self.visit_node(fexpr); },
         };
 
-
         let (fid, ftype) = self.session_find_variant_id(defid, argtypes)?;
-        self.session.set_ref(refid, fid);
+        self.session.set_ref(fexpr.id, fid);
         self.session.set_ref(invid, fid);
 
         debug!("CHECK VARIANT: {:?} {:?}", ftype, fexpr);

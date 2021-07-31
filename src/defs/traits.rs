@@ -8,6 +8,7 @@ use crate::session::{ Session, Error };
 use crate::types::{ Type, Check, check_type };
 use crate::hir::{ NodeID, ClassSpec };
 use crate::defs::classes::{ Vtable };
+use crate::defs::types::{ TypeAliasDef };
 
 
 #[derive(Clone, Debug, PartialEq)]
@@ -102,7 +103,9 @@ impl TraitImpl {
         let name = format!("{}_{}", deftype.get_name()?, impltype.get_name()?);
         let tscope = session.map.get_or_add(impl_id, Some(scope.clone()));
         tscope.set_basename(&name);
-        tscope.define_type("Self", trait_id)?;
+        // TODO this should be impl_id, and it should be an alias
+        TypeAliasDef::define(session, tscope.clone(), NodeID::generate(), Type::Object("Self".to_string(), impl_id, vec!()), impltype.clone())?;
+        //tscope.define_type("Self", impl_id)?;
 
         let vtable = Vtable::create(session, NodeID::generate(), format!("{}_vtable", name.clone()))?;
         let traitimpl = Self::new_ref(impl_id, trait_id, impltype.clone(), vtable);
@@ -116,15 +119,5 @@ impl TraitImpl {
         Ok(traitimpl)
     }
 }
-
-// parser should only accept decls in trait definition
-// trait implementation should require all functions to be defined (name binding stage or after?)
-// transform should create a vtable for each implementation
-
-// trait type needs to be introduced somehow
-// converting to a trait type needs to be tracked so it can be inserted into output
-// 
-
-
 
 

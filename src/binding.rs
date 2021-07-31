@@ -313,14 +313,17 @@ impl<'sess> Visitor for NameBinder<'sess> {
     }
 
 
-    fn visit_resolver(&mut self, _id: NodeID, left: &Expr, _right: &str, oid: NodeID) -> Result<Self::Return, Error> {
+    fn visit_resolver(&mut self, id: NodeID, left: &Expr, _right: &str, oid: NodeID) -> Result<Self::Return, Error> {
         let scope = self.stack.get_scope();
         // TODO should this always work on a type reference, or should classes be added as values as well as types?
         //self.visit_node(left);
         match &left.kind {
             ExprKind::Identifier(ident) => {
                 match scope.get_type_def(&ident) {
-                    Some(defid) => self.session.set_ref(oid, defid),
+                    Some(defid) => {
+                        self.session.set_ref(left.id, defid);
+                        self.session.set_ref(oid, defid);
+                    },
                     None => return Err(Error::new(format!("NameError: undefined type {:?}", ident)))
                 }
             },
