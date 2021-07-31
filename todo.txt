@@ -1,10 +1,19 @@
 
-* fix method invokes
+* you can maybe have a special type Type::Convert(dest_type: R<Type>, src_type: R<Type>) which can be produced by check_type
+* the issue with having a table instead for conversions, is that it's hard to find where that actually exists in the tree
+
+* can you make closure conversion a separate stage somehow, possibly with a MutVisitor
+
+* you can maybe store more info in the defs, including the context of the function (Plain, Class Method, Trait Method), and then use that during
+  transform, and you can use the FunctionParts struct for building and transforming a function, so your top level transform_func_def becomes
+  a series of "apply_*" functions which take a &mut FunctionParts and transform it in stages, including an if context == Trait then apply pack/unpack
+
 * add tests for traits
 * separate trait objects and bare universals
-* implement trait inheritence
+* implement trait dependence
 * update documentation
 * write overview
+* fix method invokes
 * fix bind_type_names
 
 * for calling a function without it being a method call, you can parse "(" expression ")" into a special AST::BracketExpr or something, which can pass through the expr

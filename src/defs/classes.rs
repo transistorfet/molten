@@ -7,7 +7,7 @@ use crate::types::Type;
 use crate::scope::{ Scope, ScopeRef };
 use crate::session::{ Session, Error };
 use crate::types::{ check_type, Check };
-use crate::hir::{ NodeID, Mutability, Expr, ExprKind };
+use crate::hir::{ NodeID, Mutability, Visibility, Expr, ExprKind };
 
 use crate::defs::variables::FieldDef;
 
@@ -232,9 +232,9 @@ impl Vtable {
         for node in body.iter() {
             match &node.kind {
                 ExprKind::Function(func) => {
-                    if let Some(name) = func.name.as_ref() {
+                    if func.vis != Visibility::Anonymous {
                         let defid = session.get_ref(node.id).unwrap();
-                        self.add_entry(session, defid, name, session.get_type(defid).unwrap().clone());
+                        self.add_entry(session, defid, &func.name, session.get_type(defid).unwrap().clone());
                     }
                 },
                 ExprKind::Declare(_, name, _, _) => {

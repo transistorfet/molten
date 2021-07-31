@@ -18,15 +18,15 @@ use crate::llvm::llcode::{ LLType, LLLink, LLCC, LLExpr, LLGlobal };
 impl<'sess> Transformer<'sess> {
     pub fn transform_vis(&mut self, vis: Visibility) -> LLLink {
         match vis {
-            Visibility::Private => LLLink::Private,
+            Visibility::Private | Visibility::Anonymous => LLLink::Private,
             Visibility::Public | Visibility::Global => LLLink::Public,
         }
     }
 
-    pub fn transform_func_name(&mut self, name: Option<&str>, id: NodeID) -> String {
+    pub fn transform_func_name(&mut self, name: &str, id: NodeID) -> String {
         let scope = self.stack.get_scope();
         let ftype = self.session.get_type(id).unwrap();
-        scope.get_full_name(name.map(|name| ftype.get_abi().unwrap_or(ABI::Molten).mangle_name(name, ftype.get_argtypes().unwrap(), 2)), id)
+        scope.get_full_name(ftype.get_abi().unwrap_or(ABI::Molten).mangle_name(name, ftype.get_argtypes().unwrap()))
     }
 
     pub fn transform_func_def_type(&mut self, abi: ABI, args: &Vec<Type>, ret: &Type) -> LLType {
@@ -57,8 +57,8 @@ impl<'sess> Transformer<'sess> {
     pub fn transform_func_def(&mut self, id: NodeID, func: &Function) -> Vec<LLExpr> {
         let defid = self.session.get_ref(id).unwrap();
         match func.abi {
-            ABI::C => CFuncTransform::transform_def(self, defid, func.vis, func.name.as_deref(), &func.args, &func.body),
-            ABI::Molten | ABI::Unknown => ClosureTransform::transform_def(self, defid, func.vis, func.name.as_deref(), &func.args, &func.body),
+            ABI::C => CFuncTransform::transform_def(self, defid, func.vis, &func.name, &func.args, &func.body),
+            ABI::Molten | ABI::Unknown => ClosureTransform::transform_def(self, defid, func.vis, &func.name, &func.args, &func.body),
             _ => panic!("Not Implemented: {:?}", func.abi),
         }
     }
@@ -105,7 +105,7 @@ impl CFuncTransform {
     }
 
     pub fn transform_decl(transform: &mut Transformer, defid: NodeID, _vis: Visibility, name: &str, _ttype: &Type) -> Vec<LLExpr> {
-        let fname = transform.transform_func_name(Some(name), defid);
+        let fname = transform.transform_func_name(name, defid);
         let ftype = transform.session.get_type(defid).unwrap();
         let (argtypes, rettype, _) = ftype.get_function_types().unwrap();
         let lftype = CFuncTransform::transform_def_type(transform, &argtypes.as_vec(), rettype);
@@ -117,7 +117,7 @@ impl CFuncTransform {
         args.iter().map(|arg| (transform.session.get_ref(arg.id).unwrap(), arg.name.clone())).collect()
     }
 
-    pub fn transform_def(transform: &mut Transformer, defid: NodeID, vis: Visibility, name: Option<&str>, args: &Vec<Argument>, body: &Vec<Expr>) -> Vec<LLExpr> {
+    pub fn transform_def(transform: &mut Transformer, defid: NodeID, vis: Visibility, name: &str, args: &Vec<Argument>, body: &Vec<Expr>) -> Vec<LLExpr> {
         let fscope = transform.session.map.get(&defid);
         let fname = transform.transform_func_name(name, defid);
 
@@ -182,7 +182,7 @@ impl ClosureTransform {
     }
 
     pub fn transform_decl(transform: &mut Transformer, defid: NodeID, vis: Visibility, name: &str, ttype: &Type) -> Vec<LLExpr> {
-        let fname = transform.transform_func_name(Some(name), defid);
+        let fname = transform.transform_func_name(name, defid);
         let ftype = transform.transform_value_type(ttype);
 
         ClosureTransform::make_definition(transform, defid, vis, fname, ftype, None)
@@ -193,7 +193,7 @@ impl ClosureTransform {
         fargs.push((exp_id, String::from("__exception__")));
     }
 
-    pub fn transform_def(transform: &mut Transformer, defid: NodeID, vis: Visibility, name: Option<&str>, args: &Vec<Argument>, body: &Vec<Expr>) -> Vec<LLExpr> {
+    pub fn transform_def(transform: &mut Transformer, defid: NodeID, vis: Visibility, name: &str, args: &Vec<Argument>, body: &Vec<Expr>) -> Vec<LLExpr> {
         let scope = transform.stack.get_scope();
         let fscope = transform.session.map.get(&defid);
         let fname = transform.transform_func_name(name, defid);

@@ -72,10 +72,8 @@ impl<'sess> Visitor for ExportsCollector<'sess> {
     }
 
     fn visit_function(&mut self, id: NodeID, func: &Function) -> Result<Self::Return, Error> {
-        if let Some(name) = &func.name {
-            let defid = self.session.get_ref(id)?;
-            self.declarations.push_str(&emit_declaration(self.session, defid, func.vis, &name, &func.whereclause.constraints));
-        }
+        let defid = self.session.get_ref(id)?;
+        self.declarations.push_str(&emit_declaration(self.session, defid, func.vis, &func.name, &func.whereclause.constraints));
         // TODO we would walk the body here to search everything that's publically visable, but currently only top level functions are exported
         Ok(())
     }
@@ -105,11 +103,9 @@ impl<'sess> Visitor for ExportsCollector<'sess> {
                     self.declarations.push_str(&emit_declaration(self.session, defid, *vis, name, &whereclause.constraints));
                 },
                 ExprKind::Function(func) => {
-                    if let Some(name) = &func.name {
-                        let defid = self.session.get_ref(node.id)?;
-                        self.declarations.push_str("    ");
-                        self.declarations.push_str(&emit_declaration(self.session, defid, func.vis, &name, &func.whereclause.constraints));
-                    }
+                    let defid = self.session.get_ref(node.id)?;
+                    self.declarations.push_str("    ");
+                    self.declarations.push_str(&emit_declaration(self.session, defid, func.vis, &func.name, &func.whereclause.constraints));
                 },
                 _ => {  },
             }

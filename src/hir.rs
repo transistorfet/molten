@@ -8,6 +8,7 @@ pub type NodeID = UniqueID;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Visibility {
+    Anonymous,
     Private,
     Public,
     Global,
@@ -75,7 +76,7 @@ pub struct WhereClause {
 #[derive(Clone, Debug, PartialEq)]
 pub struct Function {
     pub vis: Visibility,
-    pub name: Option<String>,
+    pub name: String,
     pub args: Vec<Argument>,
     pub rettype: Option<Type>,
     pub body: Vec<Expr>,
@@ -215,6 +216,19 @@ impl WhereClause {
     }
 }
 
+impl Function {
+    pub fn new(vis: Visibility, name: String, args: Vec<Argument>, rettype: Option<Type>, body: Vec<Expr>, abi: ABI, whereclause: WhereClause) -> Function {
+        Function {
+            vis,
+            name,
+            args,
+            rettype,
+            body,
+            abi,
+            whereclause
+        }
+    }
+}
 
 impl Pattern {
     pub fn new(pos: Pos, kind: PatKind) -> Self {
@@ -362,8 +376,8 @@ impl Expr {
     }
 
     #[allow(dead_code)]
-    pub fn make_func(pos: Pos, vis: Visibility, name: Option<String>, args: Vec<Argument>, rettype: Option<Type>, body: Vec<Expr>, abi: ABI, whereclause: WhereClause) -> Expr {
-        Expr { id: NodeID::generate(), pos: pos, kind: ExprKind::Function(Function { vis, name, args, rettype, body, abi, whereclause }) }
+    pub fn make_func(pos: Pos, func: Function) -> Expr {
+        Expr { id: NodeID::generate(), pos: pos, kind: ExprKind::Function(func) }
     }
 
     #[allow(dead_code)]

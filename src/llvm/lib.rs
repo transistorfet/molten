@@ -75,7 +75,7 @@ pub fn declare_builtins_node<'sess>(session: &Session, scope: ScopeRef, node: &B
             bind_type_names(session, tscope, ftype.as_mut()).unwrap();
             debug!("BUILTIN TYPE: {:?}", ftype);
             let abi = ftype.as_ref().map(|t| t.get_abi().unwrap()).unwrap_or(ABI::Molten);
-            AnyFunc::define(session, scope, *id, Visibility::Global, Some(name), abi, ftype).unwrap();
+            AnyFunc::define(session, scope, *id, Visibility::Global, name, abi, ftype).unwrap();
         },
         BuiltinDef::Class(id, name, params, _, entries) => {
             let tscope = session.map.get_or_add(*id, Some(scope.clone()));
@@ -107,7 +107,7 @@ pub unsafe fn define_builtins_node<'sess>(llvm: &LLVM<'sess>, transformer: &mut 
         BuiltinDef::Func(id, sname, _, func) => {
             let ftype = llvm.session.get_type(*id).unwrap();
             let (argtypes, rettype, abi) = ftype.get_function_types().unwrap();
-            let name = abi.mangle_name(sname, argtypes, 2);
+            let name = abi.mangle_name(sname, argtypes);
             let ltype = transformer.transform_func_def_type(abi, &argtypes.as_vec(), rettype);
             match *func {
                 FuncKind::FromNamed => {

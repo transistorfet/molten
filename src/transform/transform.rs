@@ -373,7 +373,7 @@ impl<'sess> Transformer<'sess> {
         self.add_global(LLGlobal::DefGlobal(memo_id, LLLink::Once, memo_name, LLType::I1, true));
 
         let module_run_name = format!("run_{}", name);
-        let exprs = ClosureTransform::transform_def(self, defid, Visibility::Public, Some(&module_run_name), &vec!(), code);
+        let exprs = ClosureTransform::transform_def(self, defid, Visibility::Public, &module_run_name, &vec!(), code);
 
         exprs
     }
@@ -506,7 +506,7 @@ impl<'sess> Transformer<'sess> {
         self.set_type(compiled_func_id, lltype.clone());
 
         let module_run_name = format!("run_{}", name.replace(".", "_"));
-        let module_run_name_global = self.transform_func_name(Some(&module_run_name), defid);
+        let module_run_name_global = self.transform_func_name(&module_run_name, defid);
         let module_run_name_func = format!("{}_func", module_run_name_global);
         self.add_global(LLGlobal::DeclCFunc(compiled_func_id, module_run_name_func, lltype, LLCC::FastCC));
 

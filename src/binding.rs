@@ -70,7 +70,7 @@ impl<'sess> Visitor for NameBinder<'sess> {
         self.session.map.set(defid, scope.clone());
         self.session.set_type(defid, ttype.clone());
 
-        ClosureDef::define(self.session, scope.clone(), defid, Visibility::Public, Some(&format!("run_{}", name)), Some(ttype))?;
+        ClosureDef::define(self.session, scope.clone(), defid, Visibility::Public, &format!("run_{}", name), Some(ttype))?;
         self.visit_vec(code)
     }
 
@@ -79,7 +79,7 @@ impl<'sess> Visitor for NameBinder<'sess> {
 
         let scope = self.stack.get_scope();
         let fscope = self.session.map.add(defid, Some(scope.clone()));
-        fscope.set_basename(func.name.as_ref().unwrap_or(&format!("anon{}", defid)));
+        fscope.set_basename(&func.name);
 
         // Check for typevars in the type params
         let mut argtypes = vec!();
@@ -108,7 +108,7 @@ impl<'sess> Visitor for NameBinder<'sess> {
         let nftype = Type::Function(r(Type::Tuple(argtypes)), r(rettype.unwrap_or_else(|| self.session.new_typevar())), func.abi);
 
         // Define the function variable and it's arguments variables
-        AnyFunc::define(self.session, scope.clone(), defid, func.vis, func.name.as_deref(), func.abi, Some(nftype))?;
+        AnyFunc::define(self.session, scope.clone(), defid, func.vis, &func.name, func.abi, Some(nftype))?;
 
         self.with_scope(fscope, |visitor| {
             visitor.visit_vec(&func.body)
@@ -135,7 +135,7 @@ impl<'sess> Visitor for NameBinder<'sess> {
         // NOTE we resolve the type here to allow the resolution of aliases before this type becomes the cannonical type of this definition
         let ttype = resolve_type(self.session, ttype, false)?;
         let abi = ttype.get_abi().unwrap_or(ABI::Molten);
-        AnyFunc::define(self.session, scope.clone(), defid, vis, Some(name), abi, Some(ttype))?;
+        AnyFunc::define(self.session, scope.clone(), defid, vis, name, abi, Some(ttype))?;
         Ok(())
     }
 

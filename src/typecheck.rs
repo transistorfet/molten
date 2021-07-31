@@ -394,7 +394,7 @@ impl<'sess> Visitor for TypeChecker<'sess> {
         for node in body {
             match &node.kind {
                 ExprKind::Function(func) => {
-                    let name = func.name.as_ref().unwrap();  // NOTE this should have already been checked by refinery
+                    let name = &func.name;
                     let defid = *names.get(name).ok_or(Error::new(format!("TraitError: function not declared in the trait def, but found in the trait impl, {:?}", name)))?;
                     let deftype = self.session.get_type(defid);
                     let impltype = self.session.get_type(node.id);

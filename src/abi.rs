@@ -49,9 +49,9 @@ impl ABI {
         }
     }
 
-    pub fn mangle_name(&self, name: &str, argtypes: &Type, funcdefs: i32) -> String {
+    pub fn mangle_name(&self, name: &str, argtypes: &Type) -> String {
         match *self {
-            ABI::Molten => molten_mangle_name(name, argtypes, funcdefs),
+            ABI::Molten => molten_mangle_name(name, argtypes),
             // TODO C++, etc
             _ => String::from(name),
         }
@@ -68,12 +68,8 @@ impl fmt::Display for ABI {
 }
 
 
-pub fn molten_mangle_name(name: &str, argtypes: &Type, funcdefs: i32) -> String {
-    if funcdefs >= 2 {
-        format!("_Z{}{}{}", name.len(), name, molten_mangle_type(argtypes))
-    } else {
-        String::from(name)
-    }
+pub fn molten_mangle_name(name: &str, argtypes: &Type) -> String {
+    format!("_Z{}{}{}", name.len(), name, molten_mangle_type(argtypes))
 }
 
 pub fn molten_mangle_type(ttype: &Type) -> String {

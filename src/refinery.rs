@@ -6,7 +6,7 @@ use crate::types::Type;
 use crate::ast::{ Pos, AST };
 use crate::misc::{ r, UniqueID };
 use crate::session::{ Session, Error };
-use crate::hir::{ NodeID, Visibility, Mutability, AssignType, Literal, Argument, ClassSpec, MatchCase, EnumVariant, WhereClause, Pattern, Expr, ExprKind };
+use crate::hir::{ NodeID, Visibility, Mutability, AssignType, Literal, Argument, ClassSpec, MatchCase, EnumVariant, Function, WhereClause, Pattern, Expr, ExprKind };
 
 
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -103,7 +103,7 @@ impl<'sess> Refinery<'sess> {
                 Expr::make_decl(pos, vis, ident, ttype, whereclause)
             },
 
-            AST::Function(pos, _vis, ident, args, ret, body, abi, whereclause) => {
+            AST::Function(pos, _vis, name, args, ret, body, abi, whereclause) => {
                 // TODO visibility is forced here so I don't have to add 'pub' keywords yet
                 let vis = if self.top_level() {
                     Visibility::Public
@@ -111,8 +111,11 @@ impl<'sess> Refinery<'sess> {
                     Visibility::Private
                 };
 
+                let id = NodeID::generate();
+                let name = name.unwrap_or(format!("anon{}", id));
                 self.with_context(CodeContext::Func(abi), || {
-                    Ok(Expr::make_func(pos, vis, ident, args, ret, self.refine_vec(body), abi, whereclause))
+                    let func = Function::new(vis, name, args, ret, self.refine_vec(body), abi, whereclause);
+                    Ok(Expr::new_with_id(id, pos, ExprKind::Function(func)))
                 })?
             },
 
@@ -366,7 +369,7 @@ impl<'sess> Refinery<'sess> {
             newbody.push(node);
         }
         if !has_new {
-            //newbody.insert(0, Expr::make_func(pos, Some(String::from("new")), vec!((String::from("self"), None, None)), None, r(AST::Identifier(id, pos, String::from("self"))), UniqueID::generate(), ABI::Molten, WhereClause::empty()));
+            //newbody.insert(0, Expr::make_func(pos, Function::new(Some(String::from("new")), vec!((String::from("self"), None, None)), None, r(AST::Identifier(id, pos, String::from("self"))), UniqueID::generate(), ABI::Molten, WhereClause::empty())));
             //return Err(Error::new(format!("SyntaxError: you must declare a \"new\" method on a class")));
         }
 
@@ -421,6 +424,7 @@ impl<'sess> Refinery<'sess> {
             match node {
                 AST::Function(pos, _vis, name, mut args, ret, body, abi, whereclause) if name.is_some() => {
                     let vis = Visibility::Public;
+                    let name = name.ok_or(Error::new("SyntaxError: anonymous functions are not allowed in trait implementations".to_string()))?;
 
                     let mut body = self.with_context(CodeContext::Func(abi), || {
                         Ok(self.refine_vec(body))
@@ -435,7 +439,7 @@ impl<'sess> Refinery<'sess> {
                         }
                     }
 
-                    newbody.push(Expr::make_func(pos, vis, name, args, ret, body, abi, whereclause));
+                    newbody.push(Expr::make_func(pos, Function::new(vis, name, args, ret, body, abi, whereclause)));
                 },
                 node => return Err(Error::new(format!("SyntaxError: only functions are allowed in trait impls, found {:?}", node))),
             }

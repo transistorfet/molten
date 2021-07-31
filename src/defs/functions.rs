@@ -16,11 +16,11 @@ pub struct AnyFunc();
 
 impl AnyFunc {
     #[must_use]
-    pub fn define(session: &Session, scope: ScopeRef, id: NodeID, vis: Visibility, name: Option<&str>, abi: ABI, ttype: Option<Type>) -> Result<Def, Error> {
+    pub fn define(session: &Session, scope: ScopeRef, id: NodeID, vis: Visibility, name: &str, abi: ABI, ttype: Option<Type>) -> Result<Def, Error> {
         match abi {
             ABI::C => CFuncDef::define(session, scope.clone(), id, vis, name, ttype),
             ABI::Molten => {
-                if scope.is_redirect() && name.is_some() {
+                if scope.is_redirect() && vis != Visibility::Anonymous {
                     MethodDef::define(session, scope.clone(), id, vis, name, ttype)
                 } else {
                     ClosureDef::define(session, scope.clone(), id, vis, name, ttype)
@@ -31,14 +31,14 @@ impl AnyFunc {
     }
 
     #[must_use]
-    pub fn set_func_def(session: &Session, scope: ScopeRef, id: NodeID, name: Option<&str>, def: Def, ttype: Option<Type>) -> Result<(), Error> {
+    pub fn set_func_def(session: &Session, scope: ScopeRef, id: NodeID, vis: Visibility, name: &str, def: Def, ttype: Option<Type>) -> Result<(), Error> {
         session.set_def(id, def.clone());
 
         if let Some(ttype) = &ttype {
             session.update_type(id, ttype)?;
         }
 
-        if let Some(name) = name {
+        if vis != Visibility::Anonymous {
             let dscope = Scope::target(session, scope.clone());
             if let Some(previd) = dscope.get_var_def(&name) {
                 OverloadDef::define(session, scope.clone(), &name, id, previd, ttype)?;
@@ -183,7 +183,7 @@ pub type ClosureDefRef = Rc<ClosureDef>;
 
 impl ClosureDef {
     #[must_use]
-    pub fn define(session: &Session, scope: ScopeRef, id: NodeID, vis: Visibility, name: Option<&str>, ttype: Option<Type>) -> Result<Def, Error> {
+    pub fn define(session: &Session, scope: ScopeRef, id: NodeID, vis: Visibility, name: &str, ttype: Option<Type>) -> Result<Def, Error> {
         let ctid = NodeID::generate();
         let structdef = StructDef::new_ref(Scope::new_ref(Some(scope.clone())));
 
@@ -196,7 +196,7 @@ impl ClosureDef {
             context_arg_id: NodeID::generate(),
         }));
 
-        AnyFunc::set_func_def(session, scope.clone(), id, name, def.clone(), ttype)?;
+        AnyFunc::set_func_def(session, scope.clone(), id, vis, name, def.clone(), ttype)?;
         Ok(def)
     }
 
@@ -228,7 +228,7 @@ pub type MethodDefRef = Rc<MethodDef>;
 
 impl MethodDef {
     #[must_use]
-    pub fn define(session: &Session, scope: ScopeRef, id: NodeID, vis: Visibility, name: Option<&str>, ttype: Option<Type>) -> Result<Def, Error> {
+    pub fn define(session: &Session, scope: ScopeRef, id: NodeID, vis: Visibility, name: &str, ttype: Option<Type>) -> Result<Def, Error> {
         let closure = match ClosureDef::define(session, scope, id, vis, name, ttype) {
             Ok(Def::Closure(cl)) => cl,
             result @ _ => return result,
@@ -257,15 +257,14 @@ pub type CFuncDefRef = Rc<CFuncDef>;
 
 impl CFuncDef {
     #[must_use]
-    pub fn define(session: &Session, scope: ScopeRef, id: NodeID, vis: Visibility, name: Option<&str>, ttype: Option<Type>) -> Result<Def, Error> {
+    pub fn define(session: &Session, scope: ScopeRef, id: NodeID, vis: Visibility, name: &str, ttype: Option<Type>) -> Result<Def, Error> {
         if scope.is_redirect() {
             return Err(Error::new(format!("DefError: cannot declare a C ABI function within a class body")));
         }
 
-        let name = match name.as_ref() {
-            Some(name) => name,
-            None => return Err(Error::new(format!("NameError: C ABI function declared without a name"))),
-        };
+        if vis == Visibility::Anonymous {
+            return Err(Error::new(format!("NameError: C ABI function declared without a name")));
+        }
 
         let def = Def::CFunc(Rc::new(CFuncDef {
             id: id,
