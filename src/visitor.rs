@@ -183,8 +183,8 @@ pub trait Visitor: Sized {
         walk_assignment(self, id, left, right, ty)
     }
 
-    fn visit_module(&mut self, _id: NodeID, _name: &str, code: &Vec<Expr>, _memo_id: NodeID) -> Result<Self::Return, Error> {
-        self.visit_vec(code)
+    fn visit_module(&mut self, _id: NodeID, _name: &str, code: &Expr, _memo_id: NodeID) -> Result<Self::Return, Error> {
+        self.visit_node(code)
     }
 
 

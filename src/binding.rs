@@ -59,19 +59,18 @@ impl<'sess> Visitor for NameBinder<'sess> {
         Ok(())
     }
 
-    fn visit_module(&mut self, id: NodeID, name: &str, code: &Vec<Expr>, memo_id: NodeID) -> Result<Self::Return, Error> {
+    fn visit_module(&mut self, id: NodeID, name: &str, code: &Expr, memo_id: NodeID) -> Result<Self::Return, Error> {
         let scope = self.stack.get_scope();
 
         let memo_name = format!("memo.{}", name);
         VarDef::define(self.session, scope.clone(), memo_id, Mutability::Mutable, &memo_name, Some(scope.find_type(self.session, "Bool")?.clone()))?;
 
-        let defid = self.session.new_def_id(id);
-        let ttype = Type::Function(r(Type::Tuple(vec!())), r(scope.find_type(self.session, "Bool")?.clone()), ABI::Molten);
-        self.session.map.set(defid, scope.clone());
-        self.session.set_type(defid, ttype.clone());
+        self.visit_node(code)?;
 
-        ClosureDef::define(self.session, scope.clone(), defid, Visibility::Public, &format!("run_{}", name), Some(ttype))?;
-        self.visit_vec(code)
+        // Set the basename of the scope of the module's closure to "" so that exported names don't include it
+        let fscope = self.session.map.get(self.session.get_ref(code.id).unwrap()).unwrap();
+        fscope.set_basename("");
+        Ok(())
     }
 
     fn visit_function(&mut self, id: NodeID, func: &Function) -> Result<Self::Return, Error> {

@@ -239,7 +239,7 @@ impl ScopeMapRef {
     }
 
     pub fn get_global(&self) -> ScopeRef {
-        self.get(ScopeMapRef::GLOBAL).unwrap()
+        self.get(ScopeMapRef::PRIMATIVE).unwrap()
     }
 }
 

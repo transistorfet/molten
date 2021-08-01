@@ -1,4 +1,12 @@
 
+* commit the changes for making the module run function even more like a proper function
+* copy the changes for closure context access to transform for now (until you get the new one working)
+* try to get the closure conversion working
+* can you make an exception conversion mut visitor? to add the execption argument to everything
+* there is a problem in object/funcptr-uninitialized-issue.mol caused by an argument being defined twice.  I think it has to do with __init__ and duplicating code
+* remove the PRIMATIVE name in scope maps
+
+* add common constants for various context and vtable strings throughout, instead of dupilcating strings
 * you can maybe have a special type Type::Convert(dest_type: R<Type>, src_type: R<Type>) which can be produced by check_type
 * the issue with having a table instead for conversions, is that it's hard to find where that actually exists in the tree
 

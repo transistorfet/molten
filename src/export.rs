@@ -60,6 +60,15 @@ impl<'sess> Visitor for ExportsCollector<'sess> {
         Ok(())
     }
 
+    fn visit_module(&mut self, id: NodeID, name: &str, code: &Expr, memo_id: NodeID) -> Result<Self::Return, Error> {
+        match &code.kind {
+            ExprKind::Function(func) => {
+                self.visit_vec(&func.body)
+            },
+            _ => panic!("SyntaxError: expected module to contain one function, found {:?}", code),
+        }
+    }
+
     fn visit_import(&mut self, _id: NodeID, _ident: &str, _decls: &Vec<Expr>) -> Result<Self::Return, Error> {
         // Don't traverse imports
         Ok(())

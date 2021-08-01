@@ -53,9 +53,6 @@ impl<'sess> Refinery<'sess> {
     }
 
     pub fn refine_module(&self, code: Vec<AST>) -> Vec<Expr> {
-        //let mut body = self.refine_vec(code);
-        //body.push(Expr::make_lit(Literal::Boolean(true)));
-
         let module_name = self.session.name.replace(".", "_");
         let memo = format!("memo.{}", module_name);
 
@@ -71,7 +68,9 @@ impl<'sess> Refinery<'sess> {
             ))
         );
 
-        vec!(Expr::make_module(module_name, body))
+        let module_run_name = format!("run_{}", module_name);
+        let func = Expr::new(Pos::empty(), ExprKind::Function(Function::new(Visibility::Public, module_run_name, vec!(), None, body, ABI::Molten, WhereClause::empty())));
+        vec!(Expr::make_module(module_name, func))
     }
 
     pub fn refine_vec(&self, code: Vec<AST>) -> Vec<Expr> {

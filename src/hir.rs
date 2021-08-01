@@ -153,7 +153,7 @@ pub enum ExprKind {
     Definition(Mutability, String, Option<Type>, R<Expr>),
     Assignment(R<Expr>, R<Expr>, AssignType),
 
-    Module(String, Vec<Expr>, NodeID),
+    Module(String, R<Expr>, NodeID),
 }
 
 impl Argument {
@@ -436,8 +436,8 @@ impl Expr {
     }
 
     #[allow(dead_code)]
-    pub fn make_module(name: String, code: Vec<Expr>) -> Expr {
-        Expr { id: NodeID::generate(), pos: Pos::empty(), kind: ExprKind::Module(name, code, NodeID::generate()) }
+    pub fn make_module(name: String, code: Expr) -> Expr {
+        Expr { id: NodeID::generate(), pos: Pos::empty(), kind: ExprKind::Module(name, r(code), NodeID::generate()) }
     }
 
 

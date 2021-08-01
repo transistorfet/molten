@@ -313,7 +313,7 @@ impl<'sess> Visitor for Transformer<'sess> {
         Ok(self.transform_assignment(id, left, right))
     }
 
-    fn visit_module(&mut self, id: NodeID, name: &str, code: &Vec<Expr>, memo_id: NodeID) -> Result<Self::Return, Error> {
+    fn visit_module(&mut self, id: NodeID, name: &str, code: &Expr, memo_id: NodeID) -> Result<Self::Return, Error> {
         Ok(self.transform_module(id, name, code, memo_id))
     }
 
@@ -365,17 +365,12 @@ impl<'sess> Visitor for Transformer<'sess> {
 
 impl<'sess> Transformer<'sess> {
 
-    pub fn transform_module(&mut self, id: NodeID, name: &str, code: &Vec<Expr>, memo_id: NodeID) -> Vec<LLExpr> {
-        let defid = self.session.get_ref(id).unwrap();
-
+    pub fn transform_module(&mut self, id: NodeID, name: &str, code: &Expr, memo_id: NodeID) -> Vec<LLExpr> {
         // Define a global that will store whether we've run this function or not
         let memo_name = format!("memo.{}", name);
         self.add_global(LLGlobal::DefGlobal(memo_id, LLLink::Once, memo_name, LLType::I1, true));
 
-        let module_run_name = format!("run_{}", name);
-        let exprs = ClosureTransform::transform_def(self, defid, Visibility::Public, &module_run_name, &vec!(), code);
-
-        exprs
+        self.visit_node(code).unwrap()
     }
 
     pub fn build_main_func(&mut self, init_code: Vec<LLExpr>) {
