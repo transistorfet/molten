@@ -148,7 +148,7 @@ impl<'sess> Visitor for Transformer<'sess> {
     }
 
     fn get_scope_by_id(&self, id: NodeID) -> ScopeRef {
-        self.session.map.get(&id)
+        self.session.map.get(id).unwrap()
     }
 
     fn handle_error(&mut self, node: &Expr, err: Error) -> Result<Self::Return, Error> {
@@ -696,7 +696,7 @@ impl<'sess> Transformer<'sess> {
         exprs.push(LLExpr::SetValue(condid, r(condval)));
 
         for case in cases {
-            let lscope = self.session.map.get(&case.id);
+            let lscope = self.session.map.get(case.id).unwrap();
             self.with_scope(lscope, |transform| {
                 conds.push(transform.transform_pattern(&case.pat, condid));
                 blocks.push(transform.visit_node(&case.body).unwrap());

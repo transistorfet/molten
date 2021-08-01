@@ -53,7 +53,7 @@ impl<'sess> Visitor for TypeChecker<'sess> {
     }
 
     fn get_scope_by_id(&self, id: NodeID) -> ScopeRef {
-        self.session.map.get(&id)
+        self.session.map.get(id).unwrap()
     }
 
     fn handle_error(&mut self, node: &Expr, err: Error) -> Result<Self::Return, Error> {
@@ -112,7 +112,7 @@ impl<'sess> Visitor for TypeChecker<'sess> {
 
     fn visit_function(&mut self, refid: NodeID, func: &Function) -> Result<Self::Return, Error> {
         let defid = self.session.get_ref(refid)?;
-        let fscope = self.session.map.get(&defid);
+        let fscope = self.session.map.get(defid).unwrap();
         let dftype = self.session.get_type(defid).unwrap();
         let rtype = dftype.get_rettype()?;
 
@@ -244,7 +244,7 @@ impl<'sess> Visitor for TypeChecker<'sess> {
 
         let mut rtype = None;
         for case in cases {
-            let lscope = self.session.map.get(&case.id);
+            let lscope = self.session.map.get(case.id).unwrap();
             self.with_scope(lscope.clone(), |visitor| {
                 ctype = expect_type(visitor.session, Some(&ctype), Some(&visitor.visit_pattern(&case.pat)?), Check::List)?;
                 rtype = Some(expect_type(visitor.session, rtype.as_ref(), Some(&visitor.visit_node_or_error(&case.body)), Check::List)?);
@@ -262,7 +262,7 @@ impl<'sess> Visitor for TypeChecker<'sess> {
 
         let mut rtype = None;
         for case in cases {
-            let lscope = self.session.map.get(&case.id);
+            let lscope = self.session.map.get(case.id).unwrap();
             self.with_scope(lscope.clone(), |visitor| {
                 ctype = expect_type(visitor.session, Some(&ctype), Some(&visitor.visit_pattern(&case.pat)?), Check::List)?;
                 rtype = Some(expect_type(visitor.session, rtype.as_ref(), Some(&visitor.visit_node_or_error(&case.body)), Check::List)?);
@@ -382,7 +382,7 @@ impl<'sess> Visitor for TypeChecker<'sess> {
         let impl_id = self.session.get_ref(id)?;
 
         // TODO this gets the impl-specific tscope and not the trait def tscope
-        let tscope = self.session.map.get(&impl_id);
+        let tscope = self.session.map.get(impl_id).unwrap();
         self.with_scope(tscope.clone(), |visitor| {
             visitor.visit_vec(body)
         })?;
@@ -437,7 +437,7 @@ impl<'sess> Visitor for TypeChecker<'sess> {
     fn visit_class(&mut self, refid: NodeID, _classspec: &ClassSpec, _parentspec: &Option<ClassSpec>, _whereclause: &WhereClause, body: &Vec<Expr>) -> Result<Self::Return, Error> {
         let scope = self.stack.get_scope();
         let defid = self.session.get_ref(refid)?;
-        let tscope = self.session.map.get(&defid);
+        let tscope = self.session.map.get(defid).unwrap();
         self.with_scope(tscope.clone(), |visitor| {
             visitor.visit_vec(body)
         })?;

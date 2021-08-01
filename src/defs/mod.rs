@@ -20,18 +20,22 @@ use crate::defs::functions::{ OverloadDefRef, ClosureDefRef, MethodDefRef, CFunc
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Def {
-    TypeAlias(TypeAliasDefRef),
+    // Values
     Var(VarDefRef),
     Arg(ArgDefRef),
     Field(FieldDefRef),
-    Class(ClassDefRef),
-    #[allow(dead_code)]
-    Struct(StructDefRef),
-    Enum(EnumDefRef),
     Overload(OverloadDefRef),
     Closure(ClosureDefRef),
     Method(MethodDefRef),
     CFunc(CFuncDefRef),
+
+    // Types
+    Class(ClassDefRef),
+    Struct(StructDefRef),
+    Enum(EnumDefRef),
+    TypeAlias(TypeAliasDefRef),
+
+    // Not really either
     TraitDef(TraitDefRef),
     TraitImpl(TraitImplRef),
 }
@@ -92,8 +96,13 @@ impl Def {
         }
     }
 
+    /// Return true if the definition is always accessible globally (true), or must be accessed through a closure context (false)
     pub fn is_globally_accessible(&self) -> bool {
         match self {
+            Def::Class(_) |
+            Def::Struct(_) |
+            Def::Enum(_) |
+            Def::TypeAlias(_) |
             Def::CFunc(_) => true,
             _ => false,
         }

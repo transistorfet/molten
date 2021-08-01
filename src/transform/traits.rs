@@ -37,12 +37,12 @@ impl<'sess> Transformer<'sess> {
         traitimpl.vtable.inherit(&traitdef.vtable);
         traitimpl.vtable.build_vtable(self.session, body);
 
-        let tscope = self.session.map.get(&traitimpl.id);
+        let tscope = self.session.map.get(traitimpl.id).unwrap();
         let mut exprs = self.with_scope(tscope, |transform| {
             transform.visit_vec(body)
         }).unwrap();
 
-        let tscope = self.session.map.get(&traitimpl.id);
+        let tscope = self.session.map.get(traitimpl.id).unwrap();
         match self.get_context() {
             Some(CodeContext::Import) =>
                 exprs.extend(VtableTransform::decl_vtable(self, format!("__{}_vtable", tscope.get_basename()), &traitimpl.vtable)),

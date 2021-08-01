@@ -52,7 +52,7 @@ impl<'sess> Visitor for ExportsCollector<'sess> {
     }
 
     fn get_scope_by_id(&self, id: NodeID) -> ScopeRef {
-        self.session.map.get(&id)
+        self.session.map.get(id).unwrap()
     }
 
     fn handle_error(&mut self, node: &Expr, err: Error) -> Result<(), Error> {

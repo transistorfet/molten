@@ -234,12 +234,12 @@ impl ScopeMapRef {
         self.0.borrow_mut().insert(id, scope);
     }
 
-    pub fn get(&self, id: &UniqueID) -> ScopeRef {
-        self.0.borrow().get(id).unwrap().clone()
+    pub fn get(&self, id: UniqueID) -> Option<ScopeRef> {
+        self.0.borrow().get(&id).cloned()
     }
 
     pub fn get_global(&self) -> ScopeRef {
-        self.get(&ScopeMapRef::GLOBAL)
+        self.get(ScopeMapRef::GLOBAL).unwrap()
     }
 }
 

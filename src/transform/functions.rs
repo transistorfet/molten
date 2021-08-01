@@ -166,7 +166,7 @@ impl CFuncTransform {
     }
 
     pub fn transform_def(transform: &mut Transformer, defid: NodeID, vis: Visibility, name: &str, args: &Vec<Argument>, body: &Vec<Expr>) -> Vec<LLExpr> {
-        let fscope = transform.session.map.get(&defid);
+        let fscope = transform.session.map.get(defid).unwrap();
         let fname = transform.transform_func_name(name, defid);
 
         let ftype = transform.session.get_type(defid).unwrap();
@@ -243,7 +243,7 @@ impl ClosureTransform {
 
     pub fn transform_def(transform: &mut Transformer, defid: NodeID, vis: Visibility, name: &str, args: &Vec<Argument>, body: &Vec<Expr>) -> Vec<LLExpr> {
         let scope = transform.stack.get_scope();
-        let fscope = transform.session.map.get(&defid);
+        let fscope = transform.session.map.get(defid).unwrap();
         let fname = transform.transform_func_name(name, defid);
         let cl = transform.session.get_def(defid).unwrap().as_closure().unwrap();
         let (compiled_func_name, compiled_func_type) = ClosureTransform::transform_raw_func_data(transform, defid, &fname, cl.compiled_func_id);

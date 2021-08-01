@@ -30,7 +30,7 @@ impl<'sess> Transformer<'sess> {
             return vec!();
         }
 
-        let tscope = self.session.map.get(&classdef.id);
+        let tscope = self.session.map.get(classdef.id).unwrap();
         VtableTransform::decl_vtable(self, format!("__{}_vtable", tscope.get_basename()), &classdef.vtable)
     }
 
@@ -39,14 +39,14 @@ impl<'sess> Transformer<'sess> {
             return vec!();
         }
 
-        let tscope = self.session.map.get(&classdef.id);
+        let tscope = self.session.map.get(classdef.id).unwrap();
         VtableTransform::init_vtable(self, format!("__{}_vtable", tscope.get_basename()), &classdef.vtable)
     }
 
     pub fn transform_class_body(&mut self, id: NodeID, body: &Vec<Expr>) -> Vec<LLExpr> {
         let defid = self.session.get_ref(id).unwrap();
         let mut exprs = vec!();
-        let tscope = self.session.map.get(&defid);
+        let tscope = self.session.map.get(defid).unwrap();
         let classdef = self.session.get_def(defid).unwrap().as_class().unwrap();
 
         self.transform_class_type_data(classdef.clone(), body);
