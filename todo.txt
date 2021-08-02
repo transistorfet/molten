@@ -1,4 +1,6 @@
 
+* you could possibly add a TraitFuncDef which contains a ClosureDef, just like MethodDef, but you'll probably need to add the CodeContext stuff to make it work
+
 * there is an interdependent issue with closure context structdefs (the parent scope their vars inherits from), and the code that prevents redefinitions in session.
   If you're not allowed to redefine defs, and the structdef inherits from None, then when a field is added to the struct, it will define a new FieldDef for it, but
   since it was given an ID that corresponds to the variable that's being converted into a context access, it tries to redefine it.  When the scope inherits from the
@@ -8,12 +10,12 @@
   to use a different ID for the field, so that it works, causes another error about something not being set correctly... (ID 1841 was not set)
 
 
-* commit the changes for making the module run function even more like a proper function
 * copy the changes for closure context access to transform for now (until you get the new one working)
 * try to get the closure conversion working
 * can you make an exception conversion mut visitor? to add the execption argument to everything
 * there is a problem in object/funcptr-uninitialized-issue.mol caused by an argument being defined twice.  I think it has to do with __init__ and duplicating code
 * remove the PRIMATIVE name in scope maps
+* add a check to make sure trait defs are all ABI::Molten
 
 * add common constants for various context and vtable strings throughout, instead of dupilcating strings
 * you can maybe have a special type Type::Convert(dest_type: R<Type>, src_type: R<Type>) which can be produced by check_type

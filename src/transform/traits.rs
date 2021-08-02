@@ -122,5 +122,34 @@ impl<'sess> Transformer<'sess> {
         }
         return value;
     }
+
+    pub fn convert_impl_func_args(&mut self, func_id: NodeID, traitdefid: NodeID, fargs: &mut Vec<(NodeID, String)>, body: &mut Vec<LLExpr>) {
+        let deftype = self.session.get_type(traitdefid).unwrap();
+        let trait_id = self.session.get_ref(traitdefid).unwrap();
+        // TODO convert trait arguments via fargs and insert a SetValue(arg.id, <converted-value>)
+        // TODO and don't forget the return type
+
+        for (arg, argtype) in fargs.iter_mut().zip(deftype.get_argtypes().unwrap().as_vec()) {
+            let ttype = self.session.get_type(arg.0).unwrap();
+
+            if argtype.get_id() == Ok(trait_id) {
+                // TODO here you would insert the the conversions, but doing so would require the arg.id to be swapped, and then the Def for arg.id to be changed to VarDef
+                let converted_id = arg.0;
+                arg.0 = NodeID::generate();
+                body.insert(0, LLExpr::SetValue(converted_id, r(self.convert_unpack_trait_obj(LLExpr::GetValue(arg.0)))));
+            }
+        }
+
+        let rettype = deftype.get_rettype().unwrap();
+        if rettype.get_id() == Ok(trait_id) {
+            let impltype = self.session.get_type(func_id).unwrap().get_rettype().unwrap().clone();
+            let traitdef = self.session.get_def(trait_id).unwrap().as_trait_def().unwrap();
+            let last = body.pop().unwrap();
+            let value = self.convert_pack_trait_obj(body, Some(traitdef), &impltype, last);
+            body.push(value);
+        }
+
+        self.session.set_type(func_id, deftype);
+    }
 }
 

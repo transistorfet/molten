@@ -228,8 +228,6 @@ impl ClosureTransform {
         let fscope = transform.session.map.get(defid).unwrap();
         let fname = transform.transform_func_name(name, defid);
         let cl = transform.session.get_def(defid).unwrap().as_closure().unwrap();
-        let (compiled_func_name, compiled_func_type) = ClosureTransform::transform_raw_func_data(transform, defid, &fname, cl.compiled_func_id);
-
 
         // Add context argument to transformed arguments list
         let exp_id = NodeID::generate();
@@ -242,13 +240,19 @@ impl ClosureTransform {
 
         // Transforms body and create C function definition
         let index = transform.globals.len();
-        let body = transform.with_context(CodeContext::Func(ABI::Molten, defid), |transform| {
+        let mut body = transform.with_context(CodeContext::Func(ABI::Molten, defid), |transform| {
             transform.with_exception(exp_id, |transform| {
                 transform.with_scope(fscope, |transform| {
                     transform.visit_vec(body)
                 }).unwrap()
             })
         });
+
+        if let Ok(traitdefid) = transform.session.get_ref(defid) {
+            transform.convert_impl_func_args(defid, traitdefid, &mut fargs, &mut body);
+        }
+
+        let (compiled_func_name, compiled_func_type) = ClosureTransform::transform_raw_func_data(transform, defid, &fname, cl.compiled_func_id);
         let llvis = transform.transform_vis(vis);
         transform.insert_global(index, LLGlobal::DefCFunc(cl.compiled_func_id, llvis, compiled_func_name.clone(), compiled_func_type.clone(), fargs, body, LLCC::FastCC));
 

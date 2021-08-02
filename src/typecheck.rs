@@ -125,7 +125,7 @@ impl<'sess> Visitor for TypeChecker<'sess> {
             //let vtype = arg.default.clone().map(|vexpr| self.visit_node_or_error(vexpr));
             //atype = expect_type(self.session, scope.clone(), atype, vtype, Check::Def)?;
 
-            if &arg.name[..] == "self" || &arg.name[..] == "self_boxed" {
+            if &arg.name[..] == "self" {
                 let stype = fscope.find_type(self.session, "Self")?;
                 atype = expect_type(self.session, Some(&atype), Some(&stype), Check::Def)?;
             }
@@ -399,6 +399,8 @@ impl<'sess> Visitor for TypeChecker<'sess> {
                     let deftype = self.session.get_type(defid);
                     let impltype = self.session.get_type(node.id);
                     check_type(self.session, deftype.as_ref(), impltype.as_ref(), Check::Def, false)?;
+                    self.session.set_ref(self.session.get_ref(node.id).unwrap(), defid);
+                    self.session.set_ref(defid, traitdef.id);
                     names.remove(name);
                 }
                 _ => panic!("InternalError: expected function definition, found {:?}", node),

@@ -418,7 +418,7 @@ impl<'sess> Refinery<'sess> {
     }
 
     pub fn desugar_trait_impl(&self, pos: Pos, traitspec: ClassSpec, impltype: Type, body: Vec<AST>) -> Result<Expr, Error> {
-        let mut newbody = vec!();
+        let mut trait_body = vec!();
         for node in body {
             match node {
                 AST::Function(pos, _vis, name, mut args, ret, body, abi, whereclause) if name.is_some() => {
@@ -429,21 +429,12 @@ impl<'sess> Refinery<'sess> {
                         Ok(self.refine_vec(body))
                     })?;
 
-                    for i in 0..args.len() {
-                        if &args[i].name[..] == "self" {
-                            body.insert(0,
-                                Expr::make_def(args[i].pos, Mutability::Immutable, args[i].name.clone(), None,
-                                    Expr::make_unpack_trait_obj(args[i].pos, impltype.clone(), Expr::make_ident_from_str(args[i].pos, "self_boxed"))));
-                            args[i].name = "self_boxed".to_string();
-                        }
-                    }
-
-                    newbody.push(Expr::make_func(pos, Function::new(vis, name, args, ret, body, abi, whereclause)));
+                    trait_body.push(Expr::make_func(pos, Function::new(vis, name, args, ret, body, abi, whereclause)));
                 },
                 node => return Err(Error::new(format!("SyntaxError: only functions are allowed in trait impls, found {:?}", node))),
             }
         }
-        Ok(Expr::make_trait_impl(pos, traitspec, impltype, newbody))
+        Ok(Expr::make_trait_impl(pos, traitspec, impltype, trait_body))
     }
 }
 
