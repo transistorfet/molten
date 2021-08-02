@@ -48,12 +48,10 @@ pub enum BuiltinDef<'sess> {
 
 
 pub fn make_global<'sess>(session: &Session, builtins: &Vec<BuiltinDef<'sess>>) {
-    let primatives = session.map.add(ScopeMapRef::PRIMATIVE, None);
-    primatives.set_context(Context::Primative);
+    let globals = session.map.add(ScopeMapRef::GLOBAL, None);
+    globals.set_context(Context::Global);
 
-    declare_builtins_vec(session, primatives.clone(), builtins);
-
-    session.map.add(ScopeMapRef::GLOBAL, Some(primatives));
+    declare_builtins_vec(session, globals, builtins);
 }
 
 pub fn declare_builtins_vec<'sess>(session: &Session, scope: ScopeRef, entries: &Vec<BuiltinDef<'sess>>) {
@@ -65,15 +63,13 @@ pub fn declare_builtins_vec<'sess>(session: &Session, scope: ScopeRef, entries: 
 pub fn declare_builtins_node<'sess>(session: &Session, scope: ScopeRef, node: &BuiltinDef<'sess>) {
     match node {
         BuiltinDef::Func(id, name, ftype, _) => {
-            let tscope = if scope.is_primative() {
-                Scope::new_ref(Some(scope.clone()))
-            } else {
-                scope.clone()
-            };
+            // This tscope will hold any universal typevars that appear in ftype without them beig defined in the global scope
+            let tscope = Scope::new_ref(Some(scope.clone()));
 
             let mut ftype = parse_type(ftype);
-            bind_type_names(session, tscope, ftype.as_mut()).unwrap();
+            bind_type_names(session, tscope.clone(), ftype.as_mut()).unwrap();
             debug!("BUILTIN TYPE: {:?}", ftype);
+
             let abi = ftype.as_ref().map(|t| t.get_abi().unwrap()).unwrap_or(ABI::Molten);
             AnyFunc::define(session, scope, *id, Visibility::Global, name, abi, ftype).unwrap();
         },

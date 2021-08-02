@@ -15,7 +15,6 @@ const TYPES: usize = 1;
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum Context {
-    Primative,
     Global,
     Local,
     Object,
@@ -54,12 +53,8 @@ impl Scope {
         self.context.set(if value { Context::Object } else { Context::Local });
     }
 
-    pub fn is_primative(&self) -> bool {
-        self.context.get() == Context::Primative
-    }
-
     pub fn is_global(&self) -> bool {
-        self.context.get() == Context::Global || self.context.get() == Context::Primative
+        self.context.get() == Context::Global
     }
 
     pub fn is_redirect(&self) -> bool {
@@ -209,7 +204,6 @@ impl Scope {
 pub struct ScopeMapRef(RefCell<HashMap<UniqueID, ScopeRef>>);
 
 impl ScopeMapRef {
-    pub const PRIMATIVE: UniqueID = UniqueID(0);
     pub const GLOBAL: UniqueID = UniqueID(1);
 
     pub fn new() -> Self {
@@ -239,7 +233,7 @@ impl ScopeMapRef {
     }
 
     pub fn get_global(&self) -> ScopeRef {
-        self.get(ScopeMapRef::PRIMATIVE).unwrap()
+        self.get(ScopeMapRef::GLOBAL).unwrap()
     }
 }
 

@@ -14,7 +14,6 @@
 * try to get the closure conversion working
 * can you make an exception conversion mut visitor? to add the execption argument to everything
 * there is a problem in object/funcptr-uninitialized-issue.mol caused by an argument being defined twice.  I think it has to do with __init__ and duplicating code
-* remove the PRIMATIVE name in scope maps
 * add a check to make sure trait defs are all ABI::Molten
 
 * add common constants for various context and vtable strings throughout, instead of dupilcating strings
@@ -127,7 +126,7 @@ GENERAL ISSUES:
   is a blind cast and is unsafe, but we're currently relying on it for memory allocations and such
 
 
-* why is the primative == and != not causing an overload error?  (I assume it's because over*riding* is enabled (primative scope is different from module scope), but it's still a bit weird)
+* why is the global == and != not causing an overload error?  (I assume it's because over*riding* is enabled (global scope is different from module scope), but it's still a bit weird)
 * will there be an issue where declaring a function that's external, but not via an import, might cause the global variable to be defined incorrectly??
 
 
@@ -203,11 +202,11 @@ Changes:
 
 * you could modify the forloop code to take an iterator in future
 * should vtables be dynamically allocated, or should we add a LLType::ElementOf() type or something to GetElement an aliased type
-* strings, buffers, and all the primative types require vtables if they have methods, but there aren't vtables stored inside them.  You could make static vtable exceptions for them
-* make primative types unable to inherit from, because there's no vtable
+* strings, buffers, and all the builtin types require vtables if they have methods, but there aren't vtables stored inside them.  You could make static vtable exceptions for them
+* make builtin types unable to inherit from, because there's no vtable
 * fix lib to allow builtin classes??
 
-* can you make a check for nil before unboxing a type... and somehow return an appropriate default value?  I guess that's feasible because only primative types would be
+* can you make a check for nil before unboxing a type... and somehow return an appropriate default value?  I guess that's feasible because only builtin types would be
   boxed/unboxed, although records and tuples might be an issue
 * when you box a type to be converted to typevar, you can possibly add a vtable of sorts in the process, possibly containing functions and metadata for copying. You could also
   make buffer copying functions that take the element size and copy the buffer data into the boxed location.
