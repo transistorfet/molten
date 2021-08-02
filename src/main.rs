@@ -139,8 +139,6 @@ fn compile_file(input: &str, output: Option<&str>) {
 
     export::write_exports(&session, session.map.get_global(), &format!("{}.dec", session.target), &code);
 
-    mutvisitor::ClosureConversion::visit(&session, session.map.get_global(), &mut code);
-
     let mut transformer = transform::transform::Transformer::new(&session);
     transformer.initialize();
     transformer.transform_code(session.map.get_global(), &code);

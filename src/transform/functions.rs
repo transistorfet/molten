@@ -85,24 +85,6 @@ impl<'sess> Transformer<'sess> {
     }
 
     pub fn transform_func_def(&mut self, id: NodeID, func: &Function) -> Vec<LLExpr> {
-/*
-
-        // create FunctionParts
-        // transform the arguments
-        // transform the body
-        // (maybe trait pack/unpack the arguments and return)
-        // generate from parts
-
-        let fname = self.transform_func_name(func.name.as_deref(), defid);
-        let mut parts = FunctionParts::new(defid, func.vis, fname);
-        parts.args = func.args.iter().map(|arg| (self.session.get_ref(arg.id).unwrap(), arg.name.clone())).collect::<Vec<(NodeID, String)>>();
-        // TODO if trait func, then check each arg and return type and if convert, then create new id for the arg, and add a SetValue(old_id, unpack_trait), so that ArgDef GetValue transforms will still work
-
-        // TODO match abi for transform_def(self, &Function, &mut FunctionParts)
-        // TODO generate_function
-*/
-
-
         let defid = self.session.get_ref(id).unwrap();
         match func.abi {
             ABI::C => CFuncTransform::transform_def(self, defid, func.vis, &func.name, &func.args, &func.body),

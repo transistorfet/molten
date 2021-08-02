@@ -7,7 +7,7 @@ use crate::defs::Def;
 use crate::scope::{ Scope, ScopeRef };
 use crate::session::{ Session, Error };
 use crate::types::{ Type, Check, check_type };
-use crate::hir::{ NodeID, Mutability, Visibility };
+use crate::hir::{ NodeID, Mutability, Visibility, Expr };
 
 use crate::defs::classes::{ Define, StructDef, StructDefRef };
 
@@ -171,32 +171,46 @@ impl OverloadDef {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct ClosureDef {
-    pub id: NodeID,
     pub vis: Visibility,
-    pub context_type_id: NodeID,
-    pub context_struct: StructDefRef,
     pub compiled_func_id: NodeID,
     pub context_arg_id: NodeID,
+    pub context_type_id: NodeID,
+    pub context_struct: StructDefRef,
+    pub context_init_id: NodeID,
+    //pub context_builder: RefCell<Vec<Expr>>,
 }
 
 pub type ClosureDefRef = Rc<ClosureDef>;
 
 impl ClosureDef {
-    #[must_use]
-    pub fn define(session: &Session, scope: ScopeRef, id: NodeID, vis: Visibility, name: &str, ttype: Option<Type>) -> Result<Def, Error> {
-        let ctid = NodeID::generate();
+    pub fn create(session: &Session, scope: ScopeRef, id: NodeID, vis: Visibility, name: &str) -> Result<Def, Error> {
+        let context_type_id = NodeID::generate();
         let structdef = StructDef::new_ref(Scope::new_ref(Some(scope.clone())));
+        // TODO removing this will actually define the fields, but that messes other things up
+        //let structdef = StructDef::new_ref(Scope::new_ref(None));
 
         let def = Def::Closure(Rc::new(ClosureDef {
-            id: id,
-            vis: vis,
-            context_type_id: ctid,
-            context_struct: structdef,
+            vis,
             compiled_func_id: NodeID::generate(),
             context_arg_id: NodeID::generate(),
+            context_type_id,
+            context_struct: structdef.clone(),
+            context_init_id: NodeID::generate(),
+            //context_builder: RefCell::new(vec![]),
         }));
 
-        AnyFunc::set_func_def(session, scope.clone(), id, vis, name, def.clone(), ttype)?;
+        if let Some(fscope) = session.map.get(id) {
+            session.set_def(context_type_id, Def::Struct(structdef));
+            fscope.define("__context_type__", context_type_id)?;
+            session.set_type(context_type_id, Type::Object("__context_type__".to_string(), context_type_id, vec!()));
+        }
+        Ok(def)
+    }
+
+    #[must_use]
+    pub fn define(session: &Session, scope: ScopeRef, id: NodeID, vis: Visibility, name: &str, ttype: Option<Type>) -> Result<Def, Error> {
+        let def = ClosureDef::create(session, scope.clone(), id, vis, name)?;
+        AnyFunc::set_func_def(session, scope, id, vis, name, def.clone(), ttype)?;
         Ok(def)
     }
 
@@ -229,7 +243,7 @@ pub type MethodDefRef = Rc<MethodDef>;
 impl MethodDef {
     #[must_use]
     pub fn define(session: &Session, scope: ScopeRef, id: NodeID, vis: Visibility, name: &str, ttype: Option<Type>) -> Result<Def, Error> {
-        let closure = match ClosureDef::define(session, scope, id, vis, name, ttype) {
+        let closure = match ClosureDef::create(session, scope.clone(), id, vis, name) {
             Ok(Def::Closure(cl)) => cl,
             result @ _ => return result,
         };
@@ -240,7 +254,7 @@ impl MethodDef {
             closure: closure,
         }));
 
-        session.set_def(id, def.clone());
+        AnyFunc::set_func_def(session, scope, id, vis, name, def.clone(), ttype)?;
         Ok(def)
     }
 }
