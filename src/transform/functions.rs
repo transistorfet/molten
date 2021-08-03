@@ -239,6 +239,7 @@ impl ClosureTransform {
             Ok(vec!())
         }).unwrap();
 
+        // We need the function type during the body transformation to convert closure context references
         transform.set_type(cl.compiled_func_id, LLType::Alias(cl.compiled_func_id));
 
         // Transforms body and create C function definition

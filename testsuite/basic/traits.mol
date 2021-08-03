@@ -3,6 +3,8 @@
 //! true
 //! 15
 //! false
+//! 10
+//! 11.000000
 
 trait TraitTest {
     decl thing(Self) -> Bool
@@ -36,4 +38,31 @@ fn test_trait_unpack(t: 'a) where a: TraitTest {
 test_trait_unpack(15)
 
 //let trait: TraitTest = "Hey"
+
+
+
+trait Add {
+    decl add(Self, Self) -> Self
+}
+
+impl Add for Int {
+    fn add(self, y: Self) -> Self {
+        self + y
+    }
+}
+
+impl Add for Real {
+    fn add(self, y: Self) -> Self {
+        self + y
+    }
+}
+
+fn test_add(x: 'a, y: 'a) -> 'a where a: Add {
+    x.add(y)
+}
+
+println(str(test_add(5, 5)))
+println(str(test_add(3.2, 7.8)))
+
+
 

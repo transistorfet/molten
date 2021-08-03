@@ -1,5 +1,7 @@
 
+* add a check to make sure trait defs are all ABI::Molten
 * there are scope.map.get_or_add()s in both bindings and in defs.  They are needed in bindngs, but maybe you can turn them into get()s in the defs
+* add common constants for various context and vtable strings throughout, instead of dupilcating strings
 
 * there's a possible issue with closure reference conversion, where you only check if the name exists in the global scope, but not if it's the same definition.  It's
   possible there could be a different variable with the same name declared in the global scope causing the local one to not be converted into a context access.  But
@@ -7,11 +9,6 @@
 * can you make a walk_vec_with_scope() function and pass it a pointer to the scope stack, and subsequently have a walk_vec_with_scope_context(scope, context, body)?
 
 * Wow... there's now only 3 Scope::target calls when they used to be everywhere, and they are all called from defs which are called from bindings, from the looks of things
-
-* I was in the middle of adding CodeContext to visitors and using that everywhere for determining what something should be declared as and linked to.  Currently stashed
-* there is a problem with the way I implemented trait impl conversion which seems to have broken everything else, but I can possibly fix it using TraitFuncDef
-
-* you could possibly add a TraitFuncDef which contains a ClosureDef, just like MethodDef, but you'll probably need to add the CodeContext stuff to make it work
 
 * there is an interdependent issue with closure context structdefs (the parent scope their vars inherits from), and the code that prevents redefinitions in session.
   If you're not allowed to redefine defs, and the structdef inherits from None, then when a field is added to the struct, it will define a new FieldDef for it, but
@@ -23,16 +20,10 @@
 
 
 * copy the changes for closure context access to transform for now (until you get the new one working)
-* try to get the closure conversion working
+* can you make closure conversion a separate stage somehow, possibly with a MutVisitor
 * can you make an exception conversion mut visitor? to add the execption argument to everything
 * there is a problem in object/funcptr-uninitialized-issue.mol caused by an argument being defined twice.  I think it has to do with __init__ and duplicating code
-* add a check to make sure trait defs are all ABI::Molten
 
-* add common constants for various context and vtable strings throughout, instead of dupilcating strings
-* you can maybe have a special type Type::Convert(dest_type: R<Type>, src_type: R<Type>) which can be produced by check_type
-* the issue with having a table instead for conversions, is that it's hard to find where that actually exists in the tree
-
-* can you make closure conversion a separate stage somehow, possibly with a MutVisitor
 
 * you can maybe store more info in the defs, including the context of the function (Plain, Class Method, Trait Method), and then use that during
   transform, and you can use the FunctionParts struct for building and transforming a function, so your top level transform_func_def becomes
