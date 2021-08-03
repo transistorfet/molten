@@ -4,7 +4,7 @@ use std::cell::RefCell;
 use crate::types::Type;
 use crate::session::Error;
 use crate::scope::ScopeRef;
-use crate::hir::{ NodeID, Visibility, Mutability, AssignType, Literal, ClassSpec, MatchCase, EnumVariant, WhereClause, Function, Pattern, PatKind, Expr, ExprKind };
+use crate::hir::{ NodeID, Visibility, Mutability, AssignType, Literal, MatchCase, EnumVariant, WhereClause, Function, Pattern, PatKind, Expr, ExprKind };
 
 /*
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -88,12 +88,12 @@ pub trait Visitor: Sized {
         self.visit_vec(items)
     }
 
-    fn visit_record(&mut self, id: NodeID, items: &Vec<(String, Expr)>) -> Result<Self::Return, Error> {
-        walk_record(self, id, items)
+    fn visit_record(&mut self, _id: NodeID, items: &Vec<(String, Expr)>) -> Result<Self::Return, Error> {
+        walk_record(self, items)
     }
 
-    fn visit_record_update(&mut self, id: NodeID, record: &Expr, items: &Vec<(String, Expr)>) -> Result<Self::Return, Error> {
-        walk_record_update(self, id, record, items)
+    fn visit_record_update(&mut self, _id: NodeID, record: &Expr, items: &Vec<(String, Expr)>) -> Result<Self::Return, Error> {
+        walk_record_update(self, record, items)
     }
 
     fn visit_identifier(&mut self, _id: NodeID, _name: &str) -> Result<Self::Return, Error> {
@@ -113,8 +113,8 @@ pub trait Visitor: Sized {
         self.visit_vec(code)
     }
 
-    fn visit_invoke(&mut self, id: NodeID, func: &Expr, args: &Vec<Expr>, _fid: NodeID) -> Result<Self::Return, Error> {
-        walk_invoke(self, id, func, args)
+    fn visit_invoke(&mut self, _id: NodeID, func: &Expr, args: &Vec<Expr>, _fid: NodeID) -> Result<Self::Return, Error> {
+        walk_invoke(self, func, args)
     }
 
 
@@ -123,24 +123,24 @@ pub trait Visitor: Sized {
     }
 
 
-    fn visit_if(&mut self, id: NodeID, cond: &Expr, texpr: &Expr, fexpr: &Expr) -> Result<Self::Return, Error> {
-        walk_if(self, id, cond, texpr, fexpr)
+    fn visit_if(&mut self, _id: NodeID, cond: &Expr, texpr: &Expr, fexpr: &Expr) -> Result<Self::Return, Error> {
+        walk_if(self, cond, texpr, fexpr)
     }
 
     fn visit_raise(&mut self, _id: NodeID, expr: &Expr) -> Result<Self::Return, Error> {
         self.visit_node(expr)
     }
 
-    fn visit_try(&mut self, id: NodeID, cond: &Expr, cases: &Vec<MatchCase>) -> Result<Self::Return, Error> {
-        walk_try(self, id, cond, cases)
+    fn visit_try(&mut self, _id: NodeID, cond: &Expr, cases: &Vec<MatchCase>) -> Result<Self::Return, Error> {
+        walk_try(self, cond, cases)
     }
 
-    fn visit_match(&mut self, id: NodeID, cond: &Expr, cases: &Vec<MatchCase>) -> Result<Self::Return, Error> {
-        walk_match(self, id, cond, cases)
+    fn visit_match(&mut self, _id: NodeID, cond: &Expr, cases: &Vec<MatchCase>) -> Result<Self::Return, Error> {
+        walk_match(self,cond, cases)
     }
 
-    fn visit_while(&mut self, id: NodeID, cond: &Expr, body: &Expr) -> Result<Self::Return, Error> {
-        walk_while(self, id, cond, body)
+    fn visit_while(&mut self, _id: NodeID, cond: &Expr, body: &Expr) -> Result<Self::Return, Error> {
+        walk_while(self, cond, body)
     }
 
 
@@ -156,23 +156,23 @@ pub trait Visitor: Sized {
         Ok(self.default_return())
     }
 
-    fn visit_class(&mut self, id: NodeID, classspec: &ClassSpec, parentspec: &Option<ClassSpec>, whereclause: &WhereClause, body: &Vec<Expr>) -> Result<Self::Return, Error> {
-        walk_class(self, id, classspec, parentspec, whereclause, body)
+    fn visit_class(&mut self, id: NodeID, _classtype: &Type, _parenttype: &Option<Type>, _whereclause: &WhereClause, body: &Vec<Expr>) -> Result<Self::Return, Error> {
+        walk_class(self, id, body)
     }
 
-    fn visit_type_alias(&mut self, _id: NodeID, _classspec: &ClassSpec, _ttype: &Type) -> Result<Self::Return, Error> {
+    fn visit_type_alias(&mut self, _id: NodeID, _deftype: &Type, _ttype: &Type) -> Result<Self::Return, Error> {
         Ok(self.default_return())
     }
 
-    fn visit_enum(&mut self, _id: NodeID, _classspec: &ClassSpec, _variants: &Vec<EnumVariant>) -> Result<Self::Return, Error> {
+    fn visit_enum(&mut self, _id: NodeID, _enumtype: &Type, _variants: &Vec<EnumVariant>) -> Result<Self::Return, Error> {
         Ok(self.default_return())
     }
 
-    fn visit_trait_def(&mut self, _id: NodeID, _traitspec: &ClassSpec, body: &Vec<Expr>) -> Result<Self::Return, Error> {
+    fn visit_trait_def(&mut self, _id: NodeID, _traitname: &str, body: &Vec<Expr>) -> Result<Self::Return, Error> {
         self.visit_vec(body)
     }
 
-    fn visit_trait_impl(&mut self, _id: NodeID, _traitspec: &ClassSpec, _impltype: &Type, body: &Vec<Expr>) -> Result<Self::Return, Error> {
+    fn visit_trait_impl(&mut self, _id: NodeID, _traitname: &str, _impltype: &Type, body: &Vec<Expr>) -> Result<Self::Return, Error> {
         self.visit_vec(body)
     }
 
@@ -185,8 +185,8 @@ pub trait Visitor: Sized {
         self.visit_node(expr)
     }
 
-    fn visit_assignment(&mut self, id: NodeID, left: &Expr, right: &Expr, ty: AssignType) -> Result<Self::Return, Error> {
-        walk_assignment(self, id, left, right, ty)
+    fn visit_assignment(&mut self, _id: NodeID, left: &Expr, right: &Expr, ty: AssignType) -> Result<Self::Return, Error> {
+        walk_assignment(self, left, right, ty)
     }
 
     fn visit_module(&mut self, _id: NodeID, _name: &str, code: &Expr, _memo_id: NodeID) -> Result<Self::Return, Error> {
@@ -206,16 +206,16 @@ pub trait Visitor: Sized {
         self.visit_pattern(left)
     }
 
-    fn visit_pattern_enum_args(&mut self, id: NodeID, left: &Pattern, args: &Vec<Pattern>, _eid: NodeID) -> Result<Self::Return, Error> {
-        walk_pattern_enum_args(self, id, left, args)
+    fn visit_pattern_enum_args(&mut self, _id: NodeID, left: &Pattern, args: &Vec<Pattern>, _eid: NodeID) -> Result<Self::Return, Error> {
+        walk_pattern_enum_args(self, left, args)
     }
 
-    fn visit_pattern_tuple(&mut self, id: NodeID, items: &Vec<Pattern>) -> Result<Self::Return, Error> {
-        walk_pattern_tuple(self, id, items)
+    fn visit_pattern_tuple(&mut self, _id: NodeID, items: &Vec<Pattern>) -> Result<Self::Return, Error> {
+        walk_pattern_tuple(self, items)
     }
 
-    fn visit_pattern_record(&mut self, id: NodeID, items: &Vec<(String, Pattern)>) -> Result<Self::Return, Error> {
-        walk_pattern_record(self, id, items)
+    fn visit_pattern_record(&mut self, _id: NodeID, items: &Vec<(String, Pattern)>) -> Result<Self::Return, Error> {
+        walk_pattern_record(self, items)
     }
 
     fn visit_pattern_wild(&mut self, _id: NodeID) -> Result<Self::Return, Error> {
@@ -251,14 +251,14 @@ pub trait Visitor: Sized {
 
 }
 
-pub fn walk_record<R, V: Visitor<Return = R>>(visitor: &mut V, _id: NodeID, items: &Vec<(String, Expr)>) -> Result<R, Error> {
+pub fn walk_record<R, V: Visitor<Return = R>>(visitor: &mut V, items: &Vec<(String, Expr)>) -> Result<R, Error> {
     for item in items {
         visitor.visit_node(&item.1)?;
     }
     Ok(visitor.default_return())
 }
 
-pub fn walk_record_update<R, V: Visitor<Return = R>>(visitor: &mut V, _id: NodeID, record: &Expr, items: &Vec<(String, Expr)>) -> Result<R, Error> {
+pub fn walk_record_update<R, V: Visitor<Return = R>>(visitor: &mut V, record: &Expr, items: &Vec<(String, Expr)>) -> Result<R, Error> {
     visitor.visit_node(record)?;
     for item in items {
         visitor.visit_node(&item.1)?;
@@ -266,19 +266,19 @@ pub fn walk_record_update<R, V: Visitor<Return = R>>(visitor: &mut V, _id: NodeI
     Ok(visitor.default_return())
 }
 
-pub fn walk_invoke<R, V: Visitor<Return = R>>(visitor: &mut V, _id: NodeID, func: &Expr, args: &Vec<Expr>) -> Result<R, Error> {
+pub fn walk_invoke<R, V: Visitor<Return = R>>(visitor: &mut V, func: &Expr, args: &Vec<Expr>) -> Result<R, Error> {
     visitor.visit_node(func)?;
     visitor.visit_vec(args)
 }
 
-pub fn walk_if<R, V: Visitor<Return = R>>(visitor: &mut V, _id: NodeID, cond: &Expr, texpr: &Expr, fexpr: &Expr) -> Result<R, Error> {
+pub fn walk_if<R, V: Visitor<Return = R>>(visitor: &mut V, cond: &Expr, texpr: &Expr, fexpr: &Expr) -> Result<R, Error> {
     visitor.visit_node(cond)?;
     visitor.visit_node(texpr)?;
     visitor.visit_node(fexpr)?;
     Ok(visitor.default_return())
 }
 
-pub fn walk_try<R, V: Visitor<Return = R>>(visitor: &mut V, _id: NodeID, cond: &Expr, cases: &Vec<MatchCase>) -> Result<R, Error> {
+pub fn walk_try<R, V: Visitor<Return = R>>(visitor: &mut V, cond: &Expr, cases: &Vec<MatchCase>) -> Result<R, Error> {
     visitor.visit_node(cond)?;
     for case in cases {
         let lscope = visitor.get_scope_by_id(case.id);
@@ -287,7 +287,7 @@ pub fn walk_try<R, V: Visitor<Return = R>>(visitor: &mut V, _id: NodeID, cond: &
     Ok(visitor.default_return())
 }
 
-pub fn walk_match<R, V: Visitor<Return = R>>(visitor: &mut V, _id: NodeID, cond: &Expr, cases: &Vec<MatchCase>) -> Result<R, Error> {
+pub fn walk_match<R, V: Visitor<Return = R>>(visitor: &mut V, cond: &Expr, cases: &Vec<MatchCase>) -> Result<R, Error> {
     visitor.visit_node(cond)?;
     for case in cases {
         let lscope = visitor.get_scope_by_id(case.id);
@@ -304,7 +304,7 @@ pub fn walk_match_case<R, V: Visitor<Return = R>>(visitor: &mut V, lscope: Scope
     })
 }
 
-pub fn walk_while<R, V: Visitor<Return = R>>(visitor: &mut V, _id: NodeID, cond: &Expr, body: &Expr) -> Result<R, Error> {
+pub fn walk_while<R, V: Visitor<Return = R>>(visitor: &mut V, cond: &Expr, body: &Expr) -> Result<R, Error> {
     visitor.visit_node(cond)?;
     visitor.visit_node(body)?;
     Ok(visitor.default_return())
@@ -319,20 +319,20 @@ pub fn walk_function<R, V: Visitor<Return = R>>(visitor: &mut V, id: NodeID, fun
     Ok(visitor.default_return())
 }
 
-pub fn walk_class<R, V: Visitor<Return = R>>(visitor: &mut V, id: NodeID, _classspec: &ClassSpec, _parentspec: &Option<ClassSpec>, _whereclause: &WhereClause, body: &Vec<Expr>) -> Result<R, Error> {
+pub fn walk_class<R, V: Visitor<Return = R>>(visitor: &mut V, id: NodeID, body: &Vec<Expr>) -> Result<R, Error> {
     let tscope = visitor.get_scope_by_id(id);
     visitor.with_scope(tscope, |visitor| {
         visitor.visit_vec(body)
     })
 }
 
-pub fn walk_assignment<R, V: Visitor<Return = R>>(visitor: &mut V, _id: NodeID, left: &Expr, right: &Expr, _ty: AssignType) -> Result<R, Error> {
+pub fn walk_assignment<R, V: Visitor<Return = R>>(visitor: &mut V, left: &Expr, right: &Expr, _ty: AssignType) -> Result<R, Error> {
     visitor.visit_node(left)?;
     visitor.visit_node(right)?;
     Ok(visitor.default_return())
 }
 
-pub fn walk_pattern_enum_args<R, V: Visitor<Return = R>>(visitor: &mut V, _id: NodeID, left: &Pattern, args: &Vec<Pattern>) -> Result<R, Error> {
+pub fn walk_pattern_enum_args<R, V: Visitor<Return = R>>(visitor: &mut V, left: &Pattern, args: &Vec<Pattern>) -> Result<R, Error> {
     visitor.visit_pattern(left)?;
     for arg in args {
         visitor.visit_pattern(arg)?;
@@ -340,14 +340,14 @@ pub fn walk_pattern_enum_args<R, V: Visitor<Return = R>>(visitor: &mut V, _id: N
     Ok(visitor.default_return())
 }
 
-pub fn walk_pattern_tuple<R, V: Visitor<Return = R>>(visitor: &mut V, _id: NodeID, items: &Vec<Pattern>) -> Result<R, Error> {
+pub fn walk_pattern_tuple<R, V: Visitor<Return = R>>(visitor: &mut V, items: &Vec<Pattern>) -> Result<R, Error> {
     for item in items {
         visitor.visit_pattern(item)?;
     }
     Ok(visitor.default_return())
 }
 
-pub fn walk_pattern_record<R, V: Visitor<Return = R>>(visitor: &mut V, _id: NodeID, items: &Vec<(String, Pattern)>) -> Result<R, Error> {
+pub fn walk_pattern_record<R, V: Visitor<Return = R>>(visitor: &mut V, items: &Vec<(String, Pattern)>) -> Result<R, Error> {
     for (_, item) in items {
         visitor.visit_pattern(item)?;
     }
@@ -459,24 +459,24 @@ pub fn walk_node<R, V: Visitor<Return = R>>(visitor: &mut V, node: &Expr) -> Res
             visitor.visit_alloc_object(node.id, ttype)
         },
 
-        ExprKind::Class(classspec, parentspec, whereclause, body) => {
-            visitor.visit_class(node.id, classspec, parentspec, whereclause, body)
+        ExprKind::Class(classtype, parenttype, whereclause, body) => {
+            visitor.visit_class(node.id, classtype, parenttype, whereclause, body)
         },
 
-        ExprKind::TypeAlias(classspec, ttype) => {
-            visitor.visit_type_alias(node.id, classspec, ttype)
+        ExprKind::TypeAlias(deftype, ttype) => {
+            visitor.visit_type_alias(node.id, deftype, ttype)
         },
 
-        ExprKind::Enum(classspec, variants) => {
-            visitor.visit_enum(node.id, classspec, variants)
+        ExprKind::Enum(enumtype, variants) => {
+            visitor.visit_enum(node.id, enumtype, variants)
         },
 
-        ExprKind::TraitDef(traitspec, body) => {
-            visitor.visit_trait_def(node.id, traitspec, body)
+        ExprKind::TraitDef(traitname, body) => {
+            visitor.visit_trait_def(node.id, traitname, body)
         },
 
-        ExprKind::TraitImpl(traitspec, impltype, body) => {
-            visitor.visit_trait_impl(node.id, traitspec, impltype, body)
+        ExprKind::TraitImpl(traitname, impltype, body) => {
+            visitor.visit_trait_impl(node.id, traitname, impltype, body)
         },
 
 

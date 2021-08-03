@@ -1,7 +1,14 @@
 
-* add a check to make sure trait defs are all ABI::Molten
+* change names for id to either defid or refid to be more obvious (all visitor funcs receive the refid from the node)
 * there are scope.map.get_or_add()s in both bindings and in defs.  They are needed in bindngs, but maybe you can turn them into get()s in the defs
+
+* should you have a check that the type parameters in declarations are Universals and throw an error, since it doesn't make sense for them to be simple types at least
+  what about using a function type though...
+* can you remove some of the weirder ref trails (a ref to a ref to a ref), to make things simpler and more predictable?
+* add a check to make sure trait defs are all ABI::Molten
 * add common constants for various context and vtable strings throughout, instead of dupilcating strings
+* do you need to test unification between class and parent class, as well as trait def and impl type?
+* we currently aren't exporting enums
 
 * there's a possible issue with closure reference conversion, where you only check if the name exists in the global scope, but not if it's the same definition.  It's
   possible there could be a different variable with the same name declared in the global scope causing the local one to not be converted into a context access.  But
@@ -10,14 +17,8 @@
 
 * Wow... there's now only 3 Scope::target calls when they used to be everywhere, and they are all called from defs which are called from bindings, from the looks of things
 
-* there is an interdependent issue with closure context structdefs (the parent scope their vars inherits from), and the code that prevents redefinitions in session.
-  If you're not allowed to redefine defs, and the structdef inherits from None, then when a field is added to the struct, it will define a new FieldDef for it, but
-  since it was given an ID that corresponds to the variable that's being converted into a context access, it tries to redefine it.  When the scope inherits from the
-  scope containing the variable being converted, the code to add a field will still add the field but prevent the FieldDef from being defined.  This isn't a problem
-  with the all-at-once transformer because it never needs to transform the code that accesses the field.  The direct LLExpr is created instead.  In the separated
-  version, this causes a whole bunch of problems.  But it's not entirely correct in the all-at-once version either because the context struct is invalid, and trying
-  to use a different ID for the field, so that it works, causes another error about something not being set correctly... (ID 1841 was not set)
-
+TO CHECK:
+* classes and their parents should be able to have different numbers of type params
 
 * copy the changes for closure context access to transform for now (until you get the new one working)
 * can you make closure conversion a separate stage somehow, possibly with a MutVisitor
@@ -35,7 +36,6 @@
 * update documentation
 * write overview
 * fix method invokes
-* fix bind_type_names
 
 * for calling a function without it being a method call, you can parse "(" expression ")" into a special AST::BracketExpr or something, which can pass through the expr
   but can still be checked by the refinery and converted into an Expr::MethodInvoke or however you'll do that

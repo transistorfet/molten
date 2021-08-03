@@ -46,13 +46,6 @@ pub struct Argument {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct ClassSpec {
-    pub pos: Pos,
-    pub name: String,
-    pub types: Vec<Type>,
-}
-
-#[derive(Clone, Debug, PartialEq)]
 pub struct MatchCase {
     pub id: NodeID,
     pub pat: Pattern,
@@ -142,11 +135,11 @@ pub enum ExprKind {
     Declare(Visibility, String, Type, WhereClause),
     Function(Function),
     AllocObject(Type),
-    Class(ClassSpec, Option<ClassSpec>, WhereClause, Vec<Expr>),
-    TypeAlias(ClassSpec, Type),
-    Enum(ClassSpec, Vec<EnumVariant>),
-    TraitDef(ClassSpec, Vec<Expr>),
-    TraitImpl(ClassSpec, Type, Vec<Expr>),
+    Class(Type, Option<Type>, WhereClause, Vec<Expr>),
+    TypeAlias(Type, Type),
+    Enum(Type, Vec<EnumVariant>),
+    TraitDef(String, Vec<Expr>),
+    TraitImpl(String, Type, Vec<Expr>),
 
     Import(String, Vec<Expr>),
     Definition(Mutability, String, Option<Type>, R<Expr>),
@@ -163,16 +156,6 @@ impl Argument {
             name: name,
             ttype: ttype,
             default: default,
-        }
-    }
-}
-
-impl ClassSpec {
-    pub fn new(pos: Pos, name: String, types: Vec<Type>) -> Self {
-        ClassSpec {
-            pos: pos,
-            name: name,
-            types: types,
         }
     }
 }
@@ -385,8 +368,8 @@ impl Expr {
     }
 
     #[allow(dead_code)]
-    pub fn make_class(pos: Pos, classspec: ClassSpec, parentspec: Option<ClassSpec>, whereclause: WhereClause, body: Vec<Expr>) -> Expr {
-        Expr { id: NodeID::generate(), pos: pos, kind: ExprKind::Class(classspec, parentspec, whereclause, body) }
+    pub fn make_class(pos: Pos, classtype: Type, parenttype: Option<Type>, whereclause: WhereClause, body: Vec<Expr>) -> Expr {
+        Expr { id: NodeID::generate(), pos: pos, kind: ExprKind::Class(classtype, parenttype, whereclause, body) }
     }
 
     #[allow(dead_code)]
@@ -410,23 +393,23 @@ impl Expr {
     }
 
     #[allow(dead_code)]
-    pub fn make_type_alias(pos: Pos, classspec: ClassSpec, ttype: Type) -> Expr {
-        Expr { id: NodeID::generate(), pos: pos, kind: ExprKind::TypeAlias(classspec, ttype) }
+    pub fn make_type_alias(pos: Pos, deftype: Type, ttype: Type) -> Expr {
+        Expr { id: NodeID::generate(), pos: pos, kind: ExprKind::TypeAlias(deftype, ttype) }
     }
 
     #[allow(dead_code)]
-    pub fn make_enum(pos: Pos, classspec: ClassSpec, variants: Vec<EnumVariant>) -> Expr {
-        Expr { id: NodeID::generate(), pos: pos, kind: ExprKind::Enum(classspec, variants) }
+    pub fn make_enum(pos: Pos, enumtype: Type, variants: Vec<EnumVariant>) -> Expr {
+        Expr { id: NodeID::generate(), pos: pos, kind: ExprKind::Enum(enumtype, variants) }
     }
 
     #[allow(dead_code)]
-    pub fn make_trait_def(pos: Pos, traitspec: ClassSpec, body: Vec<Expr>) -> Expr {
-        Expr { id: NodeID::generate(), pos: pos, kind: ExprKind::TraitDef(traitspec, body) }
+    pub fn make_trait_def(pos: Pos, traitname: String, body: Vec<Expr>) -> Expr {
+        Expr { id: NodeID::generate(), pos: pos, kind: ExprKind::TraitDef(traitname, body) }
     }
 
     #[allow(dead_code)]
-    pub fn make_trait_impl(pos: Pos, traitspec: ClassSpec, impltype: Type, body: Vec<Expr>) -> Expr {
-        Expr { id: NodeID::generate(), pos: pos, kind: ExprKind::TraitImpl(traitspec, impltype, body) }
+    pub fn make_trait_impl(pos: Pos, traitname: String, impltype: Type, body: Vec<Expr>) -> Expr {
+        Expr { id: NodeID::generate(), pos: pos, kind: ExprKind::TraitImpl(traitname, impltype, body) }
     }
 
     #[allow(dead_code)]
@@ -436,8 +419,8 @@ impl Expr {
 
 
     #[allow(dead_code)]
-    pub fn make_resolve_ident(pos: Pos, object: &String, name: &str) -> Expr {
-        Expr::make_resolve(pos, Expr::make_ident(pos, object.clone()), name.to_string())
+    pub fn make_resolve_ident(pos: Pos, object: &str, name: &str) -> Expr {
+        Expr::make_resolve(pos, Expr::make_ident(pos, object.to_string()), name.to_string())
     }
 }
 

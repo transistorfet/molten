@@ -6,7 +6,7 @@ use crate::types::Type;
 use crate::ast::{ Pos, AST };
 use crate::misc::{ r, UniqueID };
 use crate::session::{ Session, Error };
-use crate::hir::{ NodeID, Visibility, Mutability, AssignType, Literal, Argument, ClassSpec, MatchCase, EnumVariant, Function, WhereClause, Pattern, Expr, ExprKind };
+use crate::hir::{ NodeID, Visibility, Mutability, AssignType, Literal, Argument, MatchCase, EnumVariant, Function, WhereClause, Pattern, Expr, ExprKind };
 
 
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -195,44 +195,42 @@ impl<'sess> Refinery<'sess> {
                 Expr::make_record_update(pos, self.refine_node(*record)?, refined)
             },
 
-            AST::Enum(pos, classspec, variants) => {
+            AST::Enum(pos, enumtype, variants) => {
                 let variants = variants.into_iter().map(|(pos, ident, ttype)| EnumVariant::new(pos, ident, ttype)).collect();
-                Expr::make_enum(pos, classspec, variants)
+                Expr::make_enum(pos, enumtype, variants)
             },
 
-            AST::TraitDef(pos, traitspec, body) => {
+            AST::TraitDef(pos, traitname, body) => {
                 for node in body.iter() {
                     match node {
                         AST::Declare(_, _, _, _, _) => { },
                         node => return Err(Error::new(format!("SyntaxError: only decls are allowed in trait definitions, found {:?}", node))),
                     }
                 }
-                Expr::make_trait_def(pos, traitspec, self.refine_vec(body))
+                Expr::make_trait_def(pos, traitname, self.refine_vec(body))
             },
 
-            AST::TraitImpl(pos, traitspec, impltype, body) => {
-                self.desugar_trait_impl(pos, traitspec, impltype, body)?
+            AST::TraitImpl(pos, traitname, impltype, body) => {
+                self.desugar_trait_impl(pos, traitname, impltype, body)?
             },
 
             AST::List(pos, items) => {
                 self.desugar_list(pos, items)?
             },
 
-            AST::New(pos, classspec, args) => {
-                let ttype = Type::from(&classspec);
-
+            AST::New(pos, ttype, args) => {
                 let object =
-                    Expr::make_invoke(pos, Expr::make_resolve_ident(pos, &classspec.name, "__init__"),
+                    Expr::make_invoke(pos, Expr::make_resolve_ident(pos, ttype.get_name()?, "__init__"),
                         vec!(Expr::make_alloc_object(pos, ttype.clone())));
 
                 let mut args = args.into_iter().map(|arg| self.refine_node(arg)).collect::<Result<Vec<_>, _>>()?;
                 args.insert(0, object);
-                Expr::make_annotation(ttype,
-                    Expr::make_invoke(pos, Expr::make_resolve_ident(pos, &classspec.name, "new"), args))
+                Expr::make_annotation(ttype.clone(),
+                    Expr::make_invoke(pos, Expr::make_resolve_ident(pos, ttype.get_name()?, "new"), args))
             },
 
-            AST::Class(pos, classspec, parentspec, whereclause, body) => {
-                self.desugar_class(pos, classspec, parentspec, whereclause, body)?
+            AST::Class(pos, classtype, parenttype, whereclause, body) => {
+                self.desugar_class(pos, classtype, parenttype, whereclause, body)?
             },
 
             AST::Index(pos, base, index) => {
@@ -281,7 +279,7 @@ impl<'sess> Refinery<'sess> {
             AST::Nil => { Expr::make_nil() },
             AST::Literal(val) => { Expr::make_lit(val) },
             AST::Identifier(pos, ident) => { Expr::make_ident(pos, ident) },
-            AST::TypeAlias(pos, classspec, ttype) => { Expr::make_type_alias(pos, classspec, ttype) },
+            AST::TypeAlias(pos, deftype, ttype) => { Expr::make_type_alias(pos, deftype, ttype) },
         })
     }
 
@@ -337,7 +335,7 @@ impl<'sess> Refinery<'sess> {
         Ok(Expr::make_block(pos, block))
     }
 
-    pub fn desugar_class(&self, pos: Pos, classspec: ClassSpec, parentspec: Option<ClassSpec>, whereclause: WhereClause, body: Vec<AST>) -> Result<Expr, Error> {
+    pub fn desugar_class(&self, pos: Pos, classtype: Type, parenttype: Option<Type>, whereclause: WhereClause, body: Vec<AST>) -> Result<Expr, Error> {
         // Make sure constructors take "self" as the first argument, and return "self" at the end
         let mut has_new = false;
         let mut has_init = false;
@@ -385,9 +383,9 @@ impl<'sess> Refinery<'sess> {
             }
 
             let iargs = vec!(Argument::new(pos, "self".to_string(), None, None));
-            if let Some(parentspec) = parentspec.as_ref() {
+            if let Some(parenttype) = parenttype.as_ref() {
                 init.insert(0, AST::Invoke(pos,
-                    r(AST::make_resolve_ident(pos, parentspec.name.clone(), "__init__")),
+                    r(AST::make_resolve_ident(pos, parenttype.get_name()?.to_string(), "__init__")),
                     vec!(AST::Identifier(pos, "self".to_string()))));
             }
             init.push(AST::make_ident_from_str(pos, "self"));
@@ -398,7 +396,7 @@ impl<'sess> Refinery<'sess> {
         let body = self.with_context(CodeContext::ClassBody, || {
             self.refine_vec(newbody)
         });
-        Ok(Expr::make_class(pos, classspec, parentspec, whereclause, body))
+        Ok(Expr::make_class(pos, classtype, parenttype, whereclause, body))
     }
 
     pub fn desugar_list(&self, pos: Pos, items: Vec<AST>) -> Result<Expr, Error> {
@@ -407,7 +405,7 @@ impl<'sess> Refinery<'sess> {
 
         // TODO this makes lists immutable, which might not be what we want
         block.push(AST::Definition(pos, Mutability::Immutable, tmplist.clone(), None,
-            r(AST::New(pos, ClassSpec::new(pos, "List".to_string(), vec!(Type::Variable(UniqueID::generate()))), vec!(/*, AST::Integer(items.len() as isize)*/)))));
+            r(AST::New(pos, Type::Object("List".to_string(), UniqueID(0), vec!(Type::Variable(UniqueID::generate()))), vec!(/*, AST::Integer(items.len() as isize)*/)))));
         for item in items {
             block.push(AST::Invoke(pos,
                 r(AST::Accessor(pos, r(AST::Identifier(pos, tmplist.clone())), "push".to_string())),
@@ -417,7 +415,7 @@ impl<'sess> Refinery<'sess> {
         Ok(Expr::make_block(pos, self.refine_vec(block)))
     }
 
-    pub fn desugar_trait_impl(&self, pos: Pos, traitspec: ClassSpec, impltype: Type, body: Vec<AST>) -> Result<Expr, Error> {
+    pub fn desugar_trait_impl(&self, pos: Pos, traitname: String, impltype: Type, body: Vec<AST>) -> Result<Expr, Error> {
         let mut trait_body = vec!();
         for node in body {
             match node {
@@ -434,7 +432,7 @@ impl<'sess> Refinery<'sess> {
                 node => return Err(Error::new(format!("SyntaxError: only functions are allowed in trait impls, found {:?}", node))),
             }
         }
-        Ok(Expr::make_trait_impl(pos, traitspec, impltype, trait_body))
+        Ok(Expr::make_trait_impl(pos, traitname, impltype, trait_body))
     }
 }
 

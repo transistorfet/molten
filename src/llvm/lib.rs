@@ -9,13 +9,12 @@ use self::llvm::prelude::*;
 use self::llvm::core::*;
 
 use crate::abi::ABI;
-use crate::ast::Pos;
 use crate::types::Type;
 use crate::session::Session;
 use crate::parser::{ parse_type };
-use crate::hir::{ NodeID, Mutability, Visibility, ClassSpec };
+use crate::hir::{ NodeID, Mutability, Visibility };
 use crate::scope::{ Scope, ScopeRef, ScopeMapRef, Context };
-use crate::binding::{ bind_type_names, bind_classspec_type_names };
+use crate::binding::{ bind_type_names };
 use crate::config::Options;
 use crate::misc::{ r, UniqueID };
 
@@ -73,9 +72,9 @@ pub fn declare_builtins_node<'sess>(session: &Session, scope: ScopeRef, node: &B
         },
         BuiltinDef::Class(id, name, params, _, entries) => {
             let tscope = session.map.get_or_add(*id, name, Context::Class(*id), Some(scope.clone()));
-            let mut classspec = ClassSpec::new(Pos::empty(), name.to_string(), params.clone());
-            bind_classspec_type_names(session, tscope.clone(), &mut classspec).unwrap();
-            ClassDef::define(session, scope, *id, Type::Object(classspec.name, *id, classspec.types), None).unwrap();
+            let mut classtype = Type::Object(name.to_string(), *id, params.clone());
+            bind_type_names(session, tscope.clone(), Some(&mut classtype)).unwrap();
+            ClassDef::define(session, scope, *id, classtype, None).unwrap();
 
             declare_builtins_vec(session, tscope, entries);
         },

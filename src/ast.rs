@@ -6,7 +6,7 @@ use crate::abi::ABI;
 use crate::types::Type;
 use crate::parser::Span;
 use crate::misc::{ R, r };
-use crate::hir::{ Visibility, Mutability, AssignType, Literal, Argument, ClassSpec, WhereClause, Pattern };
+use crate::hir::{ Visibility, Mutability, AssignType, Literal, Argument, WhereClause, Pattern };
 
 
 #[derive(Copy, Clone, PartialEq)]
@@ -50,12 +50,12 @@ pub enum AST {
 
     Declare(Pos, Visibility, String, Type, WhereClause),
     Function(Pos, Visibility, Option<String>, Vec<Argument>, Option<Type>, Vec<AST>, ABI, WhereClause),
-    New(Pos, ClassSpec, Vec<AST>),
-    Class(Pos, ClassSpec, Option<ClassSpec>, WhereClause, Vec<AST>),
-    TypeAlias(Pos, ClassSpec, Type),
-    Enum(Pos, ClassSpec, Vec<(Pos, String, Option<Type>)>),
-    TraitDef(Pos, ClassSpec, Vec<AST>),
-    TraitImpl(Pos, ClassSpec, Type, Vec<AST>),
+    New(Pos, Type, Vec<AST>),
+    Class(Pos, Type, Option<Type>, WhereClause, Vec<AST>),
+    TypeAlias(Pos, Type, Type),
+    Enum(Pos, Type, Vec<(Pos, String, Option<Type>)>),
+    TraitDef(Pos, String, Vec<AST>),
+    TraitImpl(Pos, String, Type, Vec<AST>),
 
     Import(Pos, String, Vec<AST>),
     Definition(Pos, Mutability, String, Option<Type>, R<AST>),

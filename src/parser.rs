@@ -36,7 +36,7 @@ use crate::abi::ABI;
 use crate::types::Type;
 use crate::misc::{ r, UniqueID };
 use crate::ast::{ Pos, AST };
-use crate::hir::{ NodeID, Mutability, Visibility, AssignType, Literal, Argument, ClassSpec, WhereClause, Pattern, PatKind };
+use crate::hir::{ NodeID, Mutability, Visibility, AssignType, Literal, Argument, WhereClause, Pattern, PatKind };
 
 
 ///// Parsing Macros /////
@@ -211,8 +211,8 @@ named!(class(Span) -> AST,
     do_parse!(
         pos: position!() >>
         wscom!(tag_word!("class")) >>
-        i: class_spec >>
-        p: opt!(preceded!(wscom!(tag_word!("extends")), class_spec)) >>
+        c: type_object >>
+        p: opt!(preceded!(wscom!(tag_word!("extends")), type_object)) >>
         w: opt_where_clause >>
         wscom!(tag!("{")) >>
         b: many0!(wscom!(alt!(
@@ -222,7 +222,7 @@ named!(class(Span) -> AST,
             function
         ))) >>
         return_error!(ErrorKind::Tag /*ErrorKind::Custom(ERR_IN_CLASS) */, tag!("}")) >>
-        (AST::Class(Pos::new(pos), i, p, w, b))
+        (AST::Class(Pos::new(pos), c, p, w, b))
     )
 );
 
@@ -230,10 +230,10 @@ named!(typealias(Span) -> AST,
     do_parse!(
         pos: position!() >>
         wscom!(tag_word!("type")) >>
-        c: class_spec >>
+        d: type_object >>
         wscom!(tag!("=")) >>
         ts: type_description >>
-        (AST::TypeAlias(Pos::new(pos), c, ts))
+        (AST::TypeAlias(Pos::new(pos), d, ts))
     )
 );
 
@@ -241,11 +241,11 @@ named!(typeenum(Span) -> AST,
     do_parse!(
         pos: position!() >>
         wscom!(tag_word!("enum")) >>
-        c: class_spec >>
+        t: type_object >>
         wscom!(tag!("=")) >>
         wscom!(opt!(tag!("|"))) >>
         ev: separated_list0!(complete!(wscom!(tag!("|"))), enum_variant) >>
-        (AST::Enum(Pos::new(pos), c, ev))
+        (AST::Enum(Pos::new(pos), t, ev))
     )
 );
 
@@ -262,13 +262,13 @@ named!(traitdef(Span) -> AST,
     do_parse!(
         pos: position!() >>
         wscom!(tag_word!("trait")) >>
-        c: class_spec >>
+        n: identifier >>
         wscom!(tag!("{")) >>
         b: many0!(wscom!(
             declare
         )) >>
         return_error!(ErrorKind::Tag /*ErrorKind::Custom(ERR_IN_CLASS) */, tag!("}")) >>
-        (AST::TraitDef(Pos::new(pos), c, b))
+        (AST::TraitDef(Pos::new(pos), n, b))
     )
 );
 
@@ -276,7 +276,7 @@ named!(traitimpl(Span) -> AST,
     do_parse!(
         pos: position!() >>
         wscom!(tag_word!("impl")) >>
-        c: class_spec >>
+        n: identifier >>
         wscom!(tag_word!("for")) >>
         t: type_description >>
         wscom!(tag!("{")) >>
@@ -284,7 +284,7 @@ named!(traitimpl(Span) -> AST,
             function
         )) >>
         return_error!(ErrorKind::Tag /*ErrorKind::Custom(ERR_IN_CLASS) */, tag!("}")) >>
-        (AST::TraitImpl(Pos::new(pos), c, t, b))
+        (AST::TraitImpl(Pos::new(pos), n, t, b))
     )
 );
 
@@ -301,7 +301,7 @@ named!(expression(Span) -> AST,
         matchcase |
         whileloop |
         forloop |
-        newclass |
+        newinstance |
         function |
         reference |
         annotation |
@@ -416,11 +416,11 @@ named!(forloop(Span) -> AST,
     )
 );
 
-named!(newclass(Span) -> AST,
+named!(newinstance(Span) -> AST,
     do_parse!(
         pos: position!() >>
         wscom!(tag_word!("new")) >>
-        cs: class_spec >>
+        cs: type_object >>
         a: delimited!(tag!("("), expression_list, tag!(")")) >>
         (AST::New(Pos::new(pos), cs, a))
     )
@@ -724,15 +724,6 @@ named!(identifier(Span) -> String,
     )
 );
 
-named!(class_spec(Span) -> ClassSpec,
-    do_parse!(
-        pos: position!() >>
-        i: identifier >>
-        p: opt!(complete!(delimited!(tag!("<"), separated_list0!(wscom!(tag!(",")), type_description), tag!(">")))) >>
-        (ClassSpec::new(Pos::new(pos), i, p.unwrap_or(vec!())))
-    )
-);
-
 named!(identifier_typed(Span) -> (Pos, String, Option<Type>),
     do_parse!(
         pos: position!() >>
@@ -802,8 +793,9 @@ named!(type_unit(Span) -> Type,
 
 named!(type_object(Span) -> Type,
     do_parse!(
-        cs: class_spec >>
-        (Type::Object(cs.name, UniqueID(0), cs.types))
+        i: identifier >>
+        p: opt!(complete!(delimited!(tag!("<"), separated_list0!(wscom!(tag!(",")), type_description), tag!(">")))) >>
+        (Type::Object(i, UniqueID(0), p.unwrap_or(vec!())))
     )
 );
 

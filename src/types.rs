@@ -5,7 +5,7 @@ use std::collections::HashMap;
 
 use crate::defs::Def;
 use crate::misc::{ R, r, UniqueID };
-use crate::hir::{ NodeID, ClassSpec };
+use crate::hir::{ NodeID };
 use crate::session::{ Session, Error };
 
 pub use crate::abi::ABI;
@@ -142,14 +142,18 @@ impl Type {
     pub fn display_vec(list: &Vec<Type>) -> String {
         list.iter().map(|t| format!("{}", t)).collect::<Vec<String>>().join(", ")
     }
-}
 
-
-impl From<&ClassSpec> for Type {
-    fn from(item: &ClassSpec) -> Self {
-        Type::Object(item.name.clone(), UniqueID(0), item.types.clone())
+    pub fn set_id(mut self, newid: NodeID) -> Result<Type, Error> {
+        match &mut self {
+            Type::Object(_, id, _) => {
+                *id = newid;
+                Ok(self)
+            },
+            _ => Err(Error::new(format!("TypeError: expected object when setting ID, found {:?}", self))),
+        }
     }
 }
+
 
 impl fmt::Display for Type {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

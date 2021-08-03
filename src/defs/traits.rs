@@ -6,7 +6,7 @@ use crate::defs::Def;
 use crate::scope::{ Scope, ScopeRef, Context };
 use crate::session::{ Session, Error };
 use crate::types::{ Type, Check, check_type };
-use crate::hir::{ NodeID, ClassSpec };
+use crate::hir::{ NodeID };
 use crate::defs::classes::{ Vtable };
 use crate::defs::types::{ TypeAliasDef };
 
@@ -38,17 +38,16 @@ impl TraitDef {
     }
 
     #[must_use]
-    pub fn define(session: &Session, scope: ScopeRef, defid: NodeID, traitspec: ClassSpec) -> Result<TraitDefRef, Error> {
-        let name = traitspec.name.as_str();
-        let tscope = session.map.get_or_add(defid, name, Context::TraitDef(defid), Some(scope.clone()));
+    pub fn define(session: &Session, scope: ScopeRef, defid: NodeID, traitname: &str) -> Result<TraitDefRef, Error> {
+        let tscope = session.map.get_or_add(defid, traitname, Context::TraitDef(defid), Some(scope.clone()));
         tscope.define_type("Self", defid)?;
 
-        let vars = Scope::new_ref(name, Context::TraitDef(defid), None);
+        let vars = Scope::new_ref(traitname, Context::TraitDef(defid), None);
 
-        let deftype = Type::Universal(traitspec.name.clone(), defid);
-        let vtable = Vtable::create(session, NodeID::generate(), format!("{}_vtable", name))?;
+        let deftype = Type::Universal(traitname.to_string(), defid);
+        let vtable = Vtable::create(session, NodeID::generate(), format!("{}_vtable", traitname))?;
         let traitdef = Self::new_ref(defid, vars, deftype.clone(), vtable);
-        scope.define_type(name, defid)?;
+        scope.define_type(traitname, defid)?;
         session.set_def(defid, Def::TraitDef(traitdef.clone()));
         session.set_type(defid, deftype);
         session.set_constraints(defid, vec!(defid));
@@ -107,6 +106,7 @@ impl TraitImpl {
         let traitimpl = Self::new_ref(impl_id, trait_id, impltype.clone(), vtable);
         scope.define_type(&name, impl_id)?;
         session.set_def(impl_id, Def::TraitImpl(traitimpl.clone()));
+        session.set_ref(impl_id, trait_id);
         session.set_type(impl_id, impltype);
 
         let traitdef = session.get_def(trait_id).unwrap().as_trait_def().unwrap();

@@ -3,7 +3,7 @@
 use crate::defs::Def;
 use crate::session::{ Session, Error };
 use crate::scope::{ ScopeRef };
-use crate::hir::{ NodeID, Visibility, Mutability, AssignType, Literal, ClassSpec, MatchCase, EnumVariant, WhereClause, Function, Pattern, Expr, ExprKind };
+use crate::hir::{ NodeID, Visibility, Mutability, AssignType, Literal, MatchCase, EnumVariant, WhereClause, Function, Pattern, Expr, ExprKind };
 use crate::types::{ Type, Check, ABI, expect_type, check_type, resolve_type, check_type_params };
 use crate::misc::{ r };
 use crate::visitor::{ self, Visitor, ScopeStack };
@@ -362,23 +362,23 @@ impl<'sess> Visitor for TypeChecker<'sess> {
         Ok(rtype)
     }
 
-    fn visit_enum(&mut self, _id: NodeID, _classspec: &ClassSpec, _variants: &Vec<EnumVariant>) -> Result<Self::Return, Error> {
+    fn visit_enum(&mut self, _id: NodeID, _enumtype: &Type, _variants: &Vec<EnumVariant>) -> Result<Self::Return, Error> {
         let scope = self.stack.get_scope();
         Ok(scope.find_type(self.session, "()")?)
     }
 
-    fn visit_type_alias(&mut self, _id: NodeID, _classspec: &ClassSpec, _ttype: &Type) -> Result<Self::Return, Error> {
+    fn visit_type_alias(&mut self, _id: NodeID, _deftype: &Type, _ttype: &Type) -> Result<Self::Return, Error> {
         let scope = self.stack.get_scope();
         Ok(scope.find_type(self.session, "()")?)
     }
 
-    fn visit_trait_def(&mut self, _id: NodeID, _traitspec: &ClassSpec, _body: &Vec<Expr>) -> Result<Self::Return, Error> {
+    fn visit_trait_def(&mut self, _id: NodeID, _traitname: &str, _body: &Vec<Expr>) -> Result<Self::Return, Error> {
         // Nothing to do because only decls are allowed in the trait body, so all the type information is present
         let scope = self.stack.get_scope();
         Ok(scope.find_type(self.session, "()")?)
     }
 
-    fn visit_trait_impl(&mut self, id: NodeID, _traitspec: &ClassSpec, _impltype: &Type, body: &Vec<Expr>) -> Result<Self::Return, Error> {
+    fn visit_trait_impl(&mut self, id: NodeID, _traitname: &str, _impltype: &Type, body: &Vec<Expr>) -> Result<Self::Return, Error> {
         let impl_id = self.session.get_ref(id)?;
 
         // TODO this gets the impl-specific tscope and not the trait def tscope
@@ -431,9 +431,10 @@ impl<'sess> Visitor for TypeChecker<'sess> {
         Ok(classtype.clone())
     }
 
-    fn visit_class(&mut self, refid: NodeID, _classspec: &ClassSpec, _parentspec: &Option<ClassSpec>, _whereclause: &WhereClause, body: &Vec<Expr>) -> Result<Self::Return, Error> {
-        let scope = self.stack.get_scope();
+    fn visit_class(&mut self, refid: NodeID, _classtype: &Type, _parenttype: &Option<Type>, _whereclause: &WhereClause, body: &Vec<Expr>) -> Result<Self::Return, Error> {
         let defid = self.session.get_ref(refid)?;
+
+        let scope = self.stack.get_scope();
         let tscope = self.session.map.get(defid).unwrap();
         self.with_scope(tscope.clone(), |visitor| {
             visitor.visit_vec(body)

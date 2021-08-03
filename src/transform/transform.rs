@@ -8,7 +8,7 @@ use crate::config::Options;
 use crate::scope::{ ScopeRef, ScopeMapRef };
 use crate::session::{ Session, Error };
 use crate::ast::{ Pos };
-use crate::hir::{ NodeID, Visibility, Mutability, AssignType, Literal, ClassSpec, MatchCase, EnumVariant, WhereClause, Function, Pattern, PatKind, Expr, ExprKind };
+use crate::hir::{ NodeID, Visibility, Mutability, AssignType, Literal, MatchCase, EnumVariant, WhereClause, Function, Pattern, PatKind, Expr, ExprKind };
 
 use crate::misc::{ r };
 use crate::transform::functions::{ ClosureTransform };
@@ -263,28 +263,28 @@ impl<'sess> Visitor for Transformer<'sess> {
         Ok(self.transform_alloc_object(id))
     }
 
-    fn visit_class(&mut self, id: NodeID, _classspec: &ClassSpec, _parentspec: &Option<ClassSpec>, _whereclause: &WhereClause, body: &Vec<Expr>) -> Result<Self::Return, Error> {
+    fn visit_class(&mut self, id: NodeID, _classtype: &Type, _parenttype: &Option<Type>, _whereclause: &WhereClause, body: &Vec<Expr>) -> Result<Self::Return, Error> {
         let mut exprs = self.transform_class_body(id, body);
         exprs.push(LLExpr::Literal(self.transform_lit(&Literal::Unit)));
         Ok(exprs)
     }
 
-    fn visit_type_alias(&mut self, _id: NodeID, _classspec: &ClassSpec, _ttype: &Type) -> Result<Self::Return, Error> {
+    fn visit_type_alias(&mut self, _id: NodeID, _deftype: &Type, _ttype: &Type) -> Result<Self::Return, Error> {
         /* Nothing Needs To Be Done */
         Ok(vec!())
         //Ok(self.default_return())
     }
 
-    fn visit_enum(&mut self, id: NodeID, classspec: &ClassSpec, _variants: &Vec<EnumVariant>) -> Result<Self::Return, Error> {
-        Ok(self.transform_enum_def(id, &classspec.name))
+    fn visit_enum(&mut self, id: NodeID, enumtype: &Type, _variants: &Vec<EnumVariant>) -> Result<Self::Return, Error> {
+        Ok(self.transform_enum_def(id, enumtype.get_name()?))
     }
 
-    fn visit_trait_def(&mut self, id: NodeID, traitspec: &ClassSpec, body: &Vec<Expr>) -> Result<Self::Return, Error> {
+    fn visit_trait_def(&mut self, id: NodeID, traitname: &str, body: &Vec<Expr>) -> Result<Self::Return, Error> {
         let defid = self.session.get_ref(id).unwrap();
-        Ok(self.transform_trait_def(defid, &traitspec.name, body))
+        Ok(self.transform_trait_def(defid, traitname, body))
     }
 
-    fn visit_trait_impl(&mut self, id: NodeID, _traitspec: &ClassSpec, _impltype: &Type, body: &Vec<Expr>) -> Result<Self::Return, Error> {
+    fn visit_trait_impl(&mut self, id: NodeID, _traitname: &str, _impltype: &Type, body: &Vec<Expr>) -> Result<Self::Return, Error> {
         Ok(self.transform_trait_impl(id, body))
     }
 

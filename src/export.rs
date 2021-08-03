@@ -7,7 +7,7 @@ use crate::config::Options;
 use crate::scope::{ ScopeRef };
 use crate::session::{ Session, Error };
 use crate::visitor::{ Visitor, ScopeStack };
-use crate::hir::{ NodeID, Visibility, Mutability, ClassSpec, WhereClause, Function, Expr, ExprKind };
+use crate::hir::{ NodeID, Visibility, Mutability, WhereClause, Function, Expr, ExprKind };
 
 
 pub fn write_exports(session: &Session, scope: ScopeRef, filename: &str, code: &Vec<Expr>) {
@@ -87,10 +87,10 @@ impl<'sess> Visitor for ExportsCollector<'sess> {
         Ok(())
     }
 
-    fn visit_class(&mut self, _id: NodeID, classspec: &ClassSpec, parentspec: &Option<ClassSpec>, whereclause: &WhereClause, body: &Vec<Expr>) -> Result<Self::Return, Error> {
-        let mut namespec = unparse_type(self.session, &Type::from(classspec));
-        if parentspec.is_some() {
-            namespec = format!("{} extends {}", namespec, unparse_type(self.session, &Type::from(parentspec.as_ref().unwrap())))
+    fn visit_class(&mut self, _id: NodeID, classtype: &Type, parenttype: &Option<Type>, whereclause: &WhereClause, body: &Vec<Expr>) -> Result<Self::Return, Error> {
+        let mut namespec = unparse_type(self.session, classtype);
+        if parenttype.is_some() {
+            namespec = format!("{} extends {}", namespec, unparse_type(self.session, parenttype.as_ref().unwrap()))
         }
         if whereclause.constraints.len() > 0 {
             namespec += &emit_where_clause(&whereclause.constraints);
@@ -123,10 +123,8 @@ impl<'sess> Visitor for ExportsCollector<'sess> {
         Ok(())
     }
 
-    fn visit_trait_def(&mut self, _id: NodeID, traitspec: &ClassSpec, body: &Vec<Expr>) -> Result<Self::Return, Error> {
-        let namespec = unparse_type(self.session, &Type::from(traitspec));
-
-        self.declarations.push_str(&format!("trait {} {{\n", namespec));
+    fn visit_trait_def(&mut self, _id: NodeID, traitname: &str, body: &Vec<Expr>) -> Result<Self::Return, Error> {
+        self.declarations.push_str(&format!("trait {} {{\n", traitname));
         for node in body {
             match &node.kind {
                 ExprKind::Declare(_, name, _, whereclause) => {
@@ -141,7 +139,7 @@ impl<'sess> Visitor for ExportsCollector<'sess> {
         Ok(())
     }
 
-    fn visit_trait_impl(&mut self, _id: NodeID, _traitspec: &ClassSpec, _impltype: &Type, _body: &Vec<Expr>) -> Result<Self::Return, Error> {
+    fn visit_trait_impl(&mut self, _id: NodeID, _traitname: &str, _impltype: &Type, _body: &Vec<Expr>) -> Result<Self::Return, Error> {
         // TODO we need something to cause the implementation vtable to be declared external when importing (so that a trait object of that type can be created external)
         Ok(())
     }
