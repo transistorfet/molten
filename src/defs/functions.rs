@@ -19,10 +19,12 @@ impl AnyFunc {
     pub fn define(session: &Session, scope: ScopeRef, id: NodeID, vis: Visibility, name: &str, abi: ABI, ttype: Option<Type>) -> Result<Def, Error> {
         match abi {
             ABI::C => {
-                if scope.is_redirect() {
-                    return Err(Error::new(format!("DefError: cannot declare a C ABI function within a class body")));
+                match scope.get_context() {
+                    Context::Global | Context::Block | Context::Func(_, _) =>
+                        CFuncDef::define(session, scope.clone(), id, vis, name, ttype),
+                    _ =>
+                        return Err(Error::new(format!("DefError: cannot declare a C ABI function within a class body"))),
                 }
-                CFuncDef::define(session, scope.clone(), id, vis, name, ttype)
             },
             ABI::Molten => {
                 match scope.get_context() {

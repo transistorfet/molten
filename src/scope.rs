@@ -53,13 +53,6 @@ impl Scope {
         self.context.get()
     }
 
-    pub fn is_redirect(&self) -> bool {
-        match self.context.get() {
-            Context::Class(_) | Context::TraitDef(_) => true,
-            _ => false,
-        }
-    }
-
     pub fn target(session: &Session, scope: ScopeRef) -> ScopeRef {
         match scope.context.get() {
             Context::Class(id) | Context::TraitDef(id) => session.get_def(id).unwrap().get_vars().unwrap(),

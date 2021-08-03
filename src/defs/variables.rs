@@ -4,7 +4,7 @@ use std::rc::Rc;
 use crate::defs::Def;
 use crate::types::Type;
 use crate::hir::{ NodeID, Mutability };
-use crate::scope::{ Scope, ScopeRef };
+use crate::scope::{ Scope, ScopeRef, Context };
 use crate::session::{ Session, Error };
 
 
@@ -13,11 +13,11 @@ pub struct AnyVar();
 impl AnyVar {
     #[must_use]
     pub fn define(session: &Session, scope: ScopeRef, id: NodeID, mutable: Mutability, name: &str, ttype: Option<Type>) -> Result<Def, Error> {
-        // TODO should you have a different one for Global, given that it'll compile to something different, until you remove it via closures...
-        if scope.is_redirect() {
-            FieldDef::define(session, scope, id, mutable, name, ttype)
-        } else {
-            VarDef::define(session, scope, id, mutable, name, ttype)
+        match scope.get_context() {
+            Context::Class(_) =>
+                FieldDef::define(session, scope, id, mutable, name, ttype),
+            _ =>
+                VarDef::define(session, scope, id, mutable, name, ttype),
         }
     }
 }
