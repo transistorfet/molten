@@ -58,14 +58,6 @@ impl<'sess> Transformer<'sess> {
         LLType::Struct(vec!(vttype, LLType::Ptr(r(LLType::I8))))
     }
 
-    pub fn transform_unpack_trait_obj(&mut self, code: &Expr) -> Vec<LLExpr> {
-        let mut exprs = vec!();
-        let value = self.transform_as_result(&mut exprs, code);
-        let result = self.convert_unpack_trait_obj(value);
-        exprs.push(result);
-        exprs
-    }
-
     pub fn convert_pack_trait_obj(&mut self, _exprs: &mut Vec<LLExpr>, traitdef: Option<TraitDefRef>, src_type: &Type, value: LLExpr) -> LLExpr {
         let (lltype, vtable) = match traitdef {
             Some(traitdef) => {
@@ -129,10 +121,7 @@ impl<'sess> Transformer<'sess> {
         let trait_id = traitfunc.trait_id;
 
         for (arg, argtype) in fargs.iter_mut().zip(deftype.get_argtypes().unwrap().as_vec()) {
-            let ttype = self.session.get_type(arg.0).unwrap();
-
             if argtype.get_id() == Ok(trait_id) {
-                // TODO here you would insert the the conversions, but doing so would require the arg.id to be swapped, and then the Def for arg.id to be changed to VarDef
                 let converted_id = arg.0;
                 arg.0 = NodeID::generate();
                 body.insert(0, LLExpr::SetValue(converted_id, r(self.convert_unpack_trait_obj(LLExpr::GetValue(arg.0)))));

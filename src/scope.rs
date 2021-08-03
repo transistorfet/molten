@@ -49,10 +49,6 @@ impl Scope {
         Rc::new(Scope::new(name, context, parent))
     }
 
-    pub fn set_context(&self, context: Context) {
-        self.context.set(context);
-    }
-
     pub fn get_context(&self) -> Context {
         self.context.get()
     }
@@ -99,10 +95,6 @@ impl Scope {
                 Ok(())
             },
         }
-    }
-
-    pub fn contains(&self, name: &str) -> bool {
-        self._search(NAMES, name, |_| true, false)
     }
 
     pub fn contains_local(&self, name: &str) -> bool {
@@ -219,10 +211,6 @@ impl ScopeMapRef {
         let scope = Scope::new_ref(name, context, parent);
         self.0.borrow_mut().insert(id, scope.clone());
         scope
-    }
-
-    pub fn set(&self, id: UniqueID, scope: ScopeRef) {
-        self.0.borrow_mut().insert(id, scope);
     }
 
     pub fn get(&self, id: UniqueID) -> Option<ScopeRef> {

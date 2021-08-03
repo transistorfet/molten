@@ -147,7 +147,6 @@ pub enum ExprKind {
     Enum(ClassSpec, Vec<EnumVariant>),
     TraitDef(ClassSpec, Vec<Expr>),
     TraitImpl(ClassSpec, Type, Vec<Expr>),
-    UnpackTraitObject(Type, R<Expr>),
 
     Import(String, Vec<Expr>),
     Definition(Mutability, String, Option<Type>, R<Expr>),
@@ -428,11 +427,6 @@ impl Expr {
     #[allow(dead_code)]
     pub fn make_trait_impl(pos: Pos, traitspec: ClassSpec, impltype: Type, body: Vec<Expr>) -> Expr {
         Expr { id: NodeID::generate(), pos: pos, kind: ExprKind::TraitImpl(traitspec, impltype, body) }
-    }
-
-    #[allow(dead_code)]
-    pub fn make_unpack_trait_obj(pos: Pos, impltype: Type, node: Expr) -> Expr {
-        Expr { id: NodeID::generate(), pos: pos, kind: ExprKind::UnpackTraitObject(impltype, r(node)) }
     }
 
     #[allow(dead_code)]

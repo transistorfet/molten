@@ -5,7 +5,7 @@ use crate::abi::ABI;
 use crate::defs::Def;
 use crate::types::Type;
 use crate::config::Options;
-use crate::scope::{ Scope, ScopeRef, ScopeMapRef };
+use crate::scope::{ ScopeRef, ScopeMapRef };
 use crate::session::{ Session, Error };
 use crate::ast::{ Pos };
 use crate::hir::{ NodeID, Visibility, Mutability, AssignType, Literal, ClassSpec, MatchCase, EnumVariant, WhereClause, Function, Pattern, PatKind, Expr, ExprKind };
@@ -288,11 +288,6 @@ impl<'sess> Visitor for Transformer<'sess> {
         Ok(self.transform_trait_impl(id, body))
     }
 
-    fn visit_unpack_trait_obj(&mut self, _id: NodeID, _impltype: &Type, code: &Expr) -> Result<Self::Return, Error> {
-        Ok(self.transform_unpack_trait_obj(code))
-    }
-
-
     fn visit_import(&mut self, _id: NodeID, name: &str, decls: &Vec<Expr>) -> Result<Self::Return, Error> {
         Ok(self.transform_import(name, decls))
     }
@@ -357,7 +352,7 @@ impl<'sess> Visitor for Transformer<'sess> {
 
 impl<'sess> Transformer<'sess> {
 
-    pub fn transform_module(&mut self, id: NodeID, name: &str, code: &Expr, memo_id: NodeID) -> Vec<LLExpr> {
+    pub fn transform_module(&mut self, _id: NodeID, name: &str, code: &Expr, memo_id: NodeID) -> Vec<LLExpr> {
         // Define a global that will store whether we've run this function or not
         let memo_name = format!("memo.{}", name);
         self.add_global(LLGlobal::DefGlobal(memo_id, LLLink::Once, memo_name, LLType::I1, true));

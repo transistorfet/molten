@@ -421,11 +421,11 @@ impl<'sess> Refinery<'sess> {
         let mut trait_body = vec!();
         for node in body {
             match node {
-                AST::Function(pos, _vis, name, mut args, ret, body, abi, whereclause) if name.is_some() => {
+                AST::Function(pos, _vis, name, args, ret, body, abi, whereclause) if name.is_some() => {
                     let vis = Visibility::Public;
                     let name = name.ok_or(Error::new("SyntaxError: anonymous functions are not allowed in trait implementations".to_string()))?;
 
-                    let mut body = self.with_context(CodeContext::Func(abi), || {
+                    let body = self.with_context(CodeContext::Func(abi), || {
                         Ok(self.refine_vec(body))
                     })?;
 

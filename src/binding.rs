@@ -8,7 +8,7 @@ use crate::misc::{ UniqueID, r };
 
 use crate::defs::enums::EnumDef;
 use crate::defs::classes::ClassDef;
-use crate::defs::functions::{ AnyFunc, ClosureDef };
+use crate::defs::functions::{ AnyFunc };
 use crate::defs::types::TypeAliasDef;
 use crate::defs::variables::{ AnyVar, VarDef, ArgDef };
 use crate::defs::traits::{ TraitDef, TraitImpl };
@@ -59,7 +59,7 @@ impl<'sess> Visitor for NameBinder<'sess> {
         Ok(())
     }
 
-    fn visit_module(&mut self, id: NodeID, name: &str, code: &Expr, memo_id: NodeID) -> Result<Self::Return, Error> {
+    fn visit_module(&mut self, _id: NodeID, name: &str, code: &Expr, memo_id: NodeID) -> Result<Self::Return, Error> {
         let scope = self.stack.get_scope();
 
         let memo_name = format!("memo.{}", name);
@@ -300,16 +300,7 @@ impl<'sess> Visitor for NameBinder<'sess> {
         })
     }
 
-    fn visit_unpack_trait_obj(&mut self, id: NodeID, impltype: &Type, expr: &Expr) -> Result<Self::Return, Error> {
-        let scope = self.stack.get_scope();
-        let mut impltype = impltype.clone();
-        bind_type_names(self.session, scope.clone(), Some(&mut impltype))?;
-        self.session.set_type(id, impltype);
-        self.visit_node(expr)
-    }
-
-
-    fn visit_resolver(&mut self, id: NodeID, left: &Expr, _right: &str, oid: NodeID) -> Result<Self::Return, Error> {
+    fn visit_resolver(&mut self, _id: NodeID, left: &Expr, _right: &str, oid: NodeID) -> Result<Self::Return, Error> {
         let scope = self.stack.get_scope();
         // TODO should this always work on a type reference, or should classes be added as values as well as types?
         //self.visit_node(left);

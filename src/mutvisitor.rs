@@ -1,11 +1,8 @@
 
-use std::cell::RefCell;
-
-use crate::types::Type;
 use crate::session::Error;
 use crate::scope::ScopeRef;
 use crate::session::Session;
-use crate::hir::{ NodeID, Visibility, Mutability, AssignType, Literal, ClassSpec, MatchCase, EnumVariant, WhereClause, Function, Pattern, PatKind, Expr, ExprKind };
+use crate::hir::{ NodeID, Pattern, PatKind, Expr, ExprKind };
 use crate::visitor::{ ScopeStack };
 
 pub trait MutVisitor: Sized {
@@ -38,12 +35,14 @@ pub trait MutVisitor: Sized {
     }
 }
 
+#[allow(dead_code)]
 pub fn walk_mut_vec<V: MutVisitor>(visitor: &mut V, code: &mut Vec<Expr>) {
     for node in code {
         visitor.visit_node(node);
     }
 }
 
+#[allow(dead_code)]
 pub fn walk_mut_node<V: MutVisitor>(visitor: &mut V, node: &mut Expr) {
     match &mut node.kind {
         ExprKind::Literal(_) => { },
@@ -61,7 +60,6 @@ pub fn walk_mut_node<V: MutVisitor>(visitor: &mut V, node: &mut Expr) {
         ExprKind::Resolver(expr, _, _) |
         ExprKind::Accessor(expr, _, _) |
         ExprKind::Raise(expr) |
-        ExprKind::UnpackTraitObject(_, expr) |
         ExprKind::Module(_, expr, _) |
         ExprKind::Definition(_, _, _, expr) => {
             visitor.visit_node(expr);
@@ -76,19 +74,19 @@ pub fn walk_mut_node<V: MutVisitor>(visitor: &mut V, node: &mut Expr) {
         },
 
         ExprKind::Record(items) => {
-            for (field, expr) in items {
+            for (_, expr) in items {
                 visitor.visit_node(expr);
             }
         },
 
         ExprKind::RecordUpdate(record, items) => {
             visitor.visit_node(record);
-            for (field, expr) in items {
+            for (_, expr) in items {
                 visitor.visit_node(expr);
             }
         },
 
-        ExprKind::Invoke(func, args, fid) => {
+        ExprKind::Invoke(func, args, _) => {
             visitor.visit_node(func);
             visitor.visit_vec(args);
         },
@@ -140,12 +138,14 @@ pub fn walk_mut_node<V: MutVisitor>(visitor: &mut V, node: &mut Expr) {
     }
 }
 
+#[allow(dead_code)]
 pub fn walk_mut_pattern_vec<V: MutVisitor>(visitor: &mut V, items: &mut Vec<Pattern>) {
     for item in items {
         visitor.visit_pattern(item);
     }
 }
 
+#[allow(dead_code)]
 pub fn walk_mut_pattern<V: MutVisitor>(visitor: &mut V, pat: &mut Pattern) {
     match &mut pat.kind {
         PatKind::Wild => { },

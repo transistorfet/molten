@@ -7,44 +7,12 @@ use crate::types::Type;
 use crate::ast::{ Pos };
 use crate::hir::{ NodeID, Visibility, Mutability, Argument, Function, Expr, ExprKind };
 use crate::defs::Def;
-use crate::scope::{ Context };
 use crate::visitor::{ Visitor };
 
 use crate::misc::{ r };
 use crate::transform::transform::{ Transformer, CodeContext };
 use crate::transform::classes::{ StructTransform };
 use crate::llvm::llcode::{ LLType, LLLink, LLCC, LLExpr, LLGlobal };
-
-
-pub struct FunctionParts {
-    pub defid: NodeID,
-    pub vis: Visibility,
-    pub fname: String,
-    pub predef: Vec<LLExpr>,
-    pub args: Vec<(NodeID, String)>,
-    pub argtypes: Vec<LLType>,
-    pub entry: Vec<LLExpr>,
-    pub body: Vec<LLExpr>,
-    pub exit: Vec<LLExpr>,
-}
-
-impl FunctionParts {
-    pub fn new(defid: NodeID, vis: Visibility, fname: String) -> Self {
-        FunctionParts {
-            defid,
-            vis,
-            fname,
-            predef: vec![],
-            args: vec![],
-            argtypes: vec![],
-            entry: vec![],
-            body: vec![],
-            exit: vec![],
-        }
-    }
-
-
-}
 
 
 impl<'sess> Transformer<'sess> {

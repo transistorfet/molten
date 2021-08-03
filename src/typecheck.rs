@@ -415,11 +415,6 @@ impl<'sess> Visitor for TypeChecker<'sess> {
         Ok(scope.find_type(self.session, "()")?)
     }
 
-    fn visit_unpack_trait_obj(&mut self, id: NodeID, _impltype: &Type, expr: &Expr) -> Result<Self::Return, Error> {
-        self.visit_node(expr)?;
-        Ok(self.session.get_type(id).unwrap().clone())
-    }
-
     fn visit_annotation(&mut self, refid: NodeID, _ttype: &Type, code: &Expr) -> Result<Self::Return, Error> {
         let ttype = self.session.get_type(refid).unwrap();
         let ctype = self.visit_node_or_error(code);
