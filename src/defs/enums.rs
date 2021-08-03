@@ -6,7 +6,7 @@ use crate::misc::r;
 use crate::abi::ABI;
 use crate::defs::Def;
 use crate::types::Type;
-use crate::scope::{ Scope, ScopeRef };
+use crate::scope::{ Scope, ScopeRef, Context };
 use crate::session::{ Session, Error };
 use crate::hir::{ NodeID, EnumVariant };
 
@@ -39,8 +39,7 @@ impl EnumDef {
     #[must_use]
     pub fn define(session: &Session, scope: ScopeRef, id: NodeID, deftype: Type) -> Result<EnumDefRef, Error> {
         let name = deftype.get_name()?;
-        let vars = Scope::new_ref(None);
-        vars.set_basename(name);
+        let vars = Scope::new_ref(name, Context::Enum(id), None);
 
         let enumdef = Self::new_ref(id, vars, deftype.clone());
         scope.define_type(name, id)?;

@@ -4,7 +4,7 @@ use std::cell::RefCell;
 
 use crate::abi::ABI;
 use crate::defs::Def;
-use crate::scope::{ Scope, ScopeRef };
+use crate::scope::{ Scope, ScopeRef, Context };
 use crate::session::{ Session, Error };
 use crate::types::{ Type, Check, check_type };
 use crate::hir::{ NodeID, Mutability, Visibility, Expr };
@@ -18,12 +18,20 @@ impl AnyFunc {
     #[must_use]
     pub fn define(session: &Session, scope: ScopeRef, id: NodeID, vis: Visibility, name: &str, abi: ABI, ttype: Option<Type>) -> Result<Def, Error> {
         match abi {
-            ABI::C => CFuncDef::define(session, scope.clone(), id, vis, name, ttype),
+            ABI::C => {
+                if scope.is_redirect() {
+                    return Err(Error::new(format!("DefError: cannot declare a C ABI function within a class body")));
+                }
+                CFuncDef::define(session, scope.clone(), id, vis, name, ttype)
+            },
             ABI::Molten => {
-                if scope.is_redirect() && vis != Visibility::Anonymous {
-                    MethodDef::define(session, scope.clone(), id, vis, name, ttype)
-                } else {
-                    ClosureDef::define(session, scope.clone(), id, vis, name, ttype)
+                match scope.get_context() {
+                    Context::Class(_) if vis != Visibility::Anonymous =>
+                        MethodDef::define(session, scope.clone(), id, vis, name, ttype),
+                    Context::TraitImpl(_, _) =>
+                        TraitFuncDef::define(session, scope.clone(), id, vis, name, ttype),
+                    _ =>
+                        ClosureDef::define(session, scope.clone(), id, vis, name, ttype),
                 }
             },
             _ => return Err(Error::new(format!("DefError: unsupported ABI {:?}", abi))),
@@ -85,10 +93,11 @@ impl OverloadDef {
                     prev.add_variant(session, id);
                 },
                 Ok(Def::Method(_)) |
+                Ok(Def::TraitFunc(_)) |
                 Ok(Def::Closure(_)) => {
                     let defid = OverloadDef::create(session, None, vec!(previd, id));
                     dscope.set_var_def(&name, defid);
-                }
+                },
                 _ => return Err(Error::new(format!("NameError: unable to overload {} because of a previous definitions", name)))
             }
         } else {
@@ -185,7 +194,8 @@ pub type ClosureDefRef = Rc<ClosureDef>;
 impl ClosureDef {
     pub fn create(session: &Session, scope: ScopeRef, id: NodeID, vis: Visibility, name: &str) -> Result<Def, Error> {
         let context_type_id = NodeID::generate();
-        let structdef = StructDef::new_ref(Scope::new_ref(Some(scope.clone())));
+        // TODO the context and name are incorrect here
+        let structdef = StructDef::new_ref(Scope::new_ref("", Context::Block, Some(scope.clone())));
         // TODO removing this will actually define the fields, but that messes other things up
         //let structdef = StructDef::new_ref(Scope::new_ref(None));
 
@@ -233,9 +243,8 @@ impl ClosureDef {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct MethodDef {
-    pub id: NodeID,
-    pub vis: Visibility,
     pub closure: ClosureDefRef,
+    pub id: NodeID,
 }
 
 pub type MethodDefRef = Rc<MethodDef>;
@@ -249,13 +258,54 @@ impl MethodDef {
         };
 
         let def = Def::Method(Rc::new(MethodDef {
-            id: id,
-            vis: vis,
             closure: closure,
+            id: id,
         }));
 
         AnyFunc::set_func_def(session, scope, id, vis, name, def.clone(), ttype)?;
         Ok(def)
+    }
+}
+
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct TraitFuncDef {
+    pub closure: ClosureDefRef,
+    pub trait_id: NodeID,
+    pub impl_id: NodeID,
+    pub impl_func_id: NodeID,
+    pub def_func_id: RefCell<Option<NodeID>>,
+}
+
+pub type TraitFuncDefRef = Rc<TraitFuncDef>;
+
+impl TraitFuncDef {
+    #[must_use]
+    pub fn define(session: &Session, scope: ScopeRef, id: NodeID, vis: Visibility, name: &str, ttype: Option<Type>) -> Result<Def, Error> {
+        let closure = match ClosureDef::create(session, scope.clone(), id, vis, name) {
+            Ok(Def::Closure(cl)) => cl,
+            result => return result,
+        };
+
+        let (trait_id, impl_id) = match scope.get_context() {
+            Context::TraitImpl(trait_id, impl_id) => (trait_id, impl_id),
+            context => panic!("InternalError: expected trait impl but found {:?}", context),
+        };
+
+        let def = Def::TraitFunc(Rc::new(TraitFuncDef {
+            closure: closure,
+            trait_id,
+            impl_id,
+            impl_func_id: id,
+            def_func_id: RefCell::new(None),
+        }));
+
+        AnyFunc::set_func_def(session, scope, id, vis, name, def.clone(), ttype)?;
+        Ok(def)
+    }
+
+    pub fn set_def_func_id(&self, id: NodeID) {
+        *self.def_func_id.borrow_mut() = Some(id);
     }
 }
 
@@ -272,10 +322,6 @@ pub type CFuncDefRef = Rc<CFuncDef>;
 impl CFuncDef {
     #[must_use]
     pub fn define(session: &Session, scope: ScopeRef, id: NodeID, vis: Visibility, name: &str, ttype: Option<Type>) -> Result<Def, Error> {
-        if scope.is_redirect() {
-            return Err(Error::new(format!("DefError: cannot declare a C ABI function within a class body")));
-        }
-
         if vis == Visibility::Anonymous {
             return Err(Error::new(format!("NameError: C ABI function declared without a name")));
         }

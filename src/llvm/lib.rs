@@ -48,9 +48,7 @@ pub enum BuiltinDef<'sess> {
 
 
 pub fn make_global<'sess>(session: &Session, builtins: &Vec<BuiltinDef<'sess>>) {
-    let globals = session.map.add(ScopeMapRef::GLOBAL, None);
-    globals.set_context(Context::Global);
-
+    let globals = session.map.add(ScopeMapRef::GLOBAL, "", Context::Global, None);
     declare_builtins_vec(session, globals, builtins);
 }
 
@@ -64,7 +62,7 @@ pub fn declare_builtins_node<'sess>(session: &Session, scope: ScopeRef, node: &B
     match node {
         BuiltinDef::Func(id, name, ftype, _) => {
             // This tscope will hold any universal typevars that appear in ftype without them beig defined in the global scope
-            let tscope = Scope::new_ref(Some(scope.clone()));
+            let tscope = Scope::new_ref("", Context::Block, Some(scope.clone()));
 
             let mut ftype = parse_type(ftype);
             bind_type_names(session, tscope.clone(), ftype.as_mut()).unwrap();
@@ -74,7 +72,7 @@ pub fn declare_builtins_node<'sess>(session: &Session, scope: ScopeRef, node: &B
             AnyFunc::define(session, scope, *id, Visibility::Global, name, abi, ftype).unwrap();
         },
         BuiltinDef::Class(id, name, params, _, entries) => {
-            let tscope = session.map.get_or_add(*id, Some(scope.clone()));
+            let tscope = session.map.get_or_add(*id, name, Context::Class(*id), Some(scope.clone()));
             let mut classspec = ClassSpec::new(Pos::empty(), name.to_string(), params.clone());
             bind_classspec_type_names(session, tscope.clone(), &mut classspec).unwrap();
             ClassDef::define(session, scope, *id, Type::Object(classspec.name, *id, classspec.types), None).unwrap();

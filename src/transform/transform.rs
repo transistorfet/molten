@@ -5,7 +5,7 @@ use crate::abi::ABI;
 use crate::defs::Def;
 use crate::types::Type;
 use crate::config::Options;
-use crate::scope::{ Scope, ScopeRef };
+use crate::scope::{ Scope, ScopeRef, ScopeMapRef };
 use crate::session::{ Session, Error };
 use crate::ast::{ Pos };
 use crate::hir::{ NodeID, Visibility, Mutability, AssignType, Literal, ClassSpec, MatchCase, EnumVariant, WhereClause, Function, Pattern, PatKind, Expr, ExprKind };
@@ -77,22 +77,14 @@ impl<'sess> Transformer<'sess> {
         self.globals.insert(index, global);
     }
 
-    pub fn set_context(&mut self, context: CodeContext) {
-        self.context.push(context);
-    }
-
-    pub fn restore_context(&mut self) {
-        self.context.pop();
-    }
-
     pub fn get_context(&self) -> Option<CodeContext> {
         self.context.last().map(|c| *c)
     }
 
     pub fn with_context<F, R>(&mut self, context: CodeContext, f: F) -> R where F: FnOnce(&mut Self) -> R {
-        self.set_context(context);
+        self.context.push(context);
         let ret = f(self);
-        self.restore_context();
+        self.context.pop();
         ret
     }
 
@@ -532,7 +524,8 @@ impl<'sess> Transformer<'sess> {
         let scope = self.stack.get_scope();
         if
             !scope.contains_context(name)
-            && !Scope::global(scope.clone()).contains(name)
+            // TODO this should really check if get_var_def is the same as defid (not just that it exists), but because of overloading, this isn't true and causes a segfault
+            && self.session.map.get(ScopeMapRef::GLOBAL).unwrap().get_var_def(name).is_none()
             && !self.session.get_def(defid).unwrap().is_globally_accessible()
         {
             match self.get_context() {
@@ -603,13 +596,12 @@ impl<'sess> Transformer<'sess> {
                 let objdef = self.session.get_def(objid).unwrap();
                 match self.session.get_def(defid) {
                     Ok(Def::Method(_)) => {
-                        match objdef {
-                            Def::Class(classdef) =>
-                                exprs.extend(self.transform_class_access_method(classdef, objval, defid)),
-                            Def::TraitDef(traitdef) =>
-                                exprs.extend(self.transform_trait_access_method(traitdef, objval, defid)),
-                            _ => panic!("Not Implemented: {:?}", objdef),
-                        }
+                        let classdef = objdef.as_class().unwrap();
+                        exprs.extend(self.transform_class_access_method(classdef, objval, defid));
+                    },
+                    Ok(Def::TraitFunc(_)) => {
+                        let traitdef = objdef.as_trait_def().unwrap();
+                        exprs.extend(self.transform_trait_access_method(traitdef, objval, defid));
                     },
                     Ok(Def::Field(_)) => {
                         let structdef = objdef.as_struct().unwrap();

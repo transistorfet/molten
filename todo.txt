@@ -1,4 +1,16 @@
 
+* there are scope.map.get_or_add()s in both bindings and in defs.  They are needed in bindngs, but maybe you can turn them into get()s in the defs
+
+* there's a possible issue with closure reference conversion, where you only check if the name exists in the global scope, but not if it's the same definition.  It's
+  possible there could be a different variable with the same name declared in the global scope causing the local one to not be converted into a context access.  But
+  right now, because of overloading, the def will be a specific function, and the stored scope def will be the overloaded def that contains all the possible specific impls
+* can you make a walk_vec_with_scope() function and pass it a pointer to the scope stack, and subsequently have a walk_vec_with_scope_context(scope, context, body)?
+
+* Wow... there's now only 3 Scope::target calls when they used to be everywhere, and they are all called from defs which are called from bindings, from the looks of things
+
+* I was in the middle of adding CodeContext to visitors and using that everywhere for determining what something should be declared as and linked to.  Currently stashed
+* there is a problem with the way I implemented trait impl conversion which seems to have broken everything else, but I can possibly fix it using TraitFuncDef
+
 * you could possibly add a TraitFuncDef which contains a ClosureDef, just like MethodDef, but you'll probably need to add the CodeContext stuff to make it work
 
 * there is an interdependent issue with closure context structdefs (the parent scope their vars inherits from), and the code that prevents redefinitions in session.

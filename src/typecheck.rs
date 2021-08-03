@@ -399,8 +399,10 @@ impl<'sess> Visitor for TypeChecker<'sess> {
                     let deftype = self.session.get_type(defid);
                     let impltype = self.session.get_type(node.id);
                     check_type(self.session, deftype.as_ref(), impltype.as_ref(), Check::Def, false)?;
-                    self.session.set_ref(self.session.get_ref(node.id).unwrap(), defid);
-                    self.session.set_ref(defid, traitdef.id);
+                    let traitfunc = self.session.get_def(self.session.get_ref(node.id).unwrap()).unwrap().as_trait_func().unwrap();
+                    traitfunc.set_def_func_id(defid);
+                    //self.session.set_ref(self.session.get_ref(node.id).unwrap(), defid);
+                    //self.session.set_ref(defid, traitdef.id);
                     names.remove(name);
                 }
                 _ => panic!("InternalError: expected function definition, found {:?}", node),

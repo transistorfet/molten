@@ -6,6 +6,16 @@ use crate::session::Error;
 use crate::scope::ScopeRef;
 use crate::hir::{ NodeID, Visibility, Mutability, AssignType, Literal, ClassSpec, MatchCase, EnumVariant, WhereClause, Function, Pattern, PatKind, Expr, ExprKind };
 
+/*
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub enum CodeContext {
+    Empty,
+    Func(ABI, NodeID),
+    Class(NodeID),
+    TraitImpl(NodeID, NodeID),
+    Import,
+}
+*/
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct ScopeStack {

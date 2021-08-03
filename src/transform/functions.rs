@@ -6,6 +6,8 @@ use crate::abi::ABI;
 use crate::types::Type;
 use crate::ast::{ Pos };
 use crate::hir::{ NodeID, Visibility, Mutability, Argument, Function, Expr, ExprKind };
+use crate::defs::Def;
+use crate::scope::{ Context };
 use crate::visitor::{ Visitor };
 
 use crate::misc::{ r };
@@ -237,6 +239,7 @@ impl ClosureTransform {
             Ok(vec!())
         }).unwrap();
 
+        transform.set_type(cl.compiled_func_id, LLType::Alias(cl.compiled_func_id));
 
         // Transforms body and create C function definition
         let index = transform.globals.len();
@@ -248,11 +251,13 @@ impl ClosureTransform {
             })
         });
 
-        if let Ok(traitdefid) = transform.session.get_ref(defid) {
-            transform.convert_impl_func_args(defid, traitdefid, &mut fargs, &mut body);
+        if let Ok(Def::TraitFunc(_)) = transform.session.get_def(defid) {
+            transform.convert_impl_func_args(defid, &mut fargs, &mut body);
         }
 
         let (compiled_func_name, compiled_func_type) = ClosureTransform::transform_raw_func_data(transform, defid, &fname, cl.compiled_func_id);
+        transform.insert_global(index, LLGlobal::DefType(cl.compiled_func_id, fname.clone(), compiled_func_type.clone()));
+
         let llvis = transform.transform_vis(vis);
         transform.insert_global(index, LLGlobal::DefCFunc(cl.compiled_func_id, llvis, compiled_func_name.clone(), compiled_func_type.clone(), fargs, body, LLCC::FastCC));
 

@@ -123,11 +123,10 @@ impl<'sess> Transformer<'sess> {
         return value;
     }
 
-    pub fn convert_impl_func_args(&mut self, func_id: NodeID, traitdefid: NodeID, fargs: &mut Vec<(NodeID, String)>, body: &mut Vec<LLExpr>) {
-        let deftype = self.session.get_type(traitdefid).unwrap();
-        let trait_id = self.session.get_ref(traitdefid).unwrap();
-        // TODO convert trait arguments via fargs and insert a SetValue(arg.id, <converted-value>)
-        // TODO and don't forget the return type
+    pub fn convert_impl_func_args(&mut self, func_id: NodeID, fargs: &mut Vec<(NodeID, String)>, body: &mut Vec<LLExpr>) {
+        let traitfunc = self.session.get_def(func_id).unwrap().as_trait_func().unwrap();
+        let deftype = self.session.get_type(traitfunc.def_func_id.borrow().unwrap()).unwrap();
+        let trait_id = traitfunc.trait_id;
 
         for (arg, argtype) in fargs.iter_mut().zip(deftype.get_argtypes().unwrap().as_vec()) {
             let ttype = self.session.get_type(arg.0).unwrap();

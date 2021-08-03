@@ -4,6 +4,7 @@ use std::cell::Cell;
 use std::cell::RefCell;
 use std::collections::HashMap;
 
+use crate::abi::ABI;
 use crate::types::Type;
 use crate::hir::{ NodeID };
 use crate::session::{ Session, Error };
@@ -16,9 +17,12 @@ const TYPES: usize = 1;
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum Context {
     Global,
-    Local,
-    Object,
     Block,
+    Func(ABI, NodeID),
+    Enum(NodeID),
+    Class(NodeID),
+    TraitDef(NodeID),
+    TraitImpl(NodeID, NodeID),
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -32,47 +36,38 @@ pub struct Scope {
 pub type ScopeRef = Rc<Scope>;
 
 impl Scope {
-    pub fn new(parent: Option<ScopeRef>) -> Scope {
+    pub fn new(name: &str, context: Context, parent: Option<ScopeRef>) -> Scope {
         Scope {
-            context: Cell::new(Context::Local),
-            basename: RefCell::new(String::from("")),
+            context: Cell::new(context),
+            basename: RefCell::new(String::from(name)),
             namespaces: [ RefCell::new(HashMap::new()), RefCell::new(HashMap::new()) ],
             parent: parent,
         }
     }
 
-    pub fn new_ref(parent: Option<ScopeRef>) -> ScopeRef {
-        Rc::new(Scope::new(parent))
+    pub fn new_ref(name: &str, context: Context, parent: Option<ScopeRef>) -> ScopeRef {
+        Rc::new(Scope::new(name, context, parent))
     }
 
     pub fn set_context(&self, context: Context) {
         self.context.set(context);
     }
 
-    pub fn set_redirect(&self, value: bool) {
-        self.context.set(if value { Context::Object } else { Context::Local });
-    }
-
-    pub fn is_global(&self) -> bool {
-        self.context.get() == Context::Global
+    pub fn get_context(&self) -> Context {
+        self.context.get()
     }
 
     pub fn is_redirect(&self) -> bool {
-        self.context.get() == Context::Object
+        match self.context.get() {
+            Context::Class(_) | Context::TraitDef(_) => true,
+            _ => false,
+        }
     }
 
     pub fn target(session: &Session, scope: ScopeRef) -> ScopeRef {
         match scope.context.get() {
-            Context::Object => scope.find_type_def(session, &scope.basename.borrow()).unwrap().get_vars().unwrap(),
+            Context::Class(id) | Context::TraitDef(id) => session.get_def(id).unwrap().get_vars().unwrap(),
             _ => scope,
-        }
-    }
-
-    pub fn global(scope: ScopeRef) -> ScopeRef {
-        if scope.is_global() {
-            scope
-        } else {
-            Scope::global(scope.parent.clone().unwrap())
         }
     }
 
@@ -132,7 +127,9 @@ impl Scope {
         } else {
             match (self.context.get(), &self.parent) {
                 (Context::Block, Some(parent)) |
-                (Context::Object, Some(parent)) => parent.contains_context(name),
+                (Context::Enum(_), Some(parent)) |
+                (Context::Class(_), Some(parent)) |
+                (Context::TraitDef(_), Some(parent)) => parent.contains_context(name),
                 _ => false
             }
         }
@@ -210,16 +207,16 @@ impl ScopeMapRef {
         ScopeMapRef(RefCell::new(HashMap::new()))
     }
 
-    pub fn get_or_add(&self, id: UniqueID, parent: Option<ScopeRef>) -> ScopeRef {
+    pub fn get_or_add(&self, id: UniqueID, name: &str, context: Context, parent: Option<ScopeRef>) -> ScopeRef {
         let tscope = self.0.borrow().get(&id).cloned();
         match tscope {
             Some(scope) => scope,
-            None => self.add(id, parent)
+            None => self.add(id, name, context, parent)
         }
     }
 
-    pub fn add(&self, id: UniqueID, parent: Option<ScopeRef>) -> ScopeRef {
-        let scope = Scope::new_ref(parent);
+    pub fn add(&self, id: UniqueID, name: &str, context: Context, parent: Option<ScopeRef>) -> ScopeRef {
+        let scope = Scope::new_ref(name, context, parent);
         self.0.borrow_mut().insert(id, scope.clone());
         scope
     }

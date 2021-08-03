@@ -3,7 +3,7 @@ use std::rc::Rc;
 use std::cell::RefCell;
 
 use crate::defs::Def;
-use crate::scope::{ Scope, ScopeRef };
+use crate::scope::{ Scope, ScopeRef, Context };
 use crate::session::{ Session, Error };
 use crate::types::{ Type, Check, check_type };
 use crate::hir::{ NodeID, ClassSpec };
@@ -40,13 +40,10 @@ impl TraitDef {
     #[must_use]
     pub fn define(session: &Session, scope: ScopeRef, defid: NodeID, traitspec: ClassSpec) -> Result<TraitDefRef, Error> {
         let name = traitspec.name.as_str();
-        let tscope = session.map.get_or_add(defid, Some(scope.clone()));
-        tscope.set_redirect(true);
-        tscope.set_basename(name);
+        let tscope = session.map.get_or_add(defid, name, Context::TraitDef(defid), Some(scope.clone()));
         tscope.define_type("Self", defid)?;
 
-        let vars = Scope::new_ref(None);
-        vars.set_basename(name);
+        let vars = Scope::new_ref(name, Context::TraitDef(defid), None);
 
         let deftype = Type::Universal(traitspec.name.clone(), defid);
         let vtable = Vtable::create(session, NodeID::generate(), format!("{}_vtable", name))?;
@@ -101,8 +98,7 @@ impl TraitImpl {
     pub fn define(session: &Session, scope: ScopeRef, impl_id: NodeID, trait_id: NodeID, impltype: Type) -> Result<TraitImplRef, Error> {
         let deftype = session.get_type(trait_id).unwrap();
         let name = format!("{}_{}", deftype.get_name()?, impltype.get_name()?);
-        let tscope = session.map.get_or_add(impl_id, Some(scope.clone()));
-        tscope.set_basename(&name);
+        let tscope = session.map.get_or_add(impl_id, &name, Context::TraitImpl(trait_id, impl_id), Some(scope.clone()));
         // TODO this should be impl_id, and it should be an alias
         TypeAliasDef::define(session, tscope.clone(), NodeID::generate(), Type::Object("Self".to_string(), impl_id, vec!()), impltype.clone())?;
         //tscope.define_type("Self", impl_id)?;

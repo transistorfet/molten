@@ -77,8 +77,7 @@ impl<'sess> Visitor for NameBinder<'sess> {
         let defid = self.session.new_def_id(id);
 
         let scope = self.stack.get_scope();
-        let fscope = self.session.map.add(defid, Some(scope.clone()));
-        fscope.set_basename(&func.name);
+        let fscope = self.session.map.add(defid, &func.name, Context::Func(func.abi, defid), Some(scope.clone()));
 
         // Check for typevars in the type params
         let mut argtypes = vec!();
@@ -160,8 +159,7 @@ impl<'sess> Visitor for NameBinder<'sess> {
         self.visit_node(cond)?;
         // TODO check to make sure Pattern::Wild only occurs as the last case, if at all
         for ref mut case in cases {
-            let lscope = self.session.map.add(case.id, Some(scope.clone()));
-            lscope.set_context(Context::Block);
+            let lscope = self.session.map.add(case.id, "", Context::Block, Some(scope.clone()));
             visitor::walk_match_case(self, lscope, case)?;
         }
         Ok(())
@@ -193,7 +191,7 @@ impl<'sess> Visitor for NameBinder<'sess> {
         let defid = self.session.new_def_id(id);
 
         let scope = self.stack.get_scope();
-        let tscope = self.session.map.get_or_add(defid, Some(scope.clone()));
+        let tscope = self.session.map.get_or_add(defid, "", Context::Class(defid), Some(scope.clone()));
 
         // Check for typevars in the type params
         let mut classspec = classspec.clone();
@@ -246,7 +244,7 @@ impl<'sess> Visitor for NameBinder<'sess> {
         let defid = self.session.new_def_id(id);
 
         let scope = self.stack.get_scope();
-        let tscope = self.session.map.get_or_add(defid, Some(scope.clone()));
+        let tscope = self.session.map.get_or_add(defid, "", Context::Enum(defid), Some(scope.clone()));
 
         let mut classspec = classspec.clone();
         bind_classspec_type_names(self.session, tscope.clone(), &mut classspec)?;
@@ -266,7 +264,7 @@ impl<'sess> Visitor for NameBinder<'sess> {
     fn visit_trait_def(&mut self, id: NodeID, traitspec: &ClassSpec, body: &Vec<Expr>) -> Result<Self::Return, Error> {
         let defid = self.session.new_def_id(id);
         let scope = self.stack.get_scope();
-        let tscope = self.session.map.get_or_add(defid, Some(scope.clone()));
+        let tscope = self.session.map.get_or_add(defid, "", Context::TraitDef(defid), Some(scope.clone()));
 
         let mut traitspec = traitspec.clone();
         bind_classspec_type_names(self.session, tscope.clone(), &mut traitspec)?;
@@ -281,13 +279,13 @@ impl<'sess> Visitor for NameBinder<'sess> {
     fn visit_trait_impl(&mut self, id: NodeID, traitspec: &ClassSpec, impltype: &Type, body: &Vec<Expr>) -> Result<Self::Return, Error> {
         let impl_id = self.session.new_def_id(id);
         let scope = self.stack.get_scope();
-        let defid = match scope.get_type_def(&traitspec.name) {
-            Some(defid) => defid,
+        let trait_id = match scope.get_type_def(&traitspec.name) {
+            Some(trait_id) => trait_id,
             None => return Err(Error::new(format!("NameError: undefined type {:?}", traitspec.name)))
         };
-        let tscope = self.session.map.get_or_add(impl_id, Some(scope.clone()));
+        let tscope = self.session.map.get_or_add(impl_id, "", Context::TraitImpl(trait_id, impl_id), Some(scope.clone()));
         self.session.set_ref(id, impl_id);
-        self.session.set_ref(impl_id, defid);
+        self.session.set_ref(impl_id, trait_id);
 
         let mut traitspec = traitspec.clone();
         bind_classspec_type_names(self.session, tscope.clone(), &mut traitspec)?;
@@ -295,9 +293,8 @@ impl<'sess> Visitor for NameBinder<'sess> {
         let mut impltype = impltype.clone();
         bind_type_names(self.session, tscope.clone(), Some(&mut impltype))?;
 
-        TraitImpl::define(self.session, scope.clone(), impl_id, defid, impltype)?;
+        TraitImpl::define(self.session, scope.clone(), impl_id, trait_id, impltype)?;
 
-        let tscope = self.session.map.get_or_add(impl_id, Some(scope.clone()));
         self.with_scope(tscope, |visitor| {
             visitor.visit_vec(body)
         })

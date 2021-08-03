@@ -4,7 +4,7 @@ use std::cell::RefCell;
 
 use crate::defs::Def;
 use crate::types::Type;
-use crate::scope::{ Scope, ScopeRef };
+use crate::scope::{ Scope, ScopeRef, Context };
 use crate::session::{ Session, Error };
 use crate::types::{ check_type, Check };
 use crate::hir::{ NodeID, Mutability, Visibility, Expr, ExprKind };
@@ -48,9 +48,7 @@ impl ClassDef {
     pub fn define(session: &Session, scope: ScopeRef, id: NodeID, classtype: Type, parenttype: Option<Type>) -> Result<ClassDefRef, Error> {
         debug!("DEF CLASS: {:?}", classtype);
         let name = classtype.get_name()?;
-        let tscope = session.map.get_or_add(id, Some(scope.clone()));
-        tscope.set_redirect(true);
-        tscope.set_basename(name);
+        let tscope = session.map.get_or_add(id, name, Context::Class(id), Some(scope.clone()));
 
         // Define Self and Super, and check for typevars in the type params
         tscope.define_type("Self", id)?;
@@ -78,8 +76,7 @@ impl ClassDef {
         };
 
         // Create class name bindings for checking ast::accessors
-        let vars = Scope::new_ref(parentclass.map(|p| p.structdef.vars.clone()));
-        vars.set_basename(name);
+        let vars = Scope::new_ref(name, Context::Class(id), parentclass.map(|p| p.structdef.vars.clone()));
 
         session.set_type(id, classtype.clone());
         let vtable = Vtable::create(session, NodeID::generate(), format!("{}_vtable", name))?;
