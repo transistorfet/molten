@@ -254,6 +254,55 @@ match val {
 }
 ```
 
+### Traits and Trait Objects
+A trait can be defined with method declarations in the body, with the predefined
+type alias "Self" used to refer to the current trait object
+```
+trait Add {
+    decl add(Self, Self) -> Self
+}
+```
+
+A trait can then be implemented for a given type.  An impl block can only have
+function definitions that match the trait declarations.  Inside the impl block
+the "Self" type alias will refer to the implementation type.  Trait objects
+that are passed to arguments with type "Self" will automatically be unpacked
+into their impl type, and if the return type has type "Self", the result will
+automatically be packed back into a trait object.
+```
+impl Add for Int {
+    fn add(x: Self, y: Self) -> Self {
+        x + y
+    }
+}
+
+impl Add for Real {
+    fn add(x: Self, y: Self) -> Self {
+        x + y
+    }
+}
+```
+
+Traits are not an object type, but instead are specified as a constraint on a
+universal variable using a `where` clause.  If the actual type given does not
+implement the constrained trait, then an type error will be raised.  Currently
+trait objects can only be created by passing them into a function that takes a
+universal variable with a constraint.  At the moment, only one trait can be
+specified as a constraint but this will be changed in future.
+```
+fn do_some_adding(x: 'a) -> 'a where a: Add {
+    x.add(x)
+}
+
+println(str(do_some_adding(400)))
+println(str(do_some_adding(1.5)))
+```
+The above example will output:
+```
+800
+3.000000
+```
+
 ### Exceptions
 Exceptions aren't quite settled yet.
 ```

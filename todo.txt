@@ -1,34 +1,37 @@
 
-* change names for id to either defid or refid to be more obvious (all visitor funcs receive the refid from the node)
-* should you make a type visitor?
-
-* should you have a check that the type parameters in declarations are Universals and throw an error, since it doesn't make sense for them to be simple types at least
-  what about using a function type though...
 * can you remove some of the weirder ref trails (a ref to a ref to a ref), to make things simpler and more predictable?
-* add a check to make sure trait defs are all ABI::Molten
+* you can maybe store more info in the defs, including the context of the function (Plain, Class Method, Trait Method), and then use that during transform
+* change names for id to either defid or refid to be more obvious (all visitor funcs receive the refid from the node)
 * add common constants for various context and vtable strings throughout, instead of dupilcating strings
-* do you need to test unification between class and parent class, as well as trait def and impl type?
 * we currently aren't exporting enums
+* add a check to make sure trait defs are all ABI::Molten
+* settle the issue with using typealiases for Self in traitdef and impldef (not sure which way I want to go yet)
+* you need to add where clauses to enums, traits as well??
 
+* can you make closure conversion a separate stage somehow, possibly with a MutVisitor
+* can you make an exception conversion mut visitor? to add the execption argument to everything
+
+* write a test for impl TraitTest for 'a { } which always returns a bool
+* also try trait TraitTest for List<'a>
+* make sure trait functions can be called via :: resolve, with the first arg passed in
+  fn (x: 'a, y: 'a) -> 'a where a: Self??? not sure I like this
+* minor issue: when a trait is not implemented, it will produce an unhelpful type error that it expected random variable, but found unimplemented type
+
+* should you make a type visitor?
+* do you need to test unification between class and parent class, as well as trait def and impl type?
+
+* should you have a check of class/enum type parameters to make sure they are Universals (or that they contain Universals), otherwise error since using a fixed typeparam is pointless
+* should you make a trait object's data be the first pointer (always a pointer), so that a double deref will get it, rather than an indexed deref?
+* should you use a different format for trait objects vs unbound universals?
+
+BUGS:
 * there's a possible issue with closure reference conversion, where you only check if the name exists in the global scope, but not if it's the same definition.  It's
   possible there could be a different variable with the same name declared in the global scope causing the local one to not be converted into a context access.  But
   right now, because of overloading, the def will be a specific function, and the stored scope def will be the overloaded def that contains all the possible specific impls
-* can you make a walk_vec_with_scope() function and pass it a pointer to the scope stack, and subsequently have a walk_vec_with_scope_context(scope, context, body)?
-
-* Wow... there's now only 3 Scope::target calls when they used to be everywhere, and they are all called from defs which are called from bindings, from the looks of things
 
 TO CHECK:
 * classes and their parents should be able to have different numbers of type params
 
-* copy the changes for closure context access to transform for now (until you get the new one working)
-* can you make closure conversion a separate stage somehow, possibly with a MutVisitor
-* can you make an exception conversion mut visitor? to add the execption argument to everything
-* there is a problem in object/funcptr-uninitialized-issue.mol caused by an argument being defined twice.  I think it has to do with __init__ and duplicating code
-
-
-* you can maybe store more info in the defs, including the context of the function (Plain, Class Method, Trait Method), and then use that during
-  transform, and you can use the FunctionParts struct for building and transforming a function, so your top level transform_func_def becomes
-  a series of "apply_*" functions which take a &mut FunctionParts and transform it in stages, including an if context == Trait then apply pack/unpack
 
 * add tests for traits
 * separate trait objects and bare universals
@@ -41,26 +44,15 @@ TO CHECK:
   but can still be checked by the refinery and converted into an Expr::MethodInvoke or however you'll do that
 * I'd really like to change the way method calls are done.  It's annoying having all these definitions and blocks for every call
 
-* write a test for impl TraitTest for 'a { } which always returns a bool
-* also try trait TraitTest for List<'a>
-* does a trait ever take type params? i don't think it makes sense
-* settle the issue with using typealiases for Self in traitdef and impldef (not sure which way I want to go yet)
-* trait impls should be able to have any variable get unboxed, not just ones named 'self' (ie. an Add trait would need fn add(x: Self, y: Self) -> Self, or maybe you can use
-* should you make a trait object's data be the first pointer (always a pointer), so that a double deref will get it, rather than an indexed deref?
-* should you use a different format for trait objects vs unbound universals?
-* you need to add where clauses to enums, traits as well??
 
 * there is an issue with resolve_type where you really should check that a Type::Object and it's stored type have the same ID, but the question is what to do if it's not
   the same... what do we do with the params?  type alias will do some checks and unify the params with the defined type, which itself might not even be right because what
   if you want "type Special<'a> = HashMap<Int, 'a>"?? I don't think this is possible atm
-* make sure trait functions can be called via :: resolve, with the first arg passed in
-  fn (x: 'a, y: 'a) -> 'a where a: Self??? not sure I like this
-* minor issue: when a trait is not implemented, it will produce an unhelpful type error that it expected random variable, but found unimplemented type
+
 * can you split AST and Expr pattern matching to make the expr stuff easier to use?  The identifier and resolve patterns are kind of clunky and there's a syntax error in bindings which
   should be in refinery if possible
 * when you had a match expr but the enum def name was left out, or was incorrect, I was getting a parse error, which totally shouldn't happen.  It should give some othe kind of error
 * can we change the way types are stored in expr? I want to get rid of the mut bind_type_names stuff somehow, and it'd be nice to not have types in Expr at all
-* should we change classspec into a type and be done with it?  We can decompose the type later?  Or can you make exprs mutable?
 * reduce the number of clone()s
 * implement the record and tuple pattern matching
 
@@ -75,7 +67,6 @@ TRAITS/TYPECLASSES:
 
 * traits need inheritence/subtraits, such that the vtable could have pointers to the vtables of the dependents, or they could use a similar kind of inheritence as classes, but you need to
   have multiple dependent traits to work
-* can you assume that all dependent traits are implemented for the same type, or could they be different types and thus the object/self that is passed to subtraits might need to be different???
 
 * currently you have function overloading, and class method overloading, which are forms of ad-hoc polymorphism.  Should all function overloading instead require a trait
   implementation (eg. all the infix operator functions and str functions would become traits which would be implemented for different types instead of being overloaded funcs).
@@ -87,8 +78,6 @@ TRAITS/TYPECLASSES:
 
 * we could possibly implement traits statically, so the object would always be typed (no trait objects, and thus no generics with traits unless you switch to monomorphizing... or
   trait objects), but having static traits would allow the implementation to be separated from the class definition
-* non boxed types should be able to use static traits too. I suppose all traits can have a static reference to the trait vtable rather than searching through the object's vtable,
-  but we'd have to make function lookup a lot more complicated (search scope, then search for a trait impl for that type that contains that function?)
 
 
 
@@ -102,19 +91,9 @@ GENERAL ISSUES:
   and are distinguished by their definition, yet one a reference always and the other is not.  Trait objects would implicitly always be a reference
 
 
-* it would be nice if you used the same parser trick as rust for distinguishing between calling a function pointer from an object vs a method call, by surrounding the function value in brackets
-  but that might be difficult to parse out
-* rust requires additional brackets around a function reference to distinguish between calling a function ptr stored inside a struct vs calling a method.  Perhaps we could do a
-  similar thing to fix the record fptr test, but it might require a special case in the parser
-
-
-* should you make all visitor functions take a reference to the node itself (since typecheck accessor/resolver needs to send the node onward)
 * for transformer, you could have a list of 'bodies' of code, which are appended to by the transform functions, rather than returned.
   It could also store the context, but you'd have to add a body when transforming `if`, `while`, `sideeffect`, `match`, `try`, and `import`
 * move the pattern transform functions into the visitor, but right now you're passing in a value_id to use for comparisons.  It'd have to be stored in the transformer obj insteado
-* is there a way to remove all the references to memo and run functions (they're just duplicated, and they shouldn't be)
-* can you remove FuncDef entirely?
-* clean up warnings
 
 * can you remove access to getindex, buffer, etc?
 * if you had a way of indexing an object easily, given an llvm object, then you can fix the print() functions to take a SuperString (which would become String)
@@ -176,7 +155,6 @@ Error Messages:
 Refactoring:
 * improve storing of file info in the Pos structs (maybe rename to Span?)
 * change parser to take session argument or something so it can record the file info, and maybe do other advanced things
-* there must be a way to fix the 'scope exceptions' (Scope::target) that we're doing to make class bodies work... pass in an argument to all scoped functions?  or use scopemap and scope ids?
 
 
 
@@ -205,15 +183,14 @@ Changes:
 
 * you could modify the forloop code to take an iterator in future
 * should vtables be dynamically allocated, or should we add a LLType::ElementOf() type or something to GetElement an aliased type
+
+* the following issues are solved by traits, but the haven't been modified to use traits yet
 * strings, buffers, and all the builtin types require vtables if they have methods, but there aren't vtables stored inside them.  You could make static vtable exceptions for them
 * make builtin types unable to inherit from, because there's no vtable
 * fix lib to allow builtin classes??
 
 * can you make a check for nil before unboxing a type... and somehow return an appropriate default value?  I guess that's feasible because only builtin types would be
   boxed/unboxed, although records and tuples might be an issue
-* when you box a type to be converted to typevar, you can possibly add a vtable of sorts in the process, possibly containing functions and metadata for copying. You could also
-  make buffer copying functions that take the element size and copy the buffer data into the boxed location.
-* implement return value conversion (this doesn't appear to be needed?  Why didn't it work with tuple closures though?)
 
 
 
@@ -221,25 +198,22 @@ Changes:
 * add 'decl as' syntax
 * add pipe operator
 * make loops use phi, and add break
-* add proper pattern matching for definitions/matchcases/etc
-* add typeclasses/traits
 * add compiler directives?
-* better support for generics
 
 
 
 
 
 
+* should you remove the Nil type? (yes, but it'll be a bit tricky)
+* should you fix scope resolution to also work on objects, so that you can have static methods from the object without explicitly referencing its type
+* should exports also list all the modules that the file imports, so that class definitions in other imports can be found, if needed for arguments
+* should you add break/continue statements for loops
 * should you add some means of accessing variant values without pattern matching?
+* should you change Real to Float?  also should you change them to lower case names, which is in line with sml, ocmal, f#
 * should you add access modifiers to classes, and maybe functions; public, private, protected
 * should module init return something other than 0, like a module object?  Is that even useful?
-* should exports also list all the modules that the file imports, so that class definitions in other imports can be found, if needed for arguments
-* should you fix scope resolution to also work on objects, so that you can have static methods from the object without explicitly referencing its type
-* should you remove the Nil type? (yes, but it'll be a bit tricky)
-* should you add break/continue statements for loops
 * should you add a return statement?  It's not functional, but it's practial
-* should you change Real to Float?  also should you change them to lower case names, which is in line with sml, ocmal, f#
 * should you allow keyword arguments in invoke; foo(a=10, b=20)
 * should you allow arguments with a default value to be omitted from a function call?, that would require a bunch of changes to typechecking
 * should local variables be allowed to be mutable...
@@ -248,13 +222,8 @@ Changes:
 * should you implement assignment of tuples and records? (in addition to the record update syntax)
 
 * is it even possible to add a special "constrained" type, which has &AST that must type check correctly in order to match (checks done in check_type)
-* you might need to integrate type restrictions which have to get resolved later; like 'a where 'a is object with add(Int) method; not sure how you could be so specific without complexity
 * what if you generalize overloaded types, such that they're checked in check_type, and options are eliminated, or resolved to one type over the course of checking
-* should implement the proper bidirectional typechecker algorithm
-
-* if you make ops methods, then everything has to be type annotated, with the type system as it is; you'd need constrained types, or multiple paths, or bidirectional or something
-  make typed functions for all math operations, with the inlinealways attribute, if you decide to make operators methods
-
+* should you implement the context method described in the proper bidirectional typechecker algorithm
 
 
 EXAMPLE PROGRAM IDEAS:
