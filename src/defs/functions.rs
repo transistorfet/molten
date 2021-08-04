@@ -194,12 +194,10 @@ pub struct ClosureDef {
 pub type ClosureDefRef = Rc<ClosureDef>;
 
 impl ClosureDef {
-    pub fn create(session: &Session, scope: ScopeRef, defid: NodeID, vis: Visibility) -> Result<Def, Error> {
+    pub fn create(session: &Session, defid: NodeID, vis: Visibility) -> Result<Def, Error> {
         let context_type_id = NodeID::generate();
         // TODO the context and name are incorrect here
-        let structdef = StructDef::new_ref(Scope::new_ref("", Context::Block, Some(scope.clone())));
-        // TODO removing this will actually define the fields, but that messes other things up
-        //let structdef = StructDef::new_ref(Scope::new_ref(None));
+        let structdef = StructDef::new_ref(Scope::new_ref("", Context::Block, None));
 
         let def = Def::Closure(Rc::new(ClosureDef {
             vis,
@@ -221,7 +219,7 @@ impl ClosureDef {
 
     #[must_use]
     pub fn define(session: &Session, scope: ScopeRef, defid: NodeID, vis: Visibility, name: &str, ttype: Option<Type>) -> Result<Def, Error> {
-        let def = ClosureDef::create(session, scope.clone(), defid, vis)?;
+        let def = ClosureDef::create(session, defid, vis)?;
         AnyFunc::set_func_def(session, scope, defid, vis, name, def.clone(), ttype)?;
         Ok(def)
     }
@@ -254,7 +252,7 @@ pub type MethodDefRef = Rc<MethodDef>;
 impl MethodDef {
     #[must_use]
     pub fn define(session: &Session, scope: ScopeRef, defid: NodeID, vis: Visibility, name: &str, ttype: Option<Type>) -> Result<Def, Error> {
-        let closure = match ClosureDef::create(session, scope.clone(), defid, vis) {
+        let closure = match ClosureDef::create(session, defid, vis) {
             Ok(Def::Closure(cl)) => cl,
             result @ _ => return result,
         };
@@ -284,7 +282,7 @@ pub type TraitFuncDefRef = Rc<TraitFuncDef>;
 impl TraitFuncDef {
     #[must_use]
     pub fn define(session: &Session, scope: ScopeRef, impl_func_id: NodeID, vis: Visibility, name: &str, ttype: Option<Type>) -> Result<Def, Error> {
-        let closure = match ClosureDef::create(session, scope.clone(), impl_func_id, vis) {
+        let closure = match ClosureDef::create(session, impl_func_id, vis) {
             Ok(Def::Closure(cl)) => cl,
             result => return result,
         };

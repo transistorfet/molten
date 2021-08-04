@@ -611,9 +611,9 @@ impl<'sess> TypeChecker<'sess> {
             None => { return self.visit_node(fexpr); },
         };
 
-        let (fid, ftype) = self.session_find_variant_id(defid, argtypes)?;
-        self.session.set_ref(fexpr.id, fid);
-        self.session.set_ref(invid, fid);
+        let (func_id, ftype) = self.session_find_variant_id(defid, argtypes)?;
+        self.session.set_ref(fexpr.id, func_id);
+        self.session.set_ref(invid, func_id);
 
         debug!("CHECK VARIANT: {:?} {:?}", ftype, fexpr);
         Ok(ftype)

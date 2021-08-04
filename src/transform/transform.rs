@@ -530,7 +530,9 @@ impl<'sess> Transformer<'sess> {
                         //vec!(LLExpr::Cast(LLType::Alias(cl.context_type_id), r(LLExpr::GetValue(cl.context_arg_id))))
                         vec!(ClosureTransform::make_closure_value(self, NodeID::generate(), cl.compiled_func_id, LLExpr::GetValue(cl.context_arg_id)))
                     } else {
-                        let index = cl.find_or_add_field(self.session, defid, name, &self.session.get_type(defid).unwrap());
+                        let field_id = NodeID::generate();
+                        self.session.set_ref(field_id, defid);
+                        let index = cl.find_or_add_field(self.session, field_id, name, &self.session.get_type(defid).unwrap());
                         let context = LLExpr::Cast(LLType::Alias(cl.context_type_id), r(LLExpr::GetValue(cl.context_arg_id)));
                         vec!(LLExpr::LoadRef(r(LLExpr::AccessRef(r(context), vec!(LLRef::Field(index))))))
                     }

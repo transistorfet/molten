@@ -117,9 +117,9 @@ impl Session {
 
     pub fn set_def(&self, id: NodeID, def: Def) {
         debug!("SET DEF: {:?} = {:?}", id, def);
-        //if let Some(existing) = self.defs.borrow().get(&id) {
-        //    panic!("Definition {} already set to {:#?} but trying to set it to {:#?}", id, existing, def);
-        //}
+        if let Some(existing) = self.defs.borrow().get(&id) {
+            panic!("Definition {} already set to {:#?} but trying to set it to {:#?}", id, existing, def);
+        }
         self.defs.borrow_mut().insert(id, def);
     }
 
