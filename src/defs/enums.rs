@@ -23,28 +23,28 @@ pub type EnumDefRef = Rc<EnumDef>;
 
 
 impl EnumDef {
-    pub fn new(id: NodeID, vars: ScopeRef, deftype: Type) -> Self {
+    pub fn new(defid: NodeID, vars: ScopeRef, deftype: Type) -> Self {
         Self {
-            id: id,
+            id: defid,
             vars: vars,
             deftype: deftype,
             variants: RefCell::new(vec!()),
         }
     }
 
-    pub fn new_ref(id: NodeID, vars: ScopeRef, deftype: Type) -> EnumDefRef {
-        Rc::new(Self::new(id, vars, deftype))
+    pub fn new_ref(defid: NodeID, vars: ScopeRef, deftype: Type) -> EnumDefRef {
+        Rc::new(Self::new(defid, vars, deftype))
     }
 
     #[must_use]
-    pub fn define(session: &Session, scope: ScopeRef, id: NodeID, deftype: Type) -> Result<EnumDefRef, Error> {
+    pub fn define(session: &Session, scope: ScopeRef, defid: NodeID, deftype: Type) -> Result<EnumDefRef, Error> {
         let name = deftype.get_name()?;
-        let vars = Scope::new_ref(name, Context::Enum(id), None);
+        let vars = Scope::new_ref(name, Context::Enum(defid), None);
 
-        let enumdef = Self::new_ref(id, vars, deftype.clone());
-        scope.define_type(name, id)?;
-        session.set_def(id, Def::Enum(enumdef.clone()));
-        session.set_type(id, deftype);
+        let enumdef = Self::new_ref(defid, vars, deftype.clone());
+        scope.define_type(name, defid)?;
+        session.set_def(defid, Def::Enum(enumdef.clone()));
+        session.set_type(defid, deftype);
 
         Ok(enumdef)
     }

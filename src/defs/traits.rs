@@ -23,9 +23,9 @@ pub struct TraitDef {
 pub type TraitDefRef = Rc<TraitDef>;
 
 impl TraitDef {
-    pub fn new(id: NodeID, vars: ScopeRef, deftype: Type, vtable: Vtable) -> Self {
+    pub fn new(defid: NodeID, vars: ScopeRef, deftype: Type, vtable: Vtable) -> Self {
         Self {
-            id: id,
+            id: defid,
             vars: vars,
             deftype: deftype,
             vtable: vtable,
@@ -33,13 +33,13 @@ impl TraitDef {
         }
     }
 
-    pub fn new_ref(id: NodeID, vars: ScopeRef, deftype: Type, vtable: Vtable) -> TraitDefRef {
-        Rc::new(Self::new(id, vars, deftype, vtable))
+    pub fn new_ref(defid: NodeID, vars: ScopeRef, deftype: Type, vtable: Vtable) -> TraitDefRef {
+        Rc::new(Self::new(defid, vars, deftype, vtable))
     }
 
     #[must_use]
     pub fn define(session: &Session, scope: ScopeRef, defid: NodeID, traitname: &str) -> Result<TraitDefRef, Error> {
-        let tscope = session.map.get_or_add(defid, traitname, Context::TraitDef(defid), Some(scope.clone()));
+        let tscope = session.map.get(defid).unwrap();
         tscope.define_type("Self", defid)?;
 
         let vars = Scope::new_ref(traitname, Context::TraitDef(defid), None);
@@ -97,7 +97,7 @@ impl TraitImpl {
     pub fn define(session: &Session, scope: ScopeRef, impl_id: NodeID, trait_id: NodeID, impltype: Type) -> Result<TraitImplRef, Error> {
         let deftype = session.get_type(trait_id).unwrap();
         let name = format!("{}_{}", deftype.get_name()?, impltype.get_name()?);
-        let tscope = session.map.get_or_add(impl_id, &name, Context::TraitImpl(trait_id, impl_id), Some(scope.clone()));
+        let tscope = session.map.get(impl_id).unwrap();
         // TODO this should be impl_id, and it should be an alias
         TypeAliasDef::define(session, tscope.clone(), NodeID::generate(), Type::Object("Self".to_string(), impl_id, vec!()), impltype.clone())?;
         //tscope.define_type("Self", impl_id)?;

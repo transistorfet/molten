@@ -222,8 +222,8 @@ pub trait Visitor: Sized {
         Ok(self.default_return())
     }
 
-    fn visit_pattern_literal(&mut self, id: NodeID, lit: &Literal) -> Result<Self::Return, Error> {
-        self.visit_literal(id, lit)
+    fn visit_pattern_literal(&mut self, _id: NodeID, _lit: &Literal, _fid: NodeID) -> Result<Self::Return, Error> {
+        Ok(self.default_return())
     }
 
     fn visit_pattern_identifier(&mut self, _id: NodeID, _name: &str) -> Result<Self::Return, Error> {
@@ -528,8 +528,8 @@ pub fn walk_pattern<R, V: Visitor<Return = R>>(visitor: &mut V, pat: &Pattern) -
             visitor.visit_pattern_wild(pat.id)
         },
 
-        PatKind::Literal(lit) => {
-            visitor.visit_pattern_literal(pat.id, lit)
+        PatKind::Literal(lit, fid) => {
+            visitor.visit_pattern_literal(pat.id, lit, *fid)
         },
 
         PatKind::Identifier(name) => {

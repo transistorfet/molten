@@ -77,23 +77,13 @@ impl<'sess> Visitor for NameBinder<'sess> {
         let defid = self.session.new_def_id(id);
 
         let scope = self.stack.get_scope();
-        let fscope = self.session.map.add(defid, &func.name, Context::Func(func.abi, defid), Some(scope.clone()));
+        let fscope = self.session.map.get_or_add(defid, &func.name, Context::Func(func.abi, defid), Some(scope.clone()));
 
         // Check for typevars in the type params
         let mut argtypes = vec!();
         for arg in func.args.iter() {
-            //let arg_defid = self.session.new_def_id(arg.id);
-            // TODO this is a hack because the arguments are being cloned in the class desugaring in refinery, and that means the id is duplicated rather
-            //      when a class has a lambda style method defined and assigned to a class field, the refinery will include the class field initializer (the function)
-            //      and then also build the __init__() method for the class, it duplicates the value initializer (the function) and assigns it to the class member during init
-            let arg_defid = if let Ok(id) = self.session.get_ref(arg.id) {
-                id
-            } else {
-                self.session.new_def_id(arg.id)
-            };
-
+            let arg_defid = self.session.new_def_id(arg.id);
             let ttype = self.bind_type_option(fscope.clone(), arg.ttype.clone())?;
-            // TODO this is assumed to be always immutable, but maybe shouldn't be
             ArgDef::define(self.session, fscope.clone(), arg_defid, Mutability::Immutable, &arg.name, ttype.clone())?;
             argtypes.push(ttype.unwrap_or_else(|| self.session.new_typevar()));
         }
@@ -135,13 +125,9 @@ impl<'sess> Visitor for NameBinder<'sess> {
 
     fn visit_identifier(&mut self, id: NodeID, name: &str) -> Result<Self::Return, Error> {
         let scope = self.stack.get_scope();
-        if self.session.get_ref(id).is_err() {
-            // TODO you must check to make sure if we are accessing a variable or argument, that it is either local or we are in a closure...
-            //      (the latter being more difficult to figure out; we need to some kind of context value)
-            match scope.get_var_def(name) {
-                Some(defid) => self.session.set_ref(id, defid),
-                None => return Err(Error::new(format!("NameError: undefined identifier {:?}", name)))
-            }
+        match scope.get_var_def(name) {
+            Some(defid) => self.session.set_ref(id, defid),
+            None => return Err(Error::new(format!("NameError: undefined identifier {:?}", name)))
         }
         Ok(())
     }
@@ -155,7 +141,7 @@ impl<'sess> Visitor for NameBinder<'sess> {
         self.visit_node(cond)?;
         // TODO check to make sure Pattern::Wild only occurs as the last case, if at all
         for ref mut case in cases {
-            let lscope = self.session.map.add(case.id, "", Context::Block, Some(scope.clone()));
+            let lscope = self.session.map.get_or_add(case.id, "", Context::Block, Some(scope.clone()));
             visitor::walk_match_case(self, lscope, case)?;
         }
         Ok(())
@@ -256,7 +242,6 @@ impl<'sess> Visitor for NameBinder<'sess> {
     fn visit_resolver(&mut self, _id: NodeID, left: &Expr, _right: &str, oid: NodeID) -> Result<Self::Return, Error> {
         let scope = self.stack.get_scope();
         // TODO should this always work on a type reference, or should classes be added as values as well as types?
-        //self.visit_node(left);
         match &left.kind {
             ExprKind::Identifier(ident) => {
                 match scope.get_type_def(&ident) {
@@ -388,7 +373,6 @@ fn bind_where_constraints(session: &Session, scope: ScopeRef, whereclause: &Wher
     Ok(())
 }
 
-#[must_use]
 pub fn check_recursive_type(ttype: Option<&Type>, forbidden_id: NodeID) -> Result<(), Error> {
     match ttype {
         Some(ttype) => match ttype {

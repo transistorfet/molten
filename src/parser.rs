@@ -35,8 +35,8 @@ use std::str::FromStr;
 use crate::abi::ABI;
 use crate::types::Type;
 use crate::misc::{ r, UniqueID };
-use crate::ast::{ Pos, AST };
-use crate::hir::{ NodeID, Mutability, Visibility, AssignType, Literal, Argument, WhereClause, Pattern, PatKind };
+use crate::ast::{ Pos, RawArgument, AST };
+use crate::hir::{ NodeID, Mutability, Visibility, AssignType, Literal, WhereClause, Pattern, PatKind };
 
 
 ///// Parsing Macros /////
@@ -482,13 +482,13 @@ named!(annotation(Span) -> AST,
     )
 );
 
-named!(argument_list(Span) -> Vec<Argument>,
+named!(argument_list(Span) -> Vec<RawArgument>,
     separated_list0!(wscom!(tag!(",")),
         do_parse!(
             i: identifier_typed >>
-            // TODO this needs an Expr instead of AST, so probably needs an intermediate struct, but default args aren't supported yet anyways
+            // TODO add default arguments
             //d: opt!(preceded!(wscom!(tag!("=")), expression)) >>
-            (Argument::new(i.0, i.1, i.2, None))
+            (RawArgument::new(i.0, i.1, i.2))
         )
     )
 );
@@ -1075,7 +1075,7 @@ named!(pattern_literal(Span) -> Pattern,
         string |
         character |
         number
-    ), |l| Pattern::new(Pos::empty(), PatKind::Literal(l.get_literal())))
+    ), |l| Pattern::new(Pos::empty(), PatKind::Literal(l.get_literal(), NodeID::generate())))
 );
 
 named!(pattern_binding(Span) -> Pattern,

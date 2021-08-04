@@ -6,7 +6,7 @@ use crate::abi::ABI;
 use crate::types::Type;
 use crate::parser::Span;
 use crate::misc::{ R, r };
-use crate::hir::{ Visibility, Mutability, AssignType, Literal, Argument, WhereClause, Pattern };
+use crate::hir::{ Visibility, Mutability, AssignType, Literal, WhereClause, Pattern };
 
 
 #[derive(Copy, Clone, PartialEq)]
@@ -15,6 +15,14 @@ pub struct Pos {
     pub column: usize,
     pub line: u32,
     pub filenum: u16,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct RawArgument {
+    pub pos: Pos,
+    pub name: String,
+    pub ttype: Option<Type>,
+    //pub default: Option<Expr>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -49,7 +57,7 @@ pub enum AST {
     While(Pos, R<AST>, R<AST>),
 
     Declare(Pos, Visibility, String, Type, WhereClause),
-    Function(Pos, Visibility, Option<String>, Vec<Argument>, Option<Type>, Vec<AST>, ABI, WhereClause),
+    Function(Pos, Visibility, Option<String>, Vec<RawArgument>, Option<Type>, Vec<AST>, ABI, WhereClause),
     New(Pos, Type, Vec<AST>),
     Class(Pos, Type, Option<Type>, WhereClause, Vec<AST>),
     TypeAlias(Pos, Type, Type),
@@ -95,6 +103,16 @@ impl fmt::Debug for Pos {
     }
 }
 
+
+impl RawArgument {
+    pub fn new(pos: Pos, name: String, ttype: Option<Type>) -> RawArgument {
+        RawArgument {
+            pos,
+            name,
+            ttype,
+        }
+    }
+}
 
 impl AST {
     pub fn get_pos(&self) -> Pos {

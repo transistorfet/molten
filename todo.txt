@@ -1,6 +1,6 @@
 
 * change names for id to either defid or refid to be more obvious (all visitor funcs receive the refid from the node)
-* there are scope.map.get_or_add()s in both bindings and in defs.  They are needed in bindngs, but maybe you can turn them into get()s in the defs
+* should you make a type visitor?
 
 * should you have a check that the type parameters in declarations are Universals and throw an error, since it doesn't make sense for them to be simple types at least
   what about using a function type though...

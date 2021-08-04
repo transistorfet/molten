@@ -149,7 +149,7 @@ pub fn walk_mut_pattern_vec<V: MutVisitor>(visitor: &mut V, items: &mut Vec<Patt
 pub fn walk_mut_pattern<V: MutVisitor>(visitor: &mut V, pat: &mut Pattern) {
     match &mut pat.kind {
         PatKind::Wild => { },
-        PatKind::Literal(_) => { },
+        PatKind::Literal(_, _) => { },
         PatKind::Binding(_) => { },
         PatKind::Identifier(_) => { },
 

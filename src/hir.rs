@@ -42,7 +42,7 @@ pub struct Argument {
     pub pos: Pos,
     pub name: String,
     pub ttype: Option<Type>,
-    pub default: Option<Expr>
+    //pub default: Option<Expr>
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -87,7 +87,7 @@ pub struct Pattern {
 #[derive(Clone, Debug, PartialEq)]
 pub enum PatKind {
     Wild,
-    Literal(Literal),
+    Literal(Literal, NodeID),
     Binding(String),
     Annotation(Type, R<Pattern>),
     Identifier(String),
@@ -149,13 +149,13 @@ pub enum ExprKind {
 }
 
 impl Argument {
-    pub fn new(pos: Pos, name: String, ttype: Option<Type>, default: Option<Expr>) -> Self {
+    pub fn new(pos: Pos, name: String, ttype: Option<Type>) -> Self {
         Argument {
             id: NodeID::generate(),
             pos: pos,
             name: name,
             ttype: ttype,
-            default: default,
+            //default: default,
         }
     }
 }
@@ -223,7 +223,7 @@ impl Pattern {
 
     #[allow(dead_code)]
     pub fn make_lit(literal: Literal) -> Pattern {
-        Pattern { id: NodeID::generate(), pos: Pos::empty(), kind: PatKind::Literal(literal) }
+        Pattern { id: NodeID::generate(), pos: Pos::empty(), kind: PatKind::Literal(literal, NodeID::generate()) }
     }
 }
 

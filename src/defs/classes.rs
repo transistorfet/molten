@@ -28,9 +28,9 @@ pub type ClassDefRef = Rc<ClassDef>;
 
 
 impl ClassDef {
-    pub fn new(id: NodeID, classname: String, classtype: Type, parenttype: Option<Type>, vars: ScopeRef, vtable: Vtable) -> Self {
+    pub fn new(defid: NodeID, classname: String, classtype: Type, parenttype: Option<Type>, vars: ScopeRef, vtable: Vtable) -> Self {
         Self {
-            id: id,
+            id: defid,
             initid: NodeID::generate(),
             classname: classname,
             classtype: classtype,
@@ -40,33 +40,33 @@ impl ClassDef {
         }
     }
 
-    pub fn new_ref(id: NodeID, classname: String, classtype: Type, parenttype: Option<Type>, vars: ScopeRef, vtable: Vtable) -> ClassDefRef {
-        Rc::new(Self::new(id, classname, classtype, parenttype, vars, vtable))
+    pub fn new_ref(defid: NodeID, classname: String, classtype: Type, parenttype: Option<Type>, vars: ScopeRef, vtable: Vtable) -> ClassDefRef {
+        Rc::new(Self::new(defid, classname, classtype, parenttype, vars, vtable))
     }
 
     #[must_use]
-    pub fn define(session: &Session, scope: ScopeRef, id: NodeID, classtype: Type, parenttype: Option<Type>) -> Result<ClassDefRef, Error> {
+    pub fn define(session: &Session, scope: ScopeRef, defid: NodeID, classtype: Type, parenttype: Option<Type>) -> Result<ClassDefRef, Error> {
         debug!("DEF CLASS: {:?}", classtype);
         let name = classtype.get_name()?;
-        let tscope = session.map.get_or_add(id, name, Context::Class(id), Some(scope.clone()));
+        let tscope = session.map.get(defid).unwrap();
 
         // Define Self and Super, and check for typevars in the type params
-        tscope.define_type("Self", id)?;
+        tscope.define_type("Self", defid)?;
         if let Some(ptype) = &parenttype {
             tscope.define_type("Super", scope.get_type_def(&ptype.get_name()?).unwrap())?;
         }
 
-        let classdef = Self::create_class(session, scope.clone(), id, classtype.clone(), parenttype)?;
+        let classdef = Self::create_class(session, scope.clone(), defid, classtype.clone(), parenttype)?;
 
         // Define the class in the local scope
-        scope.define_type(name, id)?;
-        session.set_def(id, Def::Class(classdef.clone()));
-        session.set_type(id, classtype);
+        scope.define_type(name, defid)?;
+        session.set_def(defid, Def::Class(classdef.clone()));
+        session.set_type(defid, classtype);
 
         Ok(classdef)
     }
 
-    pub fn create_class(session: &Session, scope: ScopeRef, id: NodeID, classtype: Type, parenttype: Option<Type>) -> Result<ClassDefRef, Error> {
+    pub fn create_class(session: &Session, scope: ScopeRef, defid: NodeID, classtype: Type, parenttype: Option<Type>) -> Result<ClassDefRef, Error> {
         let name = classtype.get_name()?;
 
         // Find the parent class definitions, which the new class will inherit from
@@ -76,11 +76,11 @@ impl ClassDef {
         };
 
         // Create class name bindings for checking ast::accessors
-        let vars = Scope::new_ref(name, Context::Class(id), parentclass.map(|p| p.structdef.vars.clone()));
+        let vars = Scope::new_ref(name, Context::Class(defid), parentclass.map(|p| p.structdef.vars.clone()));
 
-        session.set_type(id, classtype.clone());
+        session.set_type(defid, classtype.clone());
         let vtable = Vtable::create(session, NodeID::generate(), format!("{}_vtable", name))?;
-        let classdef = ClassDef::new_ref(id, name.to_string(), classtype, parenttype, vars, vtable);
+        let classdef = ClassDef::new_ref(defid, name.to_string(), classtype, parenttype, vars, vtable);
         Ok(classdef)
     }
 

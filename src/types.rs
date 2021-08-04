@@ -23,6 +23,40 @@ pub enum Type {
 }
 
 impl Type {
+    #[allow(dead_code)]
+    pub fn is_tuple(&self) -> bool {
+        match self {
+            Type::Tuple(_) => true,
+            _ => false
+        }
+    }
+
+    #[allow(dead_code)]
+    pub fn is_record(&self) -> bool {
+        match self {
+            Type::Record(_) => true,
+            _ => false
+        }
+    }
+
+    #[allow(dead_code)]
+    pub fn is_variable(&self) -> bool {
+        match self {
+            Type::Universal(_, _) => true,
+            Type::Variable(_) => true,
+            _ => false
+        }
+    }
+
+    #[allow(dead_code)]
+    pub fn is_function(&self) -> bool {
+        match self {
+            Type::Function(_, _, _) => true,
+            _ => false
+        }
+    }
+
+
     pub fn get_name<'a>(&'a self) -> Result<&'a str, Error> {
         match self {
             Type::Object(name, _, _) => Ok(name),
@@ -38,27 +72,10 @@ impl Type {
         }
     }
 
-    #[allow(dead_code)]
-    pub fn is_tuple(&self) -> bool {
-        match self {
-            Type::Tuple(_) => true,
-            _ => false
-        }
-    }
-
-    #[allow(dead_code)]
     pub fn as_vec(&self) -> Vec<Type> {
         match self {
             Type::Tuple(types) => types.clone(),
             _ => vec!(self.clone()),
-        }
-    }
-
-    #[allow(dead_code)]
-    pub fn is_record(&self) -> bool {
-        match self {
-            Type::Record(_) => true,
-            _ => false
         }
     }
 
@@ -80,15 +97,6 @@ impl Type {
                 Err(Error::new(format!("TypeError: no field named {:?} exists in record of type {:?}", name, self)))
             },
             _ => Err(Error::new(format!("TypeError: expected record type, found {:?}", self))),
-        }
-    }
-
-
-    #[allow(dead_code)]
-    pub fn is_function(&self) -> bool {
-        match self {
-            Type::Function(_, _, _) => true,
-            _ => false
         }
     }
 
@@ -120,16 +128,6 @@ impl Type {
         }
     }
 
-
-    #[allow(dead_code)]
-    pub fn is_variable(&self) -> bool {
-        match self {
-            Type::Universal(_, _) => true,
-            Type::Variable(_) => true,
-            _ => false
-        }
-    }
-
     pub fn get_id(&self) -> Result<UniqueID, Error> {
         match self {
             Type::Object(_, id, _) => Ok(*id),
@@ -137,10 +135,6 @@ impl Type {
             Type::Universal(_, id) => Ok(*id),
             _ => Err(Error::new(format!("TypeError: expected object or variable type, found {:?}", self))),
         }
-    }
-
-    pub fn display_vec(list: &Vec<Type>) -> String {
-        list.iter().map(|t| format!("{}", t)).collect::<Vec<String>>().join(", ")
     }
 
     pub fn set_id(mut self, newid: NodeID) -> Result<Type, Error> {
@@ -151,6 +145,10 @@ impl Type {
             },
             _ => Err(Error::new(format!("TypeError: expected object when setting ID, found {:?}", self))),
         }
+    }
+
+    pub fn display_vec(list: &Vec<Type>) -> String {
+        list.iter().map(|t| format!("{}", t)).collect::<Vec<String>>().join(", ")
     }
 }
 
@@ -354,7 +352,7 @@ pub fn check_type(session: &Session, odtype: Option<&Type>, octype: Option<&Type
 
 
 fn is_subclass_of(session: &Session, sdef: (&String, UniqueID, &Vec<Type>), pdef: (&String, UniqueID, &Vec<Type>), mode: Check, update: bool) -> Result<Type, Error> {
-    debug!("IS SUBCLASS: {:?} of {:?}", sdef, pdef);
+    //debug!("IS SUBCLASS: {:?} of {:?}", sdef, pdef);
     let mut names = Type::map_new();
     let mut sdef = (sdef.0.clone(), sdef.1, sdef.2.clone());
     //let mut deftype = session.get_type(sdef.1)?.get_params()?;
@@ -374,7 +372,7 @@ fn is_subclass_of(session: &Session, sdef: (&String, UniqueID, &Vec<Type>), pdef
                 vec!()
             };
             let rtype = Type::Object(sdef.0, sdef.1, ptypes);
-            debug!("DONE SUBCLASS: {:?}", rtype);
+            //debug!("DONE SUBCLASS: {:?}", rtype);
             return Ok(rtype);
         }
 

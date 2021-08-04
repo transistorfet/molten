@@ -18,24 +18,24 @@ pub type TypeAliasDefRef = Rc<TypeAliasDef>;
 
 
 impl TypeAliasDef {
-    pub fn new(id: NodeID, deftype: Type) -> Self {
+    pub fn new(defid: NodeID, deftype: Type) -> Self {
         Self {
-            id: id,
+            id: defid,
             deftype: deftype,
         }
     }
 
-    pub fn new_ref(id: NodeID, deftype: Type) -> TypeAliasDefRef {
-        Rc::new(Self::new(id, deftype))
+    pub fn new_ref(defid: NodeID, deftype: Type) -> TypeAliasDefRef {
+        Rc::new(Self::new(defid, deftype))
     }
 
     #[must_use]
-    pub fn define(session: &Session, scope: ScopeRef, id: NodeID, deftype: Type, aliastype: Type) -> Result<TypeAliasDefRef, Error> {
+    pub fn define(session: &Session, scope: ScopeRef, defid: NodeID, deftype: Type, aliastype: Type) -> Result<TypeAliasDefRef, Error> {
         let name = deftype.get_name()?;
-        scope.define_type(name, id)?;
-        let typealiasdef = Self::new_ref(id, deftype);
-        session.set_def(id, Def::TypeAlias(typealiasdef.clone()));
-        session.set_type(id, aliastype);
+        scope.define_type(name, defid)?;
+        let typealiasdef = Self::new_ref(defid, deftype);
+        session.set_def(defid, Def::TypeAlias(typealiasdef.clone()));
+        session.set_type(defid, aliastype);
         Ok(typealiasdef)
     }
 

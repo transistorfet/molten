@@ -16,12 +16,12 @@ pub struct AnyFunc();
 
 impl AnyFunc {
     #[must_use]
-    pub fn define(session: &Session, scope: ScopeRef, id: NodeID, vis: Visibility, name: &str, abi: ABI, ttype: Option<Type>) -> Result<Def, Error> {
+    pub fn define(session: &Session, scope: ScopeRef, defid: NodeID, vis: Visibility, name: &str, abi: ABI, ttype: Option<Type>) -> Result<Def, Error> {
         match abi {
             ABI::C => {
                 match scope.get_context() {
                     Context::Global | Context::Block | Context::Func(_, _) =>
-                        CFuncDef::define(session, scope.clone(), id, vis, name, ttype),
+                        CFuncDef::define(session, scope.clone(), defid, vis, name, ttype),
                     _ =>
                         return Err(Error::new(format!("DefError: cannot declare a C ABI function within a class body"))),
                 }
@@ -29,11 +29,11 @@ impl AnyFunc {
             ABI::Molten => {
                 match scope.get_context() {
                     Context::Class(_) if vis != Visibility::Anonymous =>
-                        MethodDef::define(session, scope.clone(), id, vis, name, ttype),
+                        MethodDef::define(session, scope.clone(), defid, vis, name, ttype),
                     Context::TraitImpl(_, _) =>
-                        TraitFuncDef::define(session, scope.clone(), id, vis, name, ttype),
+                        TraitFuncDef::define(session, scope.clone(), defid, vis, name, ttype),
                     _ =>
-                        ClosureDef::define(session, scope.clone(), id, vis, name, ttype),
+                        ClosureDef::define(session, scope.clone(), defid, vis, name, ttype),
                 }
             },
             _ => return Err(Error::new(format!("DefError: unsupported ABI {:?}", abi))),
@@ -41,19 +41,19 @@ impl AnyFunc {
     }
 
     #[must_use]
-    pub fn set_func_def(session: &Session, scope: ScopeRef, id: NodeID, vis: Visibility, name: &str, def: Def, ttype: Option<Type>) -> Result<(), Error> {
-        session.set_def(id, def.clone());
+    pub fn set_func_def(session: &Session, scope: ScopeRef, defid: NodeID, vis: Visibility, name: &str, def: Def, ttype: Option<Type>) -> Result<(), Error> {
+        session.set_def(defid, def.clone());
 
         if let Some(ttype) = &ttype {
-            session.update_type(id, ttype)?;
+            session.update_type(defid, ttype)?;
         }
 
         if vis != Visibility::Anonymous {
             let dscope = Scope::target(session, scope.clone());
             if let Some(previd) = dscope.get_var_def(&name) {
-                OverloadDef::define(session, scope.clone(), &name, id, previd, ttype)?;
+                OverloadDef::define(session, scope.clone(), &name, defid, previd, ttype)?;
             } else {
-                dscope.define(name, id)?;
+                dscope.define(name, defid)?;
             }
         }
         Ok(())
@@ -86,24 +86,24 @@ impl OverloadDef {
     }
 
     #[must_use]
-    pub fn define(session: &Session, scope: ScopeRef, name: &str, id: NodeID, previd: NodeID, _ttype: Option<Type>) -> Result<(), Error> {
+    pub fn define(session: &Session, scope: ScopeRef, name: &str, variant_id: NodeID, previd: NodeID, _ttype: Option<Type>) -> Result<(), Error> {
         let dscope = Scope::target(session, scope.clone());
 
         if dscope.contains_local(&name) {
             match session.get_def(previd) {
                 Ok(Def::Overload(prev)) => {
-                    prev.add_variant(session, id);
+                    prev.add_variant(session, variant_id);
                 },
                 Ok(Def::Method(_)) |
                 Ok(Def::TraitFunc(_)) |
                 Ok(Def::Closure(_)) => {
-                    let defid = OverloadDef::create(session, None, vec!(previd, id));
+                    let defid = OverloadDef::create(session, None, vec!(previd, variant_id));
                     dscope.set_var_def(&name, defid);
                 },
                 _ => return Err(Error::new(format!("NameError: unable to overload {} because of a previous definitions", name)))
             }
         } else {
-            let defid = OverloadDef::create(session, Some(previd), vec!(id));
+            let defid = OverloadDef::create(session, Some(previd), vec!(variant_id));
             dscope.define(name, defid)?;
         }
         Ok(())
@@ -194,7 +194,7 @@ pub struct ClosureDef {
 pub type ClosureDefRef = Rc<ClosureDef>;
 
 impl ClosureDef {
-    pub fn create(session: &Session, scope: ScopeRef, id: NodeID, vis: Visibility) -> Result<Def, Error> {
+    pub fn create(session: &Session, scope: ScopeRef, defid: NodeID, vis: Visibility) -> Result<Def, Error> {
         let context_type_id = NodeID::generate();
         // TODO the context and name are incorrect here
         let structdef = StructDef::new_ref(Scope::new_ref("", Context::Block, Some(scope.clone())));
@@ -211,7 +211,7 @@ impl ClosureDef {
             //context_builder: RefCell::new(vec![]),
         }));
 
-        if let Some(fscope) = session.map.get(id) {
+        if let Some(fscope) = session.map.get(defid) {
             session.set_def(context_type_id, Def::Struct(structdef));
             fscope.define("__context_type__", context_type_id)?;
             session.set_type(context_type_id, Type::Object("__context_type__".to_string(), context_type_id, vec!()));
@@ -220,9 +220,9 @@ impl ClosureDef {
     }
 
     #[must_use]
-    pub fn define(session: &Session, scope: ScopeRef, id: NodeID, vis: Visibility, name: &str, ttype: Option<Type>) -> Result<Def, Error> {
-        let def = ClosureDef::create(session, scope.clone(), id, vis)?;
-        AnyFunc::set_func_def(session, scope, id, vis, name, def.clone(), ttype)?;
+    pub fn define(session: &Session, scope: ScopeRef, defid: NodeID, vis: Visibility, name: &str, ttype: Option<Type>) -> Result<Def, Error> {
+        let def = ClosureDef::create(session, scope.clone(), defid, vis)?;
+        AnyFunc::set_func_def(session, scope, defid, vis, name, def.clone(), ttype)?;
         Ok(def)
     }
 
@@ -253,18 +253,18 @@ pub type MethodDefRef = Rc<MethodDef>;
 
 impl MethodDef {
     #[must_use]
-    pub fn define(session: &Session, scope: ScopeRef, id: NodeID, vis: Visibility, name: &str, ttype: Option<Type>) -> Result<Def, Error> {
-        let closure = match ClosureDef::create(session, scope.clone(), id, vis) {
+    pub fn define(session: &Session, scope: ScopeRef, defid: NodeID, vis: Visibility, name: &str, ttype: Option<Type>) -> Result<Def, Error> {
+        let closure = match ClosureDef::create(session, scope.clone(), defid, vis) {
             Ok(Def::Closure(cl)) => cl,
             result @ _ => return result,
         };
 
         let def = Def::Method(Rc::new(MethodDef {
             closure: closure,
-            id: id,
+            id: defid,
         }));
 
-        AnyFunc::set_func_def(session, scope, id, vis, name, def.clone(), ttype)?;
+        AnyFunc::set_func_def(session, scope, defid, vis, name, def.clone(), ttype)?;
         Ok(def)
     }
 }
@@ -283,8 +283,8 @@ pub type TraitFuncDefRef = Rc<TraitFuncDef>;
 
 impl TraitFuncDef {
     #[must_use]
-    pub fn define(session: &Session, scope: ScopeRef, id: NodeID, vis: Visibility, name: &str, ttype: Option<Type>) -> Result<Def, Error> {
-        let closure = match ClosureDef::create(session, scope.clone(), id, vis) {
+    pub fn define(session: &Session, scope: ScopeRef, impl_func_id: NodeID, vis: Visibility, name: &str, ttype: Option<Type>) -> Result<Def, Error> {
+        let closure = match ClosureDef::create(session, scope.clone(), impl_func_id, vis) {
             Ok(Def::Closure(cl)) => cl,
             result => return result,
         };
@@ -298,11 +298,11 @@ impl TraitFuncDef {
             closure: closure,
             trait_id,
             impl_id,
-            impl_func_id: id,
+            impl_func_id,
             def_func_id: RefCell::new(None),
         }));
 
-        AnyFunc::set_func_def(session, scope, id, vis, name, def.clone(), ttype)?;
+        AnyFunc::set_func_def(session, scope, impl_func_id, vis, name, def.clone(), ttype)?;
         Ok(def)
     }
 
@@ -323,20 +323,20 @@ pub type CFuncDefRef = Rc<CFuncDef>;
 
 impl CFuncDef {
     #[must_use]
-    pub fn define(session: &Session, scope: ScopeRef, id: NodeID, vis: Visibility, name: &str, ttype: Option<Type>) -> Result<Def, Error> {
+    pub fn define(session: &Session, scope: ScopeRef, defid: NodeID, vis: Visibility, name: &str, ttype: Option<Type>) -> Result<Def, Error> {
         if vis == Visibility::Anonymous {
             return Err(Error::new(format!("NameError: C ABI function declared without a name")));
         }
 
         let def = Def::CFunc(Rc::new(CFuncDef {
-            id: id,
+            id: defid,
             vis: vis,
         }));
 
-        scope.define(name, id)?;
-        session.set_def(id, def.clone());
+        scope.define(name, defid)?;
+        session.set_def(defid, def.clone());
         if let Some(ttype) = ttype {
-            session.set_type(id, ttype);
+            session.set_type(defid, ttype);
         }
         Ok(def)
     }

@@ -703,9 +703,9 @@ impl<'sess> Transformer<'sess> {
 
         match &pat.kind {
             PatKind::Wild => exprs.push(LLExpr::Literal(LLLit::I1(true))),
-            PatKind::Literal(lit) => {
-                let compfunc = self.transform_as_result(&mut exprs, &Expr::new_with_id(pat.id, Pos::empty(), ExprKind::Identifier("==".to_string())));
-                let compabi = self.session.get_type(pat.id).unwrap().get_abi().unwrap();
+            PatKind::Literal(lit, fid) => {
+                let compfunc = self.transform_as_result(&mut exprs, &Expr::new_with_id(*fid, Pos::empty(), ExprKind::Identifier("==".to_string())));
+                let compabi = self.session.get_type(*fid).unwrap().get_abi().unwrap();
                 let result = LLExpr::Literal(self.transform_lit(lit));
                 exprs.extend(self.create_func_invoke(compabi, compfunc, vec!(LLExpr::GetValue(value_id), result)));
             },

@@ -3,7 +3,7 @@ use std::cell::RefCell;
 
 use crate::abi::ABI;
 use crate::types::Type;
-use crate::ast::{ Pos, AST };
+use crate::ast::{ Pos, RawArgument, AST };
 use crate::misc::{ r, UniqueID };
 use crate::session::{ Session, Error };
 use crate::hir::{ NodeID, Visibility, Mutability, AssignType, Literal, Argument, MatchCase, EnumVariant, Function, WhereClause, Pattern, Expr, ExprKind };
@@ -109,6 +109,8 @@ impl<'sess> Refinery<'sess> {
                 } else {
                     Visibility::Private
                 };
+
+                let args = args.into_iter().map(|arg| Argument::new(arg.pos, arg.name, arg.ttype)).collect();
 
                 let id = NodeID::generate();
                 let name = name.unwrap_or(format!("anon{}", id));
@@ -382,7 +384,7 @@ impl<'sess> Refinery<'sess> {
                 }
             }
 
-            let iargs = vec!(Argument::new(pos, "self".to_string(), None, None));
+            let iargs = vec!(RawArgument::new(pos, "self".to_string(), None));
             if let Some(parenttype) = parenttype.as_ref() {
                 init.insert(0, AST::Invoke(pos,
                     r(AST::make_resolve_ident(pos, parenttype.get_name()?.to_string(), "__init__")),
@@ -422,12 +424,7 @@ impl<'sess> Refinery<'sess> {
                 AST::Function(pos, _vis, name, args, ret, body, abi, whereclause) if name.is_some() => {
                     let vis = Visibility::Public;
                     let name = name.ok_or(Error::new("SyntaxError: anonymous functions are not allowed in trait implementations".to_string()))?;
-
-                    let body = self.with_context(CodeContext::Func(abi), || {
-                        Ok(self.refine_vec(body))
-                    })?;
-
-                    trait_body.push(Expr::make_func(pos, Function::new(vis, name, args, ret, body, abi, whereclause)));
+                    trait_body.push(self.refine_node(AST::Function(pos, vis, Some(name), args, ret, body, abi, whereclause))?);
                 },
                 node => return Err(Error::new(format!("SyntaxError: only functions are allowed in trait impls, found {:?}", node))),
             }
