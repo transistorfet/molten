@@ -624,10 +624,10 @@ impl<'sess> Transformer<'sess> {
     }
 
     pub fn transform_resolve(&mut self, id: NodeID, _path: &Expr, _field: &str, object_id: NodeID) -> Vec<LLExpr> {
-        let defid = self.session.get_ref(id).unwrap();
+        let field_id = self.session.get_ref(id).unwrap();
         match self.session.get_def(object_id).unwrap() {
-            Def::Class(classdef) => self.transform_class_resolve_method(classdef, defid),
-            Def::Enum(enumdef) => self.transform_enum_resolve(id, enumdef, defid),
+            Def::Class(classdef) => self.transform_class_resolve_method(classdef, field_id),
+            Def::Enum(enumdef) => self.transform_enum_resolve_constructor(enumdef, field_id),
             def => panic!("DefError: expected class or enum but found {:?}", def),
         }
     }

@@ -27,9 +27,8 @@ impl<'sess> Transformer<'sess> {
 
     pub fn transform_trait_impl(&mut self, id: NodeID, body: &Vec<Expr>) -> Vec<LLExpr> {
         let impl_id = self.session.get_ref(id).unwrap();
-        let defid = self.session.get_ref(impl_id).unwrap();
-        let traitdef = self.session.get_def(defid).unwrap().as_trait_def().unwrap();
         let traitimpl = self.session.get_def(impl_id).unwrap().as_trait_impl().unwrap();
+        let traitdef = self.session.get_def(traitimpl.trait_id).unwrap().as_trait_def().unwrap();
 
         // The trait def type has already been set, and the type of the impl's vtable should be identical to the type of the def's vtable
         self.set_type(traitimpl.vtable.id, self.get_type(traitdef.vtable.id).unwrap());

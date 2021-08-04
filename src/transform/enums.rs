@@ -71,12 +71,12 @@ impl<'sess> Transformer<'sess> {
         self.set_type(id, LLType::Alias(id));
     }
 
-    pub fn transform_enum_resolve(&mut self, id: NodeID, enumdef: EnumDefRef, field_id: NodeID) -> Vec<LLExpr> {
+    pub fn transform_enum_resolve_constructor(&mut self, enumdef: EnumDefRef, field_id: NodeID) -> Vec<LLExpr> {
         match enumdef.get_variant_type_by_id(field_id) {
             Some(_) => vec!(LLExpr::GetValue(field_id)),
             None => {
                 let variant = enumdef.get_variant_by_id(field_id).unwrap();
-                vec!(LLExpr::Cast(LLType::Alias(enumdef.id), r(LLExpr::DefStruct(id, self.get_type(field_id).unwrap(), vec!(LLExpr::Literal(LLLit::I8(variant as i8)))))))
+                vec!(LLExpr::Cast(LLType::Alias(enumdef.id), r(LLExpr::DefStruct(NodeID::generate(), self.get_type(field_id).unwrap(), vec!(LLExpr::Literal(LLLit::I8(variant as i8)))))))
             },
         }
     }
