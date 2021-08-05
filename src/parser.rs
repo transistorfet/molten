@@ -143,6 +143,7 @@ named!(terminator(Span) -> Option<AST>,
 
 named!(statement(Span) -> AST,
     alt!(
+        complete!(module) |
         complete!(import) |
         complete!(class) |
         complete!(typealias) |
@@ -154,6 +155,15 @@ named!(statement(Span) -> AST,
         complete!(definition) |
         complete!(assignment) |
         complete!(expression)
+    )
+);
+
+named!(module(Span) -> AST,
+    do_parse!(
+        pos: position!() >>
+        wscom!(tag_word!("module")) >>
+        e: recognize!(separated_list0!(tag!("."), identifier)) >>
+        (AST::ModuleDecl(Pos::new(pos), ident_from_span(&e)))
     )
 );
 

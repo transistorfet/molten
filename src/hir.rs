@@ -146,6 +146,7 @@ pub enum ExprKind {
     Assignment(R<Expr>, R<Expr>, AssignType),
 
     Module(String, R<Expr>, NodeID),
+    ModuleDecl(String),
 }
 
 impl Argument {
@@ -415,6 +416,11 @@ impl Expr {
     #[allow(dead_code)]
     pub fn make_module(name: String, code: Expr) -> Expr {
         Expr { id: NodeID::generate(), pos: Pos::empty(), kind: ExprKind::Module(name, r(code), NodeID::generate()) }
+    }
+
+    #[allow(dead_code)]
+    pub fn make_module_decl(pos: Pos, name: String) -> Expr {
+        Expr { id: NodeID::generate(), pos: pos, kind: ExprKind::ModuleDecl(name) }
     }
 
 

@@ -6,6 +6,7 @@ use crate::types::Type;
 use crate::ast::{ Pos, RawArgument, AST };
 use crate::misc::{ r, UniqueID };
 use crate::session::{ Session, Error };
+use crate::defs::modules::{ ModuleDef };
 use crate::hir::{ NodeID, Visibility, Mutability, AssignType, Literal, Argument, MatchCase, EnumVariant, Function, WhereClause, Pattern, Expr, ExprKind };
 
 
@@ -53,8 +54,8 @@ impl<'sess> Refinery<'sess> {
     }
 
     pub fn refine_module(&self, code: Vec<AST>) -> Vec<Expr> {
-        let module_name = self.session.name.replace(".", "_");
-        let memo = format!("memo.{}", module_name);
+        let module_name = ModuleDef::get_module_name(&self.session.name);
+        let memo = ModuleDef::get_memo_name(&module_name);
 
         let mut init_code = vec!();
         init_code.push(Expr::make_assign(Pos::empty(), Expr::make_ident_from_str(Pos::empty(), &memo), Expr::make_lit(Literal::Boolean(true)), AssignType::Update));
@@ -68,7 +69,7 @@ impl<'sess> Refinery<'sess> {
             ))
         );
 
-        let module_run_name = format!("run_{}", module_name);
+        let module_run_name = ModuleDef::get_run_name(&module_name);
         let func = Expr::new(Pos::empty(), ExprKind::Function(Function::new(Visibility::Public, module_run_name, vec!(), None, body, ABI::Molten, WhereClause::empty())));
         vec!(Expr::make_module(module_name, func))
     }
@@ -265,6 +266,10 @@ impl<'sess> Refinery<'sess> {
                     },
                     _ => return Err(Error::new(format!("SyntaxError: assignment to to an invalid element: {:?}", left))),
                 }
+            },
+
+            AST::ModuleDecl(pos, name) => {
+                Expr::make_module_decl(pos.clone(), name)
             },
 
             AST::Import(pos, ident, _) => {

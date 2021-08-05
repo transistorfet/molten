@@ -193,6 +193,10 @@ pub trait Visitor: Sized {
         self.visit_node(code)
     }
 
+    fn visit_module_decl(&mut self, _id: NodeID, _name: &str) -> Result<Self::Return, Error> {
+        Ok(self.default_return())
+    }
+
 
     fn visit_pattern_binding(&mut self, _id: NodeID, _name: &str) -> Result<Self::Return, Error> {
         Ok(self.default_return())
@@ -494,6 +498,10 @@ pub fn walk_node<R, V: Visitor<Return = R>>(visitor: &mut V, node: &Expr) -> Res
 
         ExprKind::Module(name, code, memo_id) => {
             visitor.visit_module(node.id, name, code, *memo_id)
+        },
+
+        ExprKind::ModuleDecl(name) => {
+            visitor.visit_module_decl(node.id, name)
         },
     }
 }

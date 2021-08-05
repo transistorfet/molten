@@ -65,6 +65,7 @@ pub enum AST {
     TraitDef(Pos, String, Vec<AST>),
     TraitImpl(Pos, String, Type, Vec<AST>),
 
+    ModuleDecl(Pos, String),
     Import(Pos, String, Vec<AST>),
     Definition(Pos, Mutability, String, Option<Type>, R<AST>),
     Assignment(Pos, R<AST>, R<AST>, AssignType),

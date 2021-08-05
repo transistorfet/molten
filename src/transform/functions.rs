@@ -7,12 +7,13 @@ use crate::types::Type;
 use crate::ast::{ Pos };
 use crate::hir::{ NodeID, Visibility, Mutability, Argument, Function, Expr, ExprKind };
 use crate::defs::Def;
+use crate::scope::ScopeMapRef;
 use crate::visitor::{ Visitor };
 
 use crate::misc::{ r };
 use crate::transform::transform::{ Transformer, CodeContext };
 use crate::transform::classes::{ StructTransform };
-use crate::llvm::llcode::{ LLType, LLLink, LLCC, LLExpr, LLGlobal };
+use crate::llvm::llcode::{ LLType, LLLink, LLRef, LLCC, LLExpr, LLGlobal };
 
 
 impl<'sess> Transformer<'sess> {
@@ -308,6 +309,35 @@ impl ClosureTransform {
         exprs.push(LLExpr::CallC(r(LLExpr::GetItem(r(LLExpr::GetValue(fobj_id)), 0)), fargs, LLCC::FastCC));
 
         exprs
+    }
+
+    pub fn check_convert_closure_reference(transform: &mut Transformer, defid: NodeID, name: &str) -> Option<Vec<LLExpr>> {
+        let scope = transform.stack.get_scope();
+        if
+            !scope.contains_context(name)
+            // TODO this should really check if get_var_def is the same as defid (not just that it exists), but because of overloading, this isn't true and causes a segfault
+            && transform.session.map.get(ScopeMapRef::GLOBAL).unwrap().get_var_def(name).is_none()
+            && !transform.session.get_def(defid).unwrap().is_globally_accessible()
+        {
+            match transform.get_context() {
+                Some(CodeContext::Func(ABI::Molten, cid)) => {
+                    let cl = transform.session.get_def(cid).unwrap().as_closure().unwrap();
+                    if cid == defid {
+                        //vec!(LLExpr::Cast(LLType::Alias(cl.context_type_id), r(LLExpr::GetValue(cl.context_arg_id))))
+                        Some(vec!(ClosureTransform::make_closure_value(transform, NodeID::generate(), cl.compiled_func_id, LLExpr::GetValue(cl.context_arg_id))))
+                    } else {
+                        let field_id = NodeID::generate();
+                        transform.session.set_ref(field_id, defid);
+                        let index = cl.find_or_add_field(transform.session, field_id, name, &transform.session.get_type(defid).unwrap());
+                        let context = LLExpr::Cast(LLType::Alias(cl.context_type_id), r(LLExpr::GetValue(cl.context_arg_id)));
+                        Some(vec!(LLExpr::LoadRef(r(LLExpr::AccessRef(r(context), vec!(LLRef::Field(index)))))))
+                    }
+                },
+                _ => panic!("Cannot access variable outside of scope: {:?}", name),
+            }
+        } else {
+            None
+        }
     }
 }
 

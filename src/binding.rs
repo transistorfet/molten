@@ -12,6 +12,7 @@ use crate::defs::functions::{ AnyFunc };
 use crate::defs::types::TypeAliasDef;
 use crate::defs::variables::{ AnyVar, VarDef, ArgDef };
 use crate::defs::traits::{ TraitDef, TraitImpl };
+use crate::defs::modules::{ ModuleDef };
 
 use crate::visitor::{ self, Visitor, ScopeStack };
 
@@ -62,7 +63,7 @@ impl<'sess> Visitor for NameBinder<'sess> {
     fn visit_module(&mut self, _id: NodeID, name: &str, code: &Expr, memo_id: NodeID) -> Result<Self::Return, Error> {
         let scope = self.stack.get_scope();
 
-        let memo_name = format!("memo.{}", name);
+        let memo_name = ModuleDef::get_memo_name(name);
         VarDef::define(self.session, scope.clone(), memo_id, Mutability::Mutable, &memo_name, Some(scope.find_type(self.session, "Bool")?.clone()))?;
 
         self.visit_node(code)?;

@@ -5,14 +5,14 @@
 * add common constants for various context and vtable strings throughout, instead of dupilcating strings
 * we currently aren't exporting enums
 * add a check to make sure trait defs are all ABI::Molten
-* settle the issue with using typealiases for Self in traitdef and impldef (not sure which way I want to go yet)
 * you need to add where clauses to enums, traits as well?? what about annotate or def
-* can you but a validation stage in that can check for overloading at the end of type checking rather than during.  Trait impl checking can be moved there too
-  but this might not be possible because you need to bind references during type checking, and you can't do that without all the variants
 
 * can you make closure conversion a separate stage somehow, possibly with a MutVisitor
 * can you make an exception conversion mut visitor? to add the execption argument to everything
+* can you but a validation stage in that can check for overloading at the end of type checking rather than during.  Trait impl checking can be moved there too
+  but this might not be possible because you need to bind references during type checking, and you can't do that without all the variants
 
+* check that: classes and their parents should be able to have different numbers of type params
 * write a test for impl TraitTest for 'a { } which always returns a bool
 * also try trait TraitTest for List<'a>
 * make sure trait functions can be called via :: resolve, with the first arg passed in
@@ -30,9 +30,6 @@ BUGS:
 * there's a possible issue with closure reference conversion, where you only check if the name exists in the global scope, but not if it's the same definition.  It's
   possible there could be a different variable with the same name declared in the global scope causing the local one to not be converted into a context access.  But
   right now, because of overloading, the def will be a specific function, and the stored scope def will be the overloaded def that contains all the possible specific impls
-
-TO CHECK:
-* classes and their parents should be able to have different numbers of type params
 
 
 * add tests for traits
@@ -54,7 +51,6 @@ TO CHECK:
 * can you split AST and Expr pattern matching to make the expr stuff easier to use?  The identifier and resolve patterns are kind of clunky and there's a syntax error in bindings which
   should be in refinery if possible
 * when you had a match expr but the enum def name was left out, or was incorrect, I was getting a parse error, which totally shouldn't happen.  It should give some othe kind of error
-* can we change the way types are stored in expr? I want to get rid of the mut bind_type_names stuff somehow, and it'd be nice to not have types in Expr at all
 * reduce the number of clone()s
 * implement the record and tuple pattern matching
 

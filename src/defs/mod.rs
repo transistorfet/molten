@@ -9,6 +9,7 @@ pub mod classes;
 pub mod variables;
 pub mod functions;
 pub mod traits;
+pub mod modules;
 
 use crate::defs::enums::{ EnumDefRef };
 use crate::defs::types::{ TypeAliasDefRef };

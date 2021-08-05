@@ -1,5 +1,6 @@
 
 
+//!dec module testsuite_typecheck_infer_forward_method
 //!dec class Test {
 //!dec     decl test\(Test, Int\) -> Int
 //!dec     decl test2\(Test, Int\) -> Int

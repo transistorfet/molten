@@ -5,10 +5,11 @@ use crate::abi::ABI;
 use crate::defs::Def;
 use crate::types::Type;
 use crate::config::Options;
-use crate::scope::{ ScopeRef, ScopeMapRef };
+use crate::scope::{ ScopeRef };
 use crate::session::{ Session, Error };
 use crate::ast::{ Pos };
 use crate::hir::{ NodeID, Visibility, Mutability, AssignType, Literal, MatchCase, EnumVariant, WhereClause, Function, Pattern, PatKind, Expr, ExprKind };
+use crate::defs::modules::ModuleDef;
 
 use crate::misc::{ r };
 use crate::transform::functions::{ ClosureTransform };
@@ -94,15 +95,6 @@ impl<'sess> Transformer<'sess> {
         self.expoints.pop();
         ret
     }
-
-    /*
-    pub fn with_scope<F, R>(&mut self, scope: ScopeRef, f: F) -> R where F: FnOnce(&mut Self) -> R {
-        self.stack.push_scope(scope);
-        let ret = f(self);
-        self.stack.pop_scope();
-        ret
-    }
-    */
 
     pub fn get_exception(&self) -> Option<NodeID> {
         self.expoints.last().map(|e| *e)
@@ -304,6 +296,10 @@ impl<'sess> Visitor for Transformer<'sess> {
         Ok(self.transform_module(id, name, code, memo_id))
     }
 
+    fn visit_module_decl(&mut self, _id: NodeID, name: &str) -> Result<Self::Return, Error> {
+        Ok(self.transform_module_decl(name))
+    }
+
     /*
     fn visit_pattern_binding(&mut self, _id: NodeID, _name: &str) -> Result<Self::Return, Error> {
         Ok(self.default_return())
@@ -354,7 +350,7 @@ impl<'sess> Transformer<'sess> {
 
     pub fn transform_module(&mut self, _id: NodeID, name: &str, code: &Expr, memo_id: NodeID) -> Vec<LLExpr> {
         // Define a global that will store whether we've run this function or not
-        let memo_name = format!("memo.{}", name);
+        let memo_name = ModuleDef::get_memo_name(name);
         self.add_global(LLGlobal::DefGlobal(memo_id, LLLink::Once, memo_name, LLType::I1, true));
 
         self.visit_node(code).unwrap()
@@ -372,8 +368,7 @@ impl<'sess> Transformer<'sess> {
         let expoint = self.init_exception_point(&mut main_body, exp_id);
 
         let scope = self.stack.get_scope();
-        // TODO there should be a better way of getting this, even if it's just a method on Session
-        let module_run_name = format!("run_{}", self.session.name.replace(".", "_"));
+        let module_run_name = ModuleDef::get_run_name(&ModuleDef::get_module_name(&self.session.name));
         let run_id = scope.get_var_def(&module_run_name).unwrap();
 
         main_body.extend(init_code);
@@ -476,7 +471,13 @@ impl<'sess> Transformer<'sess> {
         exprs
     }
 
-    pub fn transform_import(&mut self, name: &str, decls: &Vec<Expr>) -> Vec<LLExpr> {
+    pub fn transform_import(&mut self, _name: &str, decls: &Vec<Expr>) -> Vec<LLExpr> {
+        self.with_context(CodeContext::Import, |transform| {
+            transform.visit_vec(decls)
+        }).unwrap()
+    }
+
+    pub fn transform_module_decl(&mut self, name: &str) -> Vec<LLExpr> {
         let mut exprs = vec!();
 
         let defid = NodeID::generate();
@@ -487,7 +488,7 @@ impl<'sess> Transformer<'sess> {
         self.session.set_type(defid, ttype.clone());
         self.set_type(compiled_func_id, lltype.clone());
 
-        let module_run_name = format!("run_{}", name.replace(".", "_"));
+        let module_run_name = ModuleDef::get_run_name(&ModuleDef::get_module_name(name));
         let module_run_name_global = self.transform_func_name(&module_run_name, defid);
         let module_run_name_func = format!("{}_func", module_run_name_global);
         self.add_global(LLGlobal::DeclCFunc(compiled_func_id, module_run_name_func, lltype, LLCC::FastCC));
@@ -498,10 +499,6 @@ impl<'sess> Transformer<'sess> {
 
         exprs.push(LLExpr::SetGlobal(defid, r(ClosureTransform::make_closure_value(self, NodeID::generate(), compiled_func_id, LLExpr::Literal(LLLit::Null(LLType::Ptr(r(LLType::I8))))))));
         exprs.extend(ClosureTransform::create_invoke(self, LLExpr::GetLocal(defid), vec!()));
-
-        self.with_context(CodeContext::Import, |transform| {
-            exprs.extend(transform.visit_vec(decls).unwrap());
-        });
         exprs
     }
 
@@ -511,39 +508,16 @@ impl<'sess> Transformer<'sess> {
             Ok(Def::Var(_)) => vec!(LLExpr::GetLocal(defid)),
             Ok(Def::Closure(_)) => vec!(LLExpr::GetLocal(defid)),
             Ok(_) => vec!(LLExpr::GetValue(defid)),
-            Err(_) => panic!("TransformError: attempting to reference a non-existent value"),
+            Err(_) => panic!("TransformError: attempting to reference a non-existent value with id {:?}", defid),
         }
     }
 
     pub fn transform_reference(&mut self, defid: NodeID, name: &str) -> Vec<LLExpr> {
-        let scope = self.stack.get_scope();
-        if
-            !scope.contains_context(name)
-            // TODO this should really check if get_var_def is the same as defid (not just that it exists), but because of overloading, this isn't true and causes a segfault
-            && self.session.map.get(ScopeMapRef::GLOBAL).unwrap().get_var_def(name).is_none()
-            && !self.session.get_def(defid).unwrap().is_globally_accessible()
-        {
-            match self.get_context() {
-                Some(CodeContext::Func(ABI::Molten, cid)) => {
-                    let cl = self.session.get_def(cid).unwrap().as_closure().unwrap();
-                    if cid == defid {
-                        //vec!(LLExpr::Cast(LLType::Alias(cl.context_type_id), r(LLExpr::GetValue(cl.context_arg_id))))
-                        vec!(ClosureTransform::make_closure_value(self, NodeID::generate(), cl.compiled_func_id, LLExpr::GetValue(cl.context_arg_id)))
-                    } else {
-                        let field_id = NodeID::generate();
-                        self.session.set_ref(field_id, defid);
-                        let index = cl.find_or_add_field(self.session, field_id, name, &self.session.get_type(defid).unwrap());
-                        let context = LLExpr::Cast(LLType::Alias(cl.context_type_id), r(LLExpr::GetValue(cl.context_arg_id)));
-                        vec!(LLExpr::LoadRef(r(LLExpr::AccessRef(r(context), vec!(LLRef::Field(index))))))
-                    }
-                },
-                _ => panic!("Cannot access variable outside of scope: {:?}", name),
-            }
-        } else {
-            self.create_reference(defid)
+        match ClosureTransform::check_convert_closure_reference(self, defid, name) {
+            Some(exprs) => exprs,
+            None => self.create_reference(defid),
         }
     }
-
 
 
     pub fn transform_alloc_ref(&mut self, id: NodeID, value: &Expr) -> Vec<LLExpr> {

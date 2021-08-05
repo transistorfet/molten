@@ -98,9 +98,7 @@ impl TraitImpl {
         let deftype = session.get_type(trait_id).unwrap();
         let name = format!("{}_{}", deftype.get_name()?, impltype.get_name()?);
         let tscope = session.map.get(impl_id).unwrap();
-        // TODO this should be impl_id, and it should be an alias
         TypeAliasDef::define(session, tscope.clone(), NodeID::generate(), Type::Object("Self".to_string(), impl_id, vec!()), impltype.clone())?;
-        //tscope.define_type("Self", impl_id)?;
 
         let vtable = Vtable::create(session, NodeID::generate(), format!("{}_vtable", name.clone()))?;
         let traitimpl = Self::new_ref(impl_id, trait_id, impltype.clone(), vtable);

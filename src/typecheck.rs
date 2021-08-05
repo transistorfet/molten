@@ -461,6 +461,11 @@ impl<'sess> Visitor for TypeChecker<'sess> {
         Ok(scope.find_type(self.session, "()")?)
     }
 
+    fn visit_module_decl(&mut self, _refid: NodeID, _name: &str) -> Result<Self::Return, Error> {
+        let scope = self.stack.get_scope();
+        Ok(scope.find_type(self.session, "()")?)
+    }
+
     fn visit_pattern_wild(&mut self, refid: NodeID) -> Result<Self::Return, Error> {
         Ok(self.get_type_or_new_typevar(refid))
     }
