@@ -150,6 +150,23 @@ impl Type {
     pub fn display_vec(list: &Vec<Type>) -> String {
         list.iter().map(|t| format!("{}", t)).collect::<Vec<String>>().join(", ")
     }
+
+    pub fn display_full(session: &Session, ttype: &Type) -> String {
+        let mut typename = format!("{}", ttype);
+        match ttype {
+            Type::Universal(_, id) | Type::Variable(id) => {
+                let constraints = session.get_constraints(*id);
+                if !constraints.is_empty() {
+                    typename += &format!(" with constraints {}", constraints.iter().map(|t| {
+                        let traitdef = session.get_def(*t).unwrap().as_trait_def().unwrap();
+                        format!("{}", traitdef.deftype.get_name().unwrap())
+                    }).collect::<Vec<String>>().join(", "));
+                }
+            },
+            _ => { },
+        }
+        typename
+    }
 }
 
 
@@ -257,10 +274,10 @@ pub fn check_type(session: &Session, odtype: Option<&Type>, octype: Option<&Type
         // function variants, or making sure overloaded functions definitions don't overlap
         if !update {
             match (&dtype, &ctype) {
-                (Type::Universal(_, _), ntype) |
-                (ntype, Type::Universal(_, _)) if !update => {
+                (Type::Universal(_, id), ntype) |
+                (ntype, Type::Universal(_, id)) if check_trait_constraints(session, *id, ntype) => {
                     return Ok(ntype.clone());
-                }
+                },
                 _ => { },
             }
         }
@@ -344,7 +361,7 @@ pub fn check_type(session: &Session, odtype: Option<&Type>, octype: Option<&Type
             },
 
             _ => {
-                Err(Error::new(format!("TypeError: type mismatch, expected {} but found {}", dtype, ctype)))
+                Err(Error::new(format!("TypeError: type mismatch, expected {} but found {}", Type::display_full(session, &dtype), Type::display_full(session, &ctype))))
             }
         }
     }

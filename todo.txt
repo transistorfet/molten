@@ -1,15 +1,15 @@
 
 * can you remove some of the weirder ref trails (a ref to a ref to a ref), to make things simpler and more predictable? overload variants, enum variants, and traits use them
-* you can maybe store move info in the defs, including the context of the function (Plain, Class Method, Trait Method), and then use that during transform
+* you can maybe store more info in the defs, including the context of the function (Plain, Class Method, Trait Method), and then use that during transform
 * add common constants for various context and vtable strings throughout, instead of dupilcating strings
 * add a check to make sure trait defs are all ABI::Molten
-* you need to add where clauses to enums, traits as well?? what about annotate or def
 
 * can you make closure conversion a separate stage somehow, possibly with a MutVisitor
 * can you make an exception conversion mut visitor? to add the execption argument to everything
 * can you put a validation stage in that can check for overloading at the end of type checking rather than during.  Trait impl checking can be moved there too
   but this might not be possible because you need to bind references during type checking, and you can't do that without all the variants
 
+* there might be an issue with overloading and universal constraints (universals might type equal when check_type(..., update=false)
 * check that: classes and their parents should be able to have different numbers of type params
 * write a test for impl TraitTest for 'a { } which always returns a bool
 * also try trait TraitTest for List<'a>
@@ -17,6 +17,7 @@
   fn (x: 'a, y: 'a) -> 'a where a: Self??? not sure I like this
 * minor issue: when a trait is not implemented, it will produce an unhelpful type error that it expected random variable, but found unimplemented type
 
+* add some way of creating a traitobj using a def or annotation (issues with universals vs variables and mapping typevars; using check_type(..., false) works but might not be correct)
 * should you make a type visitor?
 * do you need to test unification between class and parent class, as well as trait def and impl type?
 

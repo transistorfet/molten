@@ -267,7 +267,7 @@ impl<'sess> Visitor for Transformer<'sess> {
         //Ok(self.default_return())
     }
 
-    fn visit_enum(&mut self, refid: NodeID, enumtype: &Type, _variants: &Vec<EnumVariant>) -> Result<Self::Return, Error> {
+    fn visit_enum(&mut self, refid: NodeID, enumtype: &Type, _whereclause: &WhereClause, _variants: &Vec<EnumVariant>) -> Result<Self::Return, Error> {
         Ok(self.transform_enum_def(refid, enumtype.get_name()?))
     }
 
@@ -276,7 +276,7 @@ impl<'sess> Visitor for Transformer<'sess> {
         Ok(self.transform_trait_def(defid, traitname, body))
     }
 
-    fn visit_trait_impl(&mut self, refid: NodeID, _traitname: &str, _impltype: &Type, body: &Vec<Expr>) -> Result<Self::Return, Error> {
+    fn visit_trait_impl(&mut self, refid: NodeID, _traitname: &str, _impltype: &Type, _whereclause: &WhereClause, body: &Vec<Expr>) -> Result<Self::Return, Error> {
         Ok(self.transform_trait_impl(refid, body))
     }
 
@@ -467,6 +467,8 @@ impl<'sess> Transformer<'sess> {
         let defid = self.session.get_ref(refid).unwrap();
         let mut exprs = vec!();
         let valexpr = self.transform_as_result(&mut exprs, value);
+        //let ttype = self.session.get_type(defid).unwrap();
+        //let valexpr = self.check_transform_to_trait(&mut exprs, &ttype, value);
         exprs.extend(self.create_def_local(defid, name, valexpr));
         exprs
     }

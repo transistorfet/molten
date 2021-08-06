@@ -51,7 +51,7 @@ pub fn walk_mut_node<V: MutVisitor>(visitor: &mut V, node: &mut Expr) {
         ExprKind::Declare(_, _, _, _) => { },
         ExprKind::AllocObject(_) => { },
         ExprKind::TypeAlias(_, _) => { },
-        ExprKind::Enum(_, _) => { },
+        ExprKind::Enum(_, _, _) => { },
         ExprKind::TraitDef(_, _) => { },
         ExprKind::ModuleDecl(_) => { },
 
@@ -69,7 +69,7 @@ pub fn walk_mut_node<V: MutVisitor>(visitor: &mut V, node: &mut Expr) {
         ExprKind::Tuple(body) |
         ExprKind::Block(body) |
         ExprKind::SideEffect(_, body) |
-        ExprKind::TraitImpl(_, _, body) |
+        ExprKind::TraitImpl(_, _, _, body) |
         ExprKind::Import(_, body) => {
             visitor.visit_vec(body);
         },

@@ -252,10 +252,11 @@ named!(typeenum(Span) -> AST,
         pos: position!() >>
         wscom!(tag_word!("enum")) >>
         t: type_object >>
+        w: opt_where_clause >>
         wscom!(tag!("=")) >>
         wscom!(opt!(tag!("|"))) >>
         ev: separated_list0!(complete!(wscom!(tag!("|"))), enum_variant) >>
-        (AST::Enum(Pos::new(pos), t, ev))
+        (AST::Enum(Pos::new(pos), t, w, ev))
     )
 );
 
@@ -289,12 +290,13 @@ named!(traitimpl(Span) -> AST,
         n: identifier >>
         wscom!(tag_word!("for")) >>
         t: type_description >>
+        w: opt_where_clause >>
         wscom!(tag!("{")) >>
         b: many0!(wscom!(
             function
         )) >>
         return_error!(ErrorKind::Tag /*ErrorKind::Custom(ERR_IN_CLASS) */, tag!("}")) >>
-        (AST::TraitImpl(Pos::new(pos), n, t, b))
+        (AST::TraitImpl(Pos::new(pos), n, t, w, b))
     )
 );
 

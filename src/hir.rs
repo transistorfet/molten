@@ -137,9 +137,9 @@ pub enum ExprKind {
     AllocObject(Type),
     Class(Type, Option<Type>, WhereClause, Vec<Expr>),
     TypeAlias(Type, Type),
-    Enum(Type, Vec<EnumVariant>),
+    Enum(Type, WhereClause, Vec<EnumVariant>),
     TraitDef(String, Vec<Expr>),
-    TraitImpl(String, Type, Vec<Expr>),
+    TraitImpl(String, Type, WhereClause, Vec<Expr>),
 
     Import(String, Vec<Expr>),
     Definition(Mutability, String, Option<Type>, R<Expr>),
@@ -399,8 +399,8 @@ impl Expr {
     }
 
     #[allow(dead_code)]
-    pub fn make_enum(pos: Pos, enumtype: Type, variants: Vec<EnumVariant>) -> Expr {
-        Expr { id: NodeID::generate(), pos: pos, kind: ExprKind::Enum(enumtype, variants) }
+    pub fn make_enum(pos: Pos, enumtype: Type, whereclause: WhereClause, variants: Vec<EnumVariant>) -> Expr {
+        Expr { id: NodeID::generate(), pos: pos, kind: ExprKind::Enum(enumtype, whereclause, variants) }
     }
 
     #[allow(dead_code)]
@@ -409,8 +409,8 @@ impl Expr {
     }
 
     #[allow(dead_code)]
-    pub fn make_trait_impl(pos: Pos, traitname: String, impltype: Type, body: Vec<Expr>) -> Expr {
-        Expr { id: NodeID::generate(), pos: pos, kind: ExprKind::TraitImpl(traitname, impltype, body) }
+    pub fn make_trait_impl(pos: Pos, traitname: String, impltype: Type, whereclause: WhereClause, body: Vec<Expr>) -> Expr {
+        Expr { id: NodeID::generate(), pos: pos, kind: ExprKind::TraitImpl(traitname, impltype, whereclause, body) }
     }
 
     #[allow(dead_code)]

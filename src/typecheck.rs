@@ -348,7 +348,7 @@ impl<'sess> Visitor for TypeChecker<'sess> {
         Ok(rtype)
     }
 
-    fn visit_enum(&mut self, _refid: NodeID, _enumtype: &Type, _variants: &Vec<EnumVariant>) -> Result<Self::Return, Error> {
+    fn visit_enum(&mut self, _refid: NodeID, _enumtype: &Type, _whereclause: &WhereClause, _variants: &Vec<EnumVariant>) -> Result<Self::Return, Error> {
         let scope = self.stack.get_scope();
         Ok(scope.find_type(self.session, "()")?)
     }
@@ -364,7 +364,7 @@ impl<'sess> Visitor for TypeChecker<'sess> {
         Ok(scope.find_type(self.session, "()")?)
     }
 
-    fn visit_trait_impl(&mut self, refid: NodeID, _traitname: &str, _impltype: &Type, body: &Vec<Expr>) -> Result<Self::Return, Error> {
+    fn visit_trait_impl(&mut self, refid: NodeID, _traitname: &str, _impltype: &Type, _whereclause: &WhereClause, body: &Vec<Expr>) -> Result<Self::Return, Error> {
         let impl_id = self.session.get_ref(refid)?;
 
         // TODO this gets the impl-specific tscope and not the trait def tscope

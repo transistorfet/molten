@@ -164,7 +164,7 @@ pub trait Visitor: Sized {
         Ok(self.default_return())
     }
 
-    fn visit_enum(&mut self, _id: NodeID, _enumtype: &Type, _variants: &Vec<EnumVariant>) -> Result<Self::Return, Error> {
+    fn visit_enum(&mut self, _id: NodeID, _enumtype: &Type, _whereclause: &WhereClause, _variants: &Vec<EnumVariant>) -> Result<Self::Return, Error> {
         Ok(self.default_return())
     }
 
@@ -172,7 +172,7 @@ pub trait Visitor: Sized {
         self.visit_vec(body)
     }
 
-    fn visit_trait_impl(&mut self, _id: NodeID, _traitname: &str, _impltype: &Type, body: &Vec<Expr>) -> Result<Self::Return, Error> {
+    fn visit_trait_impl(&mut self, _id: NodeID, _traitname: &str, _impltype: &Type, _whereclause: &WhereClause, body: &Vec<Expr>) -> Result<Self::Return, Error> {
         self.visit_vec(body)
     }
 
@@ -471,16 +471,16 @@ pub fn walk_node<R, V: Visitor<Return = R>>(visitor: &mut V, node: &Expr) -> Res
             visitor.visit_type_alias(node.id, deftype, ttype)
         },
 
-        ExprKind::Enum(enumtype, variants) => {
-            visitor.visit_enum(node.id, enumtype, variants)
+        ExprKind::Enum(enumtype, whereclause, variants) => {
+            visitor.visit_enum(node.id, enumtype, whereclause, variants)
         },
 
         ExprKind::TraitDef(traitname, body) => {
             visitor.visit_trait_def(node.id, traitname, body)
         },
 
-        ExprKind::TraitImpl(traitname, impltype, body) => {
-            visitor.visit_trait_impl(node.id, traitname, impltype, body)
+        ExprKind::TraitImpl(traitname, impltype, whereclause, body) => {
+            visitor.visit_trait_impl(node.id, traitname, impltype, whereclause, body)
         },
 
 

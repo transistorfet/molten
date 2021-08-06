@@ -198,9 +198,9 @@ impl<'sess> Refinery<'sess> {
                 Expr::make_record_update(pos, self.refine_node(*record)?, refined)
             },
 
-            AST::Enum(pos, enumtype, variants) => {
+            AST::Enum(pos, enumtype, whereclause, variants) => {
                 let variants = variants.into_iter().map(|(pos, ident, ttype)| EnumVariant::new(pos, ident, ttype)).collect();
-                Expr::make_enum(pos, enumtype, variants)
+                Expr::make_enum(pos, enumtype, whereclause, variants)
             },
 
             AST::TraitDef(pos, traitname, body) => {
@@ -213,8 +213,8 @@ impl<'sess> Refinery<'sess> {
                 Expr::make_trait_def(pos, traitname, self.refine_vec(body))
             },
 
-            AST::TraitImpl(pos, traitname, impltype, body) => {
-                self.desugar_trait_impl(pos, traitname, impltype, body)?
+            AST::TraitImpl(pos, traitname, impltype, whereclause, body) => {
+                self.desugar_trait_impl(pos, traitname, impltype, whereclause, body)?
             },
 
             AST::List(pos, items) => {
@@ -422,7 +422,7 @@ impl<'sess> Refinery<'sess> {
         Ok(Expr::make_block(pos, self.refine_vec(block)))
     }
 
-    pub fn desugar_trait_impl(&self, pos: Pos, traitname: String, impltype: Type, body: Vec<AST>) -> Result<Expr, Error> {
+    pub fn desugar_trait_impl(&self, pos: Pos, traitname: String, impltype: Type, whereclause: WhereClause, body: Vec<AST>) -> Result<Expr, Error> {
         let mut trait_body = vec!();
         for node in body {
             match node {
@@ -434,7 +434,7 @@ impl<'sess> Refinery<'sess> {
                 node => return Err(Error::new(format!("SyntaxError: only functions are allowed in trait impls, found {:?}", node))),
             }
         }
-        Ok(Expr::make_trait_impl(pos, traitname, impltype, trait_body))
+        Ok(Expr::make_trait_impl(pos, traitname, impltype, whereclause, trait_body))
     }
 }
 

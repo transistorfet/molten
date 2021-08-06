@@ -61,9 +61,9 @@ pub enum AST {
     New(Pos, Type, Vec<AST>),
     Class(Pos, Type, Option<Type>, WhereClause, Vec<AST>),
     TypeAlias(Pos, Type, Type),
-    Enum(Pos, Type, Vec<(Pos, String, Option<Type>)>),
+    Enum(Pos, Type, WhereClause, Vec<(Pos, String, Option<Type>)>),
     TraitDef(Pos, String, Vec<AST>),
-    TraitImpl(Pos, String, Type, Vec<AST>),
+    TraitImpl(Pos, String, Type, WhereClause, Vec<AST>),
 
     ModuleDecl(Pos, String),
     Import(Pos, String, Vec<AST>),
@@ -145,7 +145,7 @@ impl AST {
             AST::Assignment(pos, _, _, _) |
             AST::While(pos, _, _) |
             AST::TypeAlias(pos, _, _) |
-            AST::Enum(pos, _, _) => { pos }
+            AST::Enum(pos, _, _, _) => { pos }
             _ => Pos::empty(),
         }
     }

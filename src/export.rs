@@ -124,7 +124,7 @@ impl<'sess> Visitor for ExportsCollector<'sess> {
         Ok(())
     }
 
-    fn visit_enum(&mut self, _refid: NodeID, enumtype: &Type, variants: &Vec<EnumVariant>) -> Result<Self::Return, Error> {
+    fn visit_enum(&mut self, _refid: NodeID, enumtype: &Type, _whereclause: &WhereClause, variants: &Vec<EnumVariant>) -> Result<Self::Return, Error> {
         self.declarations.push_str(&format!("enum {} =\n", unparse_type(self.session, &enumtype)));
         for variant in variants {
             let typename = match &variant.ttype {
@@ -152,7 +152,7 @@ impl<'sess> Visitor for ExportsCollector<'sess> {
         Ok(())
     }
 
-    fn visit_trait_impl(&mut self, _refid: NodeID, _traitname: &str, _impltype: &Type, _body: &Vec<Expr>) -> Result<Self::Return, Error> {
+    fn visit_trait_impl(&mut self, _refid: NodeID, _traitname: &str, _impltype: &Type, _whereclause: &WhereClause, _body: &Vec<Expr>) -> Result<Self::Return, Error> {
         // TODO we need something to cause the implementation vtable to be declared external when importing (so that a trait object of that type can be created external)
         Ok(())
     }
