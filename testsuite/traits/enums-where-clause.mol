@@ -1,0 +1,28 @@
+
+//! 7854
+
+trait Display {
+    decl format(Self) -> String
+}
+
+impl Display for Int {
+    fn format(self) {
+        str(self)
+    }
+}
+
+enum Nummy<'thing> where thing: Display =
+| Very('thing)
+| NotQuite
+
+
+fn print_test(v: Nummy<'a>) where a: Display {
+    match v {
+        Nummy::Very(x) => println(x.format())
+        Nummy::NotQuite => println("Hmm...")
+    }
+}
+
+
+print_test(Nummy::Very(7854))
+

@@ -1,0 +1,160 @@
+
+import lib.libcore
+
+trait TraitTest {
+    decl thing(Self) -> Bool
+}
+
+impl TraitTest for String {
+    fn thing(self) {
+        println(self)
+        true
+    }
+}
+
+impl TraitTest for Int {
+    fn thing(self) {
+        println(str(self))
+        false
+    }
+}
+
+
+fn test_trait(t: 'a) where a: TraitTest {
+    println(str(t.thing()))
+    // TODO this doesn't work.  You can't build the method resolver in transform without access to the object...
+    //println(str(TraitTest::thing(t)))
+}
+
+test_trait("Hey")
+
+// TODO get either defs or annotations working to pack trait objects
+//let trait: TraitTest = ("Hey" : TraitTest)
+
+class Assign<'item> where item: TraitTest {
+    let mut thing: 'item
+
+    fn new(self) { }
+
+    fn uni_assign(self, t: 'item) {
+        self.thing = t
+        t.thing()
+    }
+}
+
+// TODO adding the trait bound to 'a makes it type differently and thus fail
+fn assign_test(t: 'a) -> Assign<'a> where a: TraitTest {
+    let assign = new Assign<'a>();
+    let thing = t
+    assign.uni_assign(thing)
+    assign
+}
+
+let assign = assign_test(5)
+// TODO this should actually work because the type of thing should be Int and assign should be Assign<Int>
+//println(str(assign.thing))
+
+
+
+trait Add {
+    decl add(Self, Self) -> Self
+}
+
+// TODO this can't unpack y, and it would need to repack the result
+impl Add for Int {
+    fn add(self, y: Self) -> Self {
+        self + y
+    }
+}
+
+impl Add for Real {
+    fn add(self, y: Self) -> Self {
+        self + y
+    }
+}
+
+fn test_add(x: 'a, y: 'a) -> 'a where a: Add {
+    x.add(y)
+}
+
+println(str(test_add(5, 5)))
+println(str(test_add(3.2, 7.8)))
+
+fn do_some_adding(x: 'a) -> 'a where a: Add {
+    x.add(x)
+    // TOOD this doesn't work yet
+    //Add::add(x, x)
+}
+
+println(str(do_some_adding(400)))
+println(str(do_some_adding(1.5)))
+
+trait TestReturn {
+    decl test(Self) -> Self
+}
+
+impl TestReturn for Int {
+    fn test(self) {
+        self
+    }
+}
+
+fn test_return(t: 'a) where a: TestReturn {
+    t.test()
+}
+
+println(str(test_return(5)))
+
+
+
+impl TraitTest for List<'p> where p: Add {
+    fn thing(self) {
+        true
+    }
+}
+
+test_trait(new List<Real>())
+
+
+trait Display {
+    decl format(Self) -> String
+}
+
+impl Display for Int {
+    fn format(self) {
+        str(self)
+    }
+}
+
+enum Nummy<'thing> where thing: Display =
+| Very('thing)
+| NotQuite
+
+
+fn print_test(v: Nummy<'a>) where a: Display {
+    match v {
+        Nummy::Very(x) => println(x.format())
+        Nummy::NotQuite => println("Hmm...")
+    }
+}
+
+
+print_test(Nummy::Very(7854))
+
+
+// TODO this still doesn't work... the only way to create a traitobj is to call a function
+//let a: 'b where b: Display = 143
+//println(a.format())
+//println(str(a))
+
+/*
+// TODO this causes an error... should it?  Should 'a and 
+fn over(a: 'a) where a: Display {
+
+}
+
+fn over(b: 'b) {
+
+}
+*/
+

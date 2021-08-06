@@ -1,0 +1,23 @@
+
+//!should_fail
+//!err .*TypeError.*
+//!err .*
+ 
+trait TraitTest {
+    decl thing(Self) -> Bool
+}
+
+impl TraitTest for Int {
+    fn thing(self) {
+        false
+    }
+}
+
+fn test_trait(t: 'a) where a: TraitTest {
+    t.thing()
+}
+
+// Passing a String into trait test, which is not implemented
+test_trait("Hey")
+
+

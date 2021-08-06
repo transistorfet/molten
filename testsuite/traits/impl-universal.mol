@@ -1,0 +1,25 @@
+
+//! true
+//! true
+ 
+import lib.libcore
+
+trait TraitTest {
+    decl thing(Self) -> Bool
+}
+
+impl TraitTest for 'a {
+    fn thing(self) {
+        true
+    }
+}
+
+fn test_trait(t: 'a) where a: TraitTest {
+    println(str(t.thing()))
+}
+
+test_trait("Hey")
+test_trait(436)
+
+
+

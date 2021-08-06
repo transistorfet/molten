@@ -1,69 +1,66 @@
 
-* can you remove some of the weirder ref trails (a ref to a ref to a ref), to make things simpler and more predictable? overload variants, enum variants, and traits use them
-* you can maybe store more info in the defs, including the context of the function (Plain, Class Method, Trait Method), and then use that during transform
-* add common constants for various context and vtable strings throughout, instead of dupilcating strings
-* add a check to make sure trait defs are all ABI::Molten
-
-* can you make closure conversion a separate stage somehow, possibly with a MutVisitor
-* can you make an exception conversion mut visitor? to add the execption argument to everything
-* can you put a validation stage in that can check for overloading at the end of type checking rather than during.  Trait impl checking can be moved there too
-  but this might not be possible because you need to bind references during type checking, and you can't do that without all the variants
-
+* when you had a match expr but the enum def name was left out, or was incorrect, I was getting a parse error, which totally shouldn't happen.  It should give some othe kind of error
+* do you need to test unification between class and parent class, as well as trait def and impl type?
 * there might be an issue with overloading and universal constraints (universals might type equal when check_type(..., update=false)
 * check that: classes and their parents should be able to have different numbers of type params
-* write a test for impl TraitTest for 'a { } which always returns a bool
-* also try trait TraitTest for List<'a>
-* make sure trait functions can be called via :: resolve, with the first arg passed in
-  fn (x: 'a, y: 'a) -> 'a where a: Self??? not sure I like this
-* minor issue: when a trait is not implemented, it will produce an unhelpful type error that it expected random variable, but found unimplemented type
-
-* add some way of creating a traitobj using a def or annotation (issues with universals vs variables and mapping typevars; using check_type(..., false) works but might not be correct)
-* should you make a type visitor?
-* do you need to test unification between class and parent class, as well as trait def and impl type?
-
-* should you have a check of class/enum type parameters to make sure they are Universals (or that they contain Universals), otherwise error since using a fixed typeparam is pointless
-* should you make a trait object's data be the first pointer (always a pointer), so that a double deref will get it, rather than an indexed deref?
-* should you use a different format for trait objects vs unbound universals?
-
-BUGS:
-* there's a possible issue with closure reference conversion, where you only check if the name exists in the global scope, but not if it's the same definition.  It's
-  possible there could be a different variable with the same name declared in the global scope causing the local one to not be converted into a context access.  But
-  right now, because of overloading, the def will be a specific function, and the stored scope def will be the overloaded def that contains all the possible specific impls
-
-
-* add tests for traits
-* separate trait objects and bare universals
-* implement trait dependence
-* update documentation
-* write overview
-* fix method invokes
-
-* for calling a function without it being a method call, you can parse "(" expression ")" into a special AST::BracketExpr or something, which can pass through the expr
-  but can still be checked by the refinery and converted into an Expr::MethodInvoke or however you'll do that
-* I'd really like to change the way method calls are done.  It's annoying having all these definitions and blocks for every call
-
-
 * there is an issue with resolve_type where you really should check that a Type::Object and it's stored type have the same ID, but the question is what to do if it's not
   the same... what do we do with the params?  type alias will do some checks and unify the params with the defined type, which itself might not even be right because what
   if you want "type Special<'a> = HashMap<Int, 'a>"?? I don't think this is possible atm
 
-* can you split AST and Expr pattern matching to make the expr stuff easier to use?  The identifier and resolve patterns are kind of clunky and there's a syntax error in bindings which
-  should be in refinery if possible
-* when you had a match expr but the enum def name was left out, or was incorrect, I was getting a parse error, which totally shouldn't happen.  It should give some othe kind of error
-* reduce the number of clone()s
-* implement the record and tuple pattern matching
 
-* can you make it so that only functions/classes/enumdefs/etc can create a universal, and other places like new/definition/etc will raise an error if they are undefined, is this useful?
+* split AST and Expr pattern matching to make the expr stuff easier to use. The identifier and resolve patterns are kind of clunky and there's a syntax error in bindings which
+  should be in refinery if possible
+* for calling a function without it being a method call, you can parse "(" expression ")" into a special AST::BracketExpr or something, which can pass through the expr
+  but can still be checked by the refinery and converted into an Expr::MethodInvoke or however you'll do that
+* I'd really like to change the way method calls are done.  It's annoying having all these definitions and blocks for every call
+* can you make closure conversion a separate stage somehow, possibly with a MutVisitor
+* can you make an exception conversion mut visitor? to add the execption argument to everything
+* can you put a validation stage in that can check for overloading at the end of type checking rather than during.  Trait impl checking can be moved there too
+  but this might not be possible because you need to bind references during type checking, and you can't do that without all the variants
+* should you make a trait object's data be the first pointer (always a pointer), so that a double deref will get it, rather than an indexed deref?
+* should you use a different format for trait objects vs unbound universals?
+* should you make a generic type visitor?  could be used for bind_names, display, etc
+
+
+* add tests for traits
+* separate implementation of trait objects and unconstrained universals
+* implement trait dependence
+* write overview
+* fix method invokes
+* implement the record and tuple pattern matching
+* add some way of creating a traitobj using a def or annotation (issues with universals vs variables and mapping typevars; using check_type(..., false) works but might not be correct)
+* should you make it possible to call a trait method via a resolve; eg. Add::add(x, y).  The issue is that vtable is in the objects
+
+
+* can you remove some of the weirder ref trails (a ref to a ref to a ref), to make things simpler and more predictable? overload variants, enum variants, and traits use them
+* you can maybe store more info in the defs, including the context of the function (Plain, Class Method, Trait Method), and then use that during transform
+* add common constants for various context and vtable strings throughout, instead of dupilcating strings
+* add a check to make sure trait defs are all ABI::Molten
+* reduce the number of clone()s
+* for transformer, you could have a list of 'bodies' of code, which are appended to by the transform functions, rather than returned.
+  It could also store the context, but you'd have to add a body when transforming `if`, `while`, `sideeffect`, `match`, `try`, and `import`
+* move the pattern transform functions into the visitor, but right now you're passing in a value_id to use for comparisons.  It'd have to be stored in the transformer obj insteado
+* for Expr resolve and accessor, the oid's could maybe be integrated into the ident? same for invoke now?  well now traits are using oid for a ref...
+
+
 * there is an issue with accessors, such that accessing a field on a class that has a universal type, the type wont be mapped.  I don't think this is an issue for methods
   since we need the definition type and the invoke type can be determined by arguments, but println(str(assign.thing)) where assign: Assign<Int> will not work (assign.thing: 'item)
-* maybe require an ignore type function call for statements that don't return unit (ie.  disallow having comparisons and math functions where the return
-  value is ignored and the code will be optimized away, since it could be unintended)
+* can you make it so that only functions/classes/enumdefs/etc can create a universal, and other places like new/definition/etc will raise an error if they are undefined, is this useful?
+* should you have a check of class/enum type parameters to make sure they are Universals (or that they contain Universals), otherwise error since using a fixed typeparam is pointless
+* we could possibly implement traits statically, so the object would always be typed (no trait objects, and thus no generics with traits unless you switch to monomorphizing... or
+  trait objects), but having static traits would allow the implementation to be separated from the class definition
 
 
-TRAITS/TYPECLASSES:
 
-* traits need inheritence/subtraits, such that the vtable could have pointers to the vtables of the dependents, or they could use a similar kind of inheritence as classes, but you need to
-  have multiple dependent traits to work
+
+METHODS DISCUSSION:
+
+* make it possible to implement methods on enums
+* you know... it might be possible to make all 'methods' actually be functions with a fixed type for the first argument, since functions can be overloaded, and the
+  type would be unique.  I guess it wouldn't work for inheritence, but at least it doesn't cause this weird irregularity between classes/objects and enums (and eventually traits and trait objects)
+* you need to figure out what should and shouldn't be a reference type... objects are always references that are malloced with 'new', and only objects can use 'new',
+  whereas enums, records and tuples are not reference types, but can be made into references with 'ref'.  There will also be trait objects.  Enums are already 'Type::Object'
+  and are distinguished by their definition, yet one a reference always and the other is not.  Trait objects would implicitly always be a reference
 
 * currently you have function overloading, and class method overloading, which are forms of ad-hoc polymorphism.  Should all function overloading instead require a trait
   implementation (eg. all the infix operator functions and str functions would become traits which would be implemented for different types instead of being overloaded funcs).
@@ -73,24 +70,8 @@ TRAITS/TYPECLASSES:
   don't overlap, but you couldn't also have add(Int, Int) which isn't defined as a trait impl, since it would conflict with add('a, 'a).  This might not be too different from what
   you have now, as long as you make sure to check trait def types when checking for overloading
 
-* we could possibly implement traits statically, so the object would always be typed (no trait objects, and thus no generics with traits unless you switch to monomorphizing... or
-  trait objects), but having static traits would allow the implementation to be separated from the class definition
 
 
-
-GENERAL ISSUES:
-
-* make it possible to implement methods on enums
-* you know... it might be possible to make all 'methods' actually be functions with a fixed type for the first argument, since functions can be overloaded, and the
-  type would be unique.  I guess it wouldn't work for inheritence, but at least it doesn't cause this weird irregularity between classes/objects and enums (and eventually traits and trait objects)
-* you need to figure out what should and shouldn't be a reference type... objects are always references that are malloced with 'new', and only objects can use 'new',
-  whereas enums, records and tuples are not reference types, but can be made into references with 'ref'.  There will also be trait objects.  Enums are already 'Type::Object'
-  and are distinguished by their definition, yet one a reference always and the other is not.  Trait objects would implicitly always be a reference
-
-
-* for transformer, you could have a list of 'bodies' of code, which are appended to by the transform functions, rather than returned.
-  It could also store the context, but you'd have to add a body when transforming `if`, `while`, `sideeffect`, `match`, `try`, and `import`
-* move the pattern transform functions into the visitor, but right now you're passing in a value_id to use for comparisons.  It'd have to be stored in the transformer obj insteado
 
 * can you remove access to getindex, buffer, etc?
 * if you had a way of indexing an object easily, given an llvm object, then you can fix the print() functions to take a SuperString (which would become String)
@@ -108,7 +89,6 @@ GENERAL ISSUES:
 * why is the global == and != not causing an overload error?  (I assume it's because over*riding* is enabled (global scope is different from module scope), but it's still a bit weird)
 * will there be an issue where declaring a function that's external, but not via an import, might cause the global variable to be defined incorrectly??
 
-
 * need a way to import/compile directory of many files (libcore as many files)
 * add a module keyword which is automatically inserted into .dec files, which actually calls the run function, including the canonical name/path when the module was compiled
 * remove the forced visibility in refinery, when you decide on pub/priv semantics
@@ -121,12 +101,13 @@ GENERAL ISSUES:
 * iterators could be implemented as classes, traits implemented on something, or possibly closures?
 * add namespace of some kind, such that you can group functions?  like 'module' from ML?? like impl from rust?? or like namespace from C
 * there is an issue with raise, in that it is considered to return unit () instead of somehow being marked as not returning...  Getting type errors in Option def
-* for Expr resolve and accessor, the oid's could maybe be integrated into the ident? same for invoke now
-
 
 
 
 BUGS:
+* there's a possible issue with closure reference conversion, where you only check if the name exists in the global scope, but not if it's the same definition.  It's
+  possible there could be a different variable with the same name declared in the global scope causing the local one to not be converted into a context access.  But
+  right now, because of overloading, the def will be a specific function, and the stored scope def will be the overloaded def that contains all the possible specific impls
 * the overload check seems to fail in test.mol lines 94/111 with foo2 in Stuff because of the new overload code.  It's giving an overload error unless foo2 which takes a
   single Real is commented out.  It's because the types are added during the name binding phase.  This needs to be added as a test case
 * the infer-arg-as-typevar test fails because str() cannot be resolved to a concrete variant by the time it's typechecked (no backwards affect allowed)
@@ -139,6 +120,7 @@ BUGS:
 
 
 Error Messages:
+* when a trait is not implemented, it will produce an unhelpful type error that it expected random variable, but found unimplemented type
 * there is no context info for the ununified variables, which makes it hard to find the issue
 * you can put a restriction on type aliases such that a type can only use type vars defined in the declaration
 * you could require that classes explicitly define their type variables by name, to catch type errors.  So every method or definition in the top level of the class
@@ -206,6 +188,7 @@ Changes:
 * should you fix scope resolution to also work on objects, so that you can have static methods from the object without explicitly referencing its type
 * should exports also list all the modules that the file imports, so that class definitions in other imports can be found, if needed for arguments
 * should you add break/continue statements for loops
+* should you require that all return types be used, unless an "ignore('a)" function is explicitly used?
 * should you add some means of accessing variant values without pattern matching?
 * should you change Real to Float?  also should you change them to lower case names, which is in line with sml, ocmal, f#
 * should you add access modifiers to classes, and maybe functions; public, private, protected
