@@ -7,7 +7,7 @@ use crate::config::Options;
 use crate::scope::{ ScopeRef };
 use crate::session::{ Session, Error };
 use crate::visitor::{ Visitor, ScopeStack };
-use crate::hir::{ NodeID, Visibility, Mutability, WhereClause, Function, Expr, ExprKind };
+use crate::hir::{ NodeID, Visibility, Mutability, EnumVariant, WhereClause, Function, Expr, ExprKind };
 
 
 pub fn write_exports(session: &Session, scope: ScopeRef, filename: &str, code: &Vec<Expr>) {
@@ -121,6 +121,18 @@ impl<'sess> Visitor for ExportsCollector<'sess> {
             }
         }
         self.declarations.push_str(&format!("}}\n"));
+        Ok(())
+    }
+
+    fn visit_enum(&mut self, _id: NodeID, enumtype: &Type, variants: &Vec<EnumVariant>) -> Result<Self::Return, Error> {
+        self.declarations.push_str(&format!("enum {} =\n", unparse_type(self.session, &enumtype)));
+        for variant in variants {
+            let typename = match &variant.ttype {
+                Some(t) => format!("({})", t.as_vec().iter().map(|t| unparse_type(self.session, &t)).collect::<Vec<String>>().join(",")),
+                None => "".to_string(),
+            };
+            self.declarations.push_str(&format!("| {}{}\n", variant.name, typename));
+        }
         Ok(())
     }
 

@@ -362,3 +362,10 @@ fn moo2(t: 'b) {
     moo1(t)
 }
 
+
+let opt3 = OptionAlt::Some(10)
+match opt3 {
+    OptionAlt::Some(x) => println(str(x))
+    OptionAlt::None => println("None")
+}
+

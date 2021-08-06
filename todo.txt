@@ -1,15 +1,14 @@
 
 * can you remove some of the weirder ref trails (a ref to a ref to a ref), to make things simpler and more predictable? overload variants, enum variants, and traits use them
-* you can maybe store more info in the defs, including the context of the function (Plain, Class Method, Trait Method), and then use that during transform
+* you can maybe store move info in the defs, including the context of the function (Plain, Class Method, Trait Method), and then use that during transform
 * change names for id to either defid or refid to be more obvious (all visitor funcs receive the refid from the node)
 * add common constants for various context and vtable strings throughout, instead of dupilcating strings
-* we currently aren't exporting enums
 * add a check to make sure trait defs are all ABI::Molten
 * you need to add where clauses to enums, traits as well?? what about annotate or def
 
 * can you make closure conversion a separate stage somehow, possibly with a MutVisitor
 * can you make an exception conversion mut visitor? to add the execption argument to everything
-* can you but a validation stage in that can check for overloading at the end of type checking rather than during.  Trait impl checking can be moved there too
+* can you put a validation stage in that can check for overloading at the end of type checking rather than during.  Trait impl checking can be moved there too
   but this might not be possible because you need to bind references during type checking, and you can't do that without all the variants
 
 * check that: classes and their parents should be able to have different numbers of type params
