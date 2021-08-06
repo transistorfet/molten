@@ -11,8 +11,8 @@ use crate::llvm::llcode::{ LLType, LLLit, LLCC, LLLink, LLExpr, LLGlobal };
 
 
 impl<'sess> Transformer<'sess> {
-    pub fn transform_enum_def(&mut self, id: NodeID, name: &str) -> Vec<LLExpr> {
-        let defid = self.session.get_ref(id).unwrap();
+    pub fn transform_enum_def(&mut self, refid: NodeID, name: &str) -> Vec<LLExpr> {
+        let defid = self.session.get_ref(refid).unwrap();
         let selector = LLType::I8;
         let enumdef = self.session.get_def(defid).unwrap().as_enum().unwrap();
 
@@ -32,14 +32,14 @@ impl<'sess> Transformer<'sess> {
         vec!()
     }
 
-    pub fn transform_enum_variant(&mut self, defid: NodeID, id: NodeID, variant: i8, name: String, selector: LLType, ttype: Option<Type>) {
+    pub fn transform_enum_variant(&mut self, defid: NodeID, variant_id: NodeID, variant: i8, name: String, selector: LLType, ttype: Option<Type>) {
         let struct_id = NodeID::generate();
         let etype = ttype.clone().map(|t| self.transform_value_type(&t));
         self.create_enum_struct(struct_id, name.clone(), selector, etype);
-        self.set_type(id, LLType::Alias(struct_id));
+        self.set_type(variant_id, LLType::Alias(struct_id));
 
         if ttype.is_some() {
-            let ftype = self.session.get_type(id).unwrap();
+            let ftype = self.session.get_type(variant_id).unwrap();
             let (argtypes, rettype, _) = ftype.get_function_types().unwrap();
             let lftype = CFuncTransform::transform_def_type(self, &argtypes.as_vec(), rettype);
 
@@ -55,7 +55,7 @@ impl<'sess> Transformer<'sess> {
                 LLExpr::Literal(LLLit::I8(variant as i8)),
                 LLExpr::DefStruct(NodeID::generate(), self.transform_value_type(argtypes), tuple_items)
             )))));
-            self.add_global(LLGlobal::DefCFunc(id, LLLink::Once, name, lftype, params, body, LLCC::CCC));
+            self.add_global(LLGlobal::DefCFunc(variant_id, LLLink::Once, name, lftype, params, body, LLCC::CCC));
         }
     }
 

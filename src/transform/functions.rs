@@ -46,8 +46,8 @@ impl<'sess> Transformer<'sess> {
         }
     }
 
-    pub fn transform_func_decl(&mut self, abi: ABI, id: NodeID, vis: Visibility, name: &str, ttype: &Type) -> Vec<LLExpr> {
-        let defid = self.session.get_ref(id).unwrap();
+    pub fn transform_func_decl(&mut self, abi: ABI, refid: NodeID, vis: Visibility, name: &str, ttype: &Type) -> Vec<LLExpr> {
+        let defid = self.session.get_ref(refid).unwrap();
         match abi {
             ABI::C => CFuncTransform::transform_decl(self, defid, vis, name, ttype),
             ABI::Molten | ABI::Unknown => ClosureTransform::transform_decl(self, defid, vis, name, ttype),
@@ -55,8 +55,8 @@ impl<'sess> Transformer<'sess> {
         }
     }
 
-    pub fn transform_func_def(&mut self, id: NodeID, func: &Function) -> Vec<LLExpr> {
-        let defid = self.session.get_ref(id).unwrap();
+    pub fn transform_func_def(&mut self, refid: NodeID, func: &Function) -> Vec<LLExpr> {
+        let defid = self.session.get_ref(refid).unwrap();
         match func.abi {
             ABI::C => CFuncTransform::transform_def(self, defid, func.vis, &func.name, &func.args, &func.body),
             ABI::Molten | ABI::Unknown => ClosureTransform::transform_def(self, defid, func.vis, &func.name, &func.args, &func.body),

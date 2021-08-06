@@ -43,8 +43,8 @@ impl<'sess> Transformer<'sess> {
         VtableTransform::init_vtable(self, format!("__{}_vtable", tscope.get_basename()), &classdef.vtable)
     }
 
-    pub fn transform_class_body(&mut self, id: NodeID, body: &Vec<Expr>) -> Vec<LLExpr> {
-        let defid = self.session.get_ref(id).unwrap();
+    pub fn transform_class_body(&mut self, refid: NodeID, body: &Vec<Expr>) -> Vec<LLExpr> {
+        let defid = self.session.get_ref(refid).unwrap();
         let mut exprs = vec!();
         let tscope = self.session.map.get(defid).unwrap();
         let classdef = self.session.get_def(defid).unwrap().as_class().unwrap();

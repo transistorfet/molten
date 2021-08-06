@@ -1,7 +1,6 @@
 
 * can you remove some of the weirder ref trails (a ref to a ref to a ref), to make things simpler and more predictable? overload variants, enum variants, and traits use them
 * you can maybe store move info in the defs, including the context of the function (Plain, Class Method, Trait Method), and then use that during transform
-* change names for id to either defid or refid to be more obvious (all visitor funcs receive the refid from the node)
 * add common constants for various context and vtable strings throughout, instead of dupilcating strings
 * add a check to make sure trait defs are all ABI::Molten
 * you need to add where clauses to enums, traits as well?? what about annotate or def

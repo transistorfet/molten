@@ -25,8 +25,8 @@ impl<'sess> Transformer<'sess> {
         vec!()
     }
 
-    pub fn transform_trait_impl(&mut self, id: NodeID, body: &Vec<Expr>) -> Vec<LLExpr> {
-        let impl_id = self.session.get_ref(id).unwrap();
+    pub fn transform_trait_impl(&mut self, refid: NodeID, body: &Vec<Expr>) -> Vec<LLExpr> {
+        let impl_id = self.session.get_ref(refid).unwrap();
         let traitimpl = self.session.get_def(impl_id).unwrap().as_trait_impl().unwrap();
         let traitdef = self.session.get_def(traitimpl.trait_id).unwrap().as_trait_def().unwrap();
 
