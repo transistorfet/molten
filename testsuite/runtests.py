@@ -137,7 +137,7 @@ class Test (object):
             return False
 
     def print_name(self, short):
-        name = self.path[short:]
+        name = self.path[short-1:]
         print(name + ("." * (64 - len(name))), end="")
 
     def run_test(self, force, short=0):

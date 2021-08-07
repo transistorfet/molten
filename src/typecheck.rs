@@ -6,7 +6,7 @@ use crate::scope::{ ScopeRef };
 use crate::hir::{ NodeID, Visibility, Mutability, AssignType, Literal, MatchCase, EnumVariant, WhereClause, Function, Pattern, Expr, ExprKind };
 use crate::types::{ Type, Check, ABI, expect_type, check_type, resolve_type };
 use crate::misc::{ r };
-use crate::visitor::{ self, Visitor, ScopeStack };
+use crate::visitor::{ self, TypeVisitor, Visitor, ScopeStack };
 
 
 #[derive(Clone, Debug, PartialEq)]
@@ -441,17 +441,14 @@ impl<'sess> Visitor for TypeChecker<'sess> {
     }
 
     fn visit_assignment(&mut self, _refid: NodeID, left: &Expr, right: &Expr, ty: AssignType) -> Result<Self::Return, Error> {
-        let scope = self.stack.get_scope();
         match self.get_access_target(left)? {
             Some(defid) => {
                 if ty == AssignType::Update && !self.session.get_def(defid).map(|d| d.is_mutable()).unwrap_or(false) {
                     return Err(Error::new(format!("MutableError: attempting to assign to an immutable variable")));
                 }
 
-                if let Some(Type::Universal(name, id)) = self.session.get_type(defid) {
-                    if scope.get_type_def(&name) != Some(id) {
-                        return Err(Error::new(format!("AssignError: attempting to assign to a universal type outside of it's scope")));
-                    }
+                if self.session.get_type(defid).map(|ttype| !self.check_universals_in_scope(&ttype)).unwrap_or(false) {
+                    return Err(Error::new(format!("AssignError: attempting to assign to a universal type outside of it's scope")));
                 }
             },
             None => { }
@@ -650,6 +647,31 @@ impl<'sess> TypeChecker<'sess> {
         self.session.set_type(defid, ttype.clone());
         ttype
     }
+
+    pub fn check_universals_in_scope(&self, ttype: &Type) -> bool {
+        let mut checker = UniversalChecker { scope: self.stack.get_scope() };
+        return checker.visit_type(ttype).is_ok();
+    }
 }
 
+
+struct UniversalChecker {
+    pub scope: ScopeRef,
+}
+
+impl TypeVisitor for UniversalChecker {
+    type Return = ();
+    type Error = ();
+
+    fn default_type_return(&mut self) -> Result<Self::Return, Self::Error> {
+        Ok(())
+    }
+
+    fn visit_type_universal(&mut self, name: &str, id: NodeID) -> Result<(), ()> {
+        match self.scope.get_type_def(&name) == Some(id) {
+            true => Ok(()),
+            false => Err(()),
+        }
+    }
+}
 

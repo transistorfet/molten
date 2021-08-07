@@ -1,6 +1,7 @@
 
 * perhaps there needs to be a function to check for any universals that are out of scope.  I think placeholders are ok because they'll unify to something, but a universal out
   of scope can introduce a silent type failure.  There is a case for a single universal, but it should probably apply to all universals within the field type
+  Is this also a problem for other places?
 
 * you have to disallow the situation where a function returns a type variable that doesn't appear elsewhere in the definition, but that is then cast to a concrete type.  This
   is a blind cast and is unsafe, but we're currently relying on it for memory allocations and such

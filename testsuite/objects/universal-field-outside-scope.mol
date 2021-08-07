@@ -2,6 +2,8 @@
 //!should_fail
 //!err .*AssignError.*
 //!err .*
+//!err .*AssignError.*
+//!err .*
 
 class Assign<'item> {
     let mut thing: 'item
@@ -18,4 +20,22 @@ let assign = new Assign<String>()
 
 // This fails because it is out of scope, even though the field can be accessed
 assign.thing = "fail"
+
+
+class DiffAssign<'item> {
+    let mut thing: Assign<'item>
+
+    fn new(self) { }
+
+    fn assign(self, t: Assign<'item>) {
+        // This is allowed because 'time is defined in the class definition, so it's in scope
+        self.thing = t
+    }
+}
+
+let diffassign = new DiffAssign<String>()
+let assign2 = new Assign<Int>();
+
+// This fails because it is out of scope, even though the field can be accessed
+diffassign.thing = assign2
 

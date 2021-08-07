@@ -146,7 +146,10 @@ impl Type {
             _ => Err(Error::new(format!("TypeError: expected object when setting ID, found {:?}", self))),
         }
     }
+}
 
+
+impl Type {
     pub fn display_vec(list: &Vec<Type>) -> String {
         list.iter().map(|t| format!("{}", t)).collect::<Vec<String>>().join(", ")
     }
@@ -168,7 +171,6 @@ impl Type {
         typename
     }
 }
-
 
 impl fmt::Display for Type {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -201,6 +203,7 @@ impl fmt::Display for Type {
     }
 }
 
+/// Map universal type variables into placeholder variables and return the resulting type
 impl Type {
     pub fn map_all_typevars(session: &Session, ttype: Type) -> Type {
         let mut varmap = Type::map_new();
@@ -236,6 +239,70 @@ impl Type {
 
     pub fn map_typevars_vec(session: &Session, varmap: &mut HashMap<UniqueID, Type>, types: Vec<Type>) -> Vec<Type> {
         types.into_iter().map(|vtype| Type::map_typevars(session, varmap, vtype)).collect()
+    }
+}
+
+/// Recursively resolve any placeholder variables and type aliases in the given type
+/// If require_resolve is true, an error will thrown if a placeholder variable cannot be resolved to another type
+pub fn resolve_type(session: &Session, ttype: Type, require_resolve: bool) -> Result<Type, Error> {
+    match ttype {
+        Type::Object(name, id, types) => {
+            let params = types.into_iter().map(|ptype| resolve_type(session, ptype, require_resolve)).collect::<Result<Vec<Type>, Error>>()?;
+
+            match session.get_def(id) {
+                Ok(Def::TypeAlias(alias)) => {
+                    Ok(alias.resolve(session, &params)?)
+                },
+                _ => match session.get_type(id) {
+                    // NOTE we have a special case for objects because we want to return the resolved parameters and not the parameters the type was defined with
+                    Some(Type::Object(sname, sid, _)) => {
+                        match id == sid {
+                            true => Ok(Type::Object(name, id, params)),
+                            false => Err(Error::new(format!("Unexpected type alias used, {} points to {}", name, sname))),
+                        }
+                    },
+                    Some(stype) => Ok(stype.clone()),
+                    None => Err(Error::new(format!("TypeError: undefined type {:?}", name))),
+                },
+            }
+        },
+        Type::Variable(id) => {
+            match session.get_type(id) {
+                Some(vtype) => {
+                    match vtype {
+                        Type::Variable(eid) if eid == id => {
+                            if !require_resolve {
+                                Ok(vtype.clone())
+                            } else {
+                                Err(Error::new(format!("TypeError: unification variable unresolved: {}", vtype)))
+                            }
+                        },
+                        _ => resolve_type(session, vtype.clone(), require_resolve),
+                    }
+                },
+                None => Err(Error::new(format!("TypeError: undefined type variable {}", ttype))),
+            }
+        },
+        Type::Universal(name, id) => {
+            Ok(Type::Universal(name, id))
+        },
+        Type::Tuple(types) => {
+            let types = types.into_iter().map(|ttype| resolve_type(session, ttype, require_resolve)).collect::<Result<Vec<Type>, Error>>()?;
+            Ok(Type::Tuple(types))
+        },
+        Type::Record(types) => {
+            let types = types.into_iter().map(|(name, ttype)| {
+                let ttype = resolve_type(session, ttype, require_resolve)?;
+                Ok((name, ttype))
+            }).collect::<Result<Vec<(String, Type)>, Error>>()?;
+            Ok(Type::Record(types))
+        },
+        Type::Function(args, ret, abi) => {
+            Ok(Type::Function(r(resolve_type(session, *args, require_resolve)?), r(resolve_type(session, *ret, require_resolve)?), abi))
+        },
+        Type::Ref(ttype) => {
+            Ok(Type::Ref(r(resolve_type(session, *ttype, require_resolve)?)))
+        },
     }
 }
 
@@ -412,7 +479,7 @@ fn is_subclass_of(session: &Session, sdef: (&String, UniqueID, &Vec<Type>), pdef
     }
 }
 
-pub fn check_type_params(session: &Session, dtypes: &Vec<Type>, ctypes: &Vec<Type>, mode: Check, update: bool) -> Result<Vec<Type>, Error> {
+fn check_type_params(session: &Session, dtypes: &Vec<Type>, ctypes: &Vec<Type>, mode: Check, update: bool) -> Result<Vec<Type>, Error> {
     if dtypes.len() != ctypes.len() {
         Err(Error::new(format!("TypeError: number of type parameters don't match: expected {} but found {}", Type::display_vec(dtypes), Type::display_vec(ctypes))))
 
@@ -425,7 +492,7 @@ pub fn check_type_params(session: &Session, dtypes: &Vec<Type>, ctypes: &Vec<Typ
     }
 }
 
-pub fn check_trait_constraints(session: &Session, var_id: NodeID, ctype: &Type) -> bool {
+fn check_trait_constraints(session: &Session, var_id: NodeID, ctype: &Type) -> bool {
     for trait_id in session.get_constraints(var_id) {
         if !check_trait_is_implemented(session, trait_id, ctype) {
             return false;
@@ -434,7 +501,7 @@ pub fn check_trait_constraints(session: &Session, var_id: NodeID, ctype: &Type) 
     return true;
 }
 
-pub fn check_trait_is_implemented(session: &Session, trait_id: NodeID, ctype: &Type) -> bool {
+fn check_trait_is_implemented(session: &Session, trait_id: NodeID, ctype: &Type) -> bool {
     // If the class matching doesn't work, then try checking for trait matching, but this is a bad hack.  We should use universals with constraints instead of Type::Object
     match session.get_def(trait_id).and_then(|def| def.as_trait_def()) {
         Ok(traitdef) => {
@@ -448,67 +515,4 @@ pub fn check_trait_is_implemented(session: &Session, trait_id: NodeID, ctype: &T
     }
     return false;
 }
-
-pub fn resolve_type(session: &Session, ttype: Type, require_resolve: bool) -> Result<Type, Error> {
-    match ttype {
-        Type::Object(name, id, types) => {
-            let params = types.into_iter().map(|ptype| resolve_type(session, ptype, require_resolve)).collect::<Result<Vec<Type>, Error>>()?;
-
-            match session.get_def(id) {
-                Ok(Def::TypeAlias(alias)) => {
-                    Ok(alias.resolve(session, &params)?)
-                },
-                _ => match session.get_type(id) {
-                    // NOTE we have a special case for objects because we want to return the resolved parameters and not the parameters the type was defined with
-                    Some(Type::Object(sname, sid, _)) => {
-                        match id == sid {
-                            true => Ok(Type::Object(name, id, params)),
-                            false => Err(Error::new(format!("Unexpected type alias used, {} points to {}", name, sname))),
-                        }
-                    },
-                    Some(stype) => Ok(stype.clone()),
-                    None => Err(Error::new(format!("TypeError: undefined type {:?}", name))),
-                },
-            }
-        },
-        Type::Variable(id) => {
-            match session.get_type(id) {
-                Some(vtype) => {
-                    match vtype {
-                        Type::Variable(eid) if eid == id => {
-                            if !require_resolve {
-                                Ok(vtype.clone())
-                            } else {
-                                Err(Error::new(format!("TypeError: unification variable unresolved: {}", vtype)))
-                            }
-                        },
-                        _ => resolve_type(session, vtype.clone(), require_resolve),
-                    }
-                },
-                None => Err(Error::new(format!("TypeError: undefined type variable {}", ttype))),
-            }
-        },
-        Type::Universal(name, id) => {
-            Ok(Type::Universal(name, id))
-        },
-        Type::Tuple(types) => {
-            let types = types.into_iter().map(|ttype| resolve_type(session, ttype, require_resolve)).collect::<Result<Vec<Type>, Error>>()?;
-            Ok(Type::Tuple(types))
-        },
-        Type::Record(types) => {
-            let types = types.into_iter().map(|(name, ttype)| {
-                let ttype = resolve_type(session, ttype, require_resolve)?;
-                Ok((name, ttype))
-            }).collect::<Result<Vec<(String, Type)>, Error>>()?;
-            Ok(Type::Record(types))
-        },
-        Type::Function(args, ret, abi) => {
-            Ok(Type::Function(r(resolve_type(session, *args, require_resolve)?), r(resolve_type(session, *ret, require_resolve)?), abi))
-        },
-        Type::Ref(ttype) => {
-            Ok(Type::Ref(r(resolve_type(session, *ttype, require_resolve)?)))
-        },
-    }
-}
-
 

@@ -1,6 +1,7 @@
 
 use std::cell::RefCell;
 
+use crate::abi::ABI;
 use crate::types::Type;
 use crate::session::Error;
 use crate::scope::ScopeRef;
@@ -39,6 +40,70 @@ impl ScopeStack {
 
     pub fn get_scope(&self) -> ScopeRef {
         self.stack.borrow().last().cloned().unwrap()
+    }
+}
+
+
+pub trait TypeVisitor: Sized {
+    type Return;
+    type Error;
+
+    fn default_type_return(&mut self) -> Result<Self::Return, Self::Error>;
+
+    fn visit_type(&mut self, ttype: &Type) -> Result<Self::Return, Self::Error> {
+        walk_type(self, ttype)
+    }
+
+    fn visit_type_vec(&mut self, items: &Vec<Type>) -> Result<Self::Return, Self::Error> {
+        for item in items {
+            self.visit_type(item)?;
+        }
+        self.default_type_return()
+    }
+
+    fn visit_type_object(&mut self, _name: &str, _id: NodeID, params: &Vec<Type>) -> Result<Self::Return, Self::Error> {
+        self.visit_type_vec(params)
+    }
+
+    fn visit_type_tuple(&mut self, items: &Vec<Type>) -> Result<Self::Return, Self::Error> {
+        self.visit_type_vec(items)
+    }
+
+    fn visit_type_record(&mut self, items: &Vec<(String, Type)>) -> Result<Self::Return, Self::Error> {
+        for (_, item) in items {
+            self.visit_type(item)?;
+        }
+        self.default_type_return()
+    }
+
+    fn visit_type_ref(&mut self, ttype: &Type) -> Result<Self::Return, Self::Error> {
+        self.visit_type(ttype)
+    }
+
+    fn visit_type_function(&mut self, args: &Type, ret: &Type, _abi: ABI) -> Result<Self::Return, Self::Error> {
+        self.visit_type(args)?;
+        self.visit_type(ret)?;
+        self.default_type_return()
+    }
+
+    fn visit_type_variable(&mut self, _id: NodeID) -> Result<Self::Return, Self::Error> {
+        self.default_type_return()
+    }
+
+    fn visit_type_universal(&mut self, _name: &str, _id: NodeID) -> Result<Self::Return, Self::Error> {
+        self.default_type_return()
+    }
+}
+
+pub fn walk_type<V, R, E>(visitor: &mut V, ttype: &Type) -> Result<R, E> where V: TypeVisitor<Return=R, Error=E> {
+    match ttype {
+        Type::Object(name, id, params) => visitor.visit_type_object(name, *id, params),
+        Type::Tuple(items) => visitor.visit_type_tuple(items),
+        Type::Record(items) => visitor.visit_type_record(items),
+        Type::Ref(ttype) => visitor.visit_type_ref(ttype),
+        Type::Function(args, ret, abi) => visitor.visit_type_function(args, ret, *abi),
+        Type::Variable(id) => visitor.visit_type_variable(*id),
+        Type::Universal(name ,id) => visitor.visit_type_universal(name, *id),
     }
 }
 
