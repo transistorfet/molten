@@ -1,0 +1,17 @@
+
+//!should_fail
+//!err .*OverloadError: in definition.*
+//!err .*
+//!err .*
+//!err .*OverloadError: in definition.*
+//!err .*
+//!err .*
+
+fn test(a) {
+    a * 5
+}
+
+fn test(a) {
+    a * 10
+}
+

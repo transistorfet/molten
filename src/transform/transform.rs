@@ -131,8 +131,8 @@ impl<'sess> Visitor for Transformer<'sess> {
         &self.stack
     }
 
-    fn get_scope_by_id(&self, id: NodeID) -> ScopeRef {
-        self.session.map.get(id).unwrap()
+    fn get_session<'b>(&'b self) -> &'b Session {
+        self.session
     }
 
     fn handle_error(&mut self, node: &Expr, err: Error) -> Result<Self::Return, Error> {

@@ -1,12 +1,16 @@
 
-//!should_fail
-//!err .*TypeError.*
+//! 10
+
+// 2021-08-07: Previously this test was expected to fail, but I'm not sure this should be an error, since
+//             we're allowing the overloading of both arguments and the return type.  The call to
+//             child.test will always call that method, and not the parent method, which is never called
 
 import lib.libcore
 
 class Parent {
     fn new(self) { }
 
+    // This method returns unit ()
     fn test(self, i: Int) {
         ()
     }
@@ -15,6 +19,7 @@ class Parent {
 class Child extends Parent {
     fn new(self) { }
 
+    // This method returns the result
     fn test(self, i) {
         i * 2
     }

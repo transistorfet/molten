@@ -44,7 +44,7 @@ def main():
 
 def run_all(args):
     #dirname = os.path.join(testdir, args.directory)
-    dirname = args.directory
+    dirname = args.directory.rstrip('/')
 
     testfiles = [ ]
     for (basedir, dirnames, filenames) in os.walk(dirname, topdown=True):
@@ -137,7 +137,7 @@ class Test (object):
             return False
 
     def print_name(self, short):
-        name = self.path[short-1:]
+        name = self.path[short:]
         print(name + ("." * (64 - len(name))), end="")
 
     def run_test(self, force, short=0):

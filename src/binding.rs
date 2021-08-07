@@ -51,8 +51,8 @@ impl<'sess> Visitor for NameBinder<'sess> {
         &self.stack
     }
 
-    fn get_scope_by_id(&self, id: NodeID) -> ScopeRef {
-        self.session.map.get(id).unwrap()
+    fn get_session<'b>(&'b self) -> &'b Session {
+        self.session
     }
 
     fn handle_error(&mut self, node: &Expr, err: Error) -> Result<Self::Return, Error> {
@@ -84,9 +84,9 @@ impl<'sess> Visitor for NameBinder<'sess> {
         let mut argtypes = vec!();
         for arg in func.args.iter() {
             let arg_defid = self.session.new_def_id(arg.id);
-            let ttype = self.bind_type_option(fscope.clone(), arg.ttype.clone())?;
-            ArgDef::define(self.session, fscope.clone(), arg_defid, Mutability::Immutable, &arg.name, ttype.clone())?;
-            argtypes.push(ttype.unwrap_or_else(|| self.session.new_typevar()));
+            let ttype = self.bind_type_option(fscope.clone(), arg.ttype.clone())?.unwrap_or_else(|| self.session.new_typevar());
+            ArgDef::define(self.session, fscope.clone(), arg_defid, Mutability::Immutable, &arg.name, Some(ttype.clone()))?;
+            argtypes.push(ttype);
         }
         let rettype = self.bind_type_option(fscope.clone(), func.rettype.clone())?;
         bind_where_constraints(self.session, fscope.clone(), &func.whereclause)?;

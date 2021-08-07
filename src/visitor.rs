@@ -3,8 +3,8 @@ use std::cell::RefCell;
 
 use crate::abi::ABI;
 use crate::types::Type;
-use crate::session::Error;
 use crate::scope::ScopeRef;
+use crate::session::{ Session, Error };
 use crate::hir::{ NodeID, Visibility, Mutability, AssignType, Literal, MatchCase, EnumVariant, WhereClause, Function, Pattern, PatKind, Expr, ExprKind };
 
 /*
@@ -114,7 +114,7 @@ pub trait Visitor: Sized {
     fn default_return(&self) -> Self::Return;
 
     fn get_scope_stack<'a>(&'a self) -> &'a ScopeStack;
-    fn get_scope_by_id(&self, id: NodeID) -> ScopeRef;
+    fn get_session<'b>(&'b self) -> &'b Session;
 
     fn with_scope<F>(&mut self, scope: ScopeRef, f: F) -> Result<Self::Return, Error> where F: FnOnce(&mut Self) -> Result<Self::Return, Error> {
         self.get_scope_stack().push_scope(scope);
@@ -350,7 +350,7 @@ pub fn walk_if<R, V: Visitor<Return = R>>(visitor: &mut V, cond: &Expr, texpr: &
 pub fn walk_try<R, V: Visitor<Return = R>>(visitor: &mut V, cond: &Expr, cases: &Vec<MatchCase>) -> Result<R, Error> {
     visitor.visit_node(cond)?;
     for case in cases {
-        let lscope = visitor.get_scope_by_id(case.id);
+        let lscope = visitor.get_session().map.get(case.id).unwrap();
         walk_match_case(visitor, lscope, case)?;
     }
     Ok(visitor.default_return())
@@ -359,7 +359,7 @@ pub fn walk_try<R, V: Visitor<Return = R>>(visitor: &mut V, cond: &Expr, cases: 
 pub fn walk_match<R, V: Visitor<Return = R>>(visitor: &mut V, cond: &Expr, cases: &Vec<MatchCase>) -> Result<R, Error> {
     visitor.visit_node(cond)?;
     for case in cases {
-        let lscope = visitor.get_scope_by_id(case.id);
+        let lscope = visitor.get_session().map.get(case.id).unwrap();
         walk_match_case(visitor, lscope, case)?;
     }
     Ok(visitor.default_return())
@@ -379,8 +379,9 @@ pub fn walk_while<R, V: Visitor<Return = R>>(visitor: &mut V, cond: &Expr, body:
     Ok(visitor.default_return())
 }
 
-pub fn walk_function<R, V: Visitor<Return = R>>(visitor: &mut V, id: NodeID, func: &Function) -> Result<R, Error> {
-    let fscope = visitor.get_scope_by_id(id);
+pub fn walk_function<R, V: Visitor<Return = R>>(visitor: &mut V, refid: NodeID, func: &Function) -> Result<R, Error> {
+    let defid = visitor.get_session().get_ref(refid)?;
+    let fscope = visitor.get_session().map.get(defid).unwrap();
     // TODO visit arguments
     visitor.with_scope(fscope, |visitor| {
         visitor.visit_vec(&func.body)
@@ -388,8 +389,9 @@ pub fn walk_function<R, V: Visitor<Return = R>>(visitor: &mut V, id: NodeID, fun
     Ok(visitor.default_return())
 }
 
-pub fn walk_class<R, V: Visitor<Return = R>>(visitor: &mut V, id: NodeID, body: &Vec<Expr>) -> Result<R, Error> {
-    let tscope = visitor.get_scope_by_id(id);
+pub fn walk_class<R, V: Visitor<Return = R>>(visitor: &mut V, refid: NodeID, body: &Vec<Expr>) -> Result<R, Error> {
+    let defid = visitor.get_session().get_ref(refid)?;
+    let tscope = visitor.get_session().map.get(defid).unwrap();
     visitor.with_scope(tscope, |visitor| {
         visitor.visit_vec(body)
     })

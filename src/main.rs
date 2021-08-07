@@ -27,6 +27,7 @@ mod session;
 mod refinery;
 mod binding;
 mod typecheck;
+mod validate;
 mod defs;
 mod export;
 mod transform;
@@ -137,6 +138,7 @@ fn compile_file(input: &str, output: Option<&str>) {
 
     session.resolve_types();
 
+    validate::Validator::validate(&session, session.map.get_global(), &code);
     export::write_exports(&session, session.map.get_global(), &format!("{}.dec", session.target), &code);
 
     //closures::ClosureConversion::visit(&session, session.map.get_global(), &mut code);

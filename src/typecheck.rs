@@ -49,8 +49,8 @@ impl<'sess> Visitor for TypeChecker<'sess> {
         &self.stack
     }
 
-    fn get_scope_by_id(&self, id: NodeID) -> ScopeRef {
-        self.session.map.get(id).unwrap()
+    fn get_session<'b>(&'b self) -> &'b Session {
+        self.session
     }
 
     fn handle_error(&mut self, node: &Expr, err: Error) -> Result<Self::Return, Error> {
@@ -119,7 +119,7 @@ impl<'sess> Visitor for TypeChecker<'sess> {
         let mut argtypes = vec!();
         for arg in func.args.iter() {
             let arg_defid = self.session.get_ref(arg.id)?;
-            let mut atype = self.get_type_or_new_typevar(arg_defid);
+            let mut atype = self.session.get_type(arg_defid).unwrap();
 
             if &arg.name[..] == "self" {
                 let stype = fscope.find_type(self.session, "Self")?;
@@ -141,14 +141,6 @@ impl<'sess> Visitor for TypeChecker<'sess> {
 
         let tupleargs = Type::Tuple(argtypes);
         let nftype = Type::Function(r(tupleargs.clone()), r(rettype), func.abi);
-
-        if let Ok(Def::Overload(ol)) = self.session.get_def_from_ref(defid) {
-            let (mut found, _) = ol.find_local_variants(self.session, &tupleargs);
-            found = found.into_iter().filter(|(fid, _)| defid != *fid).collect();
-            if found.len() > 0 {
-                return Err(Error::new(format!("OverloadError: things {:?}\nvariants found [{}]", func.name, found.iter().map(|(_, t)| format!("{}", t)).collect::<Vec<String>>().join(", "))));
-            }
-        }
 
         debug!("FINISHED FUNCTION: {:?} -> {:?}", self.session.get_type(defid), nftype);
         self.session.update_type(defid, &nftype)?;
