@@ -1,0 +1,29 @@
+
+class Tester<'a, 'b> {
+    let a: 'a
+    let b: 'b
+
+    fn new(self) { }
+}
+
+// Issue with number type parameters being different between a type alias and a class
+type Special<'x> = Tester<Int, 'x>
+
+let tester = new Special<String>();
+
+
+// Issue with fewer parameters in child than in parent
+class BetterTester<'a> extends Tester<'a, Int> {
+    fn foo(self) { }
+}
+
+let better = new BetterTester<String>();
+
+// Issue with more parameters in child than in parent
+class WorseTester<'a, 'b, 'c> extends Tester<'c, 'a> {
+    fn foo(self) { }
+}
+
+let worse = new WorseTester<String, Int, Char>();
+
+

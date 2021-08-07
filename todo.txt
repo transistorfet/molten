@@ -1,37 +1,36 @@
 
-* when you had a match expr but the enum def name was left out, or was incorrect, I was getting a parse error, which totally shouldn't happen.  It should give some othe kind of error
-* do you need to test unification between class and parent class, as well as trait def and impl type?
-* there might be an issue with overloading and universal constraints (universals might type equal when check_type(..., update=false)
-* check that: classes and their parents should be able to have different numbers of type params
-* there is an issue with resolve_type where you really should check that a Type::Object and it's stored type have the same ID, but the question is what to do if it's not
-  the same... what do we do with the params?  type alias will do some checks and unify the params with the defined type, which itself might not even be right because what
-  if you want "type Special<'a> = HashMap<Int, 'a>"?? I don't think this is possible atm
-
-
+* you have to disallow the situation where a function returns a type variable that doesn't appear elsewhere in the definition, but that is then cast to a concrete type.  This
+  is a blind cast and is unsafe, but we're currently relying on it for memory allocations and such
 * split AST and Expr pattern matching to make the expr stuff easier to use. The identifier and resolve patterns are kind of clunky and there's a syntax error in bindings which
   should be in refinery if possible
+* do you need to test unification between class and parent class, as well as trait def and impl type?
+* check that: classes and their parents should be able to have different numbers of type params
+
+* there is an issue with accessors, such that accessing a field on a class that has a universal type, the type wont be mapped.  I don't think this is an issue for methods
+  since we need the definition type and the invoke type can be determined by arguments, but println(str(assign.thing)) where assign: Assign<Int> will not work (assign.thing: 'item)
+* add some way of creating a traitobj using a def or annotation (issues with universals vs variables and mapping typevars; using check_type(..., false) works but might not be correct)
+
+* should you make a trait object's data be the first pointer (always a pointer), so that a double deref will get it, rather than an indexed deref?
+* should you use a different format for trait objects vs unbound universals?
+* should you make it so that only functions/classes/enumdefs/etc can create a universal, and other places like new/definition/etc will raise an error if they are undefined, is this useful?
+* should you have a check of class/enum type parameters to make sure they are Universals (or that they contain Universals), otherwise error since using a fixed typeparam is pointless
+
 * for calling a function without it being a method call, you can parse "(" expression ")" into a special AST::BracketExpr or something, which can pass through the expr
   but can still be checked by the refinery and converted into an Expr::MethodInvoke or however you'll do that
 * I'd really like to change the way method calls are done.  It's annoying having all these definitions and blocks for every call
+  but this might not be possible because you need to bind references during type checking, and you can't do that without all the variants
+
+
+* write overview
+* implement trait dependence
+* fix method invokes
+* implement the record and tuple pattern matching
+
+
+* should you make a generic type visitor?  could be used for bind_names, display, etc
 * can you make closure conversion a separate stage somehow, possibly with a MutVisitor
 * can you make an exception conversion mut visitor? to add the execption argument to everything
 * can you put a validation stage in that can check for overloading at the end of type checking rather than during.  Trait impl checking can be moved there too
-  but this might not be possible because you need to bind references during type checking, and you can't do that without all the variants
-* should you make a trait object's data be the first pointer (always a pointer), so that a double deref will get it, rather than an indexed deref?
-* should you use a different format for trait objects vs unbound universals?
-* should you make a generic type visitor?  could be used for bind_names, display, etc
-
-
-* add tests for traits
-* separate implementation of trait objects and unconstrained universals
-* implement trait dependence
-* write overview
-* fix method invokes
-* implement the record and tuple pattern matching
-* add some way of creating a traitobj using a def or annotation (issues with universals vs variables and mapping typevars; using check_type(..., false) works but might not be correct)
-* should you make it possible to call a trait method via a resolve; eg. Add::add(x, y).  The issue is that vtable is in the objects
-
-
 * can you remove some of the weirder ref trails (a ref to a ref to a ref), to make things simpler and more predictable? overload variants, enum variants, and traits use them
 * you can maybe store more info in the defs, including the context of the function (Plain, Class Method, Trait Method), and then use that during transform
 * add common constants for various context and vtable strings throughout, instead of dupilcating strings
@@ -41,15 +40,6 @@
   It could also store the context, but you'd have to add a body when transforming `if`, `while`, `sideeffect`, `match`, `try`, and `import`
 * move the pattern transform functions into the visitor, but right now you're passing in a value_id to use for comparisons.  It'd have to be stored in the transformer obj insteado
 * for Expr resolve and accessor, the oid's could maybe be integrated into the ident? same for invoke now?  well now traits are using oid for a ref...
-
-
-* there is an issue with accessors, such that accessing a field on a class that has a universal type, the type wont be mapped.  I don't think this is an issue for methods
-  since we need the definition type and the invoke type can be determined by arguments, but println(str(assign.thing)) where assign: Assign<Int> will not work (assign.thing: 'item)
-* can you make it so that only functions/classes/enumdefs/etc can create a universal, and other places like new/definition/etc will raise an error if they are undefined, is this useful?
-* should you have a check of class/enum type parameters to make sure they are Universals (or that they contain Universals), otherwise error since using a fixed typeparam is pointless
-* we could possibly implement traits statically, so the object would always be typed (no trait objects, and thus no generics with traits unless you switch to monomorphizing... or
-  trait objects), but having static traits would allow the implementation to be separated from the class definition
-
 
 
 
@@ -82,8 +72,6 @@ METHODS DISCUSSION:
 * rename String type to ByteString, ByteArray, or CString, or ZString, or NullString, or NullByteArray, or ZByteArray, RawString;  I'm leaning ZByteArray or ByteString
 * rename SuperString type to String, will require a bunch of libcore changes
 * rename List to Array or Vec
-* you have to disallow the situation where a function returns a type variable that doesn't appear elsewhere in the definition, but that is then cast to a concrete type.  This
-  is a blind cast and is unsafe, but we're currently relying on it for memory allocations and such
 
 
 * why is the global == and != not causing an overload error?  (I assume it's because over*riding* is enabled (global scope is different from module scope), but it's still a bit weird)
@@ -97,6 +85,8 @@ METHODS DISCUSSION:
 * make definitions always require an initializer
 * there was an error where "let ni: newint" with no initializer was causing a type error with "expected class or concrete type", but that was actually because a definition without
   an initializer is the same as "let ni: newint = nil" and nil could not be cast to a Record, which newint is a typealias of a record
+
+* should you make it possible to call a trait method via a resolve; eg. Add::add(x, y).  The issue is that vtable is in the objects
 
 * iterators could be implemented as classes, traits implemented on something, or possibly closures?
 * add namespace of some kind, such that you can group functions?  like 'module' from ML?? like impl from rust?? or like namespace from C

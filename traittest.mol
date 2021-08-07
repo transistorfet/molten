@@ -158,3 +158,27 @@ fn over(b: 'b) {
 }
 */
 
+// Issue with type paramater numbers
+class Tester<'a, 'b> {
+    let a: 'a
+    let b: 'b
+
+    fn new(self) { }
+}
+
+type Special<'x> = Tester<Int, 'x>
+
+let tester = new Special<String>();
+
+
+/*
+// Issue with returning an unconstrained value and casting
+// TODO this works but shouldn't work.  We are returning nil and casting it to a String, which causes a segfault when accessed
+// that said, I think this only happens with nil! so removing nil might be enough to fix this
+fn breaking() -> 'problem {
+    nil
+}
+let a: String = breaking()
+println(a)
+*/
+

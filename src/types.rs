@@ -415,6 +415,7 @@ fn is_subclass_of(session: &Session, sdef: (&String, UniqueID, &Vec<Type>), pdef
 pub fn check_type_params(session: &Session, dtypes: &Vec<Type>, ctypes: &Vec<Type>, mode: Check, update: bool) -> Result<Vec<Type>, Error> {
     if dtypes.len() != ctypes.len() {
         Err(Error::new(format!("TypeError: number of type parameters don't match: expected {} but found {}", Type::display_vec(dtypes), Type::display_vec(ctypes))))
+
     } else {
         let mut ptypes = vec!();
         for (dtype, ctype) in dtypes.iter().zip(ctypes.iter()) {
@@ -455,21 +456,18 @@ pub fn resolve_type(session: &Session, ttype: Type, require_resolve: bool) -> Re
 
             match session.get_def(id) {
                 Ok(Def::TypeAlias(alias)) => {
-                    Ok(alias.resolve(session, &params).unwrap())
+                    Ok(alias.resolve(session, &params)?)
                 },
                 _ => match session.get_type(id) {
-                    // TODO this the if id == sid will allow n
-
                     // NOTE we have a special case for objects because we want to return the resolved parameters and not the parameters the type was defined with
                     Some(Type::Object(sname, sid, _)) => {
-                        if id != sid {
-                            Err(Error::new(format!("Unexpected type alias used, {} points to {}", name, sname)))
-                        } else {
-                            Ok(Type::Object(name, id, params))
+                        match id == sid {
+                            true => Ok(Type::Object(name, id, params)),
+                            false => Err(Error::new(format!("Unexpected type alias used, {} points to {}", name, sname))),
                         }
                     },
                     Some(stype) => Ok(stype.clone()),
-                    None => Err(Error::new(format!("TypeError: undefined type {:?}", name))).unwrap(),
+                    None => Err(Error::new(format!("TypeError: undefined type {:?}", name))),
                 },
             }
         },

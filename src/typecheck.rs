@@ -4,7 +4,7 @@ use crate::defs::Def;
 use crate::session::{ Session, Error };
 use crate::scope::{ ScopeRef };
 use crate::hir::{ NodeID, Visibility, Mutability, AssignType, Literal, MatchCase, EnumVariant, WhereClause, Function, Pattern, Expr, ExprKind };
-use crate::types::{ Type, Check, ABI, expect_type, check_type, resolve_type, check_type_params };
+use crate::types::{ Type, Check, ABI, expect_type, check_type, resolve_type };
 use crate::misc::{ r };
 use crate::visitor::{ self, Visitor, ScopeStack };
 
@@ -413,7 +413,7 @@ impl<'sess> Visitor for TypeChecker<'sess> {
         let classtype = self.session.get_type(refid).unwrap();
         let dtype = self.session.get_type_from_ref(refid)?;
         let mtype = Type::map_all_typevars(self.session, dtype.clone());
-        check_type_params(self.session, &mtype.get_params()?, &classtype.get_params()?, Check::Def, true)?;
+        expect_type(self.session, Some(&mtype), Some(&classtype), Check::Def)?;
         Ok(classtype.clone())
     }
 
