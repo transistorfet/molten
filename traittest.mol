@@ -60,7 +60,6 @@ trait Add {
     decl add(Self, Self) -> Self
 }
 
-// TODO this can't unpack y, and it would need to repack the result
 impl Add for Int {
     fn add(self, y: Self) -> Self {
         self + y
@@ -141,6 +140,19 @@ fn print_test(v: Nummy<'a>) where a: Display {
 
 print_test(Nummy::Very(7854))
 
+// Issue with type paramater numbers
+class Tester<'a, 'b> {
+    let a: 'a
+    let b: 'b
+
+    fn new(self) { }
+}
+
+type Special<'x> = Tester<Int, 'x>
+
+let tester = new Special<String>();
+
+
 
 // TODO this still doesn't work... the only way to create a traitobj is to call a function
 //let a: 'b where b: Display = 143
@@ -157,18 +169,6 @@ fn over(b: 'b) {
 
 }
 */
-
-// Issue with type paramater numbers
-class Tester<'a, 'b> {
-    let a: 'a
-    let b: 'b
-
-    fn new(self) { }
-}
-
-type Special<'x> = Tester<Int, 'x>
-
-let tester = new Special<String>();
 
 
 /*

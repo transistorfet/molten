@@ -1,13 +1,13 @@
 
+* perhaps there needs to be a function to check for any universals that are out of scope.  I think placeholders are ok because they'll unify to something, but a universal out
+  of scope can introduce a silent type failure.  There is a case for a single universal, but it should probably apply to all universals within the field type
+
 * you have to disallow the situation where a function returns a type variable that doesn't appear elsewhere in the definition, but that is then cast to a concrete type.  This
   is a blind cast and is unsafe, but we're currently relying on it for memory allocations and such
 * split AST and Expr pattern matching to make the expr stuff easier to use. The identifier and resolve patterns are kind of clunky and there's a syntax error in bindings which
   should be in refinery if possible
 * do you need to test unification between class and parent class, as well as trait def and impl type?
-* check that: classes and their parents should be able to have different numbers of type params
 
-* there is an issue with accessors, such that accessing a field on a class that has a universal type, the type wont be mapped.  I don't think this is an issue for methods
-  since we need the definition type and the invoke type can be determined by arguments, but println(str(assign.thing)) where assign: Assign<Int> will not work (assign.thing: 'item)
 * add some way of creating a traitobj using a def or annotation (issues with universals vs variables and mapping typevars; using check_type(..., false) works but might not be correct)
 
 * should you make a trait object's data be the first pointer (always a pointer), so that a double deref will get it, rather than an indexed deref?

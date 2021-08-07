@@ -381,9 +381,9 @@ impl<'sess> Refinery<'sess> {
         if !has_init {
             let mut init = vec!();
             for node in &newbody {
-                if let AST::Definition(_, _, name, _, value) = node {
-                    init.push(AST::Assignment(pos,
-                        r(AST::Accessor(pos, r(AST::make_ident_from_str(pos, "self")), name.clone())),
+                if let AST::Definition(pos, _, name, _, value) = node {
+                    init.push(AST::Assignment(*pos,
+                        r(AST::Accessor(*pos, r(AST::make_ident_from_str(*pos, "self")), name.clone())),
                         r(*value.clone()),
                         AssignType::Initialize));
                 }

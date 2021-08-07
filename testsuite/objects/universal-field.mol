@@ -1,0 +1,20 @@
+
+//! works
+
+class Assign<'item> {
+    let mut thing: 'item
+    let mut thong: String
+
+    fn new(self) { }
+
+    fn assign(self, t: 'item) {
+        self.thing = t
+        self.thong = ""
+        //t.thing()
+    }
+}
+
+let assign = new Assign<String>()
+assign.thong = "works"
+println(assign.thong)
+

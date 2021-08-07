@@ -441,10 +441,17 @@ impl<'sess> Visitor for TypeChecker<'sess> {
     }
 
     fn visit_assignment(&mut self, _refid: NodeID, left: &Expr, right: &Expr, ty: AssignType) -> Result<Self::Return, Error> {
+        let scope = self.stack.get_scope();
         match self.get_access_target(left)? {
             Some(defid) => {
                 if ty == AssignType::Update && !self.session.get_def(defid).map(|d| d.is_mutable()).unwrap_or(false) {
                     return Err(Error::new(format!("MutableError: attempting to assign to an immutable variable")));
+                }
+
+                if let Some(Type::Universal(name, id)) = self.session.get_type(defid) {
+                    if scope.get_type_def(&name) != Some(id) {
+                        return Err(Error::new(format!("AssignError: attempting to assign to a universal type outside of it's scope")));
+                    }
                 }
             },
             None => { }
@@ -458,12 +465,12 @@ impl<'sess> Visitor for TypeChecker<'sess> {
     fn visit_import(&mut self, _refid: NodeID, _ident: &str, decls: &Vec<Expr>) -> Result<Self::Return, Error> {
         let scope = self.stack.get_scope();
         self.visit_vec(decls)?;
-        Ok(scope.find_type(self.session, "()")?)
+        scope.find_type(self.session, "()")
     }
 
     fn visit_module_decl(&mut self, _refid: NodeID, _name: &str) -> Result<Self::Return, Error> {
         let scope = self.stack.get_scope();
-        Ok(scope.find_type(self.session, "()")?)
+        scope.find_type(self.session, "()")
     }
 
     fn visit_pattern_wild(&mut self, refid: NodeID) -> Result<Self::Return, Error> {
