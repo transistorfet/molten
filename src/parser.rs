@@ -681,16 +681,24 @@ impl AST {
     }
 }
 
+
 named!(subatomic(Span) -> AST,
     alt!(
-        // TODO if you map this to its own AST element, you can maybe remove it during refining while being able to use it to resolve whether it's a method call or not
-        //      ie. AST::SeparatedExpr as the fexpr for AST::Invoke means it's not a method call, otherwise if AST::Access then it is a method call
-        delimited!(tag!("("), wscom!(expression), tag!(")")) |
+        bracketed_expression |
         record_update |
         block |
         dereference |
         literal |
         identifier_node
+    )
+);
+
+named!(bracketed_expression(Span) -> AST,
+    // This extra AST element is how we distinguish between an intentional method call vs an access followed by a regular call
+    // If the expression is surrounded in brackets, it will not be treated as a method call when it's converted by the refinery
+    map!(
+        delimited!(tag!("("), wscom!(expression), tag!(")")),
+        |e| AST::Bracketed(r(e))
     )
 );
 

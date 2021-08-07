@@ -32,6 +32,7 @@ pub enum AST {
     Annotation(Type, R<AST>),
     Ref(Pos, R<AST>),
     Deref(Pos, R<AST>),
+    Bracketed(R<AST>),
 
     List(Pos, Vec<AST>),
     Tuple(Pos, Vec<AST>),

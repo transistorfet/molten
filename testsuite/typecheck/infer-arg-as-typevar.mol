@@ -1,8 +1,13 @@
 
-//! 1
+//!should_fail
+//!err .*OverloadError.*
+//!err .*
+//!err .*
 
-//!dec decl f : (Int) -> Nil
+// 2021-08-07: I've decide to switch this to an expected fail test, since this is a bit of a stretch to expect.
+//             You would have to either explicitly specify the type of the argument, or use traits for the arg
 
+// previously had expected this: //!dec decl f : (Int) -> Nil
 // TODO this test could be fixed by delaying the overloaded function resolution (for str) until later
 
 import lib.libcore

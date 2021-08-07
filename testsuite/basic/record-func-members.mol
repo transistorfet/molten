@@ -8,5 +8,5 @@ fn methodtest() {
 }
 
 let rec4 = { func = methodtest, b = 5 }
-rec4.func()
+(rec4.func)()
 

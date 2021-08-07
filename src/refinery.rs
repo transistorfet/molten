@@ -122,21 +122,31 @@ impl<'sess> Refinery<'sess> {
             },
 
             AST::Invoke(pos, fexpr, args) => {
+                let convert = match *fexpr {
+                    AST::Accessor(_, _, _) => true,
+                    _ => false,
+                };
+
                 let fexpr = self.refine_node(*fexpr)?;
                 let mut args = self.refine_vec(args);
 
-                // We refine fexpr before cloning here, so that the IDs will be identical (otherwise typechecking wont unify the accessed object and first argument)
-                if let ExprKind::Accessor(expr, field, _oid) = fexpr.kind {
-                    let tmpname = format!("{}", UniqueID::generate());
-                    args.insert(0, Expr::make_ident_from_str(pos, &tmpname));
+                match fexpr.kind {
+                    ExprKind::Accessor(expr, field, _oid) if convert => {
+                        let tmpname = format!("{}", UniqueID::generate());
+                        args.insert(0, Expr::make_ident_from_str(pos, &tmpname));
 
-                    Expr::make_block(pos, vec!(
-                        Expr::make_def(pos, Mutability::Immutable, tmpname.to_string(), None, *expr), 
-                        Expr::make_invoke(pos, Expr::make_access(pos, Expr::make_ident_from_str(pos, &tmpname), field), args),
-                    ))
-                } else {
-                    Expr::make_invoke(pos, fexpr, args)
+                        Expr::make_block(pos, vec!(
+                            Expr::make_def(pos, Mutability::Immutable, tmpname.to_string(), None, *expr), 
+                            Expr::make_invoke(pos, Expr::make_access(pos, Expr::make_ident_from_str(pos, &tmpname), field), args),
+                        ))
+                    },
+                    _ =>
+                        Expr::make_invoke(pos, fexpr, args),
                 }
+            },
+
+            AST::Bracketed(expr) => {
+                self.refine_node(*expr)?
             },
 
             AST::SideEffect(pos, op, args) => {
