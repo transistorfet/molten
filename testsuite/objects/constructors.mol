@@ -7,7 +7,7 @@
 import lib.libcore
 
 class Object {
-    let mut a: Int
+    val mut a: Int
 
     fn new(self, a) {
         self.a = a
@@ -20,11 +20,13 @@ class Object {
 
 class Child1 extends Object {
     fn new(self, a) {
+        Super::new(self, a)
         self.a = a + 1
     }
 
     // NOTE the type annotations are required here because we don't have constricted types
     fn new(self, a: Int, b: Int) {
+        Super::new(self, a)
         self.a = a * b
     }
 
@@ -35,6 +37,7 @@ class Child1 extends Object {
 
 class Child2 extends Object {
     fn new(self, a) {
+        Super::new(self, a)
         self.a = a + 7
     }
 

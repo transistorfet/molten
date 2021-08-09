@@ -5,11 +5,11 @@
 import lib.libcore
 
 class Object {
+    fn new(self) { }
+
     fn make() {
         new Object()
     }
-
-    fn new(self) { }
 
     // NOTE the type annotations are required here because we don't have constrained types yet
     fn multiply(x: Int, y: Int) {
@@ -18,9 +18,10 @@ class Object {
 }
 
 class Thing extends Object {
-    let mut s: String
+    val mut s: String
 
     fn new(self) {
+        Super::new(self)
         self.s = "Start"
     }
 

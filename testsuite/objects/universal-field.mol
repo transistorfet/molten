@@ -2,10 +2,13 @@
 //! works
 
 class Assign<'item> {
-    let mut thing: 'item
-    let mut thong: String
+    val mut thing: 'item
+    val mut thong: String
 
-    fn new(self) { }
+    fn new(self) {
+        self.thing = nil
+        self.thong = nil
+    }
 
     fn assign(self, t: 'item) {
         self.thing = t

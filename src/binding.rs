@@ -310,7 +310,7 @@ pub fn bind_type_names(session: &Session, scope: ScopeRef, ttype: Option<&mut Ty
                 if *id == UniqueID(0) {
                     match scope.get_type_def(name) {
                         Some(defid) => *id = defid,
-                        None => panic!("UndefinedType: {:?}", name),
+                        None => return Err(Error::new(format!("UndefinedType: {:?}", name))),
                     }
                 }
 

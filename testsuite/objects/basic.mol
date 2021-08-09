@@ -4,10 +4,13 @@
 import lib.libcore
 
 class Object {
-    let mut a: Int
-    let b = 123
+    val mut a: Int
+    val b
 
-    fn new(self) { }
+    fn new(self) {
+        self.a = 0
+        self.b = 123
+    }
 
     fn test(self, x) {
         self.a = x

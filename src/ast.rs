@@ -5,7 +5,7 @@ use std::str;
 use crate::abi::ABI;
 use crate::types::Type;
 use crate::parser::Span;
-use crate::misc::{ R, r };
+use crate::misc::{ R };
 use crate::hir::{ Visibility, Mutability, AssignType, Literal, WhereClause, Pattern };
 
 
@@ -156,14 +156,6 @@ impl AST {
             AST::Literal(lit) => lit,
             _ => panic!("Expected AST::Literal\n"),
         }
-    }
-
-    pub fn make_ident_from_str(pos: Pos, name: &str) -> AST {
-        AST::Identifier(pos, name.to_string())
-    }
-
-    pub fn make_resolve_ident(pos: Pos, ident: String, field: &str) -> AST {
-        AST::Resolver(pos, r(AST::Identifier(pos, ident)), field.to_string())
     }
 }
 

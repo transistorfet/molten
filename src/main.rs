@@ -120,7 +120,7 @@ fn compile_file(input: &str, output: Option<&str>) {
     llvm::lib::make_global(&session, &builtins);
 
     let code = session.parse_file(input, false);
-    let mut code = refinery::Refinery::refine(&session, code);
+    let code = refinery::Refinery::refine(&session, code);
     session.write_link_file();
     if Options::as_ref().linkfile_only {
         return;

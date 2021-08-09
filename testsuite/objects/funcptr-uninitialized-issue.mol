@@ -2,12 +2,15 @@
 // If there is a problem with initializing class members, then the add method wont be initialized and will cause a segfault
 
 class TestClass {
-    let mut a = 1
+    val mut a
+    val mut add
 
-    fn new(self) { }
+    fn new(self) {
+        self.a = 1
 
-    let add = fn self, x => {
-        self.a = self.a + x
+        self.add = fn self, x => {
+            self.a = self.a + x
+        }
     }
 }
 

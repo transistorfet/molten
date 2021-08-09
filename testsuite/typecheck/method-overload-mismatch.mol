@@ -8,8 +8,6 @@
 import lib.libcore
 
 class Parent {
-    fn new(self) { }
-
     // This method returns unit ()
     fn test(self, i: Int) {
         ()

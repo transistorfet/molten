@@ -1,0 +1,46 @@
+
+//!should_fail
+//!err .*ClassError: constructor doesn't set the following fields.*
+//!err .*
+//!err .*ClassError: constructor doesn't set the following fields.*
+//!err .*
+
+import lib.libcore
+
+class OkClass {
+    // This should not cause an error because there are no fields
+    fn static_method() {
+        ()
+    }
+}
+
+class MissingNew {
+    val x: Int
+}
+
+class Parent {
+    val mut bar
+
+    fn new(self) {
+        self.bar = 8
+    }
+}
+
+class Child extends Parent {
+    val mut foo: Int
+
+    fn new(self) {
+        Super::new(self)
+        // TODO if a field is not assigned to, we expect to get an error
+        //self.foo = 5
+    }
+}
+
+let parent = new Parent()
+println(str(parent.bar))
+
+let child = new Child()
+println(str(child.foo))
+println(str(child.bar))
+
+

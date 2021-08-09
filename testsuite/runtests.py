@@ -113,7 +113,8 @@ class Test (object):
         if len(expected) > 0:
             if len(output) != len(expected):
                 if self.verbose:
-                    print(output, expected)
+                    print('\n'.join(output))
+                    print('\n'.join(expected))
                     print(YELLOW, "Expected:", len(expected), "lines of", name, ", found:", len(output), CLEAR)
                 return False
             for (exp, out) in zip(expected, output):

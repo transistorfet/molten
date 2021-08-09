@@ -2,7 +2,7 @@
 //! Works
 
 class Test {
-    let mut f: (Test) -> Int
+    val mut f: (Test) -> Int
 
     fn new(self) {
         self.f = Test::test

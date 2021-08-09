@@ -3,11 +3,11 @@
 
 class Test {
     fn test() {
-        nil
+        ()
     }
 
     fn test() {
-        nil
+        ()
     }
 }
 

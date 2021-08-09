@@ -1,0 +1,12 @@
+
+import lib.libcore
+
+class NumArray<'a> extends Array<Int> {
+    val x: 'a
+
+    fn new(self) {
+        Super::new(self)
+        self.x = nil
+    }
+}
+

@@ -6,9 +6,11 @@
 //!err .*
 
 class Assign<'item> {
-    let mut thing: 'item
+    val mut thing: 'item
 
-    fn new(self) { }
+    fn new(self) {
+        self.thing = nil
+    }
 
     fn assign(self, t: 'item) {
         // This is allowed because 'time is defined in the class definition, so it's in scope
@@ -23,9 +25,11 @@ assign.thing = "fail"
 
 
 class DiffAssign<'item> {
-    let mut thing: Assign<'item>
+    val mut thing: Assign<'item>
 
-    fn new(self) { }
+    fn new(self) {
+        self.thing = nil
+    }
 
     fn assign(self, t: Assign<'item>) {
         // This is allowed because 'time is defined in the class definition, so it's in scope

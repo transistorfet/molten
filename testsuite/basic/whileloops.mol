@@ -8,7 +8,7 @@
 import lib.libcore
 
 class Test {
-    let mut i: Int
+    val mut i: Int
 
     fn new(self) {
         self.i = 0

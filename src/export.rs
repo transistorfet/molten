@@ -176,7 +176,7 @@ fn emit_declaration(session: &Session, defid: NodeID, vis: Visibility, name: &st
 fn emit_field(session: &Session, defid: NodeID, mutable: Mutability, name: &str) -> String {
     let ttype = session.get_type(defid).unwrap();
     let mutable_str = if let Mutability::Mutable = mutable { "mut " } else { "" };
-    format!("let {}{}: {}\n", mutable_str, name, unparse_type(session, &ttype))
+    format!("val {}{}: {}\n", mutable_str, name, unparse_type(session, &ttype))
 }
 
 fn emit_where_clause(constraints: &Vec<(String, String)>) -> String {

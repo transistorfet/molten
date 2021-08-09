@@ -7,8 +7,8 @@
 import lib.libcore
 
 class Option2<'item> {
-    let mut has = false
-    let mut item: 'item = nil
+    val mut has
+    val mut item: 'item
 
     fn new(self) {
         self.has = false

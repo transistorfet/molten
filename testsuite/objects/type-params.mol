@@ -1,9 +1,12 @@
 
 class Tester<'a, 'b> {
-    let a: 'a
-    let b: 'b
+    val a: 'a
+    val b: 'b
 
-    fn new(self) { }
+    fn new(self) {
+        self.a = nil
+        self.b = nil
+    }
 }
 
 // Issue with number type parameters being different between a type alias and a class

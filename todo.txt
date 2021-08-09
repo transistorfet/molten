@@ -1,4 +1,10 @@
 
+* add test for fields in the constructor not being set, make sure an error is returned
+* add a test for not calling the Super to initialize the parent in a constructor
+* either add a check for Super::new() call, or insert it automatically
+
+* make sure you can export and import trait defs and impls. make tests for this
+
 * can you remove access to getindex?
 * if you had a way of class field indexing an object easily, given an llvm object, then you can fix the print() functions to take a SuperString (which would become String)
 * you could also add a native array type (like a slice, with a pointer and size value in a pair)
@@ -9,6 +15,12 @@
 
 
 * remove nil (requires changes to constructors/init)
+* fix __init__/new problems related to class members
+* can you introduce a special ast or expr that represents a field, instead of using `let`, like `def mut len: Int` no initializers allowed, there would be no __init__ and you would have
+  to initialize each field in each new (verified in the new validation phase using a check of all the structdef fields vs all the access refs in each `new` method)
+* the alternative is adding function arguments to the class def, and using tscope as a function scope which becomes the __init__ body essentially, but this would also mean
+  `new Array<Int>(10)` would only call __init__ with all the arguments being manditory, but convention would be that you do `Array<Int>::new()` which would contain a `new` 
+* add a never-return type? Or can you add that only to the typechecker somehow, perhaps even returning a special error that can be passed up but ignored once it gets to the nearest vec of exprs
 * split AST and Expr pattern matching to make the expr stuff easier to use. The identifier and resolve patterns are kind of clunky and there's a syntax error in bindings which
   should be in refinery if possible
 * do you need to test unification between class and parent class, as well as trait def and impl type?

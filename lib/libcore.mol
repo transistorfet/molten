@@ -1,7 +1,7 @@
 
 
 class Exception {
-    let mut msg = ""
+    val mut msg
 
     pub fn new(self, msg) {
         self.msg = msg
@@ -15,8 +15,8 @@ class Exception {
 
 
 class SuperString {
-    let mut len: Int = 0
-    let mut str: String = ""
+    val mut len
+    val mut str
 
     pub fn new(self, s) {
         self.str = s
@@ -86,10 +86,13 @@ fn unwrap(opt: OptionAlt<'item>) -> 'item {
 */
 
 class Option<'item> {
-    let mut has = false
-    let mut item: 'item = nil
+    val mut has
+    val mut item: 'item
 
-    fn new(self) { }
+    fn new(self) {
+        self.has = false
+        self.item = nil
+    }
 
     pub fn Some(item: 'item) {
         let opt = new Option<'item>()
@@ -140,9 +143,9 @@ class Iterator<'item> {
 }
 
 class Array<'item> {
-    let mut capacity: Int
-    let mut length: Int
-    let mut data: UniversalArray<'item> = nil
+    val mut capacity
+    val mut length
+    val mut data: UniversalArray<'item>
 
     pub fn new(self) {
         self.length = 0
@@ -223,8 +226,8 @@ class Array<'item> {
 }
 
 class ArrayIterator<'item> extends Iterator<'item> {
-    let mut index = 0
-    let mut list: Array<'item> = nil
+    val mut index
+    val mut list: Array<'item>
 
     pub fn new(self, list) {
         self.index = 0
@@ -248,9 +251,9 @@ class ArrayIterator<'item> extends Iterator<'item> {
 
 /*
 class HashMapNode<'item> {
-    let mut key: String
-    let mut data: 'item
-    let mut next: HashMapNode<'item>
+    val mut key: String
+    val mut data: 'item
+    val mut next: HashMapNode<'item>
 
     pub fn new(self, key, data) {
         self.key = key
@@ -260,8 +263,8 @@ class HashMapNode<'item> {
 }
 
 class HashMap<'item> {
-    let mut size = 0
-    let mut data: UniversalArray<HashMapNode<'item>> = nil
+    val mut size
+    val mut data: UniversalArray<HashMapNode<'item>>
 
     pub fn new(self) {
         self.size = 10

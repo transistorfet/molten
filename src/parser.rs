@@ -182,16 +182,16 @@ named!(definition(Span) -> AST,
         wscom!(tag_word!("let")) >>
         m: mutability >>
         i: identifier_typed >>
-        e: opt!(preceded!(
+        e: preceded!(
             wscom!(tag!("=")),
             expression
-        )) >>
+        ) >>
         (AST::Definition(
             Pos::new(pos),
             m,
             i.1,
             i.2,
-            r(if e.is_some() { e.unwrap() } else { AST::Nil })
+            r(e)
         ))
     )
 );
@@ -227,12 +227,28 @@ named!(class(Span) -> AST,
         wscom!(tag!("{")) >>
         b: many0!(wscom!(alt!(
             typealias |
-            definition |
+            classfield |
             declare |
             function
         ))) >>
         return_error!(ErrorKind::Tag /*ErrorKind::Custom(ERR_IN_CLASS) */, tag!("}")) >>
         (AST::Class(Pos::new(pos), c, p, w, b))
+    )
+);
+
+named!(classfield(Span) -> AST,
+    do_parse!(
+        pos: position!() >>
+        wscom!(tag_word!("val")) >>
+        m: mutability >>
+        i: identifier_typed >>
+        (AST::Definition(
+            Pos::new(pos),
+            m,
+            i.1,
+            i.2,
+            r(AST::Nil)
+        ))
     )
 );
 

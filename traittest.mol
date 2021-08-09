@@ -32,7 +32,7 @@ test_trait("Hey")
 //let trait: TraitTest = ("Hey" : TraitTest)
 
 class Assign<'item> where item: TraitTest {
-    let mut thing: 'item
+    val mut thing: 'item
 
     fn new(self) { }
 
@@ -106,13 +106,13 @@ println(str(test_return(5)))
 
 
 
-impl TraitTest for List<'p> where p: Add {
+impl TraitTest for Array<'p> where p: Add {
     fn thing(self) {
         true
     }
 }
 
-test_trait(new List<Real>())
+test_trait(new Array<Real>())
 
 
 trait Display {
@@ -142,8 +142,8 @@ print_test(Nummy::Very(7854))
 
 // Issue with type paramater numbers
 class Tester<'a, 'b> {
-    let a: 'a
-    let b: 'b
+    val a: 'a
+    val b: 'b
 
     fn new(self) { }
 }

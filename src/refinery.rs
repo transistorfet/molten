@@ -3,7 +3,7 @@ use std::cell::RefCell;
 
 use crate::abi::ABI;
 use crate::types::Type;
-use crate::ast::{ Pos, RawArgument, AST };
+use crate::ast::{ Pos, AST };
 use crate::misc::{ r, UniqueID };
 use crate::session::{ Session, Error };
 use crate::defs::modules::{ ModuleDef };
@@ -14,6 +14,7 @@ use crate::hir::{ NodeID, Visibility, Mutability, AssignType, Literal, Argument,
 enum CodeContext {
     Func(ABI),
     ClassBody,
+    Constructor,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -115,7 +116,12 @@ impl<'sess> Refinery<'sess> {
 
                 let id = NodeID::generate();
                 let name = name.unwrap_or(format!("anon{}", id));
-                self.with_context(CodeContext::Func(abi), || {
+                let context = if self.get_context() == Some(CodeContext::ClassBody) && &name == "new" {
+                    CodeContext::Constructor
+                } else {
+                    CodeContext::Func(abi)
+                };
+                self.with_context(context, || {
                     let func = Function::new(vis, name, args, ret, self.refine_vec(body), abi, whereclause);
                     Ok(Expr::new_with_id(id, pos, ExprKind::Function(func)))
                 })?
@@ -232,9 +238,7 @@ impl<'sess> Refinery<'sess> {
             },
 
             AST::New(pos, ttype, args) => {
-                let object =
-                    Expr::make_invoke(pos, Expr::make_resolve_ident(pos, ttype.get_name()?, "__init__"),
-                        vec!(Expr::make_alloc_object(pos, ttype.clone())));
+                let object = Expr::make_alloc_object(pos, ttype.clone());
 
                 let mut args = args.into_iter().map(|arg| self.refine_node(arg)).collect::<Result<Vec<_>, _>>()?;
                 args.insert(0, object);
@@ -267,8 +271,15 @@ impl<'sess> Refinery<'sess> {
                 let left = *left;
                 match left {
                     //AST::Identifier_, _) |
-                    AST::Deref(_, _) |
-                    AST::Accessor(_, _, _) => {
+                    AST::Deref(_, _) => {
+                        Expr::make_assign(pos, self.refine_node(left)?, self.refine_node(*right)?, ty)
+                    },
+                    AST::Accessor(_, ref obj, _) => {
+                        // Assignments within a constructor should be marked as initialization assignments rather than updating assignments
+                        let ty = match &**obj {
+                            AST::Identifier(_, name) if name.as_str() == "self" && self.get_context() == Some(CodeContext::Constructor) => AssignType::Initialize,
+                            _ => AssignType::Update,
+                        };
                         Expr::make_assign(pos, self.refine_node(left)?, self.refine_node(*right)?, ty)
                     },
                     AST::Index(ipos, base, index) => {
@@ -354,60 +365,22 @@ impl<'sess> Refinery<'sess> {
 
     pub fn desugar_class(&self, pos: Pos, classtype: Type, parenttype: Option<Type>, whereclause: WhereClause, body: Vec<AST>) -> Result<Expr, Error> {
         // Make sure constructors take "self" as the first argument, and return "self" at the end
-        let mut has_new = false;
-        let mut has_init = false;
         let mut newbody = vec!();
         for node in body {
             let node = match node {
                 AST::Function(pos, vis, name, args, ret, mut body, abi, whereclause) => {
                     if name.as_deref() == Some("new") {
-                        has_new = true;
                         if args.len() > 0 && &args[0].name == "self" {
                             body.push(AST::Identifier(pos, "self".to_string()));
                         } else {
                             return Err(Error::new("SyntaxError: the \"new\" method on a class must have \"self\" as its first parameter".to_string()));
                         }
                     }
-                    name.as_ref().map(|name| if name == "__init__" { has_init = true; });
                     AST::Function(pos, vis, name, args, ret, body, abi, whereclause)
-                },
-                AST::Declare(pos, vis, name, ttype, whereclause) => {
-                    if &name == "new" {
-                        has_new = true;
-                    }
-                    if &name == "__init__" { has_init = true; }
-                    AST::Declare(pos, vis, name, ttype, whereclause)
                 },
                 _ => node
             };
             newbody.push(node);
-        }
-        if !has_new {
-            //newbody.insert(0, Expr::make_func(pos, Function::new(Some(String::from("new")), vec!((String::from("self"), None, None)), None, r(AST::Identifier(id, pos, String::from("self"))), UniqueID::generate(), ABI::Molten, WhereClause::empty())));
-            //return Err(Error::new(format!("SyntaxError: you must declare a \"new\" method on a class")));
-        }
-
-        // Create an __init__ function to initialize the fields of a newly created class object
-        if !has_init {
-            let mut init = vec!();
-            for node in &newbody {
-                if let AST::Definition(pos, _, name, _, value) = node {
-                    init.push(AST::Assignment(*pos,
-                        r(AST::Accessor(*pos, r(AST::make_ident_from_str(*pos, "self")), name.clone())),
-                        r(*value.clone()),
-                        AssignType::Initialize));
-                }
-            }
-
-            let iargs = vec!(RawArgument::new(pos, "self".to_string(), None));
-            if let Some(parenttype) = parenttype.as_ref() {
-                init.insert(0, AST::Invoke(pos,
-                    r(AST::make_resolve_ident(pos, parenttype.get_name()?.to_string(), "__init__")),
-                    vec!(AST::Identifier(pos, "self".to_string()))));
-            }
-            init.push(AST::make_ident_from_str(pos, "self"));
-            let initcode = AST::Function(pos, Visibility::Public, Some("__init__".to_string()), iargs, None, init, ABI::Molten, WhereClause::empty());
-            newbody.push(initcode);
         }
 
         let body = self.with_context(CodeContext::ClassBody, || {

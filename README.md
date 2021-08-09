@@ -110,7 +110,7 @@ foo(1, 2)
 ### Classes
 ```
 class Foo {
-    let mut name: String
+    val mut name: String
 
     fn new(self, name) {
         self.name = name
@@ -380,6 +380,10 @@ Previously Uncompleted
 - Garbage collection has been added using the Boehm-Demers-Weiser
   Conservative C Garbage Collector.  It is possible to compile without
   the garbage collector by using the `--no-gc` command line argument.
+
+- Traits have finally been added.  They currently are limited to one
+  trait constraint per type variable, but I will hopefully add
+  trait depedencies/inheritence soon
 
 
 I'd be happy to hear of any additional features ideas or suggestions, if

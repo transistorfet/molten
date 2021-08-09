@@ -1,0 +1,28 @@
+
+//! 4
+//! 123
+//! FIVE
+
+import lib.libcore
+
+// TODO this has an unresovled typevar because it cannot determine the type of an empty list
+//[]
+[1, 2, 3 * 10 + 3]
+[ 0, 1, 2, 3 ][0]
+let arr = [ 1, 2, 3, 4 ]
+
+let array1 = new Array<Int>()
+array1.push(4)
+println(str(array1[0]))
+array1[0] = 123
+println(str(array1[0]))
+
+let array2 = [ "ONE", "TWO", "THREE" ]
+array2[1] = "FIVE"
+println(array2[1])
+
+// TODO 2021-07-17 I think with the type system changes this is actually wrong, with forcing List<'thing>
+//let array2: Array<'thing> = [ "ONE", "TWO", "THREE" ]
+//array2[1] = "FIVE"
+//println(array2[1])
+

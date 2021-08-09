@@ -9,7 +9,7 @@
 import lib.libcore
 
 class Object {
-    let mut a: Int
+    val mut a: Int
 
     fn new(self, a) {
         self.a = a

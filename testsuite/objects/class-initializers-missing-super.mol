@@ -1,7 +1,7 @@
 
-//! 8
-//! It Closure Worked
-//! 8
+//!should_fail
+//!err .*ClassError: constructor doesn't call Super::new().*
+//!err .*
 
 import lib.libcore
 
@@ -20,7 +20,8 @@ fn test() {
         val mut foo
 
         fn new(self) {
-            Super::new(self)
+            // TODO if the call to the parent's constructor is missing, we expect to get an error
+            //Super::new(self)
             self.foo = clo
         }
     }

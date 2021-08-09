@@ -4,7 +4,7 @@
 import lib.libcore
 
 class Test {
-    let mut a
+    val mut a
 
     fn new(self) {
         self.a = 5

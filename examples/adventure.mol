@@ -2,9 +2,11 @@
 import lib.libcore
 
 class Input {
-    let mut stopflag: Bool = false
+    val mut stopflag: Bool
 
-    fn new(self) { }
+    fn new(self) {
+        self.stopflag = false
+    }
 
     fn loop(self) {
         while not self.stopflag {

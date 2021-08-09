@@ -87,9 +87,11 @@ println(str(s.a))
 let clo = "It Closure Worked"
 
 class Stuff {
-    let what = 8
+    val what: Int
 
-    fn new(self) { }
+    fn new(self) {
+        self.what = 8
+    }
 
     fn tell() {
         println("Let me tell you!")
@@ -98,8 +100,12 @@ class Stuff {
 
 
 class Thing extends Stuff {
-    let mut foo = clo
-    fn new(self) { }
+    val mut foo
+
+    fn new(self) {
+        Super::new(self)
+        self.foo = clo
+    }
 
     //fn bar(self) {
     //    self.foo = 129
@@ -155,10 +161,13 @@ println(str(number))
 //println(str(iter.next()))
 
 class Option2<'item> {
-    let mut has = false
-    let mut item: 'item = nil
+    val mut has
+    val mut item: 'item
 
-    fn new(self) { }
+    fn new(self) {
+        self.has = false
+        self.item = nil
+    }
 
     fn some(item) {
         let opt = new Option2<'item>()
