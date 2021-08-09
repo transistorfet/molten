@@ -142,13 +142,13 @@ class Iterator<'item> {
 class List<'item> {
     let mut capacity: Int
     let mut length: Int
-    let mut data: Buffer<'item> = nil
+    let mut data: UniversalArray<'item> = nil
 
     pub fn new(self) {
         self.length = 0
         self.capacity = 10
-        //self.data = new Buffer<'item>(self.capacity)
-        self.data = bufalloc(self.capacity)
+        //self.data = new UniversalArray<'item>(self.capacity)
+        self.data = __ua_alloc(self.capacity)
     }
 
     pub fn len(self) {
@@ -157,13 +157,13 @@ class List<'item> {
 
     pub fn resize(self, capacity) {
         self.capacity = capacity
-        self.data = bufresize(self.data, self.capacity);
+        self.data = __ua_resize(self.data, self.capacity);
     }
 
     pub fn push(self, item: 'item) {
         if self.length + 1 >= self.capacity then
             self.resize(self.capacity + 10)
-        bufset(self.data, self.length, item)
+        __ua_set(self.data, self.length, item)
         self.length = self.length + 1
     }
 
@@ -171,14 +171,14 @@ class List<'item> {
         if index >= self.length then
             nil //raise -1
         else
-            bufget(self.data, index)
+            __ua_get(self.data, index)
     }
 
     pub fn [](self, index: Int, item: 'item) -> 'item {
         if index >= self.length then
             nil //raise "IndexError: array index is out of bounds"
         else {
-            bufset(self.data, index, item);
+            __ua_set(self.data, index, item);
             item
         }
     }
@@ -196,8 +196,8 @@ class List<'item> {
         if index >= self.length then {
             self.push(item)
         } else {
-            let cur = bufget(self.data, index)
-            bufset(self.data, index, item)
+            let cur = __ua_get(self.data, index)
+            __ua_set(self.data, index, item)
             self.move_right(index + 1, cur)
         }
     }
@@ -208,8 +208,8 @@ class List<'item> {
             self.push(item);
             // TODO this is here because of a bug during the type refactor that was creating invalid IR fur the return type
         } else {
-            let cur = bufget(self.data, index)
-            bufset(self.data, index, item)
+            let cur = __ua_get(self.data, index)
+            __ua_set(self.data, index, item)
             self.insert(index + 1, cur)
         }
     }
@@ -261,11 +261,11 @@ class HashMapNode<'item> {
 
 class HashMap<'item> {
     let mut size = 0
-    let mut data: Buffer<HashMapNode<'item>> = nil
+    let mut data: UniversalArray<HashMapNode<'item>> = nil
 
     pub fn new(self) {
         self.size = 10
-        self.data = new Buffer<HashMapNode<'item>>(self.size)
+        self.data = new UniversalArray<HashMapNode<'item>>(self.size)
     }
 
     pub fn resize(self, size) {

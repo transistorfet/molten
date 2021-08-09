@@ -135,14 +135,14 @@ try {
     e => println("EXCEPTION! " + e.msg)
 }
 
-//let mem = bufalloc(10)
-//bufset(mem, 0, thing)
-//let otherthing: Thing = bufget(mem, 0)
+//let mem = __ua_alloc(10)
+//__ua_set(mem, 0, thing)
+//let otherthing: Thing = __ua_get(mem, 0)
 //println(str(otherthing.bar()))
 
-let mem2 = bufalloc(10)
-bufset(mem2, 0, 42)
-let number: Int = bufget(mem2, 0)
+let mem2 = __ua_alloc(10)
+__ua_set(mem2, 0, 42)
+let number: Int = __ua_get(mem2, 0)
 println(str(number))
 
 

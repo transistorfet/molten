@@ -284,28 +284,21 @@ pub fn get_builtins<'sess>() -> Vec<BuiltinDef<'sess>> {
         BuiltinDef::Class(id(), "Real",   vec!(), vec!(), vec!()),
         BuiltinDef::Class(id(), "String", vec!(), vec!(), vec!()),
 
-        //    BuiltinDef::Func(id(), "[]",   "(String, Int) -> Int",            FuncKind::Runtime(build_string_get)),
-        BuiltinDef::Func(id(), "getindex",  "(String, Int) -> Char / C",                    FuncKind::Function(string_get)),
+        BuiltinDef::Func(id(), "getindex",   "(String, Int) -> Char / C",                    FuncKind::Function(string_get)),
 
+        BuiltinDef::Class(id(), "UniversalArray", vec!(Type::Universal(String::from("item"), UniqueID(0))), vec!(), vec!()),
+        BuiltinDef::Func(id(),  "__ua_alloc",     "(Int) -> UniversalArray<'item> / C",                         FuncKind::Function(universal_array_alloc)),
+        BuiltinDef::Func(id(),  "__ua_resize",    "(UniversalArray<'item>, Int) -> UniversalArray<'item> / C",  FuncKind::Function(universal_array_resize)),
+        BuiltinDef::Func(id(),  "__ua_get",       "(UniversalArray<'item>, Int) -> 'item / C",                  FuncKind::Function(universal_array_get)),
+        BuiltinDef::Func(id(),  "__ua_set",       "(UniversalArray<'item>, Int, 'item) -> () / C",              FuncKind::Function(universal_array_set)),
 
-        BuiltinDef::Class(id(), "Buffer",   vec!(Type::Universal(String::from("item"), UniqueID(0))), vec!(), vec!()),
-        BuiltinDef::Func(id(), "bufalloc",  "(Int) -> Buffer<'item> / C",                   FuncKind::Function(buffer_alloc)),
-        BuiltinDef::Func(id(), "bufresize", "(Buffer<'item>, Int) -> Buffer<'item> / C",    FuncKind::Function(buffer_resize)),
-        BuiltinDef::Func(id(), "bufget",    "(Buffer<'item>, Int) -> 'item / C",            FuncKind::Function(buffer_get)),
-        BuiltinDef::Func(id(), "bufset",    "(Buffer<'item>, Int, 'item) -> () / C",        FuncKind::Function(buffer_set)),
-
-        /*
-        BuiltinDef::Class(id(), "Buffer", vec!(Type::Universal(String::from("item"), UniqueID(0))), vec!(), vec!(
-            BuiltinDef::Func(id(), "__alloc__",  "() -> Buffer<'item>",                      FuncKind::Method(buffer_allocator)),
-            BuiltinDef::Func(id(), "new",        "(Buffer<'item>, Int) -> Buffer<'item>",    FuncKind::Method(buffer_constructor)),
-            BuiltinDef::Func(id(), "resize",     "(Buffer<'item>, Int) -> Buffer<'item>",    FuncKind::Method(buffer_resize)),
-            BuiltinDef::Func(id(), "[]",         "(Buffer<'item>, Int) -> 'item",            FuncKind::Method(buffer_get_method)),
-            BuiltinDef::Func(id(), "[]",         "(Buffer<'item>, Int, 'item) -> 'item",     FuncKind::Method(buffer_set_method)),
-        )),
-        */
-
-        //BuiltinDef::Class(id(), "List",   vec!(Type::Universal(String::from("item"), UniqueID(0))), vec!(), vec!()),
-        //BuiltinDef::Class(id(), "Class",  Type::Object(String::from("Class"), vec!())),
+        //BuiltinDef::Class(id(), "UniversalArray", vec!(Type::Universal(String::from("item"), UniqueID(0))), vec!(), vec!(
+        //    BuiltinDef::Func(id(), "__init__",   "(UniversalArray<'item>) -> UniversalArray<'item>",        FuncKind::Method(universal_array_init)),
+        //    BuiltinDef::Func(id(), "new",        "(UniversalArray<'item>, Int) -> UniversalArray<'item>",   FuncKind::Method(universal_array_new)),
+        //    BuiltinDef::Func(id(), "resize",     "(UniversalArray<'item>, Int) -> UniversalArray<'item>",   FuncKind::Method(buffer_resize)),
+        //    BuiltinDef::Func(id(), "[]",         "(UniversalArray<'item>, Int) -> 'item",                   FuncKind::Method(buffer_get_method)),
+        //    BuiltinDef::Func(id(), "[]",         "(UniversalArray<'item>, Int, 'item) -> 'item",            FuncKind::Method(buffer_set_method)),
+        //)),
 
         BuiltinDef::Func(id(), "strlen",     "(String) -> Int / C",             FuncKind::External),
         BuiltinDef::Func(id(), "strcmp",     "(String, String) -> Int / C",     FuncKind::External),
@@ -314,10 +307,6 @@ pub fn get_builtins<'sess>() -> Vec<BuiltinDef<'sess>> {
         BuiltinDef::Func(id(), "strcmp",     "(String, String) -> Int / C",     FuncKind::External),
         BuiltinDef::Func(id(), "puts",       "(String) -> () / C",              FuncKind::External),
         BuiltinDef::Func(id(), "gets",       "(String) -> String / C",          FuncKind::External),
-        BuiltinDef::Func(id(), "strlen",     "(String) -> Int / C",             FuncKind::External),
-        //BuiltinDef::Func(id(), "sprintf",    "'tmp",                          FuncKind::FromNamed),
-        //BuiltinDef::Func(id(), "sprintf2",    "(String, String, '__a1, '__a2) -> () / C", FuncKind::Function(sprintf)),
-        BuiltinDef::Func(id(), "sprintf",    "(String, String, '__a1, '__a2) -> () / C", FuncKind::FromNamed),
         */
 
         BuiltinDef::Func(id(), "print",      "(String) -> () / C",              FuncKind::Function(print)),
@@ -481,57 +470,6 @@ unsafe fn molten_free(llvm: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef {
 }
 
 
-
-unsafe fn buffer_alloc(llvm: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef {
-    let size = LLVMBuildMul(llvm.builder, args[0], LLVMSizeOf(llvm.i64_type()), cstr(""));
-    let ptr = llvm.build_call_by_name("molten_malloc", &mut vec!(size));
-    LLVMBuildPointerCast(llvm.builder, ptr, llvm.ptr_type(), cstr("ptr"))
-}
-
-unsafe fn buffer_resize(llvm: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef {
-    let buffer = LLVMBuildPointerCast(llvm.builder, args[0], llvm.str_type(), cstr(""));
-    let size = LLVMBuildMul(llvm.builder, args[1], LLVMSizeOf(llvm.i64_type()), cstr(""));
-    let newptr = llvm.build_call_by_name("molten_realloc", &mut vec!(buffer, size));
-    LLVMBuildPointerCast(llvm.builder, newptr, llvm.ptr_type(), cstr("ptr"))
-}
-
-unsafe fn buffer_get(llvm: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef {
-    // TODO generate this in place of the custom function
-    //Return(
-    //  AccessVar(
-    //    AccessOffset(
-    //        AccessValue(arg 0),
-    //        Cast(AccessValue(arg 1), i32)
-    //    )
-    //  )
-    //)
-    // AccessOffset has one index, AccessField has a (0, fieldnum) to deref it first
-
-    let index = LLVMBuildCast(llvm.builder, llvm::LLVMOpcode::LLVMTrunc, args[1], llvm.i32_type(), cstr("tmp"));
-    let mut indices = vec!(index);
-    let pointer = LLVMBuildGEP(llvm.builder, args[0], indices.as_mut_ptr(), indices.len() as u32, cstr("tmp"));
-    LLVMBuildLoad(llvm.builder, pointer, cstr("tmp"))
-}
-
-unsafe fn buffer_set(llvm: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef {
-    let index = LLVMBuildCast(llvm.builder, llvm::LLVMOpcode::LLVMTrunc, args[1], llvm.i32_type(), cstr("tmp"));
-    let mut indices = vec!(index);
-    let pointer = LLVMBuildGEP(llvm.builder, args[0], indices.as_mut_ptr(), indices.len() as u32, cstr("tmp"));
-    let value = llvm.build_cast(llvm.str_type(), args[2]);
-    LLVMBuildStore(llvm.builder, value, pointer);
-
-    llvm.i32_const(0)
-}
-
-
-unsafe fn string_get(llvm: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef {
-    let mut indices = vec!(args[1]);
-    let pointer = LLVMBuildGEP(llvm.builder, args[0], indices.as_mut_ptr(), indices.len() as u32, cstr(""));
-    let value = LLVMBuildLoad(llvm.builder, pointer, cstr(""));
-    LLVMBuildCast(llvm.builder, llvm::LLVMOpcode::LLVMZExt, value, llvm.i32_type(), cstr(""))
-}
-
-
 unsafe fn print(llvm: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef {
     llvm.build_call_by_name("fputs", &mut vec!(args[0], llvm.build_load(LLVMGetNamedGlobal(llvm.module, cstr("stdout")))));
     llvm.i32_const(0)
@@ -585,7 +523,6 @@ unsafe fn real_to_str(llvm: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef {
     buffer
 }
 
-
 unsafe fn add_str(llvm: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef {
     let len1 = llvm.build_call_by_name("strlen", &mut vec!(args[0]));
     let len2 = llvm.build_call_by_name("strlen", &mut vec!(args[1]));
@@ -606,4 +543,98 @@ unsafe fn ne_str(llvm: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef {
     let result = llvm.build_call_by_name("strcmp", &mut vec!(args[0], args[1]));
     LLVMBuildICmp(llvm.builder, llvm_sys::LLVMIntPredicate::LLVMIntNE, result, llvm.i64_const(0), cstr(""))
 }
+
+unsafe fn string_get(llvm: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef {
+    let mut indices = vec!(args[1]);
+    let pointer = LLVMBuildGEP(llvm.builder, args[0], indices.as_mut_ptr(), indices.len() as u32, cstr(""));
+    let value = LLVMBuildLoad(llvm.builder, pointer, cstr(""));
+    LLVMBuildCast(llvm.builder, llvm::LLVMOpcode::LLVMZExt, value, llvm.i32_type(), cstr(""))
+}
+
+
+
+unsafe fn universal_array_alloc(llvm: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef {
+    let size = LLVMBuildMul(llvm.builder, args[0], LLVMSizeOf(llvm.tvar_type()), cstr(""));
+    let ptr = llvm.build_call_by_name("molten_malloc", &mut vec!(size));
+    LLVMBuildPointerCast(llvm.builder, ptr, llvm.ptr_of(llvm.tvar_type()), cstr("ptr"))
+}
+
+unsafe fn universal_array_resize(llvm: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef {
+    let buffer = LLVMBuildPointerCast(llvm.builder, args[0], llvm.str_type(), cstr(""));
+    let size = LLVMBuildMul(llvm.builder, args[1], LLVMSizeOf(llvm.tvar_type()), cstr(""));
+    let newptr = llvm.build_call_by_name("molten_realloc", &mut vec!(buffer, size));
+    LLVMBuildPointerCast(llvm.builder, newptr, llvm.ptr_of(llvm.tvar_type()), cstr("ptr"))
+}
+
+unsafe fn universal_array_get(llvm: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef {
+    let index = LLVMBuildCast(llvm.builder, llvm::LLVMOpcode::LLVMTrunc, args[1], llvm.i32_type(), cstr("tmp"));
+    let mut indices = vec!(index);
+    let pointer = LLVMBuildGEP(llvm.builder, args[0], indices.as_mut_ptr(), indices.len() as u32, cstr("tmp"));
+    LLVMBuildLoad(llvm.builder, pointer, cstr("tmp"))
+}
+
+unsafe fn universal_array_set(llvm: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef {
+    let index = LLVMBuildCast(llvm.builder, llvm::LLVMOpcode::LLVMTrunc, args[1], llvm.i32_type(), cstr("tmp"));
+    let mut indices = vec!(index);
+    let pointer = LLVMBuildGEP(llvm.builder, args[0], indices.as_mut_ptr(), indices.len() as u32, cstr("tmp"));
+    let value = llvm.build_cast(llvm.tvar_type(), args[2]);
+    LLVMBuildStore(llvm.builder, value, pointer);
+
+    llvm.i32_const(0)
+}
+
+
+
+/*
+unsafe fn universal_array_type(llvm: &LLVM) -> LLVMTypeRef {
+    llvm.build_type(&LLType::Struct(vec!(LLType::I64, LLType::Ptr(r(LLType::Var)))))
+}
+
+unsafe fn universal_array_alloc(llvm: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef {
+    let size = LLVMBuildMul(llvm.builder, args[0], LLVMSizeOf(llvm.tvar_type()), cstr(""));
+    let ptr = llvm.build_call_by_name("molten_malloc", &mut vec!(size));
+    let data = LLVMBuildPointerCast(llvm.builder, ptr, llvm.ptr_of(llvm.tvar_type()), cstr("data"));
+
+    llvm.build_struct(universal_array_type(llvm), vec!(args[0], data))
+}
+
+unsafe fn universal_array_resize(llvm: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef {
+    let obj = args[0];
+    let newlen = args[1];
+
+    let olddata = llvm.build_get_item(obj, 1);
+    let size = LLVMBuildMul(llvm.builder, newlen, LLVMSizeOf(llvm.tvar_type()), cstr(""));
+    let ptr = llvm.build_call_by_name("molten_realloc", &mut vec!(olddata, size));
+    let data = LLVMBuildPointerCast(llvm.builder, ptr, llvm.ptr_of(llvm.tvar_type()), cstr("data"));
+    llvm.build_set_item(obj, 1, data);
+    llvm.build_set_item(obj, 0, newlen);
+    obj
+}
+
+unsafe fn universal_array_get(llvm: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef {
+    let obj = args[0];
+    let index = args[1];
+
+    // TODO this is blind atm (no check for length)
+    let data = llvm.build_get_item(obj, 1);
+    let mut indices = vec!(index);
+    let pointer = LLVMBuildGEP(llvm.builder, data, indices.as_mut_ptr(), indices.len() as u32, cstr("tmp"));
+    LLVMBuildLoad(llvm.builder, pointer, cstr("tmp"))
+}
+
+unsafe fn universal_array_set(llvm: &LLVM, args: Vec<LLVMValueRef>) -> LLVMValueRef {
+    let obj = args[0];
+    let index = args[1];
+    let value = args[2];
+
+    // TODO this is blind atm (no check for length)
+    let data = llvm.build_get_item(obj, 1);
+    let mut indices = vec!(index);
+    let pointer = LLVMBuildGEP(llvm.builder, data, indices.as_mut_ptr(), indices.len() as u32, cstr("tmp"));
+    let value = llvm.build_cast(llvm.tvar_type(), value);
+    LLVMBuildStore(llvm.builder, value, pointer);
+
+    llvm.i32_const(0)
+}
+*/
 

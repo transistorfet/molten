@@ -57,7 +57,7 @@ impl<'sess> Transformer<'sess> {
         self.set_type(global.get_type_def(&"Int".to_string()).unwrap(), LLType::I64);
         self.set_type(global.get_type_def(&"Real".to_string()).unwrap(), LLType::F64);
         self.set_type(global.get_type_def(&"String".to_string()).unwrap(), LLType::Ptr(r(LLType::I8)));
-        self.set_type(global.get_type_def(&"Buffer".to_string()).unwrap(), LLType::Ptr(r(LLType::Ptr(r(LLType::I8)))));
+        self.set_type(global.get_type_def(&"UniversalArray".to_string()).unwrap(), LLType::Ptr(r(LLType::Var)));
 
         self.initialize_exception_type();
     }
