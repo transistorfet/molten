@@ -1,7 +1,0 @@
-
-import lib.libcore
-
-class NumList<'a> extends List<Int> {
-    let x: 'a = nil
-}
-

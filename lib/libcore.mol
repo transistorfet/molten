@@ -139,7 +139,7 @@ class Iterator<'item> {
     pub fn reset(self) => ()
 }
 
-class List<'item> {
+class Array<'item> {
     let mut capacity: Int
     let mut length: Int
     let mut data: UniversalArray<'item> = nil
@@ -214,17 +214,17 @@ class List<'item> {
         }
     }
 
-    // TODO can't forward reference ListIterator
+    // TODO can't forward reference ArrayIterator
     //fn iter() {
-    //    new ListIterator<'item>(self)
+    //    new ArrayIterator<'item>(self)
     //}
 
     // TODO add map, filter, reduce? Or should they go on the iterator parent class?
 }
 
-class ListIterator<'item> extends Iterator<'item> {
+class ArrayIterator<'item> extends Iterator<'item> {
     let mut index = 0
-    let mut list: List<'item> = nil
+    let mut list: Array<'item> = nil
 
     pub fn new(self, list) {
         self.index = 0

@@ -883,7 +883,7 @@ named!(literal(Span) -> AST,
         number |
         tuple |
         record |
-        list
+        array
     )
 );
 
@@ -1029,7 +1029,7 @@ named!(record_field_assignments(Span) -> Vec<(String, AST)>,
     ))
 );
 
-named!(list(Span) -> AST,
+named!(array(Span) -> AST,
     do_parse!(
         pos: position!() >>
         l: delimited!(
@@ -1037,7 +1037,7 @@ named!(list(Span) -> AST,
             wscom!(separated_list0!(wscom!(tag!(",")), expression)),
             tag!("]")
         ) >>
-        (AST::List(Pos::new(pos), l))
+        (AST::Array(Pos::new(pos), l))
     )
 );
 

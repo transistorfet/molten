@@ -34,7 +34,7 @@ pub enum AST {
     Deref(Pos, R<AST>),
     Bracketed(R<AST>),
 
-    List(Pos, Vec<AST>),
+    Array(Pos, Vec<AST>),
     Tuple(Pos, Vec<AST>),
     Record(Pos, Vec<(String, AST)>),
     RecordUpdate(Pos, R<AST>, Vec<(String, AST)>),
@@ -121,7 +121,7 @@ impl AST {
         match *self {
             AST::Ref(pos, _) |
             AST::Deref(pos, _) |
-            AST::List(pos, _) |
+            AST::Array(pos, _) |
             AST::Tuple(pos, _) |
             AST::Record(pos, _) |
             AST::RecordUpdate(pos, _, _) |

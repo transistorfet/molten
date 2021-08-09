@@ -76,7 +76,7 @@ Real
 String
 (Int, Int) -> Int   // function type
 'a                  // type variable
-List<Int>           // list of integers
+Array<Int>          // array of integers
 (Int, Real)         // tuple type
 { a: Int, b: Real } // record type
 ```
@@ -190,15 +190,15 @@ for i in [ 1, 2, 3 ]
     println("counting " + i)
 ```
 
-### Lists
+### Arrays
 ```
-let list1 = [ 1, 3, 6 ]
-for x in list1
+let array1 = [ 1, 3, 6 ]
+for x in array1
     println(str(x))
 
-let list2 = new List<String>();
-list2.insert(0, "Hello")
-println(list2[0])
+let array2 = new Array<String>();
+array2.insert(0, "Hello")
+println(array2[0])
 ```
 
 ### Tuples

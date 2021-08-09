@@ -1,24 +1,26 @@
 
-* can you remove access to getindex, buffer, etc?
-* if you had a way of indexing an object easily, given an llvm object, then you can fix the print() functions to take a SuperString (which would become String)
-* You could have a mutable ByteArray type, which contains the length, or an immutable ByteString or ZByteString that can be passed to C functions, so that SuperString
-  could have a ByteArray with the ability to index it (which would check the length), while a ZByteString would be unindexable (an opaque type)
+* can you remove access to getindex?
+* if you had a way of class field indexing an object easily, given an llvm object, then you can fix the print() functions to take a SuperString (which would become String)
+* you could also add a native array type (like a slice, with a pointer and size value in a pair)
 
 * ByteString or ByteArray
-* Array
-* you could also add a native array type (like a slice, with a size)
-
 * rename String type to ByteString, ByteArray, or CString, or ZString, or NullString, or NullByteArray, or ZByteArray, RawString;  I'm leaning ZByteArray or ByteString
 * rename SuperString type to String, will require a bunch of libcore changes
-* rename List to Array or Vec
 
 
-* you have to disallow the situation where a function returns a type variable that doesn't appear elsewhere in the definition, but that is then cast to a concrete type.  This
-  is a blind cast and is unsafe, but we're currently relying on it for memory allocations and such
+* remove nil (requires changes to constructors/init)
 * split AST and Expr pattern matching to make the expr stuff easier to use. The identifier and resolve patterns are kind of clunky and there's a syntax error in bindings which
   should be in refinery if possible
 * do you need to test unification between class and parent class, as well as trait def and impl type?
 * should you have a check of class/enum type parameters to make sure they are Universals (or that they contain Universals), otherwise error since using a fixed typeparam is pointless
+* I'd really like to change the way method calls are done.  It's annoying having all these definitions and blocks for every call
+  but this might not be possible because you need to bind references during type checking, and you can't do that without all the variants
+
+* write overview
+* implement trait dependence
+* implement the record and tuple pattern matching
+* add (finalize) iterators
+
 
 * add some way of creating a traitobj using a def or annotation (issues with universals vs variables and mapping typevars; using check_type(..., false) works but might not be correct)
 
@@ -26,39 +28,24 @@
 * should you use a different format for trait objects vs unbound universals?
 * should you make it so that only functions/classes/enumdefs/etc can create a universal, and other places like new/definition/etc will raise an error if they are undefined, is this useful?
 
-* I'd really like to change the way method calls are done.  It's annoying having all these definitions and blocks for every call
-  but this might not be possible because you need to bind references during type checking, and you can't do that without all the variants
-
-
-* write overview
-* implement trait dependence
-* implement the record and tuple pattern matching
-
-
+* add common constants for various context and vtable strings throughout, instead of dupilcating strings
+* for Expr resolve and accessor, the oid's could maybe be integrated into the ident? same for invoke now?  well now traits are using oid for a ref...
 * can you make closure conversion a separate stage somehow, possibly with a MutVisitor
 * can you make an exception conversion mut visitor? to add the execption argument to everything
 * can you put a validation stage in that can check for overloading at the end of type checking rather than during.  Trait impl checking can be moved there too
 * can you remove some of the weirder ref trails (a ref to a ref to a ref), to make things simpler and more predictable? overload variants, enum variants, and traits use them
 * you can maybe store more info in the defs, including the context of the function (Plain, Class Method, Trait Method), and then use that during transform
-* add common constants for various context and vtable strings throughout, instead of dupilcating strings
 * add a check to make sure trait defs are all ABI::Molten
 * reduce the number of clone()s
 * for transformer, you could have a list of 'bodies' of code, which are appended to by the transform functions, rather than returned.
   It could also store the context, but you'd have to add a body when transforming `if`, `while`, `sideeffect`, `match`, `try`, and `import`
 * move the pattern transform functions into the visitor, but right now you're passing in a value_id to use for comparisons.  It'd have to be stored in the transformer obj insteado
-* for Expr resolve and accessor, the oid's could maybe be integrated into the ident? same for invoke now?  well now traits are using oid for a ref...
-
 
 * will there be an issue where declaring a function that's external, but not via an import, might cause the global variable to be defined incorrectly??
 * need a way to import/compile directory of many files (libcore as many files)
 * fix the module keyword to have the dot name instead of the underscore name, and try to remove the special case in transform
 * remove the forced visibility in refinery, when you decide on pub/priv semantics
-
-* should you make it possible to call a trait method via a resolve; eg. Add::add(x, y).  The issue is that vtable is in the objects
-
-* add (finalize) iterators
 * there is an issue with raise, in that it is considered to return unit () instead of somehow being marked as not returning...  Getting type errors in Option def
-
 
 
 
@@ -110,12 +97,9 @@ Error Messages:
 * should you make mutable modifiers more strict, like rust?
 
 
-
 Refactoring:
 * improve storing of file info in the Pos structs (maybe rename to Span?)
 * change parser to take session argument or something so it can record the file info, and maybe do other advanced things
-
-
 
 
 
@@ -165,6 +149,7 @@ Changes:
 
 
 * should you remove the Nil type? (yes, but it'll be a bit tricky)
+* should you make it possible to call a trait method via a resolve; eg. Add::add(x, y).  The issue is that vtable is in the objects
 * should you fix scope resolution to also work on objects, so that you can have static methods from the object without explicitly referencing its type
 * should exports also list all the modules that the file imports, so that class definitions in other imports can be found, if needed for arguments
 * should you add break/continue statements for loops
@@ -190,13 +175,6 @@ EXAMPLE PROGRAM IDEAS:
 
 * hash table
 * regex matcher
-
-
-NOT REALLY BUGS:
-
-* mabye not a bug, but unable to define a method as / MF or / C ABI
-* not really a bug, but if you only have one element in a tuple, or in a record, it parses it as a block or expression
-* not really a bug, but empty lists cannot be typechecked to concrete types unless it's explicitly provided ("[]" on its own)
 
 
 COMPLETED TESTS (for reference):

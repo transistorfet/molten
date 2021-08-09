@@ -148,7 +148,7 @@ println(str(number))
 
 
 //let list = [ 1, 2, 3 ]
-//let iter = new ListIterator<Int>(list)
+//let iter = new ArrayIterator<Int>(list)
 //println(str(iter.next()))
 //println(str(iter.next()))
 //println(str(iter.next()))

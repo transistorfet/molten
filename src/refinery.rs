@@ -181,8 +181,8 @@ impl<'sess> Refinery<'sess> {
                 Expr::make_while(pos, self.refine_node(*cond)?, self.refine_node(*body)?)
             },
 
-            AST::For(pos, ident, list, body) => {
-                self.desugar_for_loop(pos, ident, *list, *body)?
+            AST::For(pos, ident, array, body) => {
+                self.desugar_for_loop(pos, ident, *array, *body)?
             },
 
             AST::Ref(pos, expr) => { Expr::make_ref(pos, self.refine_node(*expr)?) },
@@ -227,8 +227,8 @@ impl<'sess> Refinery<'sess> {
                 self.desugar_trait_impl(pos, traitname, impltype, whereclause, body)?
             },
 
-            AST::List(pos, items) => {
-                self.desugar_list(pos, items)?
+            AST::Array(pos, items) => {
+                self.desugar_array(pos, items)?
             },
 
             AST::New(pos, ttype, args) => {
@@ -315,32 +315,32 @@ impl<'sess> Refinery<'sess> {
         Ok(pat)
     }
 
-    pub fn desugar_for_loop(&self, pos: Pos, ident: String, list: AST, body: AST) -> Result<Expr, Error> {
+    pub fn desugar_for_loop(&self, pos: Pos, ident: String, array: AST, body: AST) -> Result<Expr, Error> {
         let mut block = vec!();
         let mut cond_block = vec!();
         let mut body_block = vec!();
 
         let iter = format!("{}", NodeID::generate());
-        let listname = format!("{}", NodeID::generate());
+        let arrayname = format!("{}", NodeID::generate());
 
         let access_iter = || AST::Identifier(pos, iter.clone());
-        let access_list = || AST::Identifier(pos, listname.clone());
-        let access_list_field = |field: &str| AST::Accessor(pos, r(access_list()), field.to_string());
+        let access_array = || AST::Identifier(pos, arrayname.clone());
+        let access_array_field = |field: &str| AST::Accessor(pos, r(access_array()), field.to_string());
         let invoke = |func, args| AST::Invoke(pos, func, args);
 
-        // define the list variable
-        block.push(Expr::make_def(pos, Mutability::Mutable, listname.clone(), None, self.refine_node(list)?));
+        // define the array variable
+        block.push(Expr::make_def(pos, Mutability::Mutable, arrayname.clone(), None, self.refine_node(array)?));
 
         // define the iterator index variable
         block.push(Expr::make_def(pos, Mutability::Mutable, iter.clone(), None, Expr::make_lit(Literal::Integer(0))));
 
-        // compare if iterator index is < length of list
+        // compare if iterator index is < length of array
         cond_block.push(self.refine_node(invoke(r(AST::Identifier(pos, "<".to_string())),
-            vec!(access_iter(), invoke(r(access_list_field("len")), vec!()))))?);
+            vec!(access_iter(), invoke(r(access_array_field("len")), vec!()))))?);
 
         // assign the next value to the item variable
         body_block.push(Expr::make_def(pos, Mutability::Immutable, ident, None,
-            self.refine_node(invoke(r(access_list_field("get")), vec!(access_iter())))?));
+            self.refine_node(invoke(r(access_array_field("get")), vec!(access_iter())))?));
 
         body_block.push(self.refine_node(body)?);
 
@@ -416,19 +416,18 @@ impl<'sess> Refinery<'sess> {
         Ok(Expr::make_class(pos, classtype, parenttype, whereclause, body))
     }
 
-    pub fn desugar_list(&self, pos: Pos, items: Vec<AST>) -> Result<Expr, Error> {
+    pub fn desugar_array(&self, pos: Pos, items: Vec<AST>) -> Result<Expr, Error> {
         let mut block = vec!();
-        let tmplist = format!("{}", UniqueID::generate());
+        let tmparray = format!("{}", UniqueID::generate());
 
-        // TODO this makes lists immutable, which might not be what we want
-        block.push(AST::Definition(pos, Mutability::Immutable, tmplist.clone(), None,
-            r(AST::New(pos, Type::Object("List".to_string(), UniqueID(0), vec!(Type::Variable(UniqueID::generate()))), vec!(/*, AST::Integer(items.len() as isize)*/)))));
+        block.push(AST::Definition(pos, Mutability::Immutable, tmparray.clone(), None,
+            r(AST::New(pos, Type::Object("Array".to_string(), UniqueID(0), vec!(Type::Variable(UniqueID::generate()))), vec!(/*, AST::Integer(items.len() as isize)*/)))));
         for item in items {
             block.push(AST::Invoke(pos,
-                r(AST::Accessor(pos, r(AST::Identifier(pos, tmplist.clone())), "push".to_string())),
+                r(AST::Accessor(pos, r(AST::Identifier(pos, tmparray.clone())), "push".to_string())),
                 vec!(item)));
         }
-        block.push(AST::Identifier(pos, tmplist.clone()));
+        block.push(AST::Identifier(pos, tmparray.clone()));
         Ok(Expr::make_block(pos, self.refine_vec(block)))
     }
 
