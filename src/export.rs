@@ -102,7 +102,7 @@ impl<'sess> Visitor for ExportsCollector<'sess> {
         //self.declarations.push_str(&format!("    decl __init__({}) -> Nil\n", namespec));
         for node in body {
             match &node.kind {
-                ExprKind::Definition(mutable, name, _, _) => {
+                ExprKind::Field(mutable, name, _) => {
                     let defid = self.session.get_ref(node.id)?;
                     self.declarations.push_str("    ");
                     self.declarations.push_str(&emit_field(self.session, defid, *mutable, name));

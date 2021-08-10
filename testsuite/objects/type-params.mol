@@ -3,16 +3,16 @@ class Tester<'a, 'b> {
     val a: 'a
     val b: 'b
 
-    fn new(self) {
-        self.a = nil
-        self.b = nil
+    fn new(self, a: 'a, b: 'b) {
+        self.a = a
+        self.b = b
     }
 }
 
 // Issue with number type parameters being different between a type alias and a class
 type Special<'x> = Tester<Int, 'x>
 
-let tester = new Special<String>();
+let tester = new Special<String>(10, "");
 
 
 // Issue with fewer parameters in child than in parent
@@ -20,13 +20,17 @@ class BetterTester<'a> extends Tester<'a, Int> {
     fn foo(self) { }
 }
 
-let better = new BetterTester<String>();
+let better = new BetterTester<String>("", 0);
 
 // Issue with more parameters in child than in parent
 class WorseTester<'a, 'b, 'c> extends Tester<'c, 'a> {
+    fn new(self, a: 'a, b: 'b, c: 'c) {
+        Super::new(self, c, a)
+    }
+
     fn foo(self) { }
 }
 
-let worse = new WorseTester<String, Int, Char>();
+let worse = new WorseTester<String, Int, Char>("", 0, 'n');
 
 

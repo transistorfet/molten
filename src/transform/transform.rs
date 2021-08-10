@@ -288,6 +288,11 @@ impl<'sess> Visitor for Transformer<'sess> {
         Ok(self.transform_def_local(refid, name, expr))
     }
 
+    fn visit_field(&mut self, _refid: NodeID, _mutable: Mutability, _name: &str, _ttype: &Option<Type>) -> Result<Self::Return, Error> {
+        // Do nothing because a field only appears inside a structdef
+        Ok(vec!())
+    }
+
     fn visit_assignment(&mut self, refid: NodeID, left: &Expr, right: &Expr, _ty: AssignType) -> Result<Self::Return, Error> {
         Ok(self.transform_assignment(refid, left, right))
     }

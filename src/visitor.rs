@@ -250,6 +250,10 @@ pub trait Visitor: Sized {
         self.visit_node(expr)
     }
 
+    fn visit_field(&mut self, _id: NodeID, _mutable: Mutability, _name: &str, _ttype: &Option<Type>) -> Result<Self::Return, Error> {
+        Ok(self.default_return())
+    }
+
     fn visit_assignment(&mut self, _id: NodeID, left: &Expr, right: &Expr, ty: AssignType) -> Result<Self::Return, Error> {
         walk_assignment(self, left, right, ty)
     }
@@ -557,6 +561,10 @@ pub fn walk_node<R, V: Visitor<Return = R>>(visitor: &mut V, node: &Expr) -> Res
 
         ExprKind::Definition(mutable, name, ttype, expr) => {
             visitor.visit_definition(node.id, *mutable, &name, ttype, expr)
+        },
+
+        ExprKind::Field(mutable, name, ttype) => {
+            visitor.visit_field(node.id, *mutable, &name, ttype)
         },
 
         ExprKind::Assignment(left, right, ty) => {

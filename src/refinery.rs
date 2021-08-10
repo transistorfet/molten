@@ -250,6 +250,10 @@ impl<'sess> Refinery<'sess> {
                 self.desugar_class(pos, classtype, parenttype, whereclause, body)?
             },
 
+            AST::Field(pos, mutable, ident, ttype) => {
+                Expr::make_field(pos, mutable, ident, ttype)
+            },
+
             AST::Index(pos, base, index) => {
                 self.refine_node(AST::Invoke(pos, r(AST::Accessor(pos, base, "[]".to_string())), vec!(*index)))?
             },

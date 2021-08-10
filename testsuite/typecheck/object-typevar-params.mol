@@ -6,34 +6,38 @@
 
 import lib.libcore
 
+enum Nullable<'item> =
+| Null
+| Some('item)
+
 class Option2<'item> {
     val mut has
-    val mut item: 'item
+    val mut item: Nullable<'item>
 
     fn new(self) {
         self.has = false
-        self.item = nil
+        self.item = Nullable::Null
     }
 
     fn some(item: 'item) {
         let opt = new Option2<'item>()
         opt.has = true
-        opt.item = item
+        opt.item = Nullable::Some(item)
         opt
     }
 
     fn none() {
         let opt = new Option2<'item>()
         opt.has = false
-        opt.item = nil
+        opt.item = Nullable::Null
         opt
     }
 
     fn unwrap_or(self, item: 'item) {
-        if self.has then
-            self.item
-        else
-            item
+        match self.item {
+            Nullable::Null => item
+            Nullable::Some(a) => a
+        }
     }
 }
 

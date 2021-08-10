@@ -111,6 +111,15 @@ impl<'sess> Visitor for NameBinder<'sess> {
         self.visit_node(expr)
     }
 
+    fn visit_field(&mut self, refid: NodeID, mutable: Mutability, name: &str, ttype: &Option<Type>) -> Result<Self::Return, Error> {
+        let defid = self.session.new_def_id(refid);
+
+        let scope = self.stack.get_scope();
+        let ttype = self.bind_type_option(scope.clone(), ttype.clone())?;
+        AnyVar::define(self.session, scope.clone(), defid, mutable, name, ttype)?;
+        Ok(())
+    }
+
     fn visit_declare(&mut self, refid: NodeID, vis: Visibility, name: &str, ttype: &Type, whereclause: &WhereClause) -> Result<Self::Return, Error> {
         let defid = self.session.new_def_id(refid);
 

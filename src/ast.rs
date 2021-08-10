@@ -69,6 +69,7 @@ pub enum AST {
     ModuleDecl(Pos, String),
     Import(Pos, String, Vec<AST>),
     Definition(Pos, Mutability, String, Option<Type>, R<AST>),
+    Field(Pos, Mutability, String, Option<Type>),
     Assignment(Pos, R<AST>, R<AST>, AssignType),
 }
 

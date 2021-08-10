@@ -89,7 +89,7 @@ impl<'sess> Visitor for Validator<'sess> {
         let mut names = HashMap::new();
         for node in body.iter() {
             match &node.kind {
-                ExprKind::Definition(_, name, _, _) => {
+                ExprKind::Field(_, name, _) => {
                     let defid = self.session.get_ref(node.id)?;
                     names.insert(name, defid);
                 },

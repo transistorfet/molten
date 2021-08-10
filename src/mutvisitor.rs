@@ -54,6 +54,7 @@ pub fn walk_mut_node<V: MutVisitor>(visitor: &mut V, node: &mut Expr) {
         ExprKind::Enum(_, _, _) => { },
         ExprKind::TraitDef(_, _) => { },
         ExprKind::ModuleDecl(_) => { },
+        ExprKind::Field(_, _, _) => { },
 
         ExprKind::Annotation(_, expr) |
         ExprKind::Ref(expr) |

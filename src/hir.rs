@@ -143,6 +143,7 @@ pub enum ExprKind {
 
     Import(String, Vec<Expr>),
     Definition(Mutability, String, Option<Type>, R<Expr>),
+    Field(Mutability, String, Option<Type>),
     Assignment(R<Expr>, R<Expr>, AssignType),
 
     Module(String, R<Expr>, NodeID),
@@ -381,6 +382,11 @@ impl Expr {
     #[allow(dead_code)]
     pub fn make_def(pos: Pos, mutable: Mutability, ident: String, ttype: Option<Type>, value: Expr) -> Expr {
         Expr { id: NodeID::generate(), pos: pos, kind: ExprKind::Definition(mutable, ident, ttype, r(value)) }
+    }
+
+    #[allow(dead_code)]
+    pub fn make_field(pos: Pos, mutable: Mutability, ident: String, ttype: Option<Type>) -> Expr {
+        Expr { id: NodeID::generate(), pos: pos, kind: ExprKind::Field(mutable, ident, ttype) }
     }
 
     #[allow(dead_code)]

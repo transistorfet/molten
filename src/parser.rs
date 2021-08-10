@@ -241,12 +241,11 @@ named!(classfield(Span) -> AST,
         wscom!(tag_word!("val")) >>
         m: mutability >>
         i: identifier_typed >>
-        (AST::Definition(
+        (AST::Field(
             Pos::new(pos),
             m,
             i.1,
-            i.2,
-            r(AST::Nil)
+            i.2
         ))
     )
 );

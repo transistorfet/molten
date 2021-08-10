@@ -5,8 +5,8 @@ class Assign<'item> {
     val mut thing: 'item
     val mut thong: String
 
-    fn new(self) {
-        self.thing = nil
+    fn new(self, t: 'item) {
+        self.thing = t
         self.thong = ""
     }
 
@@ -17,7 +17,7 @@ class Assign<'item> {
     }
 }
 
-let assign = new Assign<String>()
+let assign = new Assign<String>("")
 assign.thong = "works"
 println(assign.thong)
 

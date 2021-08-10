@@ -117,7 +117,7 @@ impl ClassDef {
         }
         for node in body.iter() {
             match &node.kind {
-                ExprKind::Definition(mutable, name, _, _) => {
+                ExprKind::Field(mutable, name, _) => {
                     let defid = session.get_ref(node.id).unwrap();
                     self.structdef.add_field(session, defid, *mutable, &name, session.get_type(defid).unwrap().clone(), Define::IfNotExists);
                 },

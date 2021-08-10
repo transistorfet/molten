@@ -195,6 +195,13 @@ impl<'sess> Visitor for TypeChecker<'sess> {
         Ok(btype)
     }
 
+    fn visit_field(&mut self, refid: NodeID, _mutable: Mutability, _name: &str, _ttype: &Option<Type>) -> Result<Self::Return, Error> {
+        let defid = self.session.get_ref(refid)?;
+        let dtype = self.get_type_or_new_typevar(defid);
+        self.session.update_type(defid, &dtype)?;
+        Ok(dtype)
+    }
+
     fn visit_declare(&mut self, _refid: NodeID, _vis: Visibility, _name: &str, _ttype: &Type, _whereclause: &WhereClause) -> Result<Self::Return, Error> {
         let scope = self.stack.get_scope();
         Ok(scope.find_type(self.session, "()")?)

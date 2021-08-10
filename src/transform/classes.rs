@@ -51,25 +51,9 @@ impl<'sess> Transformer<'sess> {
 
         self.transform_class_type_data(classdef.clone(), body);
 
-        self.with_scope(tscope, |transform| {
-            for node in body {
-                match &node.kind {
-                    ExprKind::Function(func) => {
-                        exprs.extend(transform.transform_func_def(node.id, func));
-                    },
-                    ExprKind::Declare(vis, name, _, _) => {
-                        let ttype = transform.session.get_type_from_ref(node.id).unwrap();
-                        exprs.extend(transform.transform_func_decl(ttype.get_abi().unwrap(), node.id, *vis, &name, &ttype));
-                    },
-
-                    // TODO this is the only reason we use this instead of just .visit_vec()
-                    ExprKind::Definition(_, _, _, _) => { },
-
-                    _ => panic!("Not Implemented: {:?}", node),
-                }
-            }
-            Ok(vec!())
-        }).unwrap();
+        exprs.extend(self.with_scope(tscope, |transform| {
+            transform.visit_vec(body)
+        }).unwrap());
 
         match self.get_context() {
             Some(CodeContext::Import) =>

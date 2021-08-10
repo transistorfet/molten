@@ -71,13 +71,13 @@ enum OptionAlt<'item> =
 impl OptionAlt<'item> {
     pub fn unwrap(self) -> 'item {
         match self {
-            None => raise new Exception("Panic: unwrap on none")
-            Some(item) => item
+            OptionAlt::None => raise new Exception("Panic: unwrap on none")
+            OptionAlt::Some(item) => item
         }
     }
 }
 
-fn unwrap(opt: OptionAlt<'item>) -> 'item {
+pub fn unwrap(opt: OptionAlt<'item>) -> 'item {
     match opt {
         OptionAlt::None => raise new Exception("Panic: unwrap on none")
         OptionAlt::Some(item) => item
