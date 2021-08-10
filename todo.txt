@@ -1,25 +1,17 @@
 
-* add test for fields in the constructor not being set, make sure an error is returned
-* add a test for not calling the Super to initialize the parent in a constructor
-* either add a check for Super::new() call, or insert it automatically
+* add check that raise is the last thing in a block
 
 * make sure you can export and import trait defs and impls. make tests for this
 
 * can you remove access to getindex?
 * if you had a way of class field indexing an object easily, given an llvm object, then you can fix the print() functions to take a SuperString (which would become String)
 * you could also add a native array type (like a slice, with a pointer and size value in a pair)
-
 * ByteString or ByteArray
 * rename String type to ByteString, ByteArray, or CString, or ZString, or NullString, or NullByteArray, or ZByteArray, RawString;  I'm leaning ZByteArray or ByteString
 * rename SuperString type to String, will require a bunch of libcore changes
 
 
-* remove nil (requires changes to constructors/init)
-* fix __init__/new problems related to class members
-* can you introduce a special ast or expr that represents a field, instead of using `let`, like `def mut len: Int` no initializers allowed, there would be no __init__ and you would have
-  to initialize each field in each new (verified in the new validation phase using a check of all the structdef fields vs all the access refs in each `new` method)
-* the alternative is adding function arguments to the class def, and using tscope as a function scope which becomes the __init__ body essentially, but this would also mean
-  `new Array<Int>(10)` would only call __init__ with all the arguments being manditory, but convention would be that you do `Array<Int>::new()` which would contain a `new` 
+* remove nil
 * add a never-return type? Or can you add that only to the typechecker somehow, perhaps even returning a special error that can be passed up but ignored once it gets to the nearest vec of exprs
 * split AST and Expr pattern matching to make the expr stuff easier to use. The identifier and resolve patterns are kind of clunky and there's a syntax error in bindings which
   should be in refinery if possible
@@ -63,11 +55,6 @@
 
 DISCUSSION:
 
-* classes shouldn't require a new function if all data has initializers...
-* make definitions always require an initializer
-* there was an error where "let ni: newint" with no initializer was causing a type error with "expected class or concrete type", but that was actually because a definition without
-  an initializer is the same as "let ni: newint = nil" and nil could not be cast to a Record, which newint is a typealias of a record
-
 * make it possible to implement methods on enums
 * you know... it might be possible to make all 'methods' actually be functions with a fixed type for the first argument, since functions can be overloaded, and the
   type would be unique.  I guess it wouldn't work for inheritence, but at least it doesn't cause this weird irregularity between classes/objects and enums (and eventually traits and trait objects)
@@ -102,8 +89,6 @@ Error Messages:
 * when a trait is not implemented, it will produce an unhelpful type error that it expected random variable, but found unimplemented type
 * there is no context info for the ununified variables, which makes it hard to find the issue
 * you can put a restriction on type aliases such that a type can only use type vars defined in the declaration
-* you could require that classes explicitly define their type variables by name, to catch type errors.  So every method or definition in the top level of the class
-  could only use explicitly declared type variables
 * you might not be making sure that non-closure functions don't access variables outside their scope (methods are never closures)
 * make sure that you don't overload different types of functions (closures, functions, and methods must all be the same type to allow overloading)
 * should you make mutable modifiers more strict, like rust?

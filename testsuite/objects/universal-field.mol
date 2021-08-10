@@ -7,7 +7,7 @@ class Assign<'item> {
 
     fn new(self) {
         self.thing = nil
-        self.thong = nil
+        self.thong = ""
     }
 
     fn assign(self, t: 'item) {

@@ -31,7 +31,7 @@ class SuperString {
         if index >= self.len then {
             raise new Exception("Index Out Of Range")
             // TODO this is here because raise returns unit instead of being marked as 'no return' somehow
-            '\0'
+            //'\0'
         } else {
             getindex(self.str, index)
         }
@@ -112,7 +112,7 @@ class Option<'item> {
         if not self.has then {
             raise new Exception("Panic: unwrap on none")
             // TODO this is here because raise returns unit instead of being marked as 'no return' somehow
-            self.item
+            //self.item
         }
         else
             self.item
@@ -172,14 +172,14 @@ class Array<'item> {
 
     pub fn [](self, index: Int) -> 'item {
         if index >= self.length then
-            nil //raise -1
+            raise new Exception("IndexError: array index is out of bounds")
         else
             __ua_get(self.data, index)
     }
 
     pub fn [](self, index: Int, item: 'item) -> 'item {
         if index >= self.length then
-            nil //raise "IndexError: array index is out of bounds"
+            raise new Exception("IndexError: array index is out of bounds")
         else {
             __ua_set(self.data, index, item);
             item

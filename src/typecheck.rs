@@ -264,7 +264,7 @@ impl<'sess> Visitor for TypeChecker<'sess> {
         // TODO should you check for a special error/exception type?
         let extype = scope.find_type(self.session, "Exception")?;
         expect_type(self.session, Some(&extype), Some(&self.visit_node_or_error(expr)), Check::Def)?;
-        Ok(scope.find_type(self.session, "()")?)
+        Ok(self.session.new_typevar())
     }
 
     fn visit_while(&mut self, _refid: NodeID, cond: &Expr, body: &Expr) -> Result<Self::Return, Error> {

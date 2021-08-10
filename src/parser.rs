@@ -151,7 +151,6 @@ named!(statement(Span) -> AST,
         complete!(traitdef) |
         complete!(traitimpl) |
         complete!(declare) |
-        complete!(raise) |
         complete!(definition) |
         complete!(assignment) |
         complete!(expression)
@@ -332,6 +331,7 @@ named!(expression(Span) -> AST,
         newinstance |
         function |
         reference |
+        raise |
         annotation |
         infix
     )

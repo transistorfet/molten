@@ -23,7 +23,6 @@ try test() {
 
 try {
     raise new Exception("Test")
-    ()
 } catch {
     e => println("EXCEPTION! " + e.msg)
 }

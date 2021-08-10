@@ -63,7 +63,7 @@ impl<'sess> Transformer<'sess> {
         exprs
     }
 
-    pub fn transform_raise(&mut self, _id: NodeID, valexpr: &Expr) -> Vec<LLExpr> {
+    pub fn transform_raise(&mut self, id: NodeID, valexpr: &Expr) -> Vec<LLExpr> {
         let mut exprs = vec!();
         let exp_id = self.get_exception().unwrap();
         let value = self.transform_as_result(&mut exprs, valexpr);
@@ -71,7 +71,8 @@ impl<'sess> Transformer<'sess> {
         exprs.push(LLExpr::StoreRef(r(LLExpr::AccessRef(r(LLExpr::GetValue(exp_id)), vec!(LLRef::Field(1)))), r(LLExpr::Cast(LLType::Var, r(value)))));
         exprs.push(LLExpr::CallC(r(LLExpr::GetNamed("longjmp".to_string())), vec!(LLExpr::Cast(LLType::Ptr(r(LLType::I8)), r(LLExpr::GetValue(exp_id))), LLExpr::Literal(LLLit::I32(1))), LLCC::CCC));
 
-        exprs.push(LLExpr::Literal(LLLit::I32(0)));
+        let ltype = self.transform_value_type(&self.session.get_type(id).unwrap());
+        exprs.push(LLExpr::Cast(ltype.clone(), r(LLExpr::Literal(LLLit::Null(ltype)))));
         exprs
     }
 }

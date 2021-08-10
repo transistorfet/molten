@@ -51,6 +51,18 @@ impl<'sess> Visitor for Validator<'sess> {
         Ok(self.default_return())
     }
 
+    fn visit_vec(&mut self, code: &Vec<Expr>) -> Result<Self::Return, Error> {
+        // Check that "raise" always appears as the last item in a block, or else there will be a placeholder unification error (this just makes it easier to debug)
+        for i in 0..code.len() {
+            match &code[i].kind {
+                ExprKind::Raise(_) if i != code.len() - 1 => {
+                    return Err(Error::new("RaiseError: found raise expression that is not the last node in a block".to_string()));
+                },
+                _ => { },
+            }
+        }
+        visitor::walk_vec(self, code)
+    }
 
     fn visit_function(&mut self, refid: NodeID, func: &Function) -> Result<Self::Return, Error> {
         visitor::walk_function(self, refid, func)?;
