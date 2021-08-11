@@ -91,6 +91,7 @@ pub enum PatKind {
     Binding(String),
     Annotation(Type, R<Pattern>),
     EnumVariant(Vec<String>, Vec<Pattern>, NodeID),
+    Ref(R<Pattern>),
     Tuple(Vec<Pattern>),
     Record(Vec<(String, Pattern)>),
 }
@@ -244,6 +245,11 @@ impl Pattern {
     #[allow(dead_code)]
     pub fn make_enum_variant(pos: Pos, path: Vec<String>, args: Vec<Pattern>) -> Pattern {
         Pattern { id: NodeID::generate(), pos: pos, kind: PatKind::EnumVariant(path, args, NodeID::generate()) }
+    }
+
+    #[allow(dead_code)]
+    pub fn make_ref(pos: Pos, subpat: Pattern) -> Pattern {
+        Pattern { id: NodeID::generate(), pos: pos, kind: PatKind::Ref(r(subpat)) }
     }
 
     #[allow(dead_code)]

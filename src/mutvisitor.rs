@@ -154,6 +154,7 @@ pub fn walk_mut_pattern<V: MutVisitor>(visitor: &mut V, pat: &mut Pattern) {
         PatKind::Literal(_, _) => { },
         PatKind::Binding(_) => { },
 
+        PatKind::Ref(subpat) |
         PatKind::Annotation(_, subpat) => {
             visitor.visit_pattern(subpat);
         },

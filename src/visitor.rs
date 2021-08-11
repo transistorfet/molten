@@ -283,6 +283,10 @@ pub trait Visitor: Sized {
         self.visit_pattern(subpat)
     }
 
+    fn visit_pattern_ref(&mut self, _id: NodeID, subpat: &Pattern) -> Result<Self::Return, Error> {
+        self.visit_pattern(subpat)
+    }
+
     fn visit_pattern_tuple(&mut self, _id: NodeID, items: &Vec<Pattern>) -> Result<Self::Return, Error> {
         walk_pattern_vec(self, items)
     }
@@ -580,6 +584,10 @@ pub fn walk_pattern<R, V: Visitor<Return = R>>(visitor: &mut V, pat: &Pattern) -
 
         PatKind::Annotation(ttype, subpat) => {
             visitor.visit_pattern_annotation(pat.id, ttype, subpat)
+        },
+
+        PatKind::Ref(subpat) => {
+            visitor.visit_pattern_ref(pat.id, subpat)
         },
 
         PatKind::Tuple(items) => {

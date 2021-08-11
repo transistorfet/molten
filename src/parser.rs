@@ -1107,6 +1107,7 @@ named!(pattern_atomic(Span) -> ASTPattern,
         value!(ASTPattern::Wild, tag!("_")) |
         pattern_literal |
         pattern_enum_variant |
+        pattern_ref |
         pattern_tuple |
         pattern_record |
         pattern_binding
@@ -1145,6 +1146,17 @@ named!(pattern_enum_variant(Span) -> ASTPattern,
             tag!(")")
         )) >>
         (ASTPattern::EnumVariant(Pos::new(pos), vec!(p.0, p.2), o.unwrap_or(vec!())))
+    )
+);
+
+named!(pattern_ref(Span) -> ASTPattern,
+    do_parse!(
+        pos: position!() >>
+        p: preceded!(
+            wscom!(tag_word!("ref")),
+            pattern
+        ) >>
+        (ASTPattern::Ref(Pos::new(pos), r(p)))
     )
 );
 

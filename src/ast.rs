@@ -32,6 +32,7 @@ pub enum ASTPattern {
     Binding(Pos, String),
     Annotation(Pos, Type, R<ASTPattern>),
     EnumVariant(Pos, Vec<String>, Vec<ASTPattern>),
+    Ref(Pos, R<ASTPattern>),
     Tuple(Pos, Vec<ASTPattern>),
     Record(Pos, Vec<(String, ASTPattern)>),
 }

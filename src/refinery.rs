@@ -343,12 +343,17 @@ impl<'sess> Refinery<'sess> {
                 Pattern::make_enum_variant(pos, path, args)
             },
 
+            ASTPattern::Ref(pos, subpat) => {
+                Pattern::make_ref(pos, self.refine_pattern(*subpat)?)
+            },
+
             ASTPattern::Tuple(pos, items) => {
                 let items = items.into_iter().map(|p| self.refine_pattern(p)).collect::<Result<Vec<Pattern>, Error>>()?;
                 Pattern::make_tuple(pos, items)
             },
 
-            ASTPattern::Record(pos, items) => {
+            ASTPattern::Record(pos, mut items) => {
+                items.sort_unstable_by(|a, b| a.0.cmp(&b.0));
                 let mut refined = vec!();
                 for (i, p) in items {
                     refined.push((i, self.refine_pattern(p)?));

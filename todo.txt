@@ -1,7 +1,4 @@
 
-* implement the record and tuple pattern matching
-* add ref pattern?
-
 * add some way of setting the file number in Pos, so that it points to the right file for error messages
 * should you go back to the match/with try/with syntax?  I think now that 'raise' is fixed it might not be a clunky
 

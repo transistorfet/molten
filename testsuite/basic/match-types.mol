@@ -1,0 +1,23 @@
+
+//! found 346
+//! 3
+//! 1
+
+match (1, ref 346) {
+    (1, ref a) => println("found " + str(a))
+    _ => println("nope")
+}
+
+match (1, 2) {
+    (1, 3) => println(str(1))
+    (2, 3) => println(str(2))
+    (1, 2) => println(str(3))
+    _ => println("not quite")
+}
+
+match { a = 1, b = 2 } {
+    { b = 2, a = 1 } => println(str(1))
+    _ => println("fail")
+}
+
+

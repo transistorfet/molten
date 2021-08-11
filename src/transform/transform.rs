@@ -686,21 +686,46 @@ impl<'sess> Transformer<'sess> {
 
         match &pat.kind {
             PatKind::Wild => exprs.push(LLExpr::Literal(LLLit::I1(true))),
+
             PatKind::Literal(lit, fid) => {
                 let compfunc = self.transform_as_result(&mut exprs, &Expr::new_with_id(*fid, Pos::empty(), ExprKind::Identifier("==".to_string())));
                 let compabi = self.session.get_type(*fid).unwrap().get_abi().unwrap();
                 let result = LLExpr::Literal(self.transform_lit(lit));
                 exprs.extend(self.create_func_invoke(compabi, compfunc, vec!(LLExpr::GetValue(value_id), result)));
             },
+
             PatKind::Binding(name) => {
                 let defid = self.session.get_ref(pat.id).unwrap();
                 exprs.extend(self.create_def_local(defid, name, LLExpr::GetValue(value_id)));
                 exprs.push(LLExpr::Literal(LLLit::I1(true)));
             },
+
             PatKind::Annotation(_, subpat) => {
                 let ttype = self.session.get_type(pat.id).unwrap();
                 exprs.push(LLExpr::SetValue(pat.id, r(LLExpr::Cast(self.transform_value_type(&ttype), r(LLExpr::GetValue(value_id))))));
                 exprs.extend(self.transform_pattern(subpat, pat.id));
+            },
+
+            PatKind::Ref(subpat) => {
+                exprs.push(LLExpr::SetValue(pat.id, r(LLExpr::LoadRef(r(LLExpr::GetValue(value_id))))));
+                exprs.extend(self.transform_pattern(subpat, pat.id));
+            },
+
+            PatKind::Tuple(items) => {
+                for (i, item) in items.iter().enumerate() {
+                    let value = LLExpr::GetItem(r(LLExpr::GetValue(value_id)), i);
+                    exprs.push(LLExpr::SetValue(item.id, r(value)));
+                    exprs.extend(self.transform_pattern(&item, item.id));
+                }
+            },
+
+            PatKind::Record(items) => {
+                for (i, (_, item)) in items.iter().enumerate() {
+                    //let index = items.iter().position(|(name, _)| name == field).unwrap();
+                    let value = LLExpr::GetItem(r(LLExpr::GetValue(value_id)), i);
+                    exprs.push(LLExpr::SetValue(item.id, r(value)));
+                    exprs.extend(self.transform_pattern(&item, item.id));
+                }
             },
 
             PatKind::EnumVariant(_, args, eid) => {
@@ -737,7 +762,6 @@ impl<'sess> Transformer<'sess> {
                 }
                 exprs.push(LLExpr::Cmp(LLCmpType::Equal, r(LLExpr::GetItem(r(LLExpr::GetValue(value_id)), 0)), r(LLExpr::Literal(LLLit::I8(variant as i8)))));
             },
-            _ => panic!("Not Implemented: {:?}", pat),
         }
         exprs
     }

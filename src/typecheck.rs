@@ -499,6 +499,27 @@ impl<'sess> Visitor for TypeChecker<'sess> {
         expect_type(self.session, ttype.as_ref(), Some(&etype), Check::Def)
     }
 
+    fn visit_pattern_ref(&mut self, _refid: NodeID, subpat: &Pattern) -> Result<Self::Return, Error> {
+        let subtype = self.visit_pattern(subpat)?;
+        Ok(Type::Ref(r(subtype)))
+    }
+
+    fn visit_pattern_tuple(&mut self, _refid: NodeID, items: &Vec<Pattern>) -> Result<Self::Return, Error> {
+        let mut itemtypes = vec!();
+        for item in items {
+            itemtypes.push(self.visit_pattern(item)?);
+        }
+        Ok(Type::Tuple(itemtypes))
+    }
+
+    fn visit_pattern_record(&mut self, _refid: NodeID, items: &Vec<(String, Pattern)>) -> Result<Self::Return, Error> {
+        let mut itemtypes = vec!();
+        for (name, item) in items {
+            itemtypes.push((name.clone(), self.visit_pattern(item)?));
+        }
+        Ok(Type::Record(itemtypes))
+    }
+
     fn visit_pattern_enum_variant(&mut self, refid: NodeID, _path: &Vec<String>, args: &Vec<Pattern>, eid: NodeID) -> Result<Self::Return, Error> {
         let enumdef = self.session.get_def_from_ref(refid)?.as_enum()?;
         let variant_id = self.session.get_ref(eid)?;
