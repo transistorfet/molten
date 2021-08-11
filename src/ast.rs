@@ -65,6 +65,7 @@ pub enum AST {
     Enum(Pos, Type, WhereClause, Vec<(Pos, String, Option<Type>)>),
     TraitDef(Pos, String, Vec<AST>),
     TraitImpl(Pos, String, Type, WhereClause, Vec<AST>),
+    Methods(Pos, Type, WhereClause, Vec<AST>),
 
     ModuleDecl(Pos, String),
     Import(Pos, String, Vec<AST>),

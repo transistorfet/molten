@@ -71,6 +71,7 @@ pub fn walk_mut_node<V: MutVisitor>(visitor: &mut V, node: &mut Expr) {
         ExprKind::Block(body) |
         ExprKind::SideEffect(_, body) |
         ExprKind::TraitImpl(_, _, _, body) |
+        ExprKind::Methods(_, _, body) |
         ExprKind::Import(_, body) => {
             visitor.visit_vec(body);
         },

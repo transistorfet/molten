@@ -55,7 +55,7 @@ impl Scope {
 
     pub fn target(session: &Session, scope: ScopeRef) -> ScopeRef {
         match scope.context.get() {
-            Context::Class(id) | Context::TraitDef(id) => session.get_def(id).unwrap().get_vars().unwrap(),
+            Context::Class(id) | Context::TraitDef(id) | Context::Enum(id) => session.get_def(id).unwrap().get_vars().unwrap(),
             _ => scope,
         }
     }

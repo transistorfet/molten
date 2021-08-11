@@ -140,6 +140,7 @@ pub enum ExprKind {
     Enum(Type, WhereClause, Vec<EnumVariant>),
     TraitDef(String, Vec<Expr>),
     TraitImpl(String, Type, WhereClause, Vec<Expr>),
+    Methods(Type, WhereClause, Vec<Expr>),
 
     Import(String, Vec<Expr>),
     Definition(Mutability, String, Option<Type>, R<Expr>),
@@ -372,6 +373,11 @@ impl Expr {
     #[allow(dead_code)]
     pub fn make_class(pos: Pos, classtype: Type, parenttype: Option<Type>, whereclause: WhereClause, body: Vec<Expr>) -> Expr {
         Expr { id: NodeID::generate(), pos: pos, kind: ExprKind::Class(classtype, parenttype, whereclause, body) }
+    }
+
+    #[allow(dead_code)]
+    pub fn make_methods(pos: Pos, ttype: Type, whereclause: WhereClause, body: Vec<Expr>) -> Expr {
+        Expr { id: NodeID::generate(), pos: pos, kind: ExprKind::Methods(ttype, whereclause, body) }
     }
 
     #[allow(dead_code)]

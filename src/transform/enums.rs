@@ -80,5 +80,9 @@ impl<'sess> Transformer<'sess> {
             },
         }
     }
+
+    pub fn transform_enum_access_method(&mut self, defid: NodeID) -> Vec<LLExpr> {
+        vec!(LLExpr::GetLocal(defid))
+    }
 }
 

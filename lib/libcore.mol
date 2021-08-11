@@ -63,80 +63,30 @@ pub fn +(str1: SuperString, ch: Char) -> SuperString {
 }
 
 
-enum OptionAlt<'item> =
+enum Option<'item> =
     | None
     | Some('item)
 
-/*
-impl OptionAlt<'item> {
+methods Option<'item> {
     pub fn unwrap(self) -> 'item {
         match self {
-            OptionAlt::None => raise new Exception("Panic: unwrap on none")
-            OptionAlt::Some(item) => item
+            Option::None => raise new Exception("Panic: unwrap on none")
+            Option::Some(item) => item
+        }
+    }
+
+    pub fn unwrap_or(self, item: 'item) -> 'item {
+        match self {
+            Option::None => item
+            Option::Some(item) => item
         }
     }
 }
 
-pub fn unwrap(opt: OptionAlt<'item>) -> 'item {
-    match opt {
-        OptionAlt::None => raise new Exception("Panic: unwrap on none")
-        OptionAlt::Some(item) => item
-    }
-}
-*/
-
-class Option<'item> {
-    val mut has
-    val mut item: 'item
-
-    fn new(self) {
-        self.has = false
-        self.item = nil
-    }
-
-    pub fn Some(item: 'item) {
-        let opt = new Option<'item>()
-        opt.has = true
-        opt.item = item
-        opt
-    }
-
-    pub fn None() {
-        let opt = new Option<'item>()
-        opt.has = false
-        opt.item = nil
-        opt
-    }
-
-    pub fn unwrap(self) -> 'item {
-        if not self.has then {
-            raise new Exception("Panic: unwrap on none")
-            // TODO this is here because raise returns unit instead of being marked as 'no return' somehow
-            //self.item
-        }
-        else
-            self.item
-    }
-
-    pub fn unwrap_or(self, item) {
-        if self.has then
-            self.item
-        else
-            item
-    }
-
-    pub fn is_some(self) {
-        self.has
-    }
-
-    pub fn is_none(self) {
-        not self.has
-    }
-}
 
 class Iterator<'item> {
     pub fn next(self) -> Option<'item> {
-        Option::None()
+        Option::None
     }
 
     pub fn reset(self) => ()
@@ -240,7 +190,7 @@ class ArrayIterator<'item> extends Iterator<'item> {
             self.index = self.index + 1
             Option::Some(item)
         } else {
-            Option::None()
+            Option::None
         }
     }
 

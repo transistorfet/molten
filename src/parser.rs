@@ -151,6 +151,7 @@ named!(statement(Span) -> AST,
         complete!(traitdef) |
         complete!(traitimpl) |
         complete!(declare) |
+        complete!(methods) |
         complete!(definition) |
         complete!(assignment) |
         complete!(expression)
@@ -311,6 +312,22 @@ named!(traitimpl(Span) -> AST,
         )) >>
         return_error!(ErrorKind::Tag /*ErrorKind::Custom(ERR_IN_CLASS) */, tag!("}")) >>
         (AST::TraitImpl(Pos::new(pos), n, t, w, b))
+    )
+);
+
+named!(methods(Span) -> AST,
+    do_parse!(
+        pos: position!() >>
+        wscom!(tag_word!("methods")) >>
+        c: type_object >>
+        w: opt_where_clause >>
+        wscom!(tag!("{")) >>
+        b: many0!(wscom!(alt!(
+            declare |
+            function
+        ))) >>
+        return_error!(ErrorKind::Tag /*ErrorKind::Custom(ERR_IN_METHODS) */, tag!("}")) >>
+        (AST::Methods(Pos::new(pos), c, w, b))
     )
 );
 

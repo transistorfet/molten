@@ -28,7 +28,7 @@ impl AnyFunc {
             },
             ABI::Molten => {
                 match scope.get_context() {
-                    Context::Class(_) if vis != Visibility::Anonymous =>
+                    Context::Class(_) | Context::Enum(_) if vis != Visibility::Anonymous =>
                         MethodDef::define(session, scope.clone(), defid, vis, name, ttype),
                     Context::TraitImpl(_, _) =>
                         TraitFuncDef::define(session, scope.clone(), defid, vis, name, ttype),

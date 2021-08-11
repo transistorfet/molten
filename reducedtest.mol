@@ -371,9 +371,14 @@ fn moo2(t: 'b) {
 }
 
 
-let opt3 = OptionAlt::Some(10)
+
+let opt3 = Option::Some(10)
 match opt3 {
-    OptionAlt::Some(x) => println(str(x))
-    OptionAlt::None => println("None")
+    Option::Some(x) => println(str(x))
+    Option::None => println("None")
 }
+
+let opt4 = Option::Some("hey")
+println(opt4.unwrap())
+
 

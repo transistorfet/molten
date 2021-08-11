@@ -46,6 +46,9 @@ impl EnumDef {
         session.set_def(defid, Def::Enum(enumdef.clone()));
         session.set_type(defid, deftype);
 
+        let tscope = session.map.get(defid).unwrap();
+        tscope.define_type("Self", defid)?;
+
         Ok(enumdef)
     }
 

@@ -1,7 +1,8 @@
 
-* make it possible to implement methods on enums
 * remove nil (the last major obstacle is Option, which should be made an enum, but enums can't have methods)
-* if you have a match with an enum variant, but leave out the resolve/type name, it causes a parse error
+
+* fix the issue where passing a function into another function as () -> 'a, with a universal, will unpack the value without packing it, causing a segfault
+* if you have a match with an enum variant, but leave out the resolve/type name, it causes a parse error (should cause another kind of error perhaps)
 * should you go back to the match/with try/with syntax?  I think now that 'raise' is fixed it might not be a clunky
 
 * make sure you can export and import trait defs and impls. make tests for this

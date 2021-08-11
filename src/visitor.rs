@@ -241,6 +241,10 @@ pub trait Visitor: Sized {
         self.visit_vec(body)
     }
 
+    fn visit_methods(&mut self, _id: NodeID, _ttype: &Type, _whereclause: &WhereClause, body: &Vec<Expr>) -> Result<Self::Return, Error> {
+        self.visit_vec(body)
+    }
+
 
     fn visit_import(&mut self, _id: NodeID, _ident: &str, decls: &Vec<Expr>) -> Result<Self::Return, Error> {
         self.visit_vec(decls)
@@ -552,6 +556,10 @@ pub fn walk_node<R, V: Visitor<Return = R>>(visitor: &mut V, node: &Expr) -> Res
 
         ExprKind::TraitImpl(traitname, impltype, whereclause, body) => {
             visitor.visit_trait_impl(node.id, traitname, impltype, whereclause, body)
+        },
+
+        ExprKind::Methods(ttype, whereclause, body) => {
+            visitor.visit_methods(node.id, ttype, whereclause, body)
         },
 
 

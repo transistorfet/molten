@@ -347,6 +347,17 @@ impl<'sess> Visitor for TypeChecker<'sess> {
         Ok(rtype)
     }
 
+    fn visit_class(&mut self, refid: NodeID, _classtype: &Type, _parenttype: &Option<Type>, _whereclause: &WhereClause, body: &Vec<Expr>) -> Result<Self::Return, Error> {
+        let defid = self.session.get_ref(refid)?;
+
+        let scope = self.stack.get_scope();
+        let tscope = self.session.map.get(defid).unwrap();
+        self.with_scope(tscope.clone(), |visitor| {
+            visitor.visit_vec(body)
+        })?;
+        Ok(scope.find_type(self.session, "()")?)
+    }
+
     fn visit_enum(&mut self, _refid: NodeID, _enumtype: &Type, _whereclause: &WhereClause, _variants: &Vec<EnumVariant>) -> Result<Self::Return, Error> {
         let scope = self.stack.get_scope();
         Ok(scope.find_type(self.session, "()")?)
@@ -400,6 +411,16 @@ impl<'sess> Visitor for TypeChecker<'sess> {
         Ok(scope.find_type(self.session, "()")?)
     }
 
+    fn visit_methods(&mut self, refid: NodeID, _ttype: &Type, _whereclause: &WhereClause, body: &Vec<Expr>) -> Result<Self::Return, Error> {
+        let defid = self.session.get_ref(refid)?;
+
+        let tscope = self.session.map.get(defid).unwrap();
+        self.with_scope(tscope.clone(), |visitor| {
+            visitor.visit_vec(body)
+        })?;
+        Ok(tscope.find_type(self.session, "()")?)
+    }
+
     fn visit_annotation(&mut self, refid: NodeID, _ttype: &Type, code: &Expr) -> Result<Self::Return, Error> {
         let ttype = self.session.get_type(refid).unwrap();
         let ctype = self.visit_node_or_error(code);
@@ -416,21 +437,10 @@ impl<'sess> Visitor for TypeChecker<'sess> {
         Ok(classtype.clone())
     }
 
-    fn visit_class(&mut self, refid: NodeID, _classtype: &Type, _parenttype: &Option<Type>, _whereclause: &WhereClause, body: &Vec<Expr>) -> Result<Self::Return, Error> {
-        let defid = self.session.get_ref(refid)?;
-
-        let scope = self.stack.get_scope();
-        let tscope = self.session.map.get(defid).unwrap();
-        self.with_scope(tscope.clone(), |visitor| {
-            visitor.visit_vec(body)
-        })?;
-        Ok(scope.find_type(self.session, "()")?)
-    }
-
     fn visit_resolver(&mut self, refid: NodeID, left: &Expr, field: &str, oid: NodeID) -> Result<Self::Return, Error> {
         let defid = self.check_resolve_field(left, field, oid)?;
         self.session.set_ref(refid, defid);
-        Ok(self.get_type_or_new_typevar_and_set(defid))
+        Ok(Type::map_all_typevars(self.session, self.get_type_or_new_typevar_and_set(defid)))
     }
 
     fn visit_accessor(&mut self, id: NodeID, left: &Expr, field: &str, oid: NodeID) -> Result<Self::Return, Error> {

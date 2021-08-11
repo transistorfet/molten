@@ -574,8 +574,13 @@ impl<'sess> Transformer<'sess> {
                 let objdef = self.session.get_def(objid).unwrap();
                 match self.session.get_def(defid) {
                     Ok(Def::Method(_)) => {
-                        let classdef = objdef.as_class().unwrap();
-                        exprs.extend(self.transform_class_access_method(classdef, objval, defid));
+                        match objdef {
+                            Def::Class(classdef) =>
+                                exprs.extend(self.transform_class_access_method(classdef, objval, defid)),
+                            Def::Enum(_) =>
+                                exprs.extend(self.transform_enum_access_method(defid)),
+                            result => panic!("Not Implemented: {:?}", result),
+                        }
                     },
                     Ok(Def::TraitFunc(_)) => {
                         let traitdef = objdef.as_trait_def().unwrap();

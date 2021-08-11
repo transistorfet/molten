@@ -6,6 +6,7 @@ use crate::types::{ Type, resolve_type };
 use crate::hir::{ NodeID, Visibility, Mutability, MatchCase, EnumVariant, WhereClause, Function, Pattern, PatKind, Expr, ExprKind };
 use crate::misc::{ UniqueID, r };
 
+use crate::defs::Def;
 use crate::defs::enums::EnumDef;
 use crate::defs::classes::ClassDef;
 use crate::defs::functions::{ AnyFunc };
@@ -186,6 +187,7 @@ impl<'sess> Visitor for NameBinder<'sess> {
         let classtype = self.bind_type(tscope.clone(), classtype.clone().set_id(defid)?)?;
         let parenttype = self.bind_type_option(tscope.clone(), parenttype.clone())?;
         bind_where_constraints(self.session, tscope.clone(), whereclause)?;
+        validate_object_definition(&classtype)?;
 
         ClassDef::define(self.session, scope, defid, classtype, parenttype)?;
 
@@ -196,9 +198,10 @@ impl<'sess> Visitor for NameBinder<'sess> {
 
     fn visit_type_alias(&mut self, refid: NodeID, deftype: &Type, ttype: &Type) -> Result<Self::Return, Error> {
         let defid = self.session.new_def_id(refid);
-
         let scope = self.stack.get_scope();
+
         let deftype = self.bind_type(scope.clone(), deftype.clone().set_id(defid)?)?;
+        validate_object_definition(&deftype)?;
         let ttype = self.bind_type(scope.clone(), ttype.clone())?;
 
         TypeAliasDef::define(self.session, scope.clone(), defid, deftype, ttype)?;
@@ -213,6 +216,7 @@ impl<'sess> Visitor for NameBinder<'sess> {
 
         let enumtype = self.bind_type(tscope.clone(), enumtype.clone().set_id(defid)?)?;
         bind_where_constraints(self.session, tscope.clone(), whereclause)?;
+        validate_object_definition(&enumtype)?;
         let enumdef = EnumDef::define(self.session, scope.clone(), defid, enumtype)?;
 
         for variant in variants.iter() {
@@ -246,6 +250,27 @@ impl<'sess> Visitor for NameBinder<'sess> {
         bind_where_constraints(self.session, tscope.clone(), whereclause)?;
         TraitImpl::define(self.session, scope.clone(), impl_id, trait_id, impltype)?;
 
+        self.with_scope(tscope, |visitor| {
+            visitor.visit_vec(body)
+        })
+    }
+
+    fn visit_methods(&mut self, refid: NodeID, ttype: &Type, whereclause: &WhereClause, body: &Vec<Expr>) -> Result<Self::Return, Error> {
+        let scope = self.stack.get_scope();
+
+        let ttype = self.bind_type(scope.clone(), ttype.clone())?;
+        bind_where_constraints(self.session, scope.clone(), whereclause)?;
+        validate_object_definition(&ttype)?;
+
+        let defid = scope.get_type_def(ttype.get_name()?).ok_or(Error::new(format!("NameError: undefined identifier {:?}", ttype.get_name()?)))?;
+        match self.session.get_def(defid) {
+            // Only method blocks on enums are supported at the moment
+            Ok(Def::Enum(_)) => { },
+            _ => return Err(Error::new(format!("TypeError: cannot define methods for type {:?}", ttype))),
+        }
+        self.session.set_ref(refid, defid);
+
+        let tscope = self.session.map.get(defid).unwrap();
         self.with_scope(tscope, |visitor| {
             visitor.visit_vec(body)
         })
@@ -419,5 +444,22 @@ pub fn check_recursive_type(ttype: Option<&Type>, forbidden_id: NodeID) -> Resul
         None => { },
     }
     Ok(())
+}
+
+fn validate_object_definition(ttype: &Type) -> Result<(), Error> {
+    match ttype {
+        Type::Object(_, _, types) => {
+            for ttype in types {
+                match ttype {
+                    Type::Universal(_, _) => { },
+                    _ => return Err(Error::new(format!("TypeError: type parameter in definition must be a universal type variable, but found {}", ttype))),
+                }
+            }
+            return Ok(());
+        },
+        _ => {
+            return Err(Error::new(format!("TypeError: definition types must be an object type, but found {}", ttype)));
+        },
+    }
 }
 

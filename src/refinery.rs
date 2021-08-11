@@ -233,6 +233,10 @@ impl<'sess> Refinery<'sess> {
                 self.desugar_trait_impl(pos, traitname, impltype, whereclause, body)?
             },
 
+            AST::Methods(pos, ttype, whereclause, body) => {
+                Expr::make_methods(pos, ttype, whereclause, self.refine_vec(body))
+            },
+
             AST::Array(pos, items) => {
                 self.desugar_array(pos, items)?
             },

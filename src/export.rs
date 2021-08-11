@@ -124,6 +124,33 @@ impl<'sess> Visitor for ExportsCollector<'sess> {
         Ok(())
     }
 
+
+    fn visit_methods(&mut self, _refid: NodeID, ttype: &Type, whereclause: &WhereClause, body: &Vec<Expr>) -> Result<Self::Return, Error> {
+        let mut namespec = unparse_type(self.session, ttype);
+        if whereclause.constraints.len() > 0 {
+            namespec += &emit_where_clause(&whereclause.constraints);
+        }
+
+        self.declarations.push_str(&format!("methods {} {{\n", namespec));
+        for node in body {
+            match &node.kind {
+                ExprKind::Declare(vis, name, _, whereclause) => {
+                    let defid = self.session.get_ref(node.id)?;
+                    self.declarations.push_str("    ");
+                    self.declarations.push_str(&emit_declaration(self.session, defid, *vis, name, &whereclause.constraints));
+                },
+                ExprKind::Function(func) => {
+                    let defid = self.session.get_ref(node.id)?;
+                    self.declarations.push_str("    ");
+                    self.declarations.push_str(&emit_declaration(self.session, defid, func.vis, &func.name, &func.whereclause.constraints));
+                },
+                _ => {  },
+            }
+        }
+        self.declarations.push_str(&format!("}}\n"));
+        Ok(())
+    }
+
     fn visit_enum(&mut self, _refid: NodeID, enumtype: &Type, _whereclause: &WhereClause, variants: &Vec<EnumVariant>) -> Result<Self::Return, Error> {
         self.declarations.push_str(&format!("enum {} =\n", unparse_type(self.session, &enumtype)));
         for variant in variants {
