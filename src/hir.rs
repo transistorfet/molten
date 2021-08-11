@@ -90,9 +90,7 @@ pub enum PatKind {
     Literal(Literal, NodeID),
     Binding(String),
     Annotation(Type, R<Pattern>),
-    Identifier(String),
-    Resolve(R<Pattern>, String, NodeID),
-    EnumArgs(R<Pattern>, Vec<Pattern>, NodeID),
+    EnumVariant(Vec<String>, Vec<Pattern>, NodeID),
     Tuple(Vec<Pattern>),
     Record(Vec<(String, Pattern)>),
 }
@@ -214,6 +212,7 @@ impl Function {
 }
 
 impl Pattern {
+    #[allow(dead_code)]
     pub fn new(pos: Pos, kind: PatKind) -> Self {
         Self {
             id: NodeID::generate(),
@@ -223,8 +222,38 @@ impl Pattern {
     }
 
     #[allow(dead_code)]
-    pub fn make_lit(literal: Literal) -> Pattern {
-        Pattern { id: NodeID::generate(), pos: Pos::empty(), kind: PatKind::Literal(literal, NodeID::generate()) }
+    pub fn make_wild() -> Pattern {
+        Pattern { id: NodeID::generate(), pos: Pos::empty(), kind: PatKind::Wild }
+    }
+
+    #[allow(dead_code)]
+    pub fn make_lit(pos: Pos, literal: Literal) -> Pattern {
+        Pattern { id: NodeID::generate(), pos: pos, kind: PatKind::Literal(literal, NodeID::generate()) }
+    }
+
+    #[allow(dead_code)]
+    pub fn make_binding(pos: Pos, name: String) -> Pattern {
+        Pattern { id: NodeID::generate(), pos: pos, kind: PatKind::Binding(name) }
+    }
+
+    #[allow(dead_code)]
+    pub fn make_annotation(pos: Pos, ttype: Type, pat: Pattern) -> Pattern {
+        Pattern { id: NodeID::generate(), pos: pos, kind: PatKind::Annotation(ttype, r(pat)) }
+    }
+
+    #[allow(dead_code)]
+    pub fn make_enum_variant(pos: Pos, path: Vec<String>, args: Vec<Pattern>) -> Pattern {
+        Pattern { id: NodeID::generate(), pos: pos, kind: PatKind::EnumVariant(path, args, NodeID::generate()) }
+    }
+
+    #[allow(dead_code)]
+    pub fn make_tuple(pos: Pos, items: Vec<Pattern>) -> Pattern {
+        Pattern { id: NodeID::generate(), pos: pos, kind: PatKind::Tuple(items) }
+    }
+
+    #[allow(dead_code)]
+    pub fn make_record(pos: Pos, items: Vec<(String, Pattern)>) -> Pattern {
+        Pattern { id: NodeID::generate(), pos: pos, kind: PatKind::Record(items) }
     }
 }
 

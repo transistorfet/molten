@@ -3,7 +3,7 @@ use crate::abi::ABI;
 use crate::session::{ Session, Error };
 use crate::scope::{ ScopeRef, Context };
 use crate::types::{ Type, resolve_type };
-use crate::hir::{ NodeID, Visibility, Mutability, MatchCase, EnumVariant, WhereClause, Function, Pattern, PatKind, Expr, ExprKind };
+use crate::hir::{ NodeID, Visibility, Mutability, MatchCase, EnumVariant, WhereClause, Function, Pattern, Expr, ExprKind };
 use crate::misc::{ UniqueID, r };
 
 use crate::defs::Def;
@@ -310,18 +310,17 @@ impl<'sess> Visitor for NameBinder<'sess> {
         self.visit_pattern(pat)
     }
 
-    fn visit_pattern_resolve(&mut self, _refid: NodeID, left: &Pattern, _name: &str, oid: NodeID) -> Result<Self::Return, Error> {
+    fn visit_pattern_enum_variant(&mut self, refid: NodeID, path: &Vec<String>, args: &Vec<Pattern>, eid: NodeID) -> Result<Self::Return, Error> {
         let scope = self.stack.get_scope();
-        match &left.kind {
-            PatKind::Identifier(ident) => {
-                match scope.get_type_def(ident) {
-                    Some(defid) => self.session.set_ref(oid, defid),
-                    None => return Err(Error::new(format!("NameError: undefined type {:?}", ident)))
-                }
-            },
-            _ => { return Err(Error::new(format!("SyntaxError: left-hand side of scope resolver must be identifier"))); }
-        }
-        Ok(())
+
+        let enum_id = scope.get_type_def(&path[0]).ok_or(Error::new(format!("NameError: undefined type {:?}", path[0])))?;
+        self.session.set_ref(refid, enum_id);
+
+        let enumdef = self.session.get_def(enum_id)?.as_enum()?;
+        let variant_id = enumdef.vars.get_var_def(&path[1]).ok_or(Error::new(format!("NameError: undefined enum variant {:?}", path[1])))?;
+        self.session.set_ref(eid, variant_id);
+
+        visitor::walk_pattern_vec(self, args)
     }
 }
 

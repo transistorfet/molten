@@ -499,46 +499,27 @@ impl<'sess> Visitor for TypeChecker<'sess> {
         expect_type(self.session, ttype.as_ref(), Some(&etype), Check::Def)
     }
 
-    fn visit_pattern_resolve(&mut self, refid: NodeID, _left: &Pattern, field: &str, oid: NodeID) -> Result<Self::Return, Error> {
-        let ltype = self.session.get_type_from_ref(oid).unwrap();
+    fn visit_pattern_enum_variant(&mut self, refid: NodeID, _path: &Vec<String>, args: &Vec<Pattern>, eid: NodeID) -> Result<Self::Return, Error> {
+        let enumdef = self.session.get_def_from_ref(refid)?.as_enum()?;
+        let variant_id = self.session.get_ref(eid)?;
 
-        let vars = self.session.get_def(ltype.get_id()?)?.get_vars()?;
-        let defid = vars.get_var_def(&field).ok_or(Error::new(format!("VarError: definition not set for {:?}", field)))?;
-        self.session.set_ref(refid, defid);
-        let ttype = self.session.get_type(defid).ok_or(Error::new(format!("TypeError: no type set for id {:?}", defid)))?;
-        let ttype = Type::map_all_typevars(self.session, ttype.clone());
-        expect_type(self.session, Some(&ttype), self.session.get_type(refid).as_ref(), Check::Def)
-    }
-
-    fn visit_pattern_enum_args(&mut self, refid: NodeID, left: &Pattern, args: &Vec<Pattern>, eid: NodeID) -> Result<Self::Return, Error> {
-        let ltype = self.visit_pattern(left)?;
-        let variant_id = self.session.get_ref(left.id)?;
-        self.session.set_ref(refid, variant_id);
-        let enumdef = self.session.get_def(self.session.get_ref(variant_id)?)?.as_enum()?;
         match enumdef.get_variant_type_by_id(variant_id) {
-            None => return Err(Error::new(format!("TypeError: enum variant doesn't expect any arguments, but found {:?}", args))),
+            None if args.len() > 0 => return Err(Error::new(format!("TypeError: enum variant doesn't expect any arguments, but found {:?}", args))),
+            None => {
+                self.session.set_type(eid, enumdef.deftype.clone());
+                Ok(Type::map_all_typevars(self.session, enumdef.deftype.clone()))
+            },
             Some(ttype) => {
                 self.session.set_type(eid, ttype.clone());
-                // Map the typevars from the enum type params into the enum variant's types, in order to use type hint from 'expected'
+
                 let mut typevars = Type::map_new();
-                let vtype = Type::map_typevars(self.session, &mut typevars, enumdef.deftype.clone());
-                let _ = expect_type(self.session, Some(&vtype), self.session.get_type(refid).as_ref(), Check::Def)?;
-                let rtype = resolve_type(self.session, Type::map_typevars(self.session, &mut typevars, ttype), false)?;
-                let types = rtype.as_vec();
+                let def_type = Type::map_typevars(self.session, &mut typevars, enumdef.deftype.clone());
+                let variant_type = Type::map_typevars(self.session, &mut typevars, resolve_type(self.session, ttype, false)?);
 
-                if types.len() != args.len() {
-                    return Err(Error::new(format!("TypeError: number of enum arguments expected doesn't match. Expected {:?}, found {:?}", types.len(), args.len())));
-                }
+                let argtypes = args.iter().map(|pat| self.visit_pattern(pat)).collect::<Result<Vec<Type>, Error>>()?;
 
-                let mut argtypes = vec!();
-                for (arg, ttype) in args.iter().zip(types.iter()) {
-                    argtypes.push(expect_type(self.session, Some(ttype), Some(&self.visit_pattern(&arg)?), Check::Def)?);
-                }
-
-                let etype = expect_type(self.session, Some(&rtype), Some(&Type::Tuple(argtypes)), Check::Def)?;
-                let dtype = Type::map_typevars(self.session, &mut typevars, enumdef.deftype.clone());
-                expect_type(self.session, Some(&ltype), Some(&Type::Function(r(etype), r(dtype.clone()), ABI::Unknown)), Check::Def)?;
-                Ok(dtype)
+                expect_type(self.session, Some(&variant_type), Some(&Type::Tuple(argtypes)), Check::Def)?;
+                Ok(def_type)
             },
         }
     }

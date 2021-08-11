@@ -6,7 +6,7 @@ use crate::abi::ABI;
 use crate::types::Type;
 use crate::parser::Span;
 use crate::misc::{ R };
-use crate::hir::{ Visibility, Mutability, AssignType, Literal, WhereClause, Pattern };
+use crate::hir::{ Visibility, Mutability, AssignType, Literal, WhereClause };
 
 
 #[derive(Copy, Clone, PartialEq)]
@@ -23,6 +23,17 @@ pub struct RawArgument {
     pub name: String,
     pub ttype: Option<Type>,
     //pub default: Option<Expr>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum ASTPattern {
+    Wild,
+    Literal(Pos, Literal),
+    Binding(Pos, String),
+    Annotation(Pos, Type, R<ASTPattern>),
+    EnumVariant(Pos, Vec<String>, Vec<ASTPattern>),
+    Tuple(Pos, Vec<ASTPattern>),
+    Record(Pos, Vec<(String, ASTPattern)>),
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -51,8 +62,8 @@ pub enum AST {
     SideEffect(Pos, String, Vec<AST>),
     If(Pos, R<AST>, R<AST>, R<AST>),
     Raise(Pos, R<AST>),
-    Try(Pos, R<AST>, Vec<(Pattern, AST)>),
-    Match(Pos, R<AST>, Vec<(Pattern, AST)>),
+    Try(Pos, R<AST>, Vec<(ASTPattern, AST)>),
+    Match(Pos, R<AST>, Vec<(ASTPattern, AST)>),
     For(Pos, String, R<AST>, R<AST>),
     While(Pos, R<AST>, R<AST>),
 

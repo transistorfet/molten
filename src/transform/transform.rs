@@ -702,43 +702,40 @@ impl<'sess> Transformer<'sess> {
                 exprs.push(LLExpr::SetValue(pat.id, r(LLExpr::Cast(self.transform_value_type(&ttype), r(LLExpr::GetValue(value_id))))));
                 exprs.extend(self.transform_pattern(subpat, pat.id));
             },
-            PatKind::Resolve(_left, _field, oid) => {
-                let defid = self.session.get_ref(pat.id).unwrap();
-                let enumdef = self.session.get_def_from_ref(*oid).unwrap().as_enum().unwrap();
-                let variant = enumdef.get_variant_by_id(defid).unwrap();
-                // TODO we aren't doing a trait object cast here because we're assuming we can't unpack the value
-                exprs.push(LLExpr::Cmp(LLCmpType::Equal, r(LLExpr::GetItem(r(LLExpr::GetValue(value_id)), 0)), r(LLExpr::Literal(LLLit::I8(variant as i8)))));
-            },
-            PatKind::EnumArgs(left, args, eid) => {
-                let variant_id = self.session.get_ref(pat.id).unwrap();
-                let item_id = NodeID::generate();
-                //exprs.push(LLExpr::SetValue(item_id, r(LLExpr::GetItem(r(LLExpr::Cast(self.get_type(variant_id).unwrap(), r(LLExpr::GetValue(value_id)))), 1))));
 
-                // TODO this indirection is a fix for an infinite loop during optimization when directly fetching the second argument in an enum, the raw array
-                //      The problem with the previous approach is that the Cast llexpr is very complicated and will not necessarily do the right conversion when
-                //      using a struct instead of a pointer to a struct.  Creating a temporary variable means that the direct variable reference is a pointer, and
-                //      can thus be indexed as one.  This might change if enums are made into references always
-                let tmp_id = NodeID::generate();
-                let ltype = self.get_type(variant_id).unwrap();
-                exprs.push(LLExpr::DefLocal(tmp_id, tmp_id.to_string(), ltype.clone(), r(LLExpr::Cast(ltype.clone(), r(LLExpr::GetValue(value_id))))));
+            PatKind::EnumVariant(_, args, eid) => {
+                let enum_id = self.session.get_ref(pat.id).unwrap();
+                let enumdef = self.session.get_def(enum_id).unwrap().as_enum().unwrap();
+                let variant_id = self.session.get_ref(*eid).unwrap();
+                let variant = enumdef.get_variant_by_id(variant_id).unwrap();
 
-                exprs.push(LLExpr::SetValue(item_id, r(
-                    LLExpr::LoadRef(r(
-                        LLExpr::AccessRef(r(
-                            LLExpr::Cast(LLType::Ptr(r(ltype)), r(LLExpr::GetValue(tmp_id)))
-                        ), vec!(LLRef::Field(1)))
-                    ))
-                )));
+                if args.len() > 0 {
+                    // TODO this indirection is a fix for an infinite loop during optimization when directly fetching the second argument in an enum, the raw array
+                    //      The problem with the previous approach is that the Cast llexpr is very complicated and will not necessarily do the right conversion when
+                    //      using a struct instead of a pointer to a struct.  Creating a temporary variable means that the direct variable reference is a pointer, and
+                    //      can thus be indexed as one.  This might change if enums are made into references always
+                    let value_ref_id = NodeID::generate();
+                    let variant_type = self.get_type(variant_id).unwrap();
+                    exprs.push(LLExpr::DefLocal(value_ref_id, value_ref_id.to_string(), variant_type.clone(), r(LLExpr::Cast(variant_type.clone(), r(LLExpr::GetValue(value_id))))));
 
-                let argtypes = self.session.get_type(*eid).unwrap().as_vec();
-                for ((i, arg), packed_type) in args.iter().enumerate().zip(argtypes.iter()) {
-                    let unpacked_type = self.session.get_type(arg.id).unwrap();
-                    let value = self.check_convert_to_trait(&mut exprs, &unpacked_type, packed_type, LLExpr::GetItem(r(LLExpr::GetValue(item_id)), i));
-                    exprs.push(LLExpr::SetValue(arg.id, r(value)));
-                    exprs.extend(self.transform_pattern(&arg, arg.id));
+                    let item_id = NodeID::generate();
+                    exprs.push(LLExpr::SetValue(item_id, r(
+                        LLExpr::LoadRef(r(
+                            LLExpr::AccessRef(r(
+                                LLExpr::Cast(LLType::Ptr(r(variant_type)), r(LLExpr::GetValue(value_ref_id)))
+                            ), vec!(LLRef::Field(1)))
+                        ))
+                    )));
+
+                    let argtypes = self.session.get_type(*eid).unwrap().as_vec();
+                    for ((i, arg), packed_type) in args.iter().enumerate().zip(argtypes.iter()) {
+                        let unpacked_type = self.session.get_type(arg.id).unwrap();
+                        let value = self.check_convert_to_trait(&mut exprs, &unpacked_type, packed_type, LLExpr::GetItem(r(LLExpr::GetValue(item_id)), i));
+                        exprs.push(LLExpr::SetValue(arg.id, r(value)));
+                        exprs.extend(self.transform_pattern(&arg, arg.id));
+                    }
                 }
-                //let result = exprs.pop();
-                exprs.extend(self.transform_pattern(left, value_id));
+                exprs.push(LLExpr::Cmp(LLCmpType::Equal, r(LLExpr::GetItem(r(LLExpr::GetValue(value_id)), 0)), r(LLExpr::Literal(LLLit::I8(variant as i8)))));
             },
             _ => panic!("Not Implemented: {:?}", pat),
         }

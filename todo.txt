@@ -1,28 +1,27 @@
 
-* fix the issue where passing a function into another function as () -> 'a, with a universal, will unpack the value without packing it, causing a segfault
-* if you have a match with an enum variant, but leave out the resolve/type name, it causes a parse error (should cause another kind of error perhaps)
+* implement the record and tuple pattern matching
+* add ref pattern?
+
+* add some way of setting the file number in Pos, so that it points to the right file for error messages
 * should you go back to the match/with try/with syntax?  I think now that 'raise' is fixed it might not be a clunky
 
 * make sure you can export and import trait defs and impls. make tests for this
-* split AST and Expr pattern matching to make the expr stuff easier to use. The identifier and resolve patterns are kind of clunky and there's a syntax error in bindings which
-  should be in refinery if possible
+* add (finalize) iterators
 
 * can you remove access to getindex?
-* ByteString or ByteArray
+* ByteString or ByteArray or ImmutableString?
 * rename String type to ByteString, ByteArray, or CString, or ZString, or NullString, or NullByteArray, or ZByteArray, RawString;  I'm leaning ZByteArray or ByteString
 * rename SuperString type to String, will require a bunch of libcore changes
 
 
+* fix the issue where passing a function into another function as () -> 'a, with a universal, will unpack the value without packing it, causing a segfault
 * add a check to make sure trait defs are all ABI::Molten
 * do you need to test unification between class and parent class, as well as trait def and impl type?
-* should you have a check of class/enum type parameters to make sure they are Universals (or that they contain Universals), otherwise error since using a fixed typeparam is pointless
 * I'd really like to change the way method calls are done.  It's annoying having all these definitions and blocks for every call
   but this might not be possible because you need to bind references during type checking, and you can't do that without all the variants
 
 * write overview
 * implement trait dependence
-* implement the record and tuple pattern matching
-* add (finalize) iterators
 
 
 * add some way of creating a traitobj using a def or annotation (issues with universals vs variables and mapping typevars; using check_type(..., false) works but might not be correct)
@@ -33,7 +32,6 @@
 * need a way to import/compile directory of many files (libcore as many files)
 * fix the module keyword to have the dot name instead of the underscore name, and try to remove the special case in transform
 * remove the forced visibility in refinery, when you decide on pub/priv semantics
-* there is an issue with raise, in that it is considered to return unit () instead of somehow being marked as not returning...  Getting type errors in Option def
 
 
 DISCUSSION:
@@ -82,7 +80,6 @@ BUGS:
 * there is still a bug with the Phi statement, in that it will return null if you don't cover all cases. there is no check for coverage
 * unwrap error when recursively calling in `let recfoo = fn x =>` because the actual DefLocal is inserted after the initializer code is transformed, but if this was fixed,
   would it be possible to access recfoo before it's been initialized, such as in `let something: Int = { something; 0 }`
-* parse error for if statements in an expression, they require brackets around them: let h = 5 + if r > 4 then 5 else 10
 
 
 
@@ -123,9 +120,6 @@ Changes:
 * make builtin types unable to inherit from, because there's no vtable
 * fix lib to allow builtin classes??
 
-* can you make a check for nil before unboxing a type... and somehow return an appropriate default value?  I guess that's feasible because only builtin types would be
-  boxed/unboxed, although records and tuples might be an issue
-
 
 
 * add 'import as' syntax
@@ -139,7 +133,6 @@ Changes:
 
 
 
-* should you remove the Nil type? (yes, but it'll be a bit tricky)
 * should you make it possible to call a trait method via a resolve; eg. Add::add(x, y).  The issue is that vtable is in the objects
 * should you fix scope resolution to also work on objects, so that you can have static methods from the object without explicitly referencing its type
 * should exports also list all the modules that the file imports, so that class definitions in other imports can be found, if needed for arguments

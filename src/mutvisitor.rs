@@ -153,15 +153,12 @@ pub fn walk_mut_pattern<V: MutVisitor>(visitor: &mut V, pat: &mut Pattern) {
         PatKind::Wild => { },
         PatKind::Literal(_, _) => { },
         PatKind::Binding(_) => { },
-        PatKind::Identifier(_) => { },
 
-        PatKind::Annotation(_, subpat) |
-        PatKind::Resolve(subpat, _, _) => {
+        PatKind::Annotation(_, subpat) => {
             visitor.visit_pattern(subpat);
         },
 
-        PatKind::EnumArgs(left, args, _) => {
-            visitor.visit_pattern(left);
+        PatKind::EnumVariant(_, args, _) => {
             walk_mut_pattern_vec(visitor, args);
         },
 

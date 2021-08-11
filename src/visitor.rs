@@ -267,30 +267,6 @@ pub trait Visitor: Sized {
     }
 
 
-    fn visit_pattern_binding(&mut self, _id: NodeID, _name: &str) -> Result<Self::Return, Error> {
-        Ok(self.default_return())
-    }
-
-    fn visit_pattern_annotation(&mut self, _id: NodeID, _ttype: &Type, subpat: &Pattern) -> Result<Self::Return, Error> {
-        self.visit_pattern(subpat)
-    }
-
-    fn visit_pattern_resolve(&mut self, _id: NodeID, left: &Pattern, _field: &str, _oid: NodeID) -> Result<Self::Return, Error> {
-        self.visit_pattern(left)
-    }
-
-    fn visit_pattern_enum_args(&mut self, _id: NodeID, left: &Pattern, args: &Vec<Pattern>, _eid: NodeID) -> Result<Self::Return, Error> {
-        walk_pattern_enum_args(self, left, args)
-    }
-
-    fn visit_pattern_tuple(&mut self, _id: NodeID, items: &Vec<Pattern>) -> Result<Self::Return, Error> {
-        walk_pattern_tuple(self, items)
-    }
-
-    fn visit_pattern_record(&mut self, _id: NodeID, items: &Vec<(String, Pattern)>) -> Result<Self::Return, Error> {
-        walk_pattern_record(self, items)
-    }
-
     fn visit_pattern_wild(&mut self, _id: NodeID) -> Result<Self::Return, Error> {
         Ok(self.default_return())
     }
@@ -299,10 +275,25 @@ pub trait Visitor: Sized {
         Ok(self.default_return())
     }
 
-    fn visit_pattern_identifier(&mut self, _id: NodeID, _name: &str) -> Result<Self::Return, Error> {
+    fn visit_pattern_binding(&mut self, _id: NodeID, _name: &str) -> Result<Self::Return, Error> {
         Ok(self.default_return())
     }
 
+    fn visit_pattern_annotation(&mut self, _id: NodeID, _ttype: &Type, subpat: &Pattern) -> Result<Self::Return, Error> {
+        self.visit_pattern(subpat)
+    }
+
+    fn visit_pattern_tuple(&mut self, _id: NodeID, items: &Vec<Pattern>) -> Result<Self::Return, Error> {
+        walk_pattern_vec(self, items)
+    }
+
+    fn visit_pattern_record(&mut self, _id: NodeID, items: &Vec<(String, Pattern)>) -> Result<Self::Return, Error> {
+        walk_pattern_record(self, items)
+    }
+
+    fn visit_pattern_enum_variant(&mut self, _id: NodeID, _path: &Vec<String>, args: &Vec<Pattern>, _eid: NodeID) -> Result<Self::Return, Error> {
+        walk_pattern_vec(self, args)
+    }
 
 
     fn handle_error(&mut self, _node: &Expr, err: Error) -> Result<Self::Return, Error> {
@@ -407,15 +398,7 @@ pub fn walk_assignment<R, V: Visitor<Return = R>>(visitor: &mut V, left: &Expr, 
     Ok(visitor.default_return())
 }
 
-pub fn walk_pattern_enum_args<R, V: Visitor<Return = R>>(visitor: &mut V, left: &Pattern, args: &Vec<Pattern>) -> Result<R, Error> {
-    visitor.visit_pattern(left)?;
-    for arg in args {
-        visitor.visit_pattern(arg)?;
-    }
-    Ok(visitor.default_return())
-}
-
-pub fn walk_pattern_tuple<R, V: Visitor<Return = R>>(visitor: &mut V, items: &Vec<Pattern>) -> Result<R, Error> {
+pub fn walk_pattern_vec<R, V: Visitor<Return = R>>(visitor: &mut V, items: &Vec<Pattern>) -> Result<R, Error> {
     for item in items {
         visitor.visit_pattern(item)?;
     }
@@ -583,20 +566,20 @@ pub fn walk_node<R, V: Visitor<Return = R>>(visitor: &mut V, node: &Expr) -> Res
 
 pub fn walk_pattern<R, V: Visitor<Return = R>>(visitor: &mut V, pat: &Pattern) -> Result<R, Error> {
     match &pat.kind {
+        PatKind::Wild => {
+            visitor.visit_pattern_wild(pat.id)
+        },
+
+        PatKind::Literal(lit, fid) => {
+            visitor.visit_pattern_literal(pat.id, lit, *fid)
+        },
+
         PatKind::Binding(name) => {
             visitor.visit_pattern_binding(pat.id, &name)
         },
 
         PatKind::Annotation(ttype, subpat) => {
             visitor.visit_pattern_annotation(pat.id, ttype, subpat)
-        },
-
-        PatKind::Resolve(left, name, oid) => {
-            visitor.visit_pattern_resolve(pat.id, left, &name, *oid)
-        },
-
-        PatKind::EnumArgs(left, args, eid) => {
-            visitor.visit_pattern_enum_args(pat.id, left, args, *eid)
         },
 
         PatKind::Tuple(items) => {
@@ -607,16 +590,8 @@ pub fn walk_pattern<R, V: Visitor<Return = R>>(visitor: &mut V, pat: &Pattern) -
             visitor.visit_pattern_record(pat.id, items)
         },
 
-        PatKind::Wild => {
-            visitor.visit_pattern_wild(pat.id)
-        },
-
-        PatKind::Literal(lit, fid) => {
-            visitor.visit_pattern_literal(pat.id, lit, *fid)
-        },
-
-        PatKind::Identifier(name) => {
-            visitor.visit_pattern_identifier(pat.id, &name)
+        PatKind::EnumVariant(path, args, eid) => {
+            visitor.visit_pattern_enum_variant(pat.id, path, args, *eid)
         },
     }
 }

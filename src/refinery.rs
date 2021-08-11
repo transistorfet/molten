@@ -3,7 +3,7 @@ use std::cell::RefCell;
 
 use crate::abi::ABI;
 use crate::types::Type;
-use crate::ast::{ Pos, AST };
+use crate::ast::{ Pos, ASTPattern, AST };
 use crate::misc::{ r, UniqueID };
 use crate::session::{ Session, Error };
 use crate::defs::modules::{ ModuleDef };
@@ -65,8 +65,8 @@ impl<'sess> Refinery<'sess> {
 
         let body = vec!(
             Expr::make_match(Pos::empty(), Expr::make_ident_from_str(Pos::empty(), &memo), vec!(
-                MatchCase::new(Pattern::make_lit(Literal::Boolean(true)), Expr::make_lit(Literal::Boolean(true))),
-                MatchCase::new(Pattern::make_lit(Literal::Boolean(false)), Expr::make_block(Pos::empty(), init_code)),
+                MatchCase::new(Pattern::make_lit(Pos::empty(), Literal::Boolean(true)), Expr::make_lit(Literal::Boolean(true))),
+                MatchCase::new(Pattern::make_lit(Pos::empty(), Literal::Boolean(false)), Expr::make_block(Pos::empty(), init_code)),
             ))
         );
 
@@ -318,7 +318,7 @@ impl<'sess> Refinery<'sess> {
         })
     }
 
-    pub fn refine_cases(&self, cases: Vec<(Pattern, AST)>) -> Result<Vec<MatchCase>, Error> {
+    pub fn refine_cases(&self, cases: Vec<(ASTPattern, AST)>) -> Result<Vec<MatchCase>, Error> {
         let mut refined = vec!();
         for case in cases {
             let pat = self.refine_pattern(case.0)?;
@@ -328,9 +328,34 @@ impl<'sess> Refinery<'sess> {
         Ok(refined)
     }
 
-    pub fn refine_pattern(&self, pat: Pattern) -> Result<Pattern, Error> {
-        // TODO refine the pattern, if needed
-        Ok(pat)
+    pub fn refine_pattern(&self, pat: ASTPattern) -> Result<Pattern, Error> {
+        Ok(match pat {
+            ASTPattern::Wild => Pattern::make_wild(),
+
+            ASTPattern::Literal(pos, lit) => Pattern::make_lit(pos, lit),
+
+            ASTPattern::Binding(pos, name) => Pattern::make_binding(pos, name),
+
+            ASTPattern::Annotation(pos, ttype, subpat) => Pattern::make_annotation(pos, ttype, self.refine_pattern(*subpat)?),
+
+            ASTPattern::EnumVariant(pos, path, args) => {
+                let args = args.into_iter().map(|p| self.refine_pattern(p)).collect::<Result<Vec<Pattern>, Error>>()?;
+                Pattern::make_enum_variant(pos, path, args)
+            },
+
+            ASTPattern::Tuple(pos, items) => {
+                let items = items.into_iter().map(|p| self.refine_pattern(p)).collect::<Result<Vec<Pattern>, Error>>()?;
+                Pattern::make_tuple(pos, items)
+            },
+
+            ASTPattern::Record(pos, items) => {
+                let mut refined = vec!();
+                for (i, p) in items {
+                    refined.push((i, self.refine_pattern(p)?));
+                }
+                Pattern::make_record(pos, refined)
+            },
+        })
     }
 
     pub fn desugar_for_loop(&self, pos: Pos, ident: String, array: AST, body: AST) -> Result<Expr, Error> {

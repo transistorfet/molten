@@ -35,8 +35,8 @@ use std::str::FromStr;
 use crate::abi::ABI;
 use crate::types::Type;
 use crate::misc::{ r, UniqueID };
-use crate::ast::{ Pos, RawArgument, AST };
-use crate::hir::{ NodeID, Mutability, Visibility, AssignType, Literal, WhereClause, Pattern, PatKind };
+use crate::ast::{ Pos, RawArgument, ASTPattern, AST };
+use crate::hir::{ Mutability, Visibility, AssignType, Literal, WhereClause };
 
 
 ///// Parsing Macros /////
@@ -435,16 +435,16 @@ named!(matchcase(Span) -> AST,
     )
 );
 
-named!(caselist(Span) -> Vec<(Pattern, AST)>,
+named!(caselist(Span) -> Vec<(ASTPattern, AST)>,
     //separated_list0!(wscom!(tag!("|")), do_parse!(
-    dbg_dmp!(many1!(wscom!(do_parse!(
+    many1!(wscom!(do_parse!(
         //wscom!(tag!("|")) >>
         c: pattern >>
         wscom!(tag!("=>")) >>
         e: expression >>
         //wscom!(tag!(",")) >>
         ((c, e))
-    ))))
+    )))
 );
 
 named!(forloop(Span) -> AST,
@@ -1073,17 +1073,16 @@ named!(not_reserved(Span) -> (),
     // TODO you need to figure out the add_error thing to raise a specific error
     //return_error!(ErrorKind::Custom(128), alt!(
     not!(alt!(
-        tag_word!("do") |
-        tag_word!("end") |
+        tag_word!("begin") |tag_word!("end") |
         tag_word!("while") |
         tag_word!("class") |
         tag_word!("import") |
-        tag_word!("let") |
+        tag_word!("let") | //tag_word!("val") |
         tag_word!("type") |
-        tag_word!("match") |
-        tag_word!("with") |
+        tag_word!("enum") | tag_word!("methods") |
+        tag_word!("match") | tag_word!("with") |
+        tag_word!("try") | tag_word!("raise") |
         tag_word!("if") | tag_word!("then") | tag_word!("else") |
-        tag_word!("try") | tag_word!("with") | tag_word!("raise") |
         tag_word!("for") | tag_word!("in") |
         tag_word!("fn") | tag_word!("decl")
     ))
@@ -1091,21 +1090,21 @@ named!(not_reserved(Span) -> (),
 
 
 
-named!(pattern(Span) -> Pattern,
+named!(pattern(Span) -> ASTPattern,
     do_parse!(
         pos: position!() >>
         p: pattern_atomic >>
         a: opt!(preceded!(wscom!(tag!(":")), type_description)) >>
         (match a {
-            Some(ty) => Pattern::new(Pos::new(pos), PatKind::Annotation(ty, r(p))),
+            Some(ty) => ASTPattern::Annotation(Pos::new(pos), ty, r(p)),
             None => p,
         })
     )
 );
 
-named!(pattern_atomic(Span) -> Pattern,
+named!(pattern_atomic(Span) -> ASTPattern,
     alt!(
-        value!(Pattern::new(Pos::empty(), PatKind::Wild), tag!("_")) |
+        value!(ASTPattern::Wild, tag!("_")) |
         pattern_literal |
         pattern_enum_variant |
         pattern_tuple |
@@ -1114,46 +1113,42 @@ named!(pattern_atomic(Span) -> Pattern,
     )
 );
 
-named!(pattern_literal(Span) -> Pattern,
-    map!(alt!(
-        unit |
-        boolean |
-        string |
-        character |
-        number
-    ), |l| Pattern::new(Pos::empty(), PatKind::Literal(l.get_literal(), NodeID::generate())))
-);
-
-named!(pattern_binding(Span) -> Pattern,
-    map!(identifier, |i| Pattern::new(Pos::empty(), PatKind::Binding(i)))
-);
-
-named!(pattern_resolve(Span) -> Pattern,
+named!(pattern_literal(Span) -> ASTPattern,
     do_parse!(
         pos: position!() >>
-        left: identifier >>
-        operations: many1!(preceded!(tag!("::"), identifier)) >>
-        (operations.into_iter().fold(Pattern::new(Pos::new(pos), PatKind::Identifier(left)), |acc, i| Pattern::new(Pos::new(pos), PatKind::Resolve(r(acc), i, NodeID::generate()))))
+        l: alt!(
+            unit |
+            boolean |
+            string |
+            character |
+            number
+        ) >>
+        (ASTPattern::Literal(Pos::new(pos), l.get_literal()))
     )
 );
 
-named!(pattern_enum_variant(Span) -> Pattern,
+named!(pattern_binding(Span) -> ASTPattern,
     do_parse!(
         pos: position!() >>
-        p: pattern_resolve >>
+        i: identifier >>
+        (ASTPattern::Binding(Pos::new(pos), i))
+    )
+);
+
+named!(pattern_enum_variant(Span) -> ASTPattern,
+    do_parse!(
+        pos: position!() >>
+        p: tuple!(identifier, tag!("::"), identifier) >>
         o: opt!(delimited!(
             tag!("("),
             separated_list0!(wscom!(tag!(",")), pattern),
             tag!(")")
         )) >>
-        (match o {
-            None => p,
-            Some(l) => Pattern::new(Pos::new(pos), PatKind::EnumArgs(r(p), l, NodeID::generate()))
-        })
+        (ASTPattern::EnumVariant(Pos::new(pos), vec!(p.0, p.2), o.unwrap_or(vec!())))
     )
 );
 
-named!(pattern_tuple(Span) -> Pattern,
+named!(pattern_tuple(Span) -> ASTPattern,
     do_parse!(
         pos: position!() >>
         l: delimited!(
@@ -1161,11 +1156,11 @@ named!(pattern_tuple(Span) -> Pattern,
             wscom!(separated_list0!(wscom!(tag!(",")), pattern)),
             tag!(")")
         ) >>
-        (Pattern::new(Pos::new(pos), PatKind::Tuple(l)))
+        (ASTPattern::Tuple(Pos::new(pos), l))
     )
 );
 
-named!(pattern_record(Span) -> Pattern,
+named!(pattern_record(Span) -> ASTPattern,
     do_parse!(
         pos: position!() >>
         l: delimited!(
@@ -1173,11 +1168,11 @@ named!(pattern_record(Span) -> Pattern,
             wscom!(pattern_record_field_assignments),
             return_error!(ErrorKind::Tag /*ErrorKind::Custom(ERR_IN_LIST) */, tag!("}"))
         ) >>
-        (Pattern::new(Pos::new(pos), PatKind::Record(l)))
+        (ASTPattern::Record(Pos::new(pos), l))
     )
 );
 
-named!(pattern_record_field_assignments(Span) -> Vec<(String, Pattern)>,
+named!(pattern_record_field_assignments(Span) -> Vec<(String, ASTPattern)>,
     separated_list0!(wscom!(tag!(",")), do_parse!(
         i: identifier >>
         wscom!(tag!("=")) >>
