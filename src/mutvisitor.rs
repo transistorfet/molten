@@ -46,7 +46,6 @@ pub fn walk_mut_vec<V: MutVisitor>(visitor: &mut V, code: &mut Vec<Expr>) {
 pub fn walk_mut_node<V: MutVisitor>(visitor: &mut V, node: &mut Expr) {
     match &mut node.kind {
         ExprKind::Literal(_) => { },
-        ExprKind::Nil => { },
         ExprKind::Identifier(_) => { },
         ExprKind::Declare(_, _, _, _) => { },
         ExprKind::AllocObject(_) => { },

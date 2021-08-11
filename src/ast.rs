@@ -28,7 +28,6 @@ pub struct RawArgument {
 #[derive(Clone, Debug, PartialEq)]
 pub enum AST {
     Literal(Literal),
-    Nil,
     Annotation(Type, R<AST>),
     Ref(Pos, R<AST>),
     Deref(Pos, R<AST>),

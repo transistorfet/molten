@@ -161,30 +161,29 @@ println(str(number))
 
 class Option2<'item> {
     val mut has
-    val mut item: 'item
+    val mut item: Option<'item>
 
     fn new(self) {
         self.has = false
-        self.item = nil
+        self.item = Option::None
     }
 
     fn some(item) {
         let opt = new Option2<'item>()
         opt.has = true
-        opt.item = item
+        opt.item = Option::Some(item)
         opt
     }
 
     fn none() {
         let opt = new Option2<'item>()
         opt.has = false
-        opt.item = nil
         opt
     }
 
     fn unwrap_or(self, item: 'item) {
         if self.has then
-            self.item
+            self.item.unwrap()
         else
             item
     }

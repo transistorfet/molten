@@ -254,6 +254,22 @@ match val {
 }
 ```
 
+Methods can be added to enums using a `methods` body.  Currently it can only be
+used with enums.
+
+```
+methods Value {
+    fn is_some(val: Value) {
+        match val {
+            None => false
+            _ => true
+        }
+    }
+}
+
+val.is_some()
+```
+
 ### Traits and Trait Objects
 A trait can be defined with method declarations in the body, with the predefined
 type alias "Self" used to refer to the current trait object

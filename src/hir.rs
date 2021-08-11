@@ -105,11 +105,9 @@ pub struct Expr {
     pub kind: ExprKind,
 }
 
-// TODO convert these to use struct variants instead of tuple variants
 #[derive(Clone, Debug, PartialEq)]
 pub enum ExprKind {
     Literal(Literal),
-    Nil,
     Ref(R<Expr>),
     Deref(R<Expr>),
     Annotation(Type, R<Expr>),
@@ -278,11 +276,6 @@ impl Expr {
     #[allow(dead_code)]
     pub fn make_lit(literal: Literal) -> Expr {
         Expr { id: NodeID::generate(), pos: Pos::empty(), kind: ExprKind::Literal(literal) }
-    }
-
-    #[allow(dead_code)]
-    pub fn make_nil() -> Expr {
-        Expr { id: NodeID::generate(), pos: Pos::empty(), kind: ExprKind::Nil }
     }
 
     #[allow(dead_code)]

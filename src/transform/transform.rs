@@ -50,7 +50,6 @@ impl<'sess> Transformer<'sess> {
         let global = self.session.map.get_global();
 
         self.set_type(global.get_type_def(&"()".to_string()).unwrap(), LLType::I32);
-        self.set_type(global.get_type_def(&"Nil".to_string()).unwrap(), LLType::Ptr(r(LLType::I8)));
         self.set_type(global.get_type_def(&"Bool".to_string()).unwrap(), LLType::I1);
         self.set_type(global.get_type_def(&"Byte".to_string()).unwrap(), LLType::I8);
         self.set_type(global.get_type_def(&"Char".to_string()).unwrap(), LLType::I32);
@@ -153,10 +152,6 @@ impl<'sess> Visitor for Transformer<'sess> {
 
     fn visit_literal(&mut self, _refid: NodeID, lit: &Literal) -> Result<Self::Return, Error> {
         Ok(vec!(LLExpr::Literal(self.transform_lit(lit))))
-    }
-
-    fn visit_nil(&mut self, refid: NodeID) -> Result<Self::Return, Error> {
-        Ok(vec!(LLExpr::Literal(LLLit::Null(self.transform_value_type(&self.session.get_type(refid).unwrap())))))
     }
 
     fn visit_annotation(&mut self, refid: NodeID, _ttype: &Type, code: &Expr) -> Result<Self::Return, Error> {

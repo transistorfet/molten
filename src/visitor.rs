@@ -133,10 +133,6 @@ pub trait Visitor: Sized {
         Ok(self.default_return())
     }
 
-    fn visit_nil(&mut self, _id: NodeID) -> Result<Self::Return, Error> {
-        Ok(self.default_return())
-    }
-
     fn visit_annotation(&mut self, _id: NodeID, _ttype: &Type, code: &Expr) -> Result<Self::Return, Error> {
         self.visit_node(code)
     }
@@ -448,10 +444,6 @@ pub fn walk_node<R, V: Visitor<Return = R>>(visitor: &mut V, node: &Expr) -> Res
     match &node.kind {
         ExprKind::Literal(lit) => {
             visitor.visit_literal(node.id, lit)
-        },
-
-        ExprKind::Nil => {
-            visitor.visit_nil(node.id)
         },
 
         ExprKind::Annotation(ttype, code) => {

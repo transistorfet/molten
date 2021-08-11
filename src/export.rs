@@ -98,8 +98,6 @@ impl<'sess> Visitor for ExportsCollector<'sess> {
         }
 
         self.declarations.push_str(&format!("class {} {{\n", namespec));
-        //self.declarations.push_str(&format!("    decl __alloc__() -> {}\n", namespec));
-        //self.declarations.push_str(&format!("    decl __init__({}) -> Nil\n", namespec));
         for node in body {
             match &node.kind {
                 ExprKind::Field(mutable, name, _) => {

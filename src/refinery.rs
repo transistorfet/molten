@@ -312,7 +312,6 @@ impl<'sess> Refinery<'sess> {
                 Expr::make_annotation(ttype, self.refine_node(*value)?)
             },
 
-            AST::Nil => { Expr::make_nil() },
             AST::Literal(val) => { Expr::make_lit(val) },
             AST::Identifier(pos, ident) => { Expr::make_ident(pos, ident) },
             AST::TypeAlias(pos, deftype, ttype) => { Expr::make_type_alias(pos, deftype, ttype) },

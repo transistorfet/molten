@@ -908,7 +908,6 @@ named!(abi_specifier(Span) -> ABI,
 named!(literal(Span) -> AST,
     alt!(
         unit |
-        nil |
         boolean |
         string |
         character |
@@ -921,10 +920,6 @@ named!(literal(Span) -> AST,
 
 named!(unit(Span) -> AST,
     value!(AST::Literal(Literal::Unit), tag_word!("()"))
-);
-
-named!(nil(Span) -> AST,
-    value!(AST::Nil, tag_word!("nil"))
 );
 
 named!(boolean(Span) -> AST,
@@ -1122,7 +1117,6 @@ named!(pattern_atomic(Span) -> Pattern,
 named!(pattern_literal(Span) -> Pattern,
     map!(alt!(
         unit |
-        nil |
         boolean |
         string |
         character |

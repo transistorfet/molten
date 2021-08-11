@@ -282,11 +282,6 @@ impl<'sess> Visitor for TypeChecker<'sess> {
         Ok(scope.find_type(self.session, "()")?)
     }
 
-    fn visit_nil(&mut self, refid: NodeID) -> Result<Self::Return, Error> {
-        let ttype = self.get_type_or_new_typevar(refid);
-        Ok(ttype)
-    }
-
     fn visit_ref(&mut self, refid: NodeID, expr: &Expr) -> Result<Self::Return, Error> {
         let ttype = self.visit_node_or_error(expr);
         let rtype = Type::Ref(r(ttype));
