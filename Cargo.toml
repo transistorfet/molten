@@ -5,9 +5,9 @@ authors = ["transistor <trans@jabberwocky.ca>"]
 edition = "2018"
 
 [dependencies]
-nom = { version = "^6.1.2" }
-nom_locate = { version = "^3.0" }
+nom = { version = "^6" }
+nom_locate = { version = "^3" }
 clap = "^2"
 llvm-sys = "^110"
-regex = "^1.1.0"
+regex = "^1"
 

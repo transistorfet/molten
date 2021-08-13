@@ -400,10 +400,12 @@ fn bind_where_constraints(session: &Session, scope: ScopeRef, whereclause: &Wher
         let var_id = scope.get_type_def(&varname).ok_or_else(|| Error::new(format!("TypeError: definition not set for {:?}", varname)))?;
         let trait_id = scope.get_type_def(&traitname).ok_or_else(|| Error::new(format!("TypeError: definition not set for {:?}", traitname)))?;
         let mut constraints = session.get_constraints(var_id);
-        if constraints.len() > 0 {
+        if !constraints.contains(&trait_id) {
+            constraints.push(trait_id);
+        }
+        if constraints.len() > 1 {
             panic!("We're only allowing 1 trait constraint per universal at the moment");
         }
-        constraints.push(trait_id);
         session.set_constraints(var_id, constraints);
     }
     Ok(())

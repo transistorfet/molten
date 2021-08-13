@@ -197,7 +197,7 @@ impl fmt::Display for Type {
                 write!(f, "{} -> {}{}", args, *ret, abi)
             }
             Type::Ref(ttype) => {
-                write!(f, "{}", ttype)
+                write!(f, "ref {}", ttype)
             }
         }
     }

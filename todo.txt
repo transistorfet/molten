@@ -1,4 +1,5 @@
 
+* `println(list.get(list.len() - 1).str)` is where list is Array<SuperString> is causing a segfault.  It seems to be related to the access because `let data = ...; data.str` works
 * add some way of setting the file number in Pos, so that it points to the right file for error messages
 * should you go back to the match/with try/with syntax?  I think now that 'raise' is fixed it might not be a clunky
 

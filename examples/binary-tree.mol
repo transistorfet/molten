@@ -1,0 +1,72 @@
+
+import lib.libcore
+
+
+// A trait to compare if a value is less than another identical value
+trait LessThan {
+    decl less_than(Self, Self) -> Bool
+}
+
+// Implementation of our trait for the Int type, which is the only node
+// type we will use in this example
+impl LessThan for Int {
+    fn less_than(x: Self, y: Self) -> Bool {
+        x < y
+    }
+}
+
+// Our binary tree will hold a generic 'item which must have the LessThan trait implemented
+enum BinaryTree<'item> where item: LessThan =
+    | Empty
+    | Node('item, ref BinaryTree<'item>, ref BinaryTree<'item>)
+
+
+// Insert a new item into the tree using recursion
+//
+// The trait LessThan is called to decide between the left-hand or right-hand side of the tree
+// when decending.  When it reaches an empty spot, it will modify the ref containing the empty
+// node and replace it with a new node holding the inserted value
+fn insert_node(tree: ref BinaryTree<'item>, item: 'item) where item: LessThan {
+    match *tree {
+        BinaryTree::Empty => {
+            *tree = BinaryTree::Node(item, ref BinaryTree::Empty, ref BinaryTree::Empty)
+        }
+        BinaryTree::Node(stored, left, right) => {
+            if item.less_than(stored) then
+                insert_node(left, item)
+            else
+                insert_node(right, item)
+        }
+    }
+}
+
+// Print out the contents of the tree
+//
+// This version only works with Int instead of using generics because we are currently limited
+// to only one trait constraint per universal, and since our list already uses the LessThan
+// trait, we can't add any additional constraints here
+fn print_tree(tree) {
+    match *tree {
+        BinaryTree::Empty => ()
+        BinaryTree::Node(stored, left, right) => {
+            print_tree(left)
+            println(str(stored))
+            print_tree(right)
+        }
+    }
+}
+
+// Our input data stored in an Array<Int>
+let numbers = [ 1, 3, 50, 98, 17, 2, 350, 9, 18, 2, 37, 50, 9, 12, 73, 50, 97, 30, 87 ]
+
+// Create an empty tree (refs are mutable)
+let tree = ref BinaryTree::Empty
+
+// For each number in our input list, insert it into our tree in place
+for v in numbers {
+    insert_node(tree, v)
+}
+
+// Print the contents of the tree
+print_tree(tree)
+
