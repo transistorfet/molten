@@ -107,7 +107,7 @@ impl<'sess> Transformer<'sess> {
                 return self.convert_pack_trait_obj(exprs, opt_traitdef, &src_type, value)
             },
             (_, Type::Universal(_, _)) => {
-                return self.convert_unpack_trait_obj(value);
+                return LLExpr::Cast(self.transform_value_type(dest_type), r(self.convert_unpack_trait_obj(value)));
             },
             _ => { },
         }

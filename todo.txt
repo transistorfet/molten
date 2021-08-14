@@ -1,10 +1,12 @@
 
-* `println(list.get(list.len() - 1).str)` is where list is Array<SuperString> is causing a segfault.  It seems to be related to the access because `let data = ...; data.str` works
-* add some way of setting the file number in Pos, so that it points to the right file for error messages
-* should you go back to the match/with try/with syntax?  I think now that 'raise' is fixed it might not be a clunky
-
+* write overview
 * make sure you can export and import trait defs and impls. make tests for this
 * add (finalize) iterators
+* add some way of setting the file number in Pos, so that it points to the right file for error messages
+* should you go back to the match/with try/with syntax?  I think now that 'raise' is fixed it might not be a clunky
+* do you need to test unification between class and parent class, as well as trait def and impl type?
+* add a check to make sure trait defs are all ABI::Molten
+* you could modify the forloop code to take an iterator in future
 
 * can you remove access to getindex?
 * ByteString or ByteArray or ImmutableString?
@@ -12,17 +14,14 @@
 * rename SuperString type to String, will require a bunch of libcore changes
 
 
-* fix the issue where passing a function into another function as () -> 'a, with a universal, will unpack the value without packing it, causing a segfault
-* add a check to make sure trait defs are all ABI::Molten
-* do you need to test unification between class and parent class, as well as trait def and impl type?
+* fix the issue where passing a function `() -> String` into another function as `() -> 'a`, with a universal, will unpack the String value without packing it from within
+  the non-universal function, causing a segfault
 * I'd really like to change the way method calls are done.  It's annoying having all these definitions and blocks for every call
   but this might not be possible because you need to bind references during type checking, and you can't do that without all the variants
 
-* write overview
 * implement trait dependence
-
-
 * add some way of creating a traitobj using a def or annotation (issues with universals vs variables and mapping typevars; using check_type(..., false) works but might not be correct)
+
 * should you make it so that only functions/classes/enumdefs/etc can create a universal, and other places like new/definition/etc will raise an error if they are undefined, is this useful?
 * you could also maybe add a native array type (like a slice, with a pointer and size value in a pair), to replace UniversalArray
 
@@ -82,6 +81,7 @@ BUGS:
 
 
 Error Messages:
+* make builtin types unable to inherit from, because there's no vtable
 * when a trait is not implemented, it will produce an unhelpful type error that it expected random variable, but found unimplemented type
 * there is no context info for the ununified variables, which makes it hard to find the issue
 * you can put a restriction on type aliases such that a type can only use type vars defined in the declaration
@@ -110,12 +110,8 @@ Changes:
 * should it be possible to not import all symbols from a module?  Should there be a namespaced object thing?
 * how does rust do "use" if there is a circular dependency?
 * the module level scope is now a closed function, so you could return a representation of it as the "module" object
-
 * add namespace of some kind, such that you can group functions?  like 'module' from ML?? like impl from rust?? or like namespace from C
-* you could modify the forloop code to take an iterator in future
-* should vtables be dynamically allocated, or should we add a LLType::ElementOf() type or something to GetElement an aliased type
 
-* make builtin types unable to inherit from, because there's no vtable
 * fix lib to allow builtin classes??
 
 
@@ -151,6 +147,7 @@ Changes:
 * is it even possible to add a special "constrained" type, which has &AST that must type check correctly in order to match (checks done in check_type)
 * what if you generalize overloaded types, such that they're checked in check_type, and options are eliminated, or resolved to one type over the course of checking
 * should you implement the context method described in the proper bidirectional typechecker algorithm
+* should vtables be dynamically allocated
 
 
 EXAMPLE PROGRAM IDEAS:

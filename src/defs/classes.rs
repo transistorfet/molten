@@ -35,7 +35,7 @@ impl ClassDef {
             classname: classname,
             classtype: classtype,
             parenttype: parenttype,
-            structdef: StructDef::new_ref(vars),
+            structdef: StructDef::new_ref(defid, vars),
             vtable: vtable,
         }
     }
@@ -149,6 +149,7 @@ pub enum Define {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct StructDef {
+    pub id: NodeID,
     pub vars: ScopeRef,
     pub fields: RefCell<Vec<(NodeID, String, Type)>>,
 }
@@ -156,15 +157,16 @@ pub struct StructDef {
 pub type StructDefRef = Rc<StructDef>;
 
 impl StructDef {
-    pub fn new(vars: ScopeRef) -> Self {
+    pub fn new(id: NodeID, vars: ScopeRef) -> Self {
         Self {
+            id: id,
             vars: vars,
             fields: RefCell::new(vec!()),
         }
     }
 
-    pub fn new_ref(vars: ScopeRef) -> StructDefRef {
-        Rc::new(Self::new(vars))
+    pub fn new_ref(id: NodeID, vars: ScopeRef) -> StructDefRef {
+        Rc::new(Self::new(id, vars))
     }
 
     pub fn inherit(&self, inherit: &StructDef) {

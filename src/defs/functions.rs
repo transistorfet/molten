@@ -197,7 +197,7 @@ impl ClosureDef {
     pub fn create(session: &Session, defid: NodeID, vis: Visibility) -> Result<Def, Error> {
         let context_type_id = NodeID::generate();
         // TODO the context and name are incorrect here
-        let structdef = StructDef::new_ref(Scope::new_ref("", Context::Block, None));
+        let structdef = StructDef::new_ref(context_type_id, Scope::new_ref("", Context::Block, None));
 
         let def = Def::Closure(Rc::new(ClosureDef {
             vis,
