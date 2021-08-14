@@ -1,0 +1,15 @@
+
+// 2021-08-13 this is causing a segfault when compiling, but only if the trait method is "str"
+// Changing the method name to anything else will make the test compile.  It doesn't seem to be
+// related to the contents of the impl (changing to a const String still causes the segfault)
+
+trait Display {
+    decl str(Self) -> String
+}
+
+impl Display for Int {
+    fn str(self) -> String {
+        str(self)
+    }
+}
+

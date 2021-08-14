@@ -86,6 +86,7 @@ impl Def {
             Def::Struct(structdef) => Ok(structdef.vars.clone()),
             Def::Enum(enumdef) => Ok(enumdef.vars.clone()),
             Def::TraitDef(traitdef) => Ok(traitdef.vars.clone()),
+            Def::TraitImpl(traitimpl) => Ok(traitimpl.vars.clone()),
             _ => Err(Error::new(format!("DefError: expected class, struct, enum, or trait def but found {:#?}", self))),
         }
     }

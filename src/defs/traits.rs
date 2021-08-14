@@ -74,23 +74,26 @@ pub struct TraitImpl {
     pub id: NodeID,
     pub trait_id: NodeID,
     pub impltype: Type,
+    pub vars: ScopeRef,
     pub vtable: Vtable,
 }
 
 pub type TraitImplRef = Rc<TraitImpl>;
 
 impl TraitImpl {
-    pub fn new(id: NodeID, trait_id: NodeID, impltype: Type, vtable: Vtable) -> Self {
+    pub fn new(id: NodeID, trait_id: NodeID, impltype: Type, vars: ScopeRef, vtable: Vtable) -> Self {
+
         Self {
             id: id,
             trait_id: trait_id,
             impltype: impltype,
+            vars: vars,
             vtable: vtable,
         }
     }
 
-    pub fn new_ref(id: NodeID, trait_id: NodeID, impltype: Type, vtable: Vtable) -> TraitImplRef {
-        Rc::new(Self::new(id, trait_id, impltype, vtable))
+    pub fn new_ref(id: NodeID, trait_id: NodeID, impltype: Type, vars: ScopeRef, vtable: Vtable) -> TraitImplRef {
+        Rc::new(Self::new(id, trait_id, impltype, vars, vtable))
     }
 
     #[must_use]
@@ -100,8 +103,10 @@ impl TraitImpl {
         let tscope = session.map.get(impl_id).unwrap();
         TypeAliasDef::define(session, tscope.clone(), NodeID::generate(), Type::Object("Self".to_string(), impl_id, vec!()), impltype.clone())?;
 
+        let vars = Scope::new_ref("", Context::TraitImpl(trait_id, impl_id), None);
+
         let vtable = Vtable::create(session, NodeID::generate(), format!("{}_vtable", name.clone()))?;
-        let traitimpl = Self::new_ref(impl_id, trait_id, impltype.clone(), vtable);
+        let traitimpl = Self::new_ref(impl_id, trait_id, impltype.clone(), vars, vtable);
         scope.define_type(&name, impl_id)?;
         session.set_def(impl_id, Def::TraitImpl(traitimpl.clone()));
         session.set_ref(impl_id, trait_id);

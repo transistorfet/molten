@@ -182,7 +182,7 @@ impl<'sess> Visitor for NameBinder<'sess> {
         let defid = self.session.new_def_id(refid);
 
         let scope = self.stack.get_scope();
-        let tscope = self.session.map.get_or_add(defid, "", Context::Class(defid), Some(scope.clone()));
+        let tscope = self.session.map.get_or_add(defid, classtype.get_name()?, Context::Class(defid), Some(scope.clone()));
 
         let classtype = self.bind_type(tscope.clone(), classtype.clone().set_id(defid)?)?;
         let parenttype = self.bind_type_option(tscope.clone(), parenttype.clone())?;
@@ -212,7 +212,7 @@ impl<'sess> Visitor for NameBinder<'sess> {
         let defid = self.session.new_def_id(refid);
 
         let scope = self.stack.get_scope();
-        let tscope = self.session.map.get_or_add(defid, "", Context::Enum(defid), Some(scope.clone()));
+        let tscope = self.session.map.get_or_add(defid, enumtype.get_name()?, Context::Enum(defid), Some(scope.clone()));
 
         let enumtype = self.bind_type(tscope.clone(), enumtype.clone().set_id(defid)?)?;
         bind_where_constraints(self.session, tscope.clone(), whereclause)?;
@@ -231,7 +231,7 @@ impl<'sess> Visitor for NameBinder<'sess> {
     fn visit_trait_def(&mut self, refid: NodeID, traitname: &str, body: &Vec<Expr>) -> Result<Self::Return, Error> {
         let defid = self.session.new_def_id(refid);
         let scope = self.stack.get_scope();
-        let tscope = self.session.map.get_or_add(defid, "", Context::TraitDef(defid), Some(scope.clone()));
+        let tscope = self.session.map.get_or_add(defid, traitname, Context::TraitDef(defid), Some(scope.clone()));
 
         TraitDef::define(self.session, scope.clone(), defid, traitname)?;
 
@@ -244,7 +244,7 @@ impl<'sess> Visitor for NameBinder<'sess> {
         let scope = self.stack.get_scope();
         let impl_id = self.session.new_def_id(refid);
         let trait_id = scope.get_type_def(traitname).ok_or_else(|| Error::new(format!("NameError: undefined type {:?}", traitname)))?;
-        let tscope = self.session.map.get_or_add(impl_id, "", Context::TraitImpl(trait_id, impl_id), Some(scope.clone()));
+        let tscope = self.session.map.get_or_add(impl_id, traitname, Context::TraitImpl(trait_id, impl_id), Some(scope.clone()));
 
         let impltype = self.bind_type(tscope.clone(), impltype.clone())?;
         bind_where_constraints(self.session, tscope.clone(), whereclause)?;
