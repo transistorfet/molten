@@ -1,6 +1,9 @@
 
+* trait defs in exports seems to work, but not importing impls (Display impl in libcore not working)
+* seems to be problems implementing Display on Option<'item>, caused by check_trait_constraints() which causes a recursive loop checking Option<'item> with 'item
+* you currently can't call a method on a type that implements a trait.  You can only call the trait methods on a universal, but that shouldn't be necessary
+
 * write overview
-* make sure you can export and import trait defs and impls. make tests for this
 * add (finalize) iterators
 * add some way of setting the file number in Pos, so that it points to the right file for error messages
 * should you go back to the match/with try/with syntax?  I think now that 'raise' is fixed it might not be a clunky

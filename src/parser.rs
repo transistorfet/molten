@@ -307,9 +307,10 @@ named!(traitimpl(Span) -> AST,
         t: type_description >>
         w: opt_where_clause >>
         wscom!(tag!("{")) >>
-        b: many0!(wscom!(
-            function
-        )) >>
+        b: many0!(wscom!(alt!(
+            function |
+            declare
+        ))) >>
         return_error!(ErrorKind::Tag /*ErrorKind::Custom(ERR_IN_CLASS) */, tag!("}")) >>
         (AST::TraitImpl(Pos::new(pos), n, t, w, b))
     )
@@ -541,7 +542,7 @@ named!(where_clause(Span) -> WhereClause,
     do_parse!(
         pos: position!() >>
         wscom!(tag_word!("where")) >>
-        c: separated_list1!(wscom!(tag!(",")),
+        c: separated_list1!(wscom!(complete!(tag!(","))),
             do_parse!(
                 v: identifier >>
                 wscom!(tag!(":")) >>

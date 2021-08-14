@@ -123,13 +123,15 @@ impl<'sess> Visitor for NameBinder<'sess> {
 
     fn visit_declare(&mut self, refid: NodeID, vis: Visibility, name: &str, ttype: &Type, whereclause: &WhereClause) -> Result<Self::Return, Error> {
         let defid = self.session.new_def_id(refid);
-
         let scope = self.stack.get_scope();
-        let ttype = self.bind_type(scope.clone(), ttype.clone())?;
-        bind_where_constraints(self.session, scope.clone(), whereclause)?;
+        let abi = ttype.get_abi().unwrap_or(ABI::Molten);
+        let tscope = self.session.map.get_or_add(defid, name, Context::Func(abi, defid), Some(scope.clone()));
+
+        let ttype = self.bind_type(tscope.clone(), ttype.clone())?;
+        bind_where_constraints(self.session, tscope.clone(), whereclause)?;
+
         // NOTE we resolve the type here to allow the resolution of aliases before this type becomes the cannonical type of this definition
         let ttype = resolve_type(self.session, ttype, false)?;
-        let abi = ttype.get_abi().unwrap_or(ABI::Molten);
         AnyFunc::define(self.session, scope.clone(), defid, vis, name, abi, Some(ttype))?;
         Ok(())
     }
@@ -257,12 +259,13 @@ impl<'sess> Visitor for NameBinder<'sess> {
 
     fn visit_methods(&mut self, refid: NodeID, ttype: &Type, whereclause: &WhereClause, body: &Vec<Expr>) -> Result<Self::Return, Error> {
         let scope = self.stack.get_scope();
+        let defid = scope.get_type_def(ttype.get_name()?).ok_or(Error::new(format!("NameError: undefined identifier {:?}", ttype.get_name()?)))?;
+        let tscope = self.session.map.get(defid).unwrap();
 
-        let ttype = self.bind_type(scope.clone(), ttype.clone())?;
-        bind_where_constraints(self.session, scope.clone(), whereclause)?;
+        let ttype = self.bind_type(tscope.clone(), ttype.clone())?;
+        bind_where_constraints(self.session, tscope.clone(), whereclause)?;
         validate_object_definition(&ttype)?;
 
-        let defid = scope.get_type_def(ttype.get_name()?).ok_or(Error::new(format!("NameError: undefined identifier {:?}", ttype.get_name()?)))?;
         match self.session.get_def(defid) {
             // Only method blocks on enums are supported at the moment
             Ok(Def::Enum(_)) => { },
@@ -270,7 +273,6 @@ impl<'sess> Visitor for NameBinder<'sess> {
         }
         self.session.set_ref(refid, defid);
 
-        let tscope = self.session.map.get(defid).unwrap();
         self.with_scope(tscope, |visitor| {
             visitor.visit_vec(body)
         })

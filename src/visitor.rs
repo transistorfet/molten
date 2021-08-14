@@ -229,16 +229,16 @@ pub trait Visitor: Sized {
         Ok(self.default_return())
     }
 
-    fn visit_trait_def(&mut self, _id: NodeID, _traitname: &str, body: &Vec<Expr>) -> Result<Self::Return, Error> {
-        self.visit_vec(body)
+    fn visit_trait_def(&mut self, id: NodeID, _traitname: &str, body: &Vec<Expr>) -> Result<Self::Return, Error> {
+        walk_trait_def(self, id, body)
     }
 
-    fn visit_trait_impl(&mut self, _id: NodeID, _traitname: &str, _impltype: &Type, _whereclause: &WhereClause, body: &Vec<Expr>) -> Result<Self::Return, Error> {
-        self.visit_vec(body)
+    fn visit_trait_impl(&mut self, id: NodeID, _traitname: &str, _impltype: &Type, _whereclause: &WhereClause, body: &Vec<Expr>) -> Result<Self::Return, Error> {
+        walk_trait_impl(self, id, body)
     }
 
-    fn visit_methods(&mut self, _id: NodeID, _ttype: &Type, _whereclause: &WhereClause, body: &Vec<Expr>) -> Result<Self::Return, Error> {
-        self.visit_vec(body)
+    fn visit_methods(&mut self, id: NodeID, _ttype: &Type, _whereclause: &WhereClause, body: &Vec<Expr>) -> Result<Self::Return, Error> {
+        walk_methods(self, id, body)
     }
 
 
@@ -389,6 +389,30 @@ pub fn walk_function<R, V: Visitor<Return = R>>(visitor: &mut V, refid: NodeID, 
 }
 
 pub fn walk_class<R, V: Visitor<Return = R>>(visitor: &mut V, refid: NodeID, body: &Vec<Expr>) -> Result<R, Error> {
+    let defid = visitor.get_session().get_ref(refid)?;
+    let tscope = visitor.get_session().map.get(defid).unwrap();
+    visitor.with_scope(tscope, |visitor| {
+        visitor.visit_vec(body)
+    })
+}
+
+pub fn walk_trait_def<R, V: Visitor<Return = R>>(visitor: &mut V, refid: NodeID, body: &Vec<Expr>) -> Result<R, Error> {
+    let defid = visitor.get_session().get_ref(refid)?;
+    let tscope = visitor.get_session().map.get(defid).unwrap();
+    visitor.with_scope(tscope, |visitor| {
+        visitor.visit_vec(body)
+    })
+}
+
+pub fn walk_trait_impl<R, V: Visitor<Return = R>>(visitor: &mut V, refid: NodeID, body: &Vec<Expr>) -> Result<R, Error> {
+    let defid = visitor.get_session().get_ref(refid)?;
+    let tscope = visitor.get_session().map.get(defid).unwrap();
+    visitor.with_scope(tscope, |visitor| {
+        visitor.visit_vec(body)
+    })
+}
+
+pub fn walk_methods<R, V: Visitor<Return = R>>(visitor: &mut V, refid: NodeID, body: &Vec<Expr>) -> Result<R, Error> {
     let defid = visitor.get_session().get_ref(refid)?;
     let tscope = visitor.get_session().map.get(defid).unwrap();
     visitor.with_scope(tscope, |visitor| {

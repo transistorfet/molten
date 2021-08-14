@@ -442,15 +442,22 @@ impl<'sess> Refinery<'sess> {
     }
 
     pub fn desugar_trait_impl(&self, pos: Pos, traitname: String, impltype: Type, whereclause: WhereClause, body: Vec<AST>) -> Result<Expr, Error> {
+        let (mut all_funcs, mut all_decls) = (false, false);
         let mut trait_body = vec!();
         for node in body {
             match node {
-                AST::Function(pos, _vis, name, args, ret, body, abi, whereclause) if name.is_some() => {
+                AST::Function(pos, _vis, name, args, ret, body, abi, whereclause) if !all_decls => {
+                    all_funcs = true;
                     let vis = Visibility::Public;
                     let name = name.ok_or(Error::new("SyntaxError: anonymous functions are not allowed in trait implementations".to_string()))?;
                     trait_body.push(self.refine_node(AST::Function(pos, vis, Some(name), args, ret, body, abi, whereclause))?);
                 },
-                node => return Err(Error::new(format!("SyntaxError: only functions are allowed in trait impls, found {:?}", node))),
+                AST::Declare(pos, _vis_, name, ttype, whereclause) if !all_funcs => {
+                    all_decls = true;
+                    let vis = Visibility::Public;
+                    trait_body.push(self.refine_node(AST::Declare(pos, vis, name, ttype, whereclause))?);
+                },
+                node => return Err(Error::new(format!("SyntaxError: only functions or decls are allowed in trait impls, but not both, found {:?}", node))),
             }
         }
         Ok(Expr::make_trait_impl(pos, traitname, impltype, whereclause, trait_body))

@@ -381,3 +381,27 @@ let opt4 = Option::Some("hey")
 println(opt4.unwrap())
 
 
+/*
+impl Display for Option<'pants> where pants: Display {
+    fn str(self) {
+        match self {
+            Option::None => "None"
+            Option::Some(item) => "Some(" + item.str() + ")"
+        }
+    }
+}
+*/
+
+// Interesting, you can only use a trait on a universal, and not on a known copy of the type... eg. true.str() doesn't work
+impl Display for Bool {
+    fn str(self) {
+        if self then "true" else "false"
+    }
+}
+
+fn disy(data: 'a) where a: Display {
+    println(data.str())
+}
+
+disy(10)
+

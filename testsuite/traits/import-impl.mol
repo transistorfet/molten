@@ -1,0 +1,12 @@
+
+// This tries to import both the TraitTest definition and its implementation for String
+// We're assuming if it compiles correctly, it works
+
+import testsuite.traits.traits
+
+fn test_it_again(t: 'a) where a: TraitTest {
+    println(str(t.thing()))
+}
+
+test_it_again("Hey")
+

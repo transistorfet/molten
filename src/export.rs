@@ -149,8 +149,13 @@ impl<'sess> Visitor for ExportsCollector<'sess> {
         Ok(())
     }
 
-    fn visit_enum(&mut self, _refid: NodeID, enumtype: &Type, _whereclause: &WhereClause, variants: &Vec<EnumVariant>) -> Result<Self::Return, Error> {
-        self.declarations.push_str(&format!("enum {} =\n", unparse_type(self.session, &enumtype)));
+    fn visit_enum(&mut self, _refid: NodeID, enumtype: &Type, whereclause: &WhereClause, variants: &Vec<EnumVariant>) -> Result<Self::Return, Error> {
+        let mut namespec = unparse_type(self.session, &enumtype);
+        if whereclause.constraints.len() > 0 {
+            namespec += &emit_where_clause(&whereclause.constraints);
+        }
+
+        self.declarations.push_str(&format!("enum {} =\n", namespec));
         for variant in variants {
             let typename = match &variant.ttype {
                 Some(t) => format!("({})", t.as_vec().iter().map(|t| unparse_type(self.session, &t)).collect::<Vec<String>>().join(",")),
@@ -177,8 +182,24 @@ impl<'sess> Visitor for ExportsCollector<'sess> {
         Ok(())
     }
 
-    fn visit_trait_impl(&mut self, _refid: NodeID, _traitname: &str, _impltype: &Type, _whereclause: &WhereClause, _body: &Vec<Expr>) -> Result<Self::Return, Error> {
-        // TODO we need something to cause the implementation vtable to be declared external when importing (so that a trait object of that type can be created external)
+    fn visit_trait_impl(&mut self, _refid: NodeID, traitname: &str, impltype: &Type, whereclause: &WhereClause, body: &Vec<Expr>) -> Result<Self::Return, Error> {
+        let mut namespec = unparse_type(self.session, &impltype);
+        if whereclause.constraints.len() > 0 {
+            namespec += &emit_where_clause(&whereclause.constraints);
+        }
+
+        self.declarations.push_str(&format!("impl {} for {} {{\n", traitname, namespec));
+        for node in body {
+            match &node.kind {
+                ExprKind::Function(func) => {
+                    let defid = self.session.get_ref(node.id)?;
+                    self.declarations.push_str("    ");
+                    self.declarations.push_str(&emit_declaration(self.session, defid, Visibility::Public, &func.name, &func.whereclause.constraints));
+                },
+                _ => {  },
+            }
+        }
+        self.declarations.push_str(&format!("}}\n"));
         Ok(())
     }
 }

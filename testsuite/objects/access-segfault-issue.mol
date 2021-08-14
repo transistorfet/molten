@@ -1,0 +1,21 @@
+
+// 2021-08-13 attempting to access the `str` field directly from the return value of a
+// universal causes a segfault but if the return item is assigned to a intermediate value
+// and then the field is accessed, it works.  Changing the name doesn't fix the problem either.
+
+class NewString {
+    val str: String
+
+    fn new(self, s) {
+        self.str = s
+    }
+}
+
+let newstring = new NewString("hey")
+
+fn inout(string: 'a) -> 'a {
+    string
+}
+
+println(inout(newstring).str)
+

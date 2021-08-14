@@ -4,7 +4,7 @@ use crate::defs::Def;
 use crate::session::{ Session, Error };
 use crate::scope::{ ScopeRef };
 use crate::hir::{ NodeID, Visibility, Mutability, AssignType, Literal, MatchCase, EnumVariant, WhereClause, Function, Pattern, Expr, ExprKind };
-use crate::types::{ Type, Check, ABI, expect_type, check_type, resolve_type };
+use crate::types::{ Type, Check, ABI, expect_type, resolve_type };
 use crate::misc::{ r };
 use crate::visitor::{ self, TypeVisitor, Visitor, ScopeStack };
 
@@ -377,30 +377,6 @@ impl<'sess> Visitor for TypeChecker<'sess> {
         self.with_scope(tscope.clone(), |visitor| {
             visitor.visit_vec(body)
         })?;
-
-        // Check the functions in the body and make sure all the functions defined in the trait def are defined with the same types, and no additional functions are present
-        let traitdef = self.session.get_def(self.session.get_ref(impl_id)?)?.as_trait_def()?;
-
-        let mut names = traitdef.vars.get_names();
-        for node in body {
-            match &node.kind {
-                ExprKind::Function(func) => {
-                    let name = &func.name;
-                    let defid = *names.get(name).ok_or(Error::new(format!("TraitError: function not declared in the trait def, but found in the trait impl, {:?}", name)))?;
-                    let deftype = self.session.get_type(defid);
-                    let impltype = self.session.get_type(node.id);
-                    check_type(self.session, deftype.as_ref(), impltype.as_ref(), Check::Def, false)?;
-                    let traitfunc = self.session.get_def(self.session.get_ref(node.id).unwrap()).unwrap().as_trait_func().unwrap();
-                    traitfunc.set_def_func_id(defid);
-                    names.remove(name);
-                }
-                _ => panic!("InternalError: expected function definition, found {:?}", node),
-            }
-        }
-
-        if names.len() > 0 {
-            return Err(Error::new(format!("TraitError: impl doesn't define the following: {:?}", names.keys().collect::<Vec<&String>>())));
-        }
 
         let scope = self.stack.get_scope();
         Ok(scope.find_type(self.session, "()")?)
