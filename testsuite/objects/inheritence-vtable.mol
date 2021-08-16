@@ -43,6 +43,6 @@ obj1.test(35)
 obj2.test(35)
 
 let list = [ obj0, obj1, obj2 ]
-for obj in list
+for obj in iter(list)
     obj.test(35)
 

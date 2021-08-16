@@ -8,6 +8,6 @@
 
     let numbers = [ 1, 2, 3 ]
     numbers.insert(1, 5)
-    for x in numbers
+    for x in iter(numbers)
         println("Count: " + str(x))
 

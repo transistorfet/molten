@@ -363,40 +363,31 @@ impl<'sess> Refinery<'sess> {
         })
     }
 
-    pub fn desugar_for_loop(&self, pos: Pos, ident: String, array: AST, body: AST) -> Result<Expr, Error> {
+    pub fn desugar_for_loop(&self, pos: Pos, ident: String, iterator: AST, body: AST) -> Result<Expr, Error> {
         let mut block = vec!();
         let mut cond_block = vec!();
-        let mut body_block = vec!();
 
-        let iter = format!("{}", NodeID::generate());
-        let arrayname = format!("{}", NodeID::generate());
+        let itername = format!("{}", NodeID::generate());
 
-        let access_iter = || AST::Identifier(pos, iter.clone());
-        let access_array = || AST::Identifier(pos, arrayname.clone());
-        let access_array_field = |field: &str| AST::Accessor(pos, r(access_array()), field.to_string());
-        let invoke = |func, args| AST::Invoke(pos, func, args);
+        // define a variable to hold the iterator
+        block.push(Expr::make_def(pos, Mutability::Immutable, itername.clone(), Some(Type::Object("Iterator".to_string(), UniqueID(0), vec!(self.session.new_typevar()))), self.refine_node(iterator)?));
 
-        // define the array variable
-        block.push(Expr::make_def(pos, Mutability::Mutable, arrayname.clone(), None, self.refine_node(array)?));
+        // assemble the call to the iterator.next() method
+        let call_next = AST::Invoke(pos, r(AST::Accessor(pos, r(AST::Identifier(pos, itername.clone())), "next".to_string())), vec!());
 
-        // define the iterator index variable
-        block.push(Expr::make_def(pos, Mutability::Mutable, iter.clone(), None, Expr::make_lit(Literal::Integer(0))));
+        // In the conditional block, a match statement either runs the body if it matches Some(ident), or exits the loop if None
+        cond_block.push(Expr::make_match(pos, self.refine_node(call_next)?, vec!(
+            MatchCase::new(
+                Pattern::make_enum_variant(pos, vec!("Option".to_string(), "Some".to_string()), vec!(Pattern::make_binding(pos, ident))),
+                Expr::make_block(pos, vec!(
+                    self.refine_node(body)?,
+                    Expr::make_lit(Literal::Boolean(true))
+                ))
+            ),
+            MatchCase::new(Pattern::make_wild(), Expr::make_lit(Literal::Boolean(false)))
+        )));
 
-        // compare if iterator index is < length of array
-        cond_block.push(self.refine_node(invoke(r(AST::Identifier(pos, "<".to_string())),
-            vec!(access_iter(), invoke(r(access_array_field("len")), vec!()))))?);
-
-        // assign the next value to the item variable
-        body_block.push(Expr::make_def(pos, Mutability::Immutable, ident, None,
-            self.refine_node(invoke(r(access_array_field("get")), vec!(access_iter())))?));
-
-        body_block.push(self.refine_node(body)?);
-
-        // increment the iterator index variable
-        body_block.push(Expr::make_assign(pos, self.refine_node(access_iter())?, self.refine_node(invoke(r(AST::Identifier(pos, "+".to_string())),
-            vec!(access_iter(), AST::Literal(Literal::Integer(1)))))?, AssignType::Update));
-
-        block.push(Expr::make_while(pos, Expr::make_block(pos, cond_block), Expr::make_block(pos, body_block)));
+        block.push(Expr::make_while(pos, Expr::make_block(pos, cond_block), Expr::make_block(pos, vec!())));
         Ok(Expr::make_block(pos, block))
     }
 

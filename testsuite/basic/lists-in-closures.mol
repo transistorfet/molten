@@ -4,7 +4,7 @@ import lib.libcore
 pub fn runloop() {
     let tval = "Hey"
     let l = [ 1, 2, 3]
-    for i in l {
+    for i in iter(l) {
         println(tval)
     }
 }

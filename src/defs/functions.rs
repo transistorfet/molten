@@ -23,7 +23,7 @@ impl AnyFunc {
                     Context::Global | Context::Block | Context::Func(_, _) =>
                         CFuncDef::define(session, scope.clone(), defid, vis, name, ttype),
                     _ =>
-                        return Err(Error::new(format!("DefError: cannot declare a C ABI function within a class body"))),
+                        return Err(Error::new(format!("DefError: cannot declare a C ABI function within a class, enum, or trait def body"))),
                 }
             },
             ABI::Molten => {

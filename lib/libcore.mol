@@ -13,6 +13,36 @@ class Exception {
 }
 
 
+enum Option<'item> =
+    | None
+    | Some('item)
+
+methods Option<'item> {
+    pub fn unwrap(self) -> 'item {
+        match self {
+            Option::None => raise new Exception("Panic: unwrap on none")
+            Option::Some(item) => item
+        }
+    }
+
+    pub fn unwrap_or(self, item: 'item) -> 'item {
+        match self {
+            Option::None => item
+            Option::Some(item) => item
+        }
+    }
+}
+
+
+class Iterator<'item> {
+    pub fn next(self) -> Option<'item> {
+        Option::None
+    }
+
+    pub fn reset(self) => ()
+}
+
+
 
 class SuperString {
     val mut len
@@ -63,34 +93,6 @@ pub fn +(str1: SuperString, ch: Char) -> SuperString {
 }
 
 
-enum Option<'item> =
-    | None
-    | Some('item)
-
-methods Option<'item> {
-    pub fn unwrap(self) -> 'item {
-        match self {
-            Option::None => raise new Exception("Panic: unwrap on none")
-            Option::Some(item) => item
-        }
-    }
-
-    pub fn unwrap_or(self, item: 'item) -> 'item {
-        match self {
-            Option::None => item
-            Option::Some(item) => item
-        }
-    }
-}
-
-
-class Iterator<'item> {
-    pub fn next(self) -> Option<'item> {
-        Option::None
-    }
-
-    pub fn reset(self) => ()
-}
 
 class Array<'item> {
     val mut capacity
@@ -168,7 +170,10 @@ class Array<'item> {
     }
 
     // TODO can't forward reference ArrayIterator
-    //fn iter() {
+    //fn iter(self) {
+    //    class ArrayIterator<'item> extends Iterator<'item> {
+    //        decl new(ArrayIterator<'item>, Array<'item>) -> ArrayIterator<'item>
+    //    }
     //    new ArrayIterator<'item>(self)
     //}
 
@@ -197,6 +202,10 @@ class ArrayIterator<'item> extends Iterator<'item> {
     pub fn reset(self) {
         self.index = 0;
     }
+}
+
+pub fn iter(array: Array<'item>) {
+    new ArrayIterator<'item>(array)
 }
 
 /*

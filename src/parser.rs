@@ -541,7 +541,7 @@ named!(argument_list(Span) -> Vec<RawArgument>,
 named!(where_clause(Span) -> WhereClause,
     do_parse!(
         pos: position!() >>
-        wscom!(tag_word!("where")) >>
+        wscom!(complete!(tag_word!("where"))) >>
         c: separated_list1!(wscom!(complete!(tag!(","))),
             do_parse!(
                 v: identifier >>
@@ -880,14 +880,14 @@ named!(type_record(Span) -> Type,
 );
 
 named!(type_function(Span) -> Type,
-    complete!(do_parse!(
+    do_parse!(
         //args: delimited!(tag!("("), separated_list0!(wscom!(tag!(",")), type_description), tag!(")")) >>
         args: alt!(type_tuple | type_variable | type_object) >>
-        wscom!(tag!("->")) >>
+        wscom!(complete!(tag!("->"))) >>
         ret: type_description >>
         abi: abi_specifier >>
         (Type::Function(r(args), r(ret), abi))
-    ))
+    )
 );
 
 // TODO this used to be Overload, but it could potentially be useful as a contrained type of sorts

@@ -127,7 +127,7 @@ Stuff::tell()
 pub fn runloop() {
     let tval = "Hey"
     let l = [ 1, 2, 3]
-    for i in l {
+    for i in new ArrayIterator<Int>(l) {
         println(tval)
     }
 }
@@ -330,23 +330,7 @@ println(str(char(0x30)))
 println(str(real(54)))
 println(str(int(12.25)))
 
-/*
-// TODO THIS CAUSES AN UNCAUGHT ERROR
-// we define the argument as a universal variable, but we treat it like an Int
-// and because we created a placeholder variable to check the body with, it worked
-// such that it matched to Int, but we can pass in a string since the function type
-// takes anything, but it will erroneously be treated as an Int.  If we didn't
-// explicitly declare that it has type 'a then I think it would produce an error.
-// Honestly, it's surprising how many cases it does actually catch... the return
-// type declaration, as 'a, is being ignored, so the return type is correct, but
-// the case below is still illogical/not-well-formed
-fn universal(a: 'a) -> 'a {
-    a + 5
-}
-println(str(universal("Hey")))
-*/
 
-/*
 enum BrokenTest<'a> =
 | Variant1
 | Variant2('a)
@@ -357,7 +341,6 @@ match broken {
     BrokenTest::Variant2(x) => println("stuff")
     _ => ()
 }
-*/
 
 
 // Test that you can pass different universals between functions, since the invoke will be mapped
@@ -379,6 +362,11 @@ match opt3 {
 
 let opt4 = Option::Some("hey")
 println(opt4.unwrap())
+
+
+trait Something {
+    //decl test(Self) -> String / C
+}
 
 
 /*
@@ -403,5 +391,43 @@ fn disy(data: 'a) where a: Display {
     println(data.str())
 }
 
-disy(10)
+disy(true)
+
+
+let itr = new ArrayIterator<Int>([1, 2, 3, 4])
+//println(str(iter.next().unwrap()))
+//println(str(iter.next().unwrap()))
+
+// TODO this type annotation is needed to satisfy the type checker
+fn print_next(itr: ArrayIterator<Int>) {
+    match itr.next() {
+        Option::Some(item) => {
+            println(str(item))
+            true
+        }
+        _ => false
+    }
+}
+
+// TODO while loops are kind of useless at the moment because we can't assign a value each iteration, nor break, nor mutate a flag
+while print_next(itr) { }
+
+itr.reset()
+
+while {
+    match itr.next() {
+        Option::Some(i) => {
+            let item = i
+            println(str(item))
+            true
+        }
+        _ => false
+    }
+} {
+}
+
+
+for item in iter(["one", "two", "three"]) {
+    println(item)
+}
 

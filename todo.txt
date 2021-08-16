@@ -1,37 +1,34 @@
 
-* trait defs in exports seems to work, but not importing impls (Display impl in libcore not working)
 * seems to be problems implementing Display on Option<'item>, caused by check_trait_constraints() which causes a recursive loop checking Option<'item> with 'item
 * you currently can't call a method on a type that implements a trait.  You can only call the trait methods on a universal, but that shouldn't be necessary
+* fix the issue where passing a function `() -> String` into another function as `() -> 'a`, with a universal, will unpack the String value without packing it from within
+  the non-universal function, causing a segfault
+* I don't like how I have to explicitly set the type params when they should be inferrable
 
 * write overview
-* add (finalize) iterators
+
 * add some way of setting the file number in Pos, so that it points to the right file for error messages
 * should you go back to the match/with try/with syntax?  I think now that 'raise' is fixed it might not be a clunky
 * do you need to test unification between class and parent class, as well as trait def and impl type?
-* add a check to make sure trait defs are all ABI::Molten
-* you could modify the forloop code to take an iterator in future
+* will there be an issue where declaring a function that's external, but not via an import, might cause the global variable to be defined incorrectly??
+* fix the module keyword to have the dot name instead of the underscore name, and try to remove the special case in transform
+* remove the forced visibility in refinery, when you decide on pub/priv semantics, and change the export code to traverse recursively
+
+* implement trait dependence
+* add some way of creating a traitobj using a def or annotation (issues with universals vs variables and mapping typevars; using check_type(..., false) works but might not be correct)
 
 * can you remove access to getindex?
 * ByteString or ByteArray or ImmutableString?
 * rename String type to ByteString, ByteArray, or CString, or ZString, or NullString, or NullByteArray, or ZByteArray, RawString;  I'm leaning ZByteArray or ByteString
 * rename SuperString type to String, will require a bunch of libcore changes
 
-
-* fix the issue where passing a function `() -> String` into another function as `() -> 'a`, with a universal, will unpack the String value without packing it from within
-  the non-universal function, causing a segfault
 * I'd really like to change the way method calls are done.  It's annoying having all these definitions and blocks for every call
   but this might not be possible because you need to bind references during type checking, and you can't do that without all the variants
-
-* implement trait dependence
-* add some way of creating a traitobj using a def or annotation (issues with universals vs variables and mapping typevars; using check_type(..., false) works but might not be correct)
 
 * should you make it so that only functions/classes/enumdefs/etc can create a universal, and other places like new/definition/etc will raise an error if they are undefined, is this useful?
 * you could also maybe add a native array type (like a slice, with a pointer and size value in a pair), to replace UniversalArray
 
-* will there be an issue where declaring a function that's external, but not via an import, might cause the global variable to be defined incorrectly??
 * need a way to import/compile directory of many files (libcore as many files)
-* fix the module keyword to have the dot name instead of the underscore name, and try to remove the special case in transform
-* remove the forced visibility in refinery, when you decide on pub/priv semantics
 
 
 DISCUSSION:
