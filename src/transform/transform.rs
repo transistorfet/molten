@@ -350,7 +350,7 @@ impl<'sess> Transformer<'sess> {
 
     pub fn transform_module(&mut self, _id: NodeID, name: &str, code: &Expr, memo_id: NodeID) -> Vec<LLExpr> {
         // Define a global that will store whether we've run this function or not
-        let memo_name = ModuleDef::get_memo_name(name);
+        let memo_name = ModuleDef::get_memo_name(&ModuleDef::get_module_name(name));
         self.add_global(LLGlobal::DefGlobal(memo_id, LLLink::Once, memo_name, LLType::I1, true));
 
         self.visit_node(code).unwrap()

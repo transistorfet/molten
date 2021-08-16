@@ -72,7 +72,7 @@ impl<'sess> Refinery<'sess> {
 
         let module_run_name = ModuleDef::get_run_name(&module_name);
         let func = Expr::new(Pos::empty(), ExprKind::Function(Function::new(Visibility::Public, module_run_name, vec!(), None, body, ABI::Molten, WhereClause::empty())));
-        vec!(Expr::make_module(module_name, func))
+        vec!(Expr::make_module(self.session.name.to_string(), func))
     }
 
     pub fn refine_vec(&self, code: Vec<AST>) -> Vec<Expr> {
