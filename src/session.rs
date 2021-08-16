@@ -61,7 +61,9 @@ impl Session {
 
     pub fn parse_string(&self, name: &str, contents: String) -> Vec<AST> {
         self.files.borrow_mut().push((String::from(name), contents));
-        parser::parse_or_error(name, &self.files.borrow().last().unwrap().1)
+
+        let fileno = (self.files.borrow().len() - 1) as u16;
+        parser::parse_or_error(fileno, name, &self.files.borrow().last().unwrap().1)
     }
 
     pub fn parse_file(&self, filename: &str, import: bool) -> Vec<AST> {
@@ -93,8 +95,8 @@ impl Session {
         self.errors.set(self.errors.get() + 1);
         let fborrow = self.files.borrow();
         if let Some(pos) = err.pos {
-            let filename = &fborrow[pos.filenum as usize].0;
-            let exerpt = pos.exerpt(fborrow[pos.filenum as usize].1.as_bytes());
+            let filename = &fborrow[pos.fileno as usize].0;
+            let exerpt = pos.exerpt(fborrow[pos.fileno as usize].1.as_bytes());
             println!("\x1B[1;31m{}:{:?}: {}\n\tat {}\x1B[0m", filename, pos, err.msg, exerpt);
         } else {
             println!("\x1B[1;31m{}\n\x1B[0m", err.msg);

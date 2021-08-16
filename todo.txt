@@ -1,18 +1,18 @@
 
+* do you need to test unification between class and parent class, as well as trait def and impl type? (i'm thinking not?)
+
+* will there be an issue where declaring a function that's external, but not via an import, might cause the global variable to be defined incorrectly??
+* remove the forced visibility in refinery, when you decide on pub/priv semantics, and change the export code to traverse recursively
+* fix the module keyword to have the dot name instead of the underscore name, and try to remove the special case in transform
 * seems to be problems implementing Display on Option<'item>, caused by check_trait_constraints() which causes a recursive loop checking Option<'item> with 'item
 * you currently can't call a method on a type that implements a trait.  You can only call the trait methods on a universal, but that shouldn't be necessary
 * fix the issue where passing a function `() -> String` into another function as `() -> 'a`, with a universal, will unpack the String value without packing it from within
   the non-universal function, causing a segfault
-* I don't like how I have to explicitly set the type params when they should be inferrable
 
 * write overview
 
-* add some way of setting the file number in Pos, so that it points to the right file for error messages
+* I don't like how I have to explicitly set the type params when they should be inferrable
 * should you go back to the match/with try/with syntax?  I think now that 'raise' is fixed it might not be a clunky
-* do you need to test unification between class and parent class, as well as trait def and impl type?
-* will there be an issue where declaring a function that's external, but not via an import, might cause the global variable to be defined incorrectly??
-* fix the module keyword to have the dot name instead of the underscore name, and try to remove the special case in transform
-* remove the forced visibility in refinery, when you decide on pub/priv semantics, and change the export code to traverse recursively
 
 * implement trait dependence
 * add some way of creating a traitobj using a def or annotation (issues with universals vs variables and mapping typevars; using check_type(..., false) works but might not be correct)

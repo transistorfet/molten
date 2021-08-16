@@ -186,7 +186,7 @@ to continue the line.
 while is_true
     println("looping")
 
-for i in [ 1, 2, 3 ]
+for i in iter([ 1, 2, 3 ])
     println("counting " + i)
 ```
 

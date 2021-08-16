@@ -364,8 +364,8 @@ let opt4 = Option::Some("hey")
 println(opt4.unwrap())
 
 
-trait Something {
-    //decl test(Self) -> String / C
+trait Display {
+    decl str(Self) -> String
 }
 
 

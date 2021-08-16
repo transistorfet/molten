@@ -91,11 +91,22 @@ macro_rules! map_ident (
     }
 );
 
+#[macro_export]
+macro_rules! get_position (
+    ($i:expr, $($args:tt)*) => {
+        map!($i, position!(), |span| Pos::new(unsafe { CURRENT_FILENO }, span))
+    }
+);
+
 
 ///// Parser /////
 
-pub fn parse_or_error(name: &str, text: &str) -> Vec<AST> {
+static mut CURRENT_FILENO: u16 = 0;
+
+pub fn parse_or_error(fileno: u16, name: &str, text: &str) -> Vec<AST> {
     let span = Span::new(text);
+
+    unsafe { CURRENT_FILENO = fileno };
     match parse(span) {
         Ok((rem, _)) if rem.fragment() != &"" => panic!("InternalError: unparsed input remaining: {:?}", rem),
         Ok((_, code)) => code,
@@ -160,25 +171,25 @@ named!(statement(Span) -> AST,
 
 named!(module(Span) -> AST,
     do_parse!(
-        pos: position!() >>
+        pos: get_position!() >>
         wscom!(tag_word!("module")) >>
         e: recognize!(separated_list0!(tag!("."), identifier)) >>
-        (AST::ModuleDecl(Pos::new(pos), ident_from_span(&e)))
+        (AST::ModuleDecl(pos, ident_from_span(&e)))
     )
 );
 
 named!(import(Span) -> AST,
     do_parse!(
-        pos: position!() >>
+        pos: get_position!() >>
         wscom!(tag_word!("import")) >>
         e: recognize!(separated_list0!(tag!("."), identifier)) >>
-        (AST::Import(Pos::new(pos), ident_from_span(&e), vec!()))
+        (AST::Import(pos, ident_from_span(&e), vec!()))
     )
 );
 
 named!(definition(Span) -> AST,
     do_parse!(
-        pos: position!() >>
+        pos: get_position!() >>
         wscom!(tag_word!("let")) >>
         m: mutability >>
         i: identifier_typed >>
@@ -187,7 +198,7 @@ named!(definition(Span) -> AST,
             expression
         ) >>
         (AST::Definition(
-            Pos::new(pos),
+            pos,
             m,
             i.1,
             i.2,
@@ -198,28 +209,28 @@ named!(definition(Span) -> AST,
 
 named!(assignment(Span) -> AST,
     do_parse!(
-        pos: position!() >>
+        pos: get_position!() >>
         o: subatomic_operation >>
         wscom!(tag!("=")) >>
         e: expression >>
-        (AST::Assignment(Pos::new(pos), r(o), r(e), AssignType::Update))
+        (AST::Assignment(pos, r(o), r(e), AssignType::Update))
     )
 );
 
 named!(whileloop(Span) -> AST,
     do_parse!(
-        pos: position!() >>
+        pos: get_position!() >>
         wscom!(tag_word!("while")) >>
         c: expression >>
         line_or_space_or_comment >>
         e: return_error!(ErrorKind::Tag /*ErrorKind::Custom(ERR_IN_WHILE) */, expression) >>
-        (AST::While(Pos::new(pos), r(c), r(e)))
+        (AST::While(pos, r(c), r(e)))
     )
 );
 
 named!(class(Span) -> AST,
     do_parse!(
-        pos: position!() >>
+        pos: get_position!() >>
         wscom!(tag_word!("class")) >>
         c: type_object >>
         p: opt!(preceded!(wscom!(tag_word!("extends")), type_object)) >>
@@ -232,18 +243,18 @@ named!(class(Span) -> AST,
             function
         ))) >>
         return_error!(ErrorKind::Tag /*ErrorKind::Custom(ERR_IN_CLASS) */, tag!("}")) >>
-        (AST::Class(Pos::new(pos), c, p, w, b))
+        (AST::Class(pos, c, p, w, b))
     )
 );
 
 named!(classfield(Span) -> AST,
     do_parse!(
-        pos: position!() >>
+        pos: get_position!() >>
         wscom!(tag_word!("val")) >>
         m: mutability >>
         i: identifier_typed >>
         (AST::Field(
-            Pos::new(pos),
+            pos,
             m,
             i.1,
             i.2
@@ -253,40 +264,40 @@ named!(classfield(Span) -> AST,
 
 named!(typealias(Span) -> AST,
     do_parse!(
-        pos: position!() >>
+        pos: get_position!() >>
         wscom!(tag_word!("type")) >>
         d: type_object >>
         wscom!(tag!("=")) >>
         ts: type_description >>
-        (AST::TypeAlias(Pos::new(pos), d, ts))
+        (AST::TypeAlias(pos, d, ts))
     )
 );
 
 named!(typeenum(Span) -> AST,
     do_parse!(
-        pos: position!() >>
+        pos: get_position!() >>
         wscom!(tag_word!("enum")) >>
         t: type_object >>
         w: opt_where_clause >>
         wscom!(tag!("=")) >>
         wscom!(opt!(tag!("|"))) >>
         ev: separated_list0!(complete!(wscom!(tag!("|"))), enum_variant) >>
-        (AST::Enum(Pos::new(pos), t, w, ev))
+        (AST::Enum(pos, t, w, ev))
     )
 );
 
 named!(enum_variant(Span) -> (Pos, String, Option<Type>),
     do_parse!(
-        pos: position!() >>
+        pos: get_position!() >>
         i: identifier >>
         t: opt!(complete!(delimited!(tag!("("), separated_list0!(wscom!(tag!(",")), type_description), tag!(")")))) >>
-        ((Pos::new(pos), i, t.map(|t| Type::Tuple(t))))
+        ((pos, i, t.map(|t| Type::Tuple(t))))
     )
 );
 
 named!(traitdef(Span) -> AST,
     do_parse!(
-        pos: position!() >>
+        pos: get_position!() >>
         wscom!(tag_word!("trait")) >>
         n: identifier >>
         wscom!(tag!("{")) >>
@@ -294,13 +305,13 @@ named!(traitdef(Span) -> AST,
             declare
         )) >>
         return_error!(ErrorKind::Tag /*ErrorKind::Custom(ERR_IN_CLASS) */, tag!("}")) >>
-        (AST::TraitDef(Pos::new(pos), n, b))
+        (AST::TraitDef(pos, n, b))
     )
 );
 
 named!(traitimpl(Span) -> AST,
     do_parse!(
-        pos: position!() >>
+        pos: get_position!() >>
         wscom!(tag_word!("impl")) >>
         n: identifier >>
         wscom!(tag_word!("for")) >>
@@ -312,13 +323,13 @@ named!(traitimpl(Span) -> AST,
             declare
         ))) >>
         return_error!(ErrorKind::Tag /*ErrorKind::Custom(ERR_IN_CLASS) */, tag!("}")) >>
-        (AST::TraitImpl(Pos::new(pos), n, t, w, b))
+        (AST::TraitImpl(pos, n, t, w, b))
     )
 );
 
 named!(methods(Span) -> AST,
     do_parse!(
-        pos: position!() >>
+        pos: get_position!() >>
         wscom!(tag_word!("methods")) >>
         c: type_object >>
         w: opt_where_clause >>
@@ -328,7 +339,7 @@ named!(methods(Span) -> AST,
             function
         ))) >>
         return_error!(ErrorKind::Tag /*ErrorKind::Custom(ERR_IN_METHODS) */, tag!("}")) >>
-        (AST::Methods(Pos::new(pos), c, w, b))
+        (AST::Methods(pos, c, w, b))
     )
 );
 
@@ -370,15 +381,15 @@ named!(block_vec(Span) -> Vec<AST>,
 
 named!(block(Span) -> AST,
     do_parse!(
-        pos: position!() >>
+        pos: get_position!() >>
         v: block_vec >>
-        (AST::Block(Pos::new(pos), v))
+        (AST::Block(pos, v))
     )
 );
 
 named!(ifexpr(Span) -> AST,
     do_parse!(
-        pos: position!() >>
+        pos: get_position!() >>
         wscom!(tag_word!("if")) >>
         c: expression >>
         wscom!(tag_word!("then")) >>
@@ -387,13 +398,13 @@ named!(ifexpr(Span) -> AST,
             wscom!(tag_word!("else")),
             expression
         )) >>
-        (AST::If(Pos::new(pos), r(c), r(t), r(if f.is_some() { f.unwrap() } else { AST::Literal(Literal::Unit) })))
+        (AST::If(pos, r(c), r(t), r(if f.is_some() { f.unwrap() } else { AST::Literal(Literal::Unit) })))
     )
 );
 
 named!(trywith(Span) -> AST,
     do_parse!(
-        pos: position!() >>
+        pos: get_position!() >>
         wscom!(tag_word!("try")) >>
         c: expression >>
         line_or_space_or_comment >>
@@ -405,22 +416,22 @@ named!(trywith(Span) -> AST,
         return_error!(ErrorKind::Tag, //ErrorKind::Custom(ERR_IN_TRY),
             tag!("}")
         ) >>
-        (AST::Try(Pos::new(pos), r(c), l))
+        (AST::Try(pos, r(c), l))
     )
 );
 
 named!(raise(Span) -> AST,
     do_parse!(
-        pos: position!() >>
+        pos: get_position!() >>
         wscom!(tag_word!("raise")) >>
         e: expression >>
-        (AST::Raise(Pos::new(pos), r(e)))
+        (AST::Raise(pos, r(e)))
     )
 );
 
 named!(matchcase(Span) -> AST,
     do_parse!(
-        pos: position!() >>
+        pos: get_position!() >>
         wscom!(tag_word!("match")) >>
         c: expression >>
         line_or_space_or_comment >>
@@ -432,7 +443,7 @@ named!(matchcase(Span) -> AST,
         return_error!(ErrorKind::Tag, //ErrorKind::Custom(ERR_IN_MATCH),
             tag!("}")
         ) >>
-        (AST::Match(Pos::new(pos), r(c), l))
+        (AST::Match(pos, r(c), l))
     )
 );
 
@@ -450,42 +461,42 @@ named!(caselist(Span) -> Vec<(ASTPattern, AST)>,
 
 named!(forloop(Span) -> AST,
     do_parse!(
-        pos: position!() >>
+        pos: get_position!() >>
         wscom!(tag_word!("for")) >>
         i: identifier >>
         wscom!(tag_word!("in")) >>
         l: expression >>
         line_or_space_or_comment >>
         e: return_error!(ErrorKind::Tag /*ErrorKind::Custom(ERR_IN_FOR) */, expression) >>
-        (AST::For(Pos::new(pos), i, r(l), r(e)))
+        (AST::For(pos, i, r(l), r(e)))
     )
 );
 
 named!(newinstance(Span) -> AST,
     do_parse!(
-        pos: position!() >>
+        pos: get_position!() >>
         wscom!(tag_word!("new")) >>
         cs: type_object >>
         a: delimited!(tag!("("), expression_list, tag!(")")) >>
-        (AST::New(Pos::new(pos), cs, a))
+        (AST::New(pos, cs, a))
     )
 );
 
 named!(declare(Span) -> AST,
     do_parse!(
-        pos: position!() >>
+        pos: get_position!() >>
         vis: visibility >>
         wscom!(tag_word!("decl")) >>
         n: alt!(identifier | operator_func_identifier) >>
         t: type_function >>
         w: opt_where_clause >>
-        (AST::Declare(Pos::new(pos), vis, n, t, w))
+        (AST::Declare(pos, vis, n, t, w))
     )
 );
 
 named!(function(Span) -> AST,
     do_parse!(
-        pos: position!() >>
+        pos: get_position!() >>
         vis: visibility >>
         wscom!(tag_word!("fn")) >>
         l: alt!(
@@ -505,16 +516,16 @@ named!(function(Span) -> AST,
             return_error!(ErrorKind::Tag /*ErrorKind::Custom(ERR_IN_FUNC) */,
                 wscoml!(block_vec))
         ) >>
-        (AST::Function(Pos::new(pos), vis, l.0, l.1, rt, e, a, w))
+        (AST::Function(pos, vis, l.0, l.1, rt, e, a, w))
     )
 );
 
 named!(reference(Span) -> AST,
     do_parse!(
-        pos: position!() >>
+        pos: get_position!() >>
         wscom!(tag_word!("ref")) >>
         e: expression >>
-        (AST::Ref(Pos::new(pos), r(e)))
+        (AST::Ref(pos, r(e)))
     )
 );
 
@@ -540,7 +551,7 @@ named!(argument_list(Span) -> Vec<RawArgument>,
 
 named!(where_clause(Span) -> WhereClause,
     do_parse!(
-        pos: position!() >>
+        pos: get_position!() >>
         wscom!(complete!(tag_word!("where"))) >>
         c: separated_list1!(wscom!(complete!(tag!(","))),
             do_parse!(
@@ -550,7 +561,7 @@ named!(where_clause(Span) -> WhereClause,
                 ((v, c))
             )
         ) >>
-        (WhereClause::new(Pos::new(pos), c))
+        (WhereClause::new(pos, c))
     )
 );
 
@@ -602,13 +613,12 @@ impl AST {
         }
     }
 
-    fn fold_op(left: AST, operations: Vec<(Span, String, AST)>) -> Self {
+    fn fold_op(left: AST, operations: Vec<(Pos, String, AST)>) -> Self {
         let mut operands: Vec<AST> = vec!();
         let mut operators: Vec<(Pos, String, i32)> = vec!();
         operands.push(left);
 
-        for (span, next_op, next_ast) in operations {
-            let pos  = Pos::new(span);
+        for (pos, next_op, next_ast) in operations {
             let p = AST::precedence(&next_op);
 
             while !operators.is_empty() && operators.last().unwrap().2 <= p {
@@ -649,7 +659,7 @@ impl AST {
 named!(infix(Span) -> AST,
     do_parse!(
         left: atomic >>
-        operations: many0!(tuple!(position!(), cont!(infix_op), atomic)) >>
+        operations: many0!(tuple!(get_position!(), cont!(infix_op), atomic)) >>
         (AST::fold_op(left, operations))
     )
 );
@@ -670,12 +680,12 @@ named!(prefix_op(Span) -> String,
 
 named!(prefix(Span) -> AST,
     do_parse!(
-        pos: position!() >>
+        pos: get_position!() >>
         op: prefix_op >>
         opt!(space1) >>
         a: atomic >>
         //(AST::Prefix(op, r(a)))
-        (AST::Invoke(Pos::new(pos), r(AST::Identifier(Pos::new(pos), op)), vec!(a)))
+        (AST::Invoke(pos, r(AST::Identifier(pos, op)), vec!(a)))
     )
 );
 
@@ -683,10 +693,10 @@ named!(subatomic_operation(Span) -> AST,
     do_parse!(
         left: subatomic >>
         operations: many0!(alt!(
-            map!(delimited!(tag!("["), tuple!(position!(), wscom!(expression)), tag!("]")), |(p, e)| SubOP::Index(Pos::new(p), e)) |
-            map!(delimited!(tag!("("), tuple!(position!(), wscom!(expression_list)), tag!(")")), |(p, e)| SubOP::Invoke(Pos::new(p), e)) |
-            map!(preceded!(tag!("."), tuple!(position!(), alt!(identifier | map!(digit1, |s| ident_from_span(&s))))), |(p, s)| SubOP::Accessor(Pos::new(p), s)) |
-            map!(preceded!(tag!("::"), tuple!(position!(), identifier)), |(p, s)| SubOP::Resolver(Pos::new(p), s))
+            map!(delimited!(tag!("["), tuple!(get_position!(), wscom!(expression)), tag!("]")), |(p, e)| SubOP::Index(p, e)) |
+            map!(delimited!(tag!("("), tuple!(get_position!(), wscom!(expression_list)), tag!(")")), |(p, e)| SubOP::Invoke(p, e)) |
+            map!(preceded!(tag!("."), tuple!(get_position!(), alt!(identifier | map!(digit1, |s| ident_from_span(&s))))), |(p, s)| SubOP::Accessor(p, s)) |
+            map!(preceded!(tag!("::"), tuple!(get_position!(), identifier)), |(p, s)| SubOP::Resolver(p, s))
         )) >>
         (AST::fold_access(left, operations))
     )
@@ -739,11 +749,11 @@ named!(record_update(Span) -> AST,
     delimited!(
         tag!("{"),
         do_parse!(
-            pos: position!() >>
+            pos: get_position!() >>
             i: wscom!(identifier_node) >>
             wscom!(tag_word!("with")) >>
             l: wscom!(record_field_assignments) >>
-            (AST::RecordUpdate(Pos::new(pos), r(i), l))
+            (AST::RecordUpdate(pos, r(i), l))
         ),
         return_error!(ErrorKind::Tag /*ErrorKind::Custom(ERR_IN_LIST) */, tag!("}"))
     )
@@ -751,18 +761,18 @@ named!(record_update(Span) -> AST,
 
 named!(dereference(Span) -> AST,
     do_parse!(
-        pos: position!() >>
+        pos: get_position!() >>
         tag!("*") >>
         a: subatomic >>
-        (AST::Deref(Pos::new(pos), r(a)))
+        (AST::Deref(pos, r(a)))
     )
 );
 
 named!(identifier_node(Span) -> AST,
     do_parse!(
-        pos: position!() >>
+        pos: get_position!() >>
         i: identifier >>
-        (AST::Identifier(Pos::new(pos), i))
+        (AST::Identifier(pos, i))
     )
 );
 
@@ -779,10 +789,10 @@ named!(identifier(Span) -> String,
 
 named!(identifier_typed(Span) -> (Pos, String, Option<Type>),
     do_parse!(
-        pos: position!() >>
+        pos: get_position!() >>
         i: identifier >>
         t: opt!(preceded!(wscom!(tag!(":")), type_description)) >>
-        (Pos::new(pos), i, t)
+        (pos, i, t)
     )
 );
 
@@ -1026,25 +1036,25 @@ impl AST {
 
 named!(tuple(Span) -> AST,
     do_parse!(
-        pos: position!() >>
+        pos: get_position!() >>
         l: delimited!(
             tag!("("),
             wscom!(separated_list0!(wscom!(tag!(",")), expression)),
             tag!(")")
         ) >>
-        (AST::Tuple(Pos::new(pos), l))
+        (AST::Tuple(pos, l))
     )
 );
 
 named!(record(Span) -> AST,
     do_parse!(
-        pos: position!() >>
+        pos: get_position!() >>
         l: delimited!(
             tag!("{"),
             wscom!(record_field_assignments),
             return_error!(ErrorKind::Tag /*ErrorKind::Custom(ERR_IN_LIST)*/, tag!("}"))
         ) >>
-        (AST::Record(Pos::new(pos), l))
+        (AST::Record(pos, l))
     )
 );
 
@@ -1059,13 +1069,13 @@ named!(record_field_assignments(Span) -> Vec<(String, AST)>,
 
 named!(array(Span) -> AST,
     do_parse!(
-        pos: position!() >>
+        pos: get_position!() >>
         l: delimited!(
             tag!("["),
             wscom!(separated_list0!(wscom!(tag!(",")), expression)),
             tag!("]")
         ) >>
-        (AST::Array(Pos::new(pos), l))
+        (AST::Array(pos, l))
     )
 );
 
@@ -1093,11 +1103,11 @@ named!(not_reserved(Span) -> (),
 
 named!(pattern(Span) -> ASTPattern,
     do_parse!(
-        pos: position!() >>
+        pos: get_position!() >>
         p: pattern_atomic >>
         a: opt!(preceded!(wscom!(tag!(":")), type_description)) >>
         (match a {
-            Some(ty) => ASTPattern::Annotation(Pos::new(pos), ty, r(p)),
+            Some(ty) => ASTPattern::Annotation(pos, ty, r(p)),
             None => p,
         })
     )
@@ -1117,7 +1127,7 @@ named!(pattern_atomic(Span) -> ASTPattern,
 
 named!(pattern_literal(Span) -> ASTPattern,
     do_parse!(
-        pos: position!() >>
+        pos: get_position!() >>
         l: alt!(
             unit |
             boolean |
@@ -1125,63 +1135,63 @@ named!(pattern_literal(Span) -> ASTPattern,
             character |
             number
         ) >>
-        (ASTPattern::Literal(Pos::new(pos), l.get_literal()))
+        (ASTPattern::Literal(pos, l.get_literal()))
     )
 );
 
 named!(pattern_binding(Span) -> ASTPattern,
     do_parse!(
-        pos: position!() >>
+        pos: get_position!() >>
         i: identifier >>
-        (ASTPattern::Binding(Pos::new(pos), i))
+        (ASTPattern::Binding(pos, i))
     )
 );
 
 named!(pattern_enum_variant(Span) -> ASTPattern,
     do_parse!(
-        pos: position!() >>
+        pos: get_position!() >>
         p: tuple!(identifier, tag!("::"), identifier) >>
         o: opt!(delimited!(
             tag!("("),
             separated_list0!(wscom!(tag!(",")), pattern),
             tag!(")")
         )) >>
-        (ASTPattern::EnumVariant(Pos::new(pos), vec!(p.0, p.2), o.unwrap_or(vec!())))
+        (ASTPattern::EnumVariant(pos, vec!(p.0, p.2), o.unwrap_or(vec!())))
     )
 );
 
 named!(pattern_ref(Span) -> ASTPattern,
     do_parse!(
-        pos: position!() >>
+        pos: get_position!() >>
         p: preceded!(
             wscom!(tag_word!("ref")),
             pattern
         ) >>
-        (ASTPattern::Ref(Pos::new(pos), r(p)))
+        (ASTPattern::Ref(pos, r(p)))
     )
 );
 
 named!(pattern_tuple(Span) -> ASTPattern,
     do_parse!(
-        pos: position!() >>
+        pos: get_position!() >>
         l: delimited!(
             tag!("("),
             wscom!(separated_list0!(wscom!(tag!(",")), pattern)),
             tag!(")")
         ) >>
-        (ASTPattern::Tuple(Pos::new(pos), l))
+        (ASTPattern::Tuple(pos, l))
     )
 );
 
 named!(pattern_record(Span) -> ASTPattern,
     do_parse!(
-        pos: position!() >>
+        pos: get_position!() >>
         l: delimited!(
             tag!("{"),
             wscom!(pattern_record_field_assignments),
             return_error!(ErrorKind::Tag /*ErrorKind::Custom(ERR_IN_LIST) */, tag!("}"))
         ) >>
-        (ASTPattern::Record(Pos::new(pos), l))
+        (ASTPattern::Record(pos, l))
     )
 );
 

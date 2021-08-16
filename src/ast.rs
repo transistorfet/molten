@@ -14,7 +14,7 @@ pub struct Pos {
     pub offset: usize,
     pub column: usize,
     pub line: u32,
-    pub filenum: u16,
+    pub fileno: u16,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -87,17 +87,17 @@ pub enum AST {
 
 
 impl Pos {
-    pub fn new(span: Span) -> Pos {
+    pub fn new(fileno: u16, span: Span) -> Pos {
         Pos {
             offset: span.location_offset(),
             column: span.get_utf8_column(),
             line: span.location_line(),
-            filenum: 0,
+            fileno: fileno,
         }
     }
 
     pub fn empty() -> Pos {
-        Pos { offset: 0, column: 0, line: 0, filenum: 0 }
+        Pos { offset: 0, column: 0, line: 0, fileno: 0 }
     }
 
     pub fn exerpt(&self, text: &[u8]) -> String {
