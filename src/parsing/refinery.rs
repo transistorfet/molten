@@ -7,7 +7,7 @@ use crate::misc::{ r, UniqueID };
 use crate::session::{ Session, Error };
 use crate::defs::modules::ModuleDef;
 use crate::parsing::ast::{ Pos, ASTPattern, AST };
-use crate::analysis::hir::{ NodeID, Visibility, Mutability, AssignType, Literal, Argument, MatchCase, EnumVariant, Function, WhereClause, Pattern, Expr, ExprKind };
+use crate::analysis::hir::{ Visibility, Mutability, AssignType, Literal, Argument, MatchCase, EnumVariant, Function, WhereClause, Pattern, Expr, ExprKind };
 
 
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -111,7 +111,7 @@ impl<'sess> Refinery<'sess> {
 
                 let args = args.into_iter().map(|arg| Argument::new(arg.pos, arg.name, arg.ttype)).collect();
 
-                let id = NodeID::generate();
+                let id = UniqueID::generate();
                 let name = name.unwrap_or(format!("anon{}", id));
                 let context = if self.get_context() == Some(CodeContext::ClassBody) && &name == "new" {
                     CodeContext::Constructor
@@ -364,7 +364,7 @@ impl<'sess> Refinery<'sess> {
         let mut block = vec!();
         let mut cond_block = vec!();
 
-        let itername = format!("{}", NodeID::generate());
+        let itername = format!("{}", UniqueID::generate());
 
         // define a variable to hold the iterator
         block.push(Expr::make_def(pos, Mutability::Immutable, itername.clone(), Some(Type::Object("Iterator".to_string(), UniqueID(0), vec!(self.session.new_typevar()))), self.refine_node(iterator)?));

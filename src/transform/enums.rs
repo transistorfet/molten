@@ -1,7 +1,7 @@
 
 use crate::misc::r;
 use crate::types::Type;
-use crate::analysis::hir::{ NodeID };
+use crate::misc::UniqueID;
 
 use crate::defs::enums::EnumDefRef;
 
@@ -11,7 +11,7 @@ use crate::llvm::llcode::{ LLType, LLLit, LLCC, LLLink, LLExpr, LLGlobal };
 
 
 impl<'sess> Transformer<'sess> {
-    pub fn transform_enum_def(&mut self, refid: NodeID, name: &str) -> Vec<LLExpr> {
+    pub fn transform_enum_def(&mut self, refid: UniqueID, name: &str) -> Vec<LLExpr> {
         let defid = self.session.get_ref(refid).unwrap();
         let selector = LLType::I8;
         let enumdef = self.session.get_def(defid).unwrap().as_enum().unwrap();
@@ -32,8 +32,8 @@ impl<'sess> Transformer<'sess> {
         vec!()
     }
 
-    pub fn transform_enum_variant(&mut self, defid: NodeID, variant_id: NodeID, variant: i8, name: String, selector: LLType, ttype: Option<Type>) {
-        let struct_id = NodeID::generate();
+    pub fn transform_enum_variant(&mut self, defid: UniqueID, variant_id: UniqueID, variant: i8, name: String, selector: LLType, ttype: Option<Type>) {
+        let struct_id = UniqueID::generate();
         let etype = ttype.clone().map(|t| self.transform_value_type(&t));
         self.create_enum_struct(struct_id, name.clone(), selector, etype);
         self.set_type(variant_id, LLType::Alias(struct_id));
@@ -46,20 +46,20 @@ impl<'sess> Transformer<'sess> {
             let mut params = vec!();
             let mut tuple_items = vec!();
             for (i, _) in argtypes.as_vec().iter().enumerate() {
-                let arg_id = NodeID::generate();
+                let arg_id = UniqueID::generate();
                 tuple_items.push(LLExpr::GetValue(arg_id));
                 params.push((arg_id, format!("value{}", i)));
             }
 
-            let body = vec!(LLExpr::Cast(LLType::Alias(defid), r(LLExpr::DefStruct(NodeID::generate(), self.get_type(struct_id).unwrap(), vec!(
+            let body = vec!(LLExpr::Cast(LLType::Alias(defid), r(LLExpr::DefStruct(UniqueID::generate(), self.get_type(struct_id).unwrap(), vec!(
                 LLExpr::Literal(LLLit::I8(variant as i8)),
-                LLExpr::DefStruct(NodeID::generate(), self.transform_value_type(argtypes), tuple_items)
+                LLExpr::DefStruct(UniqueID::generate(), self.transform_value_type(argtypes), tuple_items)
             )))));
             self.add_global(LLGlobal::DefCFunc(variant_id, LLLink::Once, name, lftype, params, body, LLCC::CCC));
         }
     }
 
-    pub fn create_enum_struct(&mut self, id: NodeID, name: String, selector: LLType, ltype: Option<LLType>) {
+    pub fn create_enum_struct(&mut self, id: UniqueID, name: String, selector: LLType, ltype: Option<LLType>) {
         let mut body = vec!(selector);
         match ltype {
             Some(ltype) => body.push(ltype),
@@ -71,17 +71,17 @@ impl<'sess> Transformer<'sess> {
         self.set_type(id, LLType::Alias(id));
     }
 
-    pub fn transform_enum_resolve_constructor(&mut self, enumdef: EnumDefRef, field_id: NodeID) -> Vec<LLExpr> {
+    pub fn transform_enum_resolve_constructor(&mut self, enumdef: EnumDefRef, field_id: UniqueID) -> Vec<LLExpr> {
         match enumdef.get_variant_type_by_id(field_id) {
             Some(_) => vec!(LLExpr::GetValue(field_id)),
             None => {
                 let variant = enumdef.get_variant_by_id(field_id).unwrap();
-                vec!(LLExpr::Cast(LLType::Alias(enumdef.id), r(LLExpr::DefStruct(NodeID::generate(), self.get_type(field_id).unwrap(), vec!(LLExpr::Literal(LLLit::I8(variant as i8)))))))
+                vec!(LLExpr::Cast(LLType::Alias(enumdef.id), r(LLExpr::DefStruct(UniqueID::generate(), self.get_type(field_id).unwrap(), vec!(LLExpr::Literal(LLLit::I8(variant as i8)))))))
             },
         }
     }
 
-    pub fn transform_enum_access_method(&mut self, defid: NodeID) -> Vec<LLExpr> {
+    pub fn transform_enum_access_method(&mut self, defid: UniqueID) -> Vec<LLExpr> {
         vec!(LLExpr::GetLocal(defid))
     }
 }

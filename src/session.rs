@@ -9,12 +9,12 @@ use std::io::prelude::*;
 use std::collections::HashMap;
 
 use crate::types;
+use crate::misc::UniqueID;
 use crate::parsing::parser;
 use crate::defs::{ Def };
 use crate::config::Options;
 use crate::types::{ Type };
 use crate::scope::{ ScopeMapRef };
-use crate::analysis::hir::{ NodeID };
 use crate::parsing::ast::{ Pos, AST };
 
 
@@ -25,10 +25,10 @@ pub struct Session {
     pub target: String,
     pub errors: Cell<u32>,
     pub map: ScopeMapRef,
-    pub defs: RefCell<HashMap<NodeID, Def>>,
-    pub refs: RefCell<HashMap<NodeID, NodeID>>,
-    pub types: RefCell<HashMap<NodeID, Type>>,
-    pub constraints: RefCell<HashMap<NodeID, Vec<NodeID>>>,
+    pub defs: RefCell<HashMap<UniqueID, Def>>,
+    pub refs: RefCell<HashMap<UniqueID, UniqueID>>,
+    pub types: RefCell<HashMap<UniqueID, Type>>,
+    pub constraints: RefCell<HashMap<UniqueID, Vec<UniqueID>>>,
 }
 
 
@@ -110,14 +110,14 @@ impl Session {
         err
     }
 
-    pub fn new_def_id(&self, refid: NodeID) -> NodeID {
-        let defid = NodeID::generate();
+    pub fn new_def_id(&self, refid: UniqueID) -> UniqueID {
+        let defid = UniqueID::generate();
         self.set_ref(refid, defid);
         debug!("NEW DEF: {:?} created from ref {:?}", defid, refid);
         defid
     }
 
-    pub fn set_def(&self, id: NodeID, def: Def) {
+    pub fn set_def(&self, id: UniqueID, def: Def) {
         debug!("SET DEF: {:?} = {:?}", id, def);
         if let Some(existing) = self.defs.borrow().get(&id) {
             panic!("Definition {} already set to {:#?} but trying to set it to {:#?}", id, existing, def);
@@ -125,7 +125,7 @@ impl Session {
         self.defs.borrow_mut().insert(id, def);
     }
 
-    pub fn get_def(&self, id: NodeID) -> Result<Def, Error> {
+    pub fn get_def(&self, id: UniqueID) -> Result<Def, Error> {
         match self.defs.borrow().get(&id) {
             Some(def) => Ok(def.clone()),
             None => Err(Error::new(format!("DefinitionError: definition not set for {:?}", id))),
@@ -133,7 +133,7 @@ impl Session {
     }
 
 
-    pub fn set_ref(&self, id: NodeID, defid: NodeID) {
+    pub fn set_ref(&self, id: UniqueID, defid: UniqueID) {
         debug!("SET REF: {:?} -> {:?}", id, defid);
         //if let Some(existing) = self.refs.borrow().get(&id) {
         //    if defid != *existing {
@@ -143,37 +143,37 @@ impl Session {
         self.refs.borrow_mut().insert(id, defid);
     }
 
-    pub fn get_ref(&self, id: NodeID) -> Result<NodeID, Error> {
+    pub fn get_ref(&self, id: UniqueID) -> Result<UniqueID, Error> {
         match self.refs.borrow().get(&id) {
             Some(defid) => Ok(defid.clone()),
             None => Err(Error::new(format!("ReferenceError: reference not set for {:?}", id))),
         }
     }
 
-    pub fn get_def_from_ref(&self, id: NodeID) -> Result<Def, Error> {
+    pub fn get_def_from_ref(&self, id: UniqueID) -> Result<Def, Error> {
         match self.refs.borrow().get(&id) {
             Some(defid) => self.get_def(*defid),
             None => Err(Error::new(format!("ReferenceError: reference not set for {:?}", id))),
         }
     }
 
-    pub fn get_type_from_ref(&self, id: NodeID) -> Result<Type, Error> {
+    pub fn get_type_from_ref(&self, id: UniqueID) -> Result<Type, Error> {
         let defid = self.get_ref(id)?;
         self.get_type(defid).ok_or(Error::new(format!("DefinitionError: no type is set for {:?}", defid)))
     }
 
 
-    pub fn set_type(&self, id: NodeID, ttype: Type) {
+    pub fn set_type(&self, id: UniqueID, ttype: Type) {
         debug!("SET TYPE: {:?} <= {:?} (previously {:?})", id, ttype, self.types.borrow().get(&id));
         self.types.borrow_mut().insert(id, ttype);
     }
 
-    pub fn get_type(&self, id: NodeID) -> Option<Type> {
+    pub fn get_type(&self, id: UniqueID) -> Option<Type> {
         self.types.borrow().get(&id).cloned()
     }
 
     pub fn new_typevar(&self) -> Type {
-        let id = NodeID::generate();
+        let id = UniqueID::generate();
         let ttype = Type::Variable(id);
         self.set_type(id, ttype.clone());
         debug!("NEW TYPEVAR: {:?}", ttype);
@@ -181,7 +181,7 @@ impl Session {
     }
 
     #[must_use]
-    pub fn update_type(&self, id: NodeID, ttype: &Type) -> Result<(), Error> {
+    pub fn update_type(&self, id: UniqueID, ttype: &Type) -> Result<(), Error> {
         let etype = self.get_type(id);
         let ntype = match &etype {
             // NOTE don't update a variable with itself or it will cause infinite recursion due to the update call in check_type
@@ -197,7 +197,7 @@ impl Session {
     }
 
     pub fn resolve_types(&self) {
-        let keys: Vec<NodeID> = self.types.borrow().keys().map(|k| *k).collect();
+        let keys: Vec<UniqueID> = self.types.borrow().keys().map(|k| *k).collect();
         for key in keys {
             let ttype = self.get_type(key).unwrap();
             match types::resolve_type(self, ttype.clone(), true) {
@@ -210,12 +210,12 @@ impl Session {
         }
     }
 
-    pub fn set_constraints(&self, id: NodeID, constraints: Vec<NodeID>) {
+    pub fn set_constraints(&self, id: UniqueID, constraints: Vec<UniqueID>) {
         debug!("SET CONSTRAINTS: {:?} <= {:?} (previously {:?})", id, constraints, self.constraints.borrow().get(&id));
         self.constraints.borrow_mut().insert(id, constraints);
     }
 
-    pub fn get_constraints(&self, id: NodeID) -> Vec<NodeID> {
+    pub fn get_constraints(&self, id: UniqueID) -> Vec<UniqueID> {
         self.constraints.borrow().get(&id).and_then(|constraints| Some(constraints.clone())).unwrap_or(vec!())
     }
 }

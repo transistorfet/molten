@@ -1,6 +1,5 @@
 
-use crate::analysis::hir::NodeID;
-use crate::misc::{ R };
+use crate::misc::{ R, UniqueID };
 
 
 #[derive(Clone, Debug, PartialEq)]
@@ -17,7 +16,7 @@ pub enum LLType {
     Ptr(R<LLType>),
     Struct(Vec<LLType>),
     Function(Vec<LLType>, R<LLType>),
-    Alias(NodeID),
+    Alias(UniqueID),
     Largest(Vec<LLType>),
     #[allow(dead_code)]
     Array(R<LLType>, usize),
@@ -76,27 +75,27 @@ pub type LLBlock = Vec<LLExpr>;
 #[derive(Clone, Debug, PartialEq)]
 pub enum LLExpr {
     Literal(LLLit),
-    GetValue(NodeID),
-    SetValue(NodeID, R<LLExpr>),
+    GetValue(UniqueID),
+    SetValue(UniqueID, R<LLExpr>),
     GetNamed(String),
     Cast(LLType, R<LLExpr>),
 
     CallC(R<LLExpr>, Vec<LLExpr>, LLCC),
 
-    DefLocal(NodeID, String, LLType, R<LLExpr>),
-    GetLocal(NodeID),
+    DefLocal(UniqueID, String, LLType, R<LLExpr>),
+    GetLocal(UniqueID),
     #[allow(dead_code)]
-    SetLocal(NodeID, R<LLExpr>),
+    SetLocal(UniqueID, R<LLExpr>),
 
-    GetGlobal(NodeID),
-    SetGlobal(NodeID, R<LLExpr>),
+    GetGlobal(UniqueID),
+    SetGlobal(UniqueID, R<LLExpr>),
 
-    DefStruct(NodeID, LLType, Vec<LLExpr>),
+    DefStruct(UniqueID, LLType, Vec<LLExpr>),
     GetItem(R<LLExpr>, usize),
     #[allow(dead_code)]
     SetItem(R<LLExpr>, usize, R<LLExpr>),
 
-    AllocRef(NodeID, LLType, Option<R<LLExpr>>),
+    AllocRef(UniqueID, LLType, Option<R<LLExpr>>),
     AccessRef(R<LLExpr>, Vec<LLRef>),
     LoadRef(R<LLExpr>),
     StoreRef(R<LLExpr>, R<LLExpr>),
@@ -108,14 +107,14 @@ pub enum LLExpr {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum LLGlobal {
-    DefType(NodeID, String, LLType),
+    DefType(UniqueID, String, LLType),
 
-    DefGlobal(NodeID, LLLink, String, LLType, bool),
-    DefCFunc(NodeID, LLLink, String, LLType, Vec<(NodeID, String)>, Vec<LLExpr>, LLCC),
-    DeclCFunc(NodeID, String, LLType, LLCC),
+    DefGlobal(UniqueID, LLLink, String, LLType, bool),
+    DefCFunc(UniqueID, LLLink, String, LLType, Vec<(UniqueID, String)>, Vec<LLExpr>, LLCC),
+    DeclCFunc(UniqueID, String, LLType, LLCC),
 
-    DefNamedStruct(NodeID, String, bool),
-    SetStructBody(NodeID, Vec<LLType>, bool),
+    DefNamedStruct(UniqueID, String, bool),
+    SetStructBody(UniqueID, Vec<LLType>, bool),
 }
 
 

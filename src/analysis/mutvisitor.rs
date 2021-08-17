@@ -1,14 +1,15 @@
 
 use crate::session::Error;
+use crate::misc::UniqueID;
 use crate::scope::ScopeRef;
 use crate::session::Session;
-use crate::analysis::hir::{ NodeID, Pattern, PatKind, Expr, ExprKind };
+use crate::analysis::hir::{ Pattern, PatKind, Expr, ExprKind };
 use crate::analysis::visitor::{ ScopeStack };
 
 pub trait MutVisitor: Sized {
     fn get_scope_stack<'a>(&'a self) -> &'a ScopeStack;
     fn get_session<'a>(&'a self) -> &'a Session;
-    fn get_scope_by_id(&self, id: NodeID) -> ScopeRef;
+    fn get_scope_by_id(&self, id: UniqueID) -> ScopeRef;
 
     fn handle_error(&mut self, node: &Expr, err: Error);
 

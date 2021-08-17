@@ -9,7 +9,6 @@ use crate::types::Type;
 use crate::misc::{ UniqueID };
 use crate::session::{ Session, Error };
 use crate::defs::Def;
-use crate::analysis::hir::{ NodeID };
 
 const NAMES: usize = 0;
 const TYPES: usize = 1;
@@ -18,18 +17,18 @@ const TYPES: usize = 1;
 pub enum Context {
     Global,
     Block,
-    Func(ABI, NodeID),
-    Enum(NodeID),
-    Class(NodeID),
-    TraitDef(NodeID),
-    TraitImpl(NodeID, NodeID),
+    Func(ABI, UniqueID),
+    Enum(UniqueID),
+    Class(UniqueID),
+    TraitDef(UniqueID),
+    TraitImpl(UniqueID, UniqueID),
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Scope {
     pub context: Cell<Context>,
     pub basename: RefCell<String>,
-    pub namespaces: [RefCell<HashMap<String, NodeID>>; 2],
+    pub namespaces: [RefCell<HashMap<String, UniqueID>>; 2],
     pub parent: Option<ScopeRef>,
 }
 
@@ -60,14 +59,14 @@ impl Scope {
         }
     }
 
-    pub fn _modify_local<F>(&self, namespace: usize, name: &str, mut f: F) where F: FnMut(&mut NodeID) {
+    pub fn _modify_local<F>(&self, namespace: usize, name: &str, mut f: F) where F: FnMut(&mut UniqueID) {
         match self.namespaces[namespace].borrow_mut().get_mut(name) {
             None => panic!("NameError: undefined in this scope; {:?}", name),
             Some(entry) => f(entry),
         }
     }
 
-    pub fn _search<F, U>(&self, namespace: usize, name: &str, f: F, default: U) -> U where F: Fn(NodeID) -> U {
+    pub fn _search<F, U>(&self, namespace: usize, name: &str, f: F, default: U) -> U where F: Fn(UniqueID) -> U {
         if let Some(sym) = self.namespaces[namespace].borrow().get(name) {
             f(*sym)
         } else if let Some(parent) = &self.parent {
@@ -79,7 +78,7 @@ impl Scope {
 
     ///// Variable Functions /////
 
-    pub fn define(&self, name: &str, defid: NodeID) -> Result<(), Error> {
+    pub fn define(&self, name: &str, defid: UniqueID) -> Result<(), Error> {
         let mut names = self.namespaces[NAMES].borrow_mut();
         match names.contains_key(name) {
             true => Err(Error::new(format!("NameError: variable is already defined; {:?}", name))),
@@ -94,15 +93,15 @@ impl Scope {
         self.namespaces[NAMES].borrow().contains_key(name)
     }
 
-    pub fn get_names(&self) -> HashMap<String, NodeID> {
+    pub fn get_names(&self) -> HashMap<String, UniqueID> {
         self.namespaces[NAMES].borrow().clone()
     }
 
-    pub fn set_var_def(&self, name: &str, defid: NodeID) {
+    pub fn set_var_def(&self, name: &str, defid: UniqueID) {
         self._modify_local(NAMES, name, move |sym| { *sym = defid; })
     }
 
-    pub fn get_var_def(&self, name: &str) -> Option<NodeID> {
+    pub fn get_var_def(&self, name: &str) -> Option<UniqueID> {
         self._search(NAMES, name, |id| Some(id), None)
     }
 
@@ -120,7 +119,7 @@ impl Scope {
         }
     }
 
-    pub fn foreach_name<F>(&self, f: F) where F: Fn(&str, NodeID) {
+    pub fn foreach_name<F>(&self, f: F) where F: Fn(&str, UniqueID) {
         for (name, id) in self.namespaces[NAMES].borrow().iter() {
             f(&name, *id)
         }
@@ -128,7 +127,7 @@ impl Scope {
 
     ///// Type Functions /////
 
-    pub fn define_type(&self, name: &str, defid: NodeID) -> Result<(), Error> {
+    pub fn define_type(&self, name: &str, defid: UniqueID) -> Result<(), Error> {
         let mut types = self.namespaces[TYPES].borrow_mut();
         match types.contains_key(name) {
             true => Err(Error::new(format!("NameError: type is already defined; {:?}", name))),
@@ -139,7 +138,7 @@ impl Scope {
         }
     }
 
-    pub fn get_type_def(&self, name: &str) -> Option<NodeID> {
+    pub fn get_type_def(&self, name: &str) -> Option<UniqueID> {
         self._search(TYPES, name, |id| Some(id), None)
     }
 
@@ -151,7 +150,7 @@ impl Scope {
         session.get_def(self.get_type_def(&name).ok_or_else(|| Error::new(format!("TypeError: definition not set for {:?}", name)))?)
     }
 
-    pub fn foreach_type<F>(&self, f: F) where F: Fn(&str, NodeID) {
+    pub fn foreach_type<F>(&self, f: F) where F: Fn(&str, UniqueID) {
         for (name, id) in self.namespaces[TYPES].borrow().iter() {
             f(&name, *id)
         }

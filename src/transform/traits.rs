@@ -1,8 +1,9 @@
 
 use crate::misc::r;
 use crate::types::Type;
+use crate::misc::UniqueID;
 use crate::defs::traits::{ TraitDefRef };
-use crate::analysis::hir::{ NodeID, Expr };
+use crate::analysis::hir::{ Expr };
 use crate::analysis::visitor::{ Visitor };
 
 use crate::transform::transform::{ CodeContext, Transformer };
@@ -11,7 +12,7 @@ use crate::llvm::llcode::{ LLType, LLLit, LLRef, LLExpr };
 
 
 impl<'sess> Transformer<'sess> {
-    pub fn transform_trait_def(&mut self, defid: NodeID, traitname: &str, body: &Vec<Expr>) -> Vec<LLExpr> {
+    pub fn transform_trait_def(&mut self, defid: UniqueID, traitname: &str, body: &Vec<Expr>) -> Vec<LLExpr> {
         let traitdef = self.session.get_def(defid).unwrap().as_trait_def().unwrap();
         traitdef.vtable.build_vtable(self.session, body);
 
@@ -25,7 +26,7 @@ impl<'sess> Transformer<'sess> {
         vec!()
     }
 
-    pub fn transform_trait_impl(&mut self, refid: NodeID, body: &Vec<Expr>) -> Vec<LLExpr> {
+    pub fn transform_trait_impl(&mut self, refid: UniqueID, body: &Vec<Expr>) -> Vec<LLExpr> {
         let impl_id = self.session.get_ref(refid).unwrap();
         let traitimpl = self.session.get_def(impl_id).unwrap().as_trait_impl().unwrap();
         let traitdef = self.session.get_def(traitimpl.trait_id).unwrap().as_trait_def().unwrap();
@@ -71,7 +72,7 @@ impl<'sess> Transformer<'sess> {
             },
         };
 
-        let id = NodeID::generate();
+        let id = UniqueID::generate();
         LLExpr::DefStruct(id, lltype, vec!(
             vtable, LLExpr::Cast(LLType::Ptr(r(LLType::I8)), r(value))
         ))
@@ -81,7 +82,7 @@ impl<'sess> Transformer<'sess> {
         LLExpr::GetItem(r(value), 1)
     }
 
-    pub fn transform_trait_access_method(&mut self, traitdef: TraitDefRef, objval: LLExpr, field_id: NodeID) -> Vec<LLExpr> {
+    pub fn transform_trait_access_method(&mut self, traitdef: TraitDefRef, objval: LLExpr, field_id: UniqueID) -> Vec<LLExpr> {
         // TODO this works to get the vtable method, but the object also needs to be converted for traits, unlike with classes which takes the same object value
         let index = traitdef.vtable.get_index_by_id(field_id).unwrap();
         let vtable = LLExpr::Cast(self.get_type(traitdef.vtable.id).unwrap(), r(LLExpr::GetItem(r(objval), 0)));
@@ -114,7 +115,7 @@ impl<'sess> Transformer<'sess> {
         return value;
     }
 
-    pub fn convert_impl_func_args(&mut self, func_id: NodeID, fargs: &mut Vec<(NodeID, String)>, body: &mut Vec<LLExpr>) {
+    pub fn convert_impl_func_args(&mut self, func_id: UniqueID, fargs: &mut Vec<(UniqueID, String)>, body: &mut Vec<LLExpr>) {
         let traitfunc = self.session.get_def(func_id).unwrap().as_trait_func().unwrap();
         let deftype = self.session.get_type(traitfunc.def_func_id.borrow().unwrap()).unwrap();
         let trait_id = traitfunc.trait_id;
@@ -122,7 +123,7 @@ impl<'sess> Transformer<'sess> {
         for (arg, argtype) in fargs.iter_mut().zip(deftype.get_argtypes().unwrap().as_vec()) {
             if argtype.get_id() == Ok(trait_id) {
                 let converted_id = arg.0;
-                arg.0 = NodeID::generate();
+                arg.0 = UniqueID::generate();
                 body.insert(0, LLExpr::SetValue(converted_id, r(self.convert_unpack_trait_obj(LLExpr::GetValue(arg.0)))));
             }
         }

@@ -4,11 +4,12 @@ use std::collections::HashMap;
 use crate::abi::ABI;
 use crate::defs::Def;
 use crate::types::Type;
+use crate::misc::UniqueID;
 use crate::config::Options;
 use crate::scope::{ ScopeRef };
 use crate::session::{ Session, Error };
 use crate::parsing::ast::{ Pos };
-use crate::analysis::hir::{ NodeID, Visibility, Mutability, AssignType, Literal, MatchCase, EnumVariant, WhereClause, Function, Pattern, PatKind, Expr, ExprKind };
+use crate::analysis::hir::{ Visibility, Mutability, AssignType, Literal, MatchCase, EnumVariant, WhereClause, Function, Pattern, PatKind, Expr, ExprKind };
 use crate::defs::modules::ModuleDef;
 
 use crate::misc::{ r };
@@ -20,7 +21,7 @@ use crate::analysis::visitor::{ Visitor, ScopeStack };
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum CodeContext {
-    Func(ABI, NodeID),
+    Func(ABI, UniqueID),
     Import,
 }
 
@@ -30,8 +31,8 @@ pub struct Transformer<'sess> {
     pub stack: ScopeStack,
     pub context: Vec<CodeContext>,
     pub globals: Vec<LLGlobal>,
-    pub expoints: Vec<NodeID>,
-    pub types: HashMap<NodeID, LLType>,
+    pub expoints: Vec<UniqueID>,
+    pub types: HashMap<UniqueID, LLType>,
 }
 
 impl<'sess> Transformer<'sess> {
@@ -61,11 +62,11 @@ impl<'sess> Transformer<'sess> {
         self.initialize_exception_type();
     }
 
-    pub fn set_type(&mut self, id: NodeID, ltype: LLType) {
+    pub fn set_type(&mut self, id: UniqueID, ltype: LLType) {
         self.types.insert(id, ltype);
     }
 
-    pub fn get_type(&self, id: NodeID) -> Result<LLType, Error> {
+    pub fn get_type(&self, id: UniqueID) -> Result<LLType, Error> {
         self.types.get(&id).map(|ltype| ltype.clone()).ok_or(Error::new(format!("Transform Type Unset: {}", id)))
     }
 
@@ -88,25 +89,25 @@ impl<'sess> Transformer<'sess> {
         ret
     }
 
-    pub fn with_exception<F, R>(&mut self, expoint: NodeID, f: F) -> R where F: FnOnce(&mut Self) -> R {
+    pub fn with_exception<F, R>(&mut self, expoint: UniqueID, f: F) -> R where F: FnOnce(&mut Self) -> R {
         self.expoints.push(expoint);
         let ret = f(self);
         self.expoints.pop();
         ret
     }
 
-    pub fn get_exception(&self) -> Option<NodeID> {
+    pub fn get_exception(&self) -> Option<UniqueID> {
         self.expoints.last().map(|e| *e)
     }
 
-    pub fn get_global_exception(&self) -> Option<NodeID> {
+    pub fn get_global_exception(&self) -> Option<UniqueID> {
         self.expoints.first().map(|e| *e)
     }
 
     pub fn transform_code(&mut self, scope: ScopeRef, code: &Vec<Expr>) {
         self.stack.push_scope(scope.clone());
 
-        let exp_id = NodeID::generate();
+        let exp_id = UniqueID::generate();
         self.declare_global_exception_point(exp_id);
         self.expoints.push(exp_id);
 
@@ -150,11 +151,11 @@ impl<'sess> Visitor for Transformer<'sess> {
     }
 
 
-    fn visit_literal(&mut self, _refid: NodeID, lit: &Literal) -> Result<Self::Return, Error> {
+    fn visit_literal(&mut self, _refid: UniqueID, lit: &Literal) -> Result<Self::Return, Error> {
         Ok(vec!(LLExpr::Literal(self.transform_lit(lit))))
     }
 
-    fn visit_annotation(&mut self, refid: NodeID, _ttype: &Type, code: &Expr) -> Result<Self::Return, Error> {
+    fn visit_annotation(&mut self, refid: UniqueID, _ttype: &Type, code: &Expr) -> Result<Self::Return, Error> {
         let mut exprs = vec!();
         let ltype = self.transform_value_type(&self.session.get_type(refid).unwrap());
         let result = self.transform_as_result(&mut exprs, code);
@@ -163,19 +164,19 @@ impl<'sess> Visitor for Transformer<'sess> {
         Ok(exprs)
     }
 
-    fn visit_ref(&mut self, refid: NodeID, expr: &Expr) -> Result<Self::Return, Error> {
+    fn visit_ref(&mut self, refid: UniqueID, expr: &Expr) -> Result<Self::Return, Error> {
         Ok(self.transform_alloc_ref(refid, expr))
     }
 
-    fn visit_deref(&mut self, _refid: NodeID, expr: &Expr) -> Result<Self::Return, Error> {
+    fn visit_deref(&mut self, _refid: UniqueID, expr: &Expr) -> Result<Self::Return, Error> {
         Ok(self.transform_deref_ref(expr))
     }
 
-    fn visit_tuple(&mut self, refid: NodeID, items: &Vec<Expr>) -> Result<Self::Return, Error> {
+    fn visit_tuple(&mut self, refid: UniqueID, items: &Vec<Expr>) -> Result<Self::Return, Error> {
         Ok(self.transform_tuple_lit(refid, &items))
     }
 
-    fn visit_record(&mut self, refid: NodeID, items: &Vec<(String, Expr)>) -> Result<Self::Return, Error> {
+    fn visit_record(&mut self, refid: UniqueID, items: &Vec<(String, Expr)>) -> Result<Self::Return, Error> {
         let mut nitems = vec!();
         for item in items {
             nitems.push(item.1.clone());
@@ -183,26 +184,26 @@ impl<'sess> Visitor for Transformer<'sess> {
         Ok(self.transform_tuple_lit(refid, &nitems))
     }
 
-    fn visit_record_update(&mut self, refid: NodeID, record: &Expr, items: &Vec<(String, Expr)>) -> Result<Self::Return, Error> {
+    fn visit_record_update(&mut self, refid: UniqueID, record: &Expr, items: &Vec<(String, Expr)>) -> Result<Self::Return, Error> {
         Ok(self.transform_record_update(refid, &record, &items))
     }
 
-    fn visit_identifier(&mut self, refid: NodeID, name: &str) -> Result<Self::Return, Error> {
+    fn visit_identifier(&mut self, refid: UniqueID, name: &str) -> Result<Self::Return, Error> {
         let defid = self.session.get_ref(refid).unwrap();
         Ok(self.transform_reference(defid, name))
     }
 
-    fn visit_resolver(&mut self, refid: NodeID, left: &Expr, right: &str, oid: NodeID) -> Result<Self::Return, Error> {
+    fn visit_resolver(&mut self, refid: UniqueID, left: &Expr, right: &str, oid: UniqueID) -> Result<Self::Return, Error> {
         let object_id = self.session.get_type_from_ref(oid).unwrap().get_id().unwrap();
         Ok(self.transform_resolve(refid, left, right, object_id))
     }
 
-    fn visit_accessor(&mut self, refid: NodeID, left: &Expr, right: &str, oid: NodeID) -> Result<Self::Return, Error> {
+    fn visit_accessor(&mut self, refid: UniqueID, left: &Expr, right: &str, oid: UniqueID) -> Result<Self::Return, Error> {
         Ok(self.transform_accessor(refid, left, right, oid))
     }
 
 
-    fn visit_invoke(&mut self, refid: NodeID, func: &Expr, args: &Vec<Expr>, fid: NodeID) -> Result<Self::Return, Error> {
+    fn visit_invoke(&mut self, refid: UniqueID, func: &Expr, args: &Vec<Expr>, fid: UniqueID) -> Result<Self::Return, Error> {
         let rettype = self.session.get_type(refid).unwrap();
         let deftype = self.session.get_type(fid).unwrap();
         let abi = deftype.get_abi().unwrap();
@@ -210,130 +211,130 @@ impl<'sess> Visitor for Transformer<'sess> {
     }
 
 
-    fn visit_side_effect(&mut self, _refid: NodeID, op: &str, args: &Vec<Expr>) -> Result<Self::Return, Error> {
+    fn visit_side_effect(&mut self, _refid: UniqueID, op: &str, args: &Vec<Expr>) -> Result<Self::Return, Error> {
         Ok(self.transform_side_effect(op, args))
     }
 
 
-    fn visit_if(&mut self, _refid: NodeID, cond: &Expr, texpr: &Expr, fexpr: &Expr) -> Result<Self::Return, Error> {
+    fn visit_if(&mut self, _refid: UniqueID, cond: &Expr, texpr: &Expr, fexpr: &Expr) -> Result<Self::Return, Error> {
         Ok(self.transform_if_expr(cond, texpr, fexpr))
     }
 
-    fn visit_raise(&mut self, refid: NodeID, expr: &Expr) -> Result<Self::Return, Error> {
+    fn visit_raise(&mut self, refid: UniqueID, expr: &Expr) -> Result<Self::Return, Error> {
         Ok(self.transform_raise(refid, expr))
     }
 
-    fn visit_try(&mut self, _refid: NodeID, code: &Expr, cases: &Vec<MatchCase>) -> Result<Self::Return, Error> {
+    fn visit_try(&mut self, _refid: UniqueID, code: &Expr, cases: &Vec<MatchCase>) -> Result<Self::Return, Error> {
         Ok(self.transform_try(code, cases))
     }
 
-    fn visit_match(&mut self, _refid: NodeID, cond: &Expr, cases: &Vec<MatchCase>) -> Result<Self::Return, Error> {
+    fn visit_match(&mut self, _refid: UniqueID, cond: &Expr, cases: &Vec<MatchCase>) -> Result<Self::Return, Error> {
         Ok(self.transform_match(cond, cases))
     }
 
-    fn visit_while(&mut self, _refid: NodeID, cond: &Expr, body: &Expr) -> Result<Self::Return, Error> {
+    fn visit_while(&mut self, _refid: UniqueID, cond: &Expr, body: &Expr) -> Result<Self::Return, Error> {
         Ok(vec!(LLExpr::Loop(self.visit_node(cond)?, self.visit_node(body)?)))
     }
 
 
-    fn visit_declare(&mut self, refid: NodeID, vis: Visibility, name: &str, _ttype: &Type, _whereclause: &WhereClause) -> Result<Self::Return, Error> {
+    fn visit_declare(&mut self, refid: UniqueID, vis: Visibility, name: &str, _ttype: &Type, _whereclause: &WhereClause) -> Result<Self::Return, Error> {
         let ttype = self.session.get_type_from_ref(refid).unwrap();
         let abi = ttype.get_abi().unwrap();
         Ok(self.transform_func_decl(abi, refid, vis, name, &ttype))
     }
 
-    fn visit_function(&mut self, refid: NodeID, func: &Function) -> Result<Self::Return, Error> {
+    fn visit_function(&mut self, refid: UniqueID, func: &Function) -> Result<Self::Return, Error> {
         Ok(self.transform_func_def(refid, func))
     }
 
-    fn visit_alloc_object(&mut self, refid: NodeID, _ttype: &Type) -> Result<Self::Return, Error> {
+    fn visit_alloc_object(&mut self, refid: UniqueID, _ttype: &Type) -> Result<Self::Return, Error> {
         Ok(self.transform_alloc_object(refid))
     }
 
-    fn visit_class(&mut self, refid: NodeID, _classtype: &Type, _parenttype: &Option<Type>, _whereclause: &WhereClause, body: &Vec<Expr>) -> Result<Self::Return, Error> {
+    fn visit_class(&mut self, refid: UniqueID, _classtype: &Type, _parenttype: &Option<Type>, _whereclause: &WhereClause, body: &Vec<Expr>) -> Result<Self::Return, Error> {
         let mut exprs = self.transform_class_body(refid, body);
         exprs.push(LLExpr::Literal(self.transform_lit(&Literal::Unit)));
         Ok(exprs)
     }
 
-    fn visit_type_alias(&mut self, _refid: NodeID, _deftype: &Type, _ttype: &Type) -> Result<Self::Return, Error> {
+    fn visit_type_alias(&mut self, _refid: UniqueID, _deftype: &Type, _ttype: &Type) -> Result<Self::Return, Error> {
         /* Nothing Needs To Be Done */
         Ok(vec!())
         //Ok(self.default_return())
     }
 
-    fn visit_enum(&mut self, refid: NodeID, enumtype: &Type, _whereclause: &WhereClause, _variants: &Vec<EnumVariant>) -> Result<Self::Return, Error> {
+    fn visit_enum(&mut self, refid: UniqueID, enumtype: &Type, _whereclause: &WhereClause, _variants: &Vec<EnumVariant>) -> Result<Self::Return, Error> {
         Ok(self.transform_enum_def(refid, enumtype.get_name()?))
     }
 
-    fn visit_trait_def(&mut self, refid: NodeID, traitname: &str, body: &Vec<Expr>) -> Result<Self::Return, Error> {
+    fn visit_trait_def(&mut self, refid: UniqueID, traitname: &str, body: &Vec<Expr>) -> Result<Self::Return, Error> {
         let defid = self.session.get_ref(refid).unwrap();
         Ok(self.transform_trait_def(defid, traitname, body))
     }
 
-    fn visit_trait_impl(&mut self, refid: NodeID, _traitname: &str, _impltype: &Type, _whereclause: &WhereClause, body: &Vec<Expr>) -> Result<Self::Return, Error> {
+    fn visit_trait_impl(&mut self, refid: UniqueID, _traitname: &str, _impltype: &Type, _whereclause: &WhereClause, body: &Vec<Expr>) -> Result<Self::Return, Error> {
         Ok(self.transform_trait_impl(refid, body))
     }
 
-    fn visit_import(&mut self, _refid: NodeID, name: &str, decls: &Vec<Expr>) -> Result<Self::Return, Error> {
+    fn visit_import(&mut self, _refid: UniqueID, name: &str, decls: &Vec<Expr>) -> Result<Self::Return, Error> {
         Ok(self.transform_import(name, decls))
     }
 
-    fn visit_definition(&mut self, refid: NodeID, _mutable: Mutability, name: &str, _ttype: &Option<Type>, expr: &Expr) -> Result<Self::Return, Error> {
+    fn visit_definition(&mut self, refid: UniqueID, _mutable: Mutability, name: &str, _ttype: &Option<Type>, expr: &Expr) -> Result<Self::Return, Error> {
         Ok(self.transform_def_local(refid, name, expr))
     }
 
-    fn visit_field(&mut self, _refid: NodeID, _mutable: Mutability, _name: &str, _ttype: &Option<Type>) -> Result<Self::Return, Error> {
+    fn visit_field(&mut self, _refid: UniqueID, _mutable: Mutability, _name: &str, _ttype: &Option<Type>) -> Result<Self::Return, Error> {
         // Do nothing because a field only appears inside a structdef
         Ok(vec!())
     }
 
-    fn visit_assignment(&mut self, refid: NodeID, left: &Expr, right: &Expr, _ty: AssignType) -> Result<Self::Return, Error> {
+    fn visit_assignment(&mut self, refid: UniqueID, left: &Expr, right: &Expr, _ty: AssignType) -> Result<Self::Return, Error> {
         Ok(self.transform_assignment(refid, left, right))
     }
 
-    fn visit_module(&mut self, refid: NodeID, name: &str, code: &Expr, memo_id: NodeID) -> Result<Self::Return, Error> {
+    fn visit_module(&mut self, refid: UniqueID, name: &str, code: &Expr, memo_id: UniqueID) -> Result<Self::Return, Error> {
         Ok(self.transform_module(refid, name, code, memo_id))
     }
 
-    fn visit_module_decl(&mut self, _refid: NodeID, name: &str) -> Result<Self::Return, Error> {
+    fn visit_module_decl(&mut self, _refid: UniqueID, name: &str) -> Result<Self::Return, Error> {
         Ok(self.transform_module_decl(name))
     }
 
     /*
-    fn visit_pattern_binding(&mut self, _refid: NodeID, _name: &str) -> Result<Self::Return, Error> {
+    fn visit_pattern_binding(&mut self, _refid: UniqueID, _name: &str) -> Result<Self::Return, Error> {
         Ok(self.default_return())
     }
 
-    fn visit_pattern_annotation(&mut self, _refid: NodeID, _ttype: &Type, subpat: &Pattern) -> Result<Self::Return, Error> {
+    fn visit_pattern_annotation(&mut self, _refid: UniqueID, _ttype: &Type, subpat: &Pattern) -> Result<Self::Return, Error> {
         self.visit_pattern(subpat)
     }
 
-    fn visit_pattern_resolve(&mut self, _refid: NodeID, left: &Pattern, _field: &str, _oid: NodeID) -> Result<Self::Return, Error> {
+    fn visit_pattern_resolve(&mut self, _refid: UniqueID, left: &Pattern, _field: &str, _oid: UniqueID) -> Result<Self::Return, Error> {
         self.visit_pattern(left)
     }
 
-    fn visit_pattern_enum_args(&mut self, refid: NodeID, left: &Pattern, args: &Vec<Pattern>) -> Result<Self::Return, Error> {
+    fn visit_pattern_enum_args(&mut self, refid: UniqueID, left: &Pattern, args: &Vec<Pattern>) -> Result<Self::Return, Error> {
         walk_pattern_enum_args(self, refid, left, args)
     }
 
-    fn visit_pattern_tuple(&mut self, refid: NodeID, items: &Vec<Pattern>) -> Result<Self::Return, Error> {
+    fn visit_pattern_tuple(&mut self, refid: UniqueID, items: &Vec<Pattern>) -> Result<Self::Return, Error> {
         walk_pattern_tuple(self, refid, items)
     }
 
-    fn visit_pattern_record(&mut self, refid: NodeID, items: &Vec<(String, Pattern)>) -> Result<Self::Return, Error> {
+    fn visit_pattern_record(&mut self, refid: UniqueID, items: &Vec<(String, Pattern)>) -> Result<Self::Return, Error> {
         walk_pattern_record(self, refid, items)
     }
 
-    fn visit_pattern_wild(&mut self, _refid: NodeID) -> Result<Self::Return, Error> {
+    fn visit_pattern_wild(&mut self, _refid: UniqueID) -> Result<Self::Return, Error> {
         Ok(self.default_return())
     }
 
-    fn visit_pattern_literal(&mut self, refid: NodeID, lit: &Literal) -> Result<Self::Return, Error> {
+    fn visit_pattern_literal(&mut self, refid: UniqueID, lit: &Literal) -> Result<Self::Return, Error> {
         self.visit_literal(refid, lit)
     }
 
-    fn visit_pattern_identifier(&mut self, _refid: NodeID, _name: &str) -> Result<Self::Return, Error> {
+    fn visit_pattern_identifier(&mut self, _refid: UniqueID, _name: &str) -> Result<Self::Return, Error> {
         Ok(self.default_return())
     }
     */
@@ -348,7 +349,7 @@ impl<'sess> Visitor for Transformer<'sess> {
 
 impl<'sess> Transformer<'sess> {
 
-    pub fn transform_module(&mut self, _id: NodeID, name: &str, code: &Expr, memo_id: NodeID) -> Vec<LLExpr> {
+    pub fn transform_module(&mut self, _id: UniqueID, name: &str, code: &Expr, memo_id: UniqueID) -> Vec<LLExpr> {
         // Define a global that will store whether we've run this function or not
         let memo_name = ModuleDef::get_memo_name(&ModuleDef::get_module_name(name));
         self.add_global(LLGlobal::DefGlobal(memo_id, LLLink::Once, memo_name, LLType::I1, true));
@@ -357,7 +358,7 @@ impl<'sess> Transformer<'sess> {
     }
 
     pub fn build_main_func(&mut self, init_code: Vec<LLExpr>) {
-        let main_id = NodeID::generate();
+        let main_id = UniqueID::generate();
         let main_ltype = LLType::Function(vec!(), r(LLType::I64));
         let mut main_body = vec!();
 
@@ -429,7 +430,7 @@ impl<'sess> Transformer<'sess> {
         }
     }
 
-    pub fn transform_tuple_lit(&mut self, refid: NodeID, items: &Vec<Expr>) -> Vec<LLExpr> {
+    pub fn transform_tuple_lit(&mut self, refid: UniqueID, items: &Vec<Expr>) -> Vec<LLExpr> {
         let mut exprs = vec!();
         let mut litems = vec!();
         for item in items {
@@ -440,7 +441,7 @@ impl<'sess> Transformer<'sess> {
         exprs
     }
 
-    pub fn transform_record_update(&mut self, refid: NodeID, record: &Expr, items: &Vec<(String, Expr)>) -> Vec<LLExpr> {
+    pub fn transform_record_update(&mut self, refid: UniqueID, record: &Expr, items: &Vec<(String, Expr)>) -> Vec<LLExpr> {
         let mut exprs = vec!();
         let mut litems = vec!();
 
@@ -458,12 +459,12 @@ impl<'sess> Transformer<'sess> {
         exprs
     }
 
-    pub fn create_def_local(&mut self, defid: NodeID, name: &str, valexpr: LLExpr) -> Vec<LLExpr> {
+    pub fn create_def_local(&mut self, defid: UniqueID, name: &str, valexpr: LLExpr) -> Vec<LLExpr> {
         let ltype = self.transform_value_type(&self.session.get_type(defid).unwrap());
         vec!(LLExpr::DefLocal(defid, name.to_string(), ltype, r(valexpr)))
     }
 
-    pub fn transform_def_local(&mut self, refid: NodeID, name: &str, value: &Expr) -> Vec<LLExpr> {
+    pub fn transform_def_local(&mut self, refid: UniqueID, name: &str, value: &Expr) -> Vec<LLExpr> {
         let defid = self.session.get_ref(refid).unwrap();
         let mut exprs = vec!();
         let valexpr = self.transform_as_result(&mut exprs, value);
@@ -482,8 +483,8 @@ impl<'sess> Transformer<'sess> {
     pub fn transform_module_decl(&mut self, name: &str) -> Vec<LLExpr> {
         let mut exprs = vec!();
 
-        let defid = NodeID::generate();
-        let compiled_func_id = NodeID::generate();
+        let defid = UniqueID::generate();
+        let compiled_func_id = UniqueID::generate();
         let scope = self.stack.get_scope();
         let ttype = Type::Function(r(Type::Tuple(vec!())), r(scope.find_type(self.session, "Bool").unwrap().clone()), ABI::Molten);
         let lltype = ClosureTransform::convert_to_def_type(LLType::Function(vec!(), r(LLType::I1)));
@@ -499,13 +500,13 @@ impl<'sess> Transformer<'sess> {
         self.add_global(LLGlobal::DefGlobal(defid, LLLink::Once, module_run_name_global, ftype, true));
         //exprs.extend(ClosureTransform::transform_decl(self, defid, Visibility::Public, &module_run_name, &ttype));
 
-        exprs.push(LLExpr::SetGlobal(defid, r(ClosureTransform::make_closure_value(self, NodeID::generate(), compiled_func_id, LLExpr::Literal(LLLit::Null(LLType::Ptr(r(LLType::I8))))))));
+        exprs.push(LLExpr::SetGlobal(defid, r(ClosureTransform::make_closure_value(self, UniqueID::generate(), compiled_func_id, LLExpr::Literal(LLLit::Null(LLType::Ptr(r(LLType::I8))))))));
         exprs.extend(ClosureTransform::create_invoke(self, LLExpr::GetLocal(defid), vec!()));
         exprs
     }
 
 
-    pub fn create_reference(&mut self, defid: NodeID) -> Vec<LLExpr> {
+    pub fn create_reference(&mut self, defid: UniqueID) -> Vec<LLExpr> {
         match self.session.get_def(defid) {
             Ok(Def::Var(_)) => vec!(LLExpr::GetLocal(defid)),
             Ok(Def::Closure(_)) => vec!(LLExpr::GetLocal(defid)),
@@ -514,7 +515,7 @@ impl<'sess> Transformer<'sess> {
         }
     }
 
-    pub fn transform_reference(&mut self, defid: NodeID, name: &str) -> Vec<LLExpr> {
+    pub fn transform_reference(&mut self, defid: UniqueID, name: &str) -> Vec<LLExpr> {
         match ClosureTransform::check_convert_closure_reference(self, defid, name) {
             Some(exprs) => exprs,
             None => self.create_reference(defid),
@@ -522,7 +523,7 @@ impl<'sess> Transformer<'sess> {
     }
 
 
-    pub fn transform_alloc_ref(&mut self, refid: NodeID, value: &Expr) -> Vec<LLExpr> {
+    pub fn transform_alloc_ref(&mut self, refid: UniqueID, value: &Expr) -> Vec<LLExpr> {
         let mut exprs = vec!();
         let valexpr = self.transform_as_result(&mut exprs, value);
         let ltype = self.transform_value_type(&self.session.get_type(refid).unwrap());
@@ -537,7 +538,7 @@ impl<'sess> Transformer<'sess> {
         exprs
     }
 
-    pub fn transform_alloc_object(&mut self, refid: NodeID) -> Vec<LLExpr> {
+    pub fn transform_alloc_object(&mut self, refid: UniqueID) -> Vec<LLExpr> {
         let mut exprs = vec!();
         let defid = self.session.get_ref(refid).unwrap();
         let ltype = self.transform_value_type(&self.session.get_type(defid).unwrap());
@@ -552,7 +553,7 @@ impl<'sess> Transformer<'sess> {
         exprs
     }
 
-    pub fn transform_accessor(&mut self, refid: NodeID, obj: &Expr, field: &str, oid: NodeID) -> Vec<LLExpr> {
+    pub fn transform_accessor(&mut self, refid: UniqueID, obj: &Expr, field: &str, oid: UniqueID) -> Vec<LLExpr> {
         let mut exprs = vec!();
         let defid = self.session.get_ref(refid).unwrap();
         let objval = self.transform_as_result(&mut exprs, obj);
@@ -560,7 +561,7 @@ impl<'sess> Transformer<'sess> {
         exprs
     }
 
-    pub fn convert_accessor(&mut self, defid: NodeID, objval: LLExpr, field: &str, oid: NodeID) -> Vec<LLExpr> {
+    pub fn convert_accessor(&mut self, defid: UniqueID, objval: LLExpr, field: &str, oid: UniqueID) -> Vec<LLExpr> {
         let mut exprs = vec!();
 
         let otype = self.session.get_type(oid).unwrap();
@@ -606,7 +607,7 @@ impl<'sess> Transformer<'sess> {
         exprs
     }
 
-    pub fn transform_resolve(&mut self, refid: NodeID, _path: &Expr, _field: &str, object_id: NodeID) -> Vec<LLExpr> {
+    pub fn transform_resolve(&mut self, refid: UniqueID, _path: &Expr, _field: &str, object_id: UniqueID) -> Vec<LLExpr> {
         let field_id = self.session.get_ref(refid).unwrap();
         match self.session.get_def(object_id).unwrap() {
             Def::Class(classdef) => self.transform_class_resolve_method(classdef, field_id),
@@ -615,7 +616,7 @@ impl<'sess> Transformer<'sess> {
         }
     }
 
-    pub fn transform_assignment(&mut self, _refid: NodeID, left: &Expr, right: &Expr) -> Vec<LLExpr> {
+    pub fn transform_assignment(&mut self, _refid: UniqueID, left: &Expr, right: &Expr) -> Vec<LLExpr> {
         let mut exprs = vec!();
 
         let value = self.transform_as_result(&mut exprs, right);
@@ -657,7 +658,7 @@ impl<'sess> Transformer<'sess> {
         let mut conds = vec!();
         let mut blocks = vec!();
 
-        let condid = NodeID::generate();
+        let condid = UniqueID::generate();
         exprs.push(LLExpr::SetValue(condid, r(condval)));
 
         for case in cases {
@@ -681,7 +682,7 @@ impl<'sess> Transformer<'sess> {
     }
 
     // TODO this can't be moved into the visitor yet because of the value_id (which represents the value to compare against)
-    pub fn transform_pattern(&mut self, pat: &Pattern, value_id: NodeID) -> Vec<LLExpr> {
+    pub fn transform_pattern(&mut self, pat: &Pattern, value_id: UniqueID) -> Vec<LLExpr> {
         let mut exprs = vec!();
 
         match &pat.kind {
@@ -739,11 +740,11 @@ impl<'sess> Transformer<'sess> {
                     //      The problem with the previous approach is that the Cast llexpr is very complicated and will not necessarily do the right conversion when
                     //      using a struct instead of a pointer to a struct.  Creating a temporary variable means that the direct variable reference is a pointer, and
                     //      can thus be indexed as one.  This might change if enums are made into references always
-                    let value_ref_id = NodeID::generate();
+                    let value_ref_id = UniqueID::generate();
                     let variant_type = self.get_type(variant_id).unwrap();
                     exprs.push(LLExpr::DefLocal(value_ref_id, value_ref_id.to_string(), variant_type.clone(), r(LLExpr::Cast(variant_type.clone(), r(LLExpr::GetValue(value_id))))));
 
-                    let item_id = NodeID::generate();
+                    let item_id = UniqueID::generate();
                     exprs.push(LLExpr::SetValue(item_id, r(
                         LLExpr::LoadRef(r(
                             LLExpr::AccessRef(r(

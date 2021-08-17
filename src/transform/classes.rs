@@ -1,10 +1,10 @@
 
-use crate::analysis::hir::{ NodeID, Expr };
+use crate::analysis::hir::{ Expr };
 use crate::analysis::visitor::{ Visitor };
 
 use crate::defs::classes::{ ClassDefRef, StructDef, StructDefRef, Vtable };
 
-use crate::misc::{ r };
+use crate::misc::{ r, UniqueID };
 use crate::transform::transform::{ Transformer, CodeContext };
 use crate::llvm::llcode::{ LLType, LLRef, LLLink, LLExpr, LLGlobal };
 
@@ -43,7 +43,7 @@ impl<'sess> Transformer<'sess> {
         VtableTransform::init_vtable(self, format!("__{}_vtable", tscope.get_basename()), &classdef.vtable)
     }
 
-    pub fn transform_class_body(&mut self, refid: NodeID, body: &Vec<Expr>) -> Vec<LLExpr> {
+    pub fn transform_class_body(&mut self, refid: UniqueID, body: &Vec<Expr>) -> Vec<LLExpr> {
         let defid = self.session.get_ref(refid).unwrap();
         let mut exprs = vec!();
         let tscope = self.session.map.get(defid).unwrap();
@@ -64,19 +64,19 @@ impl<'sess> Transformer<'sess> {
         exprs
     }
 
-    pub fn transform_class_access_method(&mut self, classdef: ClassDefRef, objval: LLExpr, field_id: NodeID) -> Vec<LLExpr> {
+    pub fn transform_class_access_method(&mut self, classdef: ClassDefRef, objval: LLExpr, field_id: UniqueID) -> Vec<LLExpr> {
         let vindex = classdef.get_struct_vtable_index().unwrap();
         let index = classdef.vtable.get_index_by_id(field_id).unwrap();
         let vtable = LLExpr::LoadRef(r(LLExpr::AccessRef(r(objval), vec!(LLRef::Field(vindex)))));
         vec!(LLExpr::LoadRef(r(LLExpr::AccessRef(r(vtable), vec!(LLRef::Field(index))))))
     }
 
-    pub fn transform_class_access_field(&mut self, structdef: StructDefRef, objval: LLExpr, field_id: NodeID) -> Vec<LLExpr> {
+    pub fn transform_class_access_field(&mut self, structdef: StructDefRef, objval: LLExpr, field_id: UniqueID) -> Vec<LLExpr> {
         let (index, _) = structdef.find_field_by_id(field_id).unwrap();
         vec!(LLExpr::LoadRef(r(LLExpr::AccessRef(r(objval), vec!(LLRef::Field(index))))))
     }
 
-    pub fn transform_class_resolve_method(&mut self, classdef: ClassDefRef, field_id: NodeID) -> Vec<LLExpr> {
+    pub fn transform_class_resolve_method(&mut self, classdef: ClassDefRef, field_id: UniqueID) -> Vec<LLExpr> {
         let index = classdef.vtable.get_index_by_id(field_id).unwrap();
         vec!(LLExpr::LoadRef(r(LLExpr::AccessRef(r(LLExpr::GetGlobal(classdef.vtable.id)), vec!(LLRef::Field(index))))))
     }
@@ -86,12 +86,12 @@ impl<'sess> Transformer<'sess> {
 pub struct StructTransform;
 
 impl StructTransform {
-    pub fn declare_struct_type(transform: &mut Transformer, id: NodeID, name: String) {
+    pub fn declare_struct_type(transform: &mut Transformer, id: UniqueID, name: String) {
         transform.add_global(LLGlobal::DefNamedStruct(id, name, true));
         transform.set_type(id, LLType::Alias(id));
     }
 
-    pub fn define_struct_type(transform: &mut Transformer, id: NodeID, structdef: &StructDef) {
+    pub fn define_struct_type(transform: &mut Transformer, id: UniqueID, structdef: &StructDef) {
         let mut items = vec!();
         structdef.foreach_field(|_, _, ttype| {
             items.push(transform.transform_value_type(ttype));
@@ -135,7 +135,7 @@ impl VtableTransform {
 
         transform.add_global(LLGlobal::DefGlobal(vtable.id, LLLink::Once, name, transform.get_type(vtable.id).unwrap(), true));
         // TODO should vtables be dynamically allocated, or should we add a LLType::ElementOf() type or something to GetElement an aliased type
-        exprs.push(LLExpr::SetGlobal(vtable.id, r(LLExpr::AllocRef(NodeID::generate(), transform.get_type(vtable.id).unwrap(), None))));
+        exprs.push(LLExpr::SetGlobal(vtable.id, r(LLExpr::AllocRef(UniqueID::generate(), transform.get_type(vtable.id).unwrap(), None))));
         vtable.foreach_enumerated(|i, id, _, ttype| {
             let ltype = transform.transform_value_type(ttype);
             let field = LLExpr::AccessRef(r(LLExpr::GetGlobal(vtable.id)), vec!(LLRef::Field(i)));

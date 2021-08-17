@@ -14,7 +14,7 @@ use crate::defs::variables::{ AnyVar, VarDef, ArgDef };
 use crate::defs::traits::{ TraitDef, TraitImpl };
 use crate::defs::modules::{ ModuleDef };
 
-use crate::analysis::hir::{ NodeID, Visibility, Mutability, MatchCase, EnumVariant, WhereClause, Function, Pattern, Expr, ExprKind };
+use crate::analysis::hir::{ Visibility, Mutability, MatchCase, EnumVariant, WhereClause, Function, Pattern, Expr, ExprKind };
 use crate::analysis::visitor::{ self, Visitor, ScopeStack };
 
 
@@ -61,7 +61,7 @@ impl<'sess> Visitor for NameBinder<'sess> {
         Ok(())
     }
 
-    fn visit_module(&mut self, _id: NodeID, name: &str, code: &Expr, memo_id: NodeID) -> Result<Self::Return, Error> {
+    fn visit_module(&mut self, _id: UniqueID, name: &str, code: &Expr, memo_id: UniqueID) -> Result<Self::Return, Error> {
         let scope = self.stack.get_scope();
 
         let memo_name = ModuleDef::get_memo_name(&ModuleDef::get_module_name(name));
@@ -75,7 +75,7 @@ impl<'sess> Visitor for NameBinder<'sess> {
         Ok(())
     }
 
-    fn visit_function(&mut self, refid: NodeID, func: &Function) -> Result<Self::Return, Error> {
+    fn visit_function(&mut self, refid: UniqueID, func: &Function) -> Result<Self::Return, Error> {
         let defid = self.session.new_def_id(refid);
 
         let scope = self.stack.get_scope();
@@ -103,7 +103,7 @@ impl<'sess> Visitor for NameBinder<'sess> {
         })
     }
 
-    fn visit_definition(&mut self, refid: NodeID, mutable: Mutability, name: &str, ttype: &Option<Type>, expr: &Expr) -> Result<Self::Return, Error> {
+    fn visit_definition(&mut self, refid: UniqueID, mutable: Mutability, name: &str, ttype: &Option<Type>, expr: &Expr) -> Result<Self::Return, Error> {
         let defid = self.session.new_def_id(refid);
 
         let scope = self.stack.get_scope();
@@ -112,7 +112,7 @@ impl<'sess> Visitor for NameBinder<'sess> {
         self.visit_node(expr)
     }
 
-    fn visit_field(&mut self, refid: NodeID, mutable: Mutability, name: &str, ttype: &Option<Type>) -> Result<Self::Return, Error> {
+    fn visit_field(&mut self, refid: UniqueID, mutable: Mutability, name: &str, ttype: &Option<Type>) -> Result<Self::Return, Error> {
         let defid = self.session.new_def_id(refid);
 
         let scope = self.stack.get_scope();
@@ -121,7 +121,7 @@ impl<'sess> Visitor for NameBinder<'sess> {
         Ok(())
     }
 
-    fn visit_declare(&mut self, refid: NodeID, vis: Visibility, name: &str, ttype: &Type, whereclause: &WhereClause) -> Result<Self::Return, Error> {
+    fn visit_declare(&mut self, refid: UniqueID, vis: Visibility, name: &str, ttype: &Type, whereclause: &WhereClause) -> Result<Self::Return, Error> {
         let defid = self.session.new_def_id(refid);
         let scope = self.stack.get_scope();
         let abi = ttype.get_abi().unwrap_or(ABI::Molten);
@@ -136,7 +136,7 @@ impl<'sess> Visitor for NameBinder<'sess> {
         Ok(())
     }
 
-    fn visit_identifier(&mut self, refid: NodeID, name: &str) -> Result<Self::Return, Error> {
+    fn visit_identifier(&mut self, refid: UniqueID, name: &str) -> Result<Self::Return, Error> {
         let scope = self.stack.get_scope();
         match scope.get_var_def(name) {
             Some(defid) => self.session.set_ref(refid, defid),
@@ -145,11 +145,11 @@ impl<'sess> Visitor for NameBinder<'sess> {
         Ok(())
     }
 
-    fn visit_try(&mut self, refid: NodeID, cond: &Expr, cases: &Vec<MatchCase>) -> Result<Self::Return, Error> {
+    fn visit_try(&mut self, refid: UniqueID, cond: &Expr, cases: &Vec<MatchCase>) -> Result<Self::Return, Error> {
         self.visit_match(refid, cond, cases)
     }
 
-    fn visit_match(&mut self, _refid: NodeID, cond: &Expr, cases: &Vec<MatchCase>) -> Result<Self::Return, Error> {
+    fn visit_match(&mut self, _refid: UniqueID, cond: &Expr, cases: &Vec<MatchCase>) -> Result<Self::Return, Error> {
         let scope = self.stack.get_scope();
         self.visit_node(cond)?;
         // TODO check to make sure Pattern::Wild only occurs as the last case, if at all
@@ -161,14 +161,14 @@ impl<'sess> Visitor for NameBinder<'sess> {
     }
 
 
-    fn visit_annotation(&mut self, refid: NodeID, ttype: &Type, code: &Expr) -> Result<Self::Return, Error> {
+    fn visit_annotation(&mut self, refid: UniqueID, ttype: &Type, code: &Expr) -> Result<Self::Return, Error> {
         let scope = self.stack.get_scope();
         let ttype = self.bind_type(scope.clone(), ttype.clone())?;
         self.session.set_type(refid, ttype);
         self.visit_node(code)
     }
 
-    fn visit_alloc_object(&mut self, refid: NodeID, ttype: &Type) -> Result<Self::Return, Error> {
+    fn visit_alloc_object(&mut self, refid: UniqueID, ttype: &Type) -> Result<Self::Return, Error> {
         let scope = self.stack.get_scope();
         let name = ttype.get_name()?;
         let ttype = self.bind_type(scope.clone(), ttype.clone())?;
@@ -180,7 +180,7 @@ impl<'sess> Visitor for NameBinder<'sess> {
         Ok(())
     }
 
-    fn visit_class(&mut self, refid: NodeID, classtype: &Type, parenttype: &Option<Type>, whereclause: &WhereClause, body: &Vec<Expr>) -> Result<Self::Return, Error> {
+    fn visit_class(&mut self, refid: UniqueID, classtype: &Type, parenttype: &Option<Type>, whereclause: &WhereClause, body: &Vec<Expr>) -> Result<Self::Return, Error> {
         let defid = self.session.new_def_id(refid);
 
         let scope = self.stack.get_scope();
@@ -198,7 +198,7 @@ impl<'sess> Visitor for NameBinder<'sess> {
         })
     }
 
-    fn visit_type_alias(&mut self, refid: NodeID, deftype: &Type, ttype: &Type) -> Result<Self::Return, Error> {
+    fn visit_type_alias(&mut self, refid: UniqueID, deftype: &Type, ttype: &Type) -> Result<Self::Return, Error> {
         let defid = self.session.new_def_id(refid);
         let scope = self.stack.get_scope();
 
@@ -210,7 +210,7 @@ impl<'sess> Visitor for NameBinder<'sess> {
         Ok(())
     }
 
-    fn visit_enum(&mut self, refid: NodeID, enumtype: &Type, whereclause: &WhereClause, variants: &Vec<EnumVariant>) -> Result<Self::Return, Error> {
+    fn visit_enum(&mut self, refid: UniqueID, enumtype: &Type, whereclause: &WhereClause, variants: &Vec<EnumVariant>) -> Result<Self::Return, Error> {
         let defid = self.session.new_def_id(refid);
 
         let scope = self.stack.get_scope();
@@ -230,7 +230,7 @@ impl<'sess> Visitor for NameBinder<'sess> {
         Ok(())
     }
 
-    fn visit_trait_def(&mut self, refid: NodeID, traitname: &str, body: &Vec<Expr>) -> Result<Self::Return, Error> {
+    fn visit_trait_def(&mut self, refid: UniqueID, traitname: &str, body: &Vec<Expr>) -> Result<Self::Return, Error> {
         let defid = self.session.new_def_id(refid);
         let scope = self.stack.get_scope();
         let tscope = self.session.map.get_or_add(defid, traitname, Context::TraitDef(defid), Some(scope.clone()));
@@ -242,7 +242,7 @@ impl<'sess> Visitor for NameBinder<'sess> {
         })
     }
 
-    fn visit_trait_impl(&mut self, refid: NodeID, traitname: &str, impltype: &Type, whereclause: &WhereClause, body: &Vec<Expr>) -> Result<Self::Return, Error> {
+    fn visit_trait_impl(&mut self, refid: UniqueID, traitname: &str, impltype: &Type, whereclause: &WhereClause, body: &Vec<Expr>) -> Result<Self::Return, Error> {
         let scope = self.stack.get_scope();
         let impl_id = self.session.new_def_id(refid);
         let trait_id = scope.get_type_def(traitname).ok_or_else(|| Error::new(format!("NameError: undefined type {:?}", traitname)))?;
@@ -257,7 +257,7 @@ impl<'sess> Visitor for NameBinder<'sess> {
         })
     }
 
-    fn visit_methods(&mut self, refid: NodeID, ttype: &Type, whereclause: &WhereClause, body: &Vec<Expr>) -> Result<Self::Return, Error> {
+    fn visit_methods(&mut self, refid: UniqueID, ttype: &Type, whereclause: &WhereClause, body: &Vec<Expr>) -> Result<Self::Return, Error> {
         let scope = self.stack.get_scope();
         let defid = scope.get_type_def(ttype.get_name()?).ok_or(Error::new(format!("NameError: undefined identifier {:?}", ttype.get_name()?)))?;
         let tscope = self.session.map.get(defid).unwrap();
@@ -278,7 +278,7 @@ impl<'sess> Visitor for NameBinder<'sess> {
         })
     }
 
-    fn visit_resolver(&mut self, _id: NodeID, left: &Expr, _right: &str, oid: NodeID) -> Result<Self::Return, Error> {
+    fn visit_resolver(&mut self, _id: UniqueID, left: &Expr, _right: &str, oid: UniqueID) -> Result<Self::Return, Error> {
         let scope = self.stack.get_scope();
         // TODO should this always work on a type reference, or should classes be added as values as well as types?
         match &left.kind {
@@ -297,7 +297,7 @@ impl<'sess> Visitor for NameBinder<'sess> {
     }
 
 
-    fn visit_pattern_binding(&mut self, refid: NodeID, name: &str) -> Result<Self::Return, Error> {
+    fn visit_pattern_binding(&mut self, refid: UniqueID, name: &str) -> Result<Self::Return, Error> {
         let defid = self.session.new_def_id(refid);
 
         let scope = self.stack.get_scope();
@@ -305,14 +305,14 @@ impl<'sess> Visitor for NameBinder<'sess> {
         Ok(())
     }
 
-    fn visit_pattern_annotation(&mut self, refid: NodeID, ttype: &Type, pat: &Pattern) -> Result<Self::Return, Error> {
+    fn visit_pattern_annotation(&mut self, refid: UniqueID, ttype: &Type, pat: &Pattern) -> Result<Self::Return, Error> {
         let scope = self.stack.get_scope();
         let ttype = self.bind_type(scope.clone(), ttype.clone())?;
         self.session.set_type(refid, ttype);
         self.visit_pattern(pat)
     }
 
-    fn visit_pattern_enum_variant(&mut self, refid: NodeID, path: &Vec<String>, args: &Vec<Pattern>, eid: NodeID) -> Result<Self::Return, Error> {
+    fn visit_pattern_enum_variant(&mut self, refid: UniqueID, path: &Vec<String>, args: &Vec<Pattern>, eid: UniqueID) -> Result<Self::Return, Error> {
         let scope = self.stack.get_scope();
 
         let enum_id = scope.get_type_def(&path[0]).ok_or(Error::new(format!("NameError: undefined type {:?}", path[0])))?;
@@ -414,7 +414,7 @@ fn bind_where_constraints(session: &Session, scope: ScopeRef, whereclause: &Wher
     Ok(())
 }
 
-pub fn check_recursive_type(ttype: Option<&Type>, forbidden_id: NodeID) -> Result<(), Error> {
+pub fn check_recursive_type(ttype: Option<&Type>, forbidden_id: UniqueID) -> Result<(), Error> {
     match ttype {
         Some(ttype) => match ttype {
             Type::Object(name, id, types) => {

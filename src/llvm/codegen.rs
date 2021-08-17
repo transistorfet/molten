@@ -21,7 +21,6 @@ use self::llvm_sys::transforms::pass_manager_builder::*;
 
 use crate::config::Options;
 use crate::misc::{ UniqueID };
-use crate::analysis::hir::NodeID;
 use crate::session::{ Session, Error };
 
 use crate::llvm::llcode::{ LLType, LLLit, LLRef, LLCmpType, LLLink, LLCC, LLExpr, LLGlobal, LLBlock };
@@ -43,8 +42,8 @@ pub struct LLVM<'sess> {
 
 
 
-pub const TYPEVAR_ID: NodeID = UniqueID(2);
-pub const EXCEPTION_ID: NodeID = UniqueID(3);
+pub const TYPEVAR_ID: UniqueID = UniqueID(2);
+pub const EXCEPTION_ID: UniqueID = UniqueID(3);
 
 pub fn cstr(string: &str) -> *mut i8 {
     CString::new(string).unwrap().into_raw()
@@ -789,7 +788,7 @@ impl<'sess> LLVM<'sess> {
         }
     }
 
-    pub unsafe fn build_cfunc_def(&self, function: LLVMValueRef, args: &Vec<(NodeID, String)>, body: &Vec<LLExpr>) {
+    pub unsafe fn build_cfunc_def(&self, function: LLVMValueRef, args: &Vec<(UniqueID, String)>, body: &Vec<LLExpr>) {
         let bb = LLVMAppendBasicBlockInContext(self.context, function, cstr("entry"));
         LLVMPositionBuilderAtEnd(self.builder, bb);
         *self.curfunc.borrow_mut() = function;

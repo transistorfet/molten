@@ -3,14 +3,14 @@ use std::rc::Rc;
 
 use crate::defs::Def;
 use crate::types::Type;
+use crate::misc::UniqueID;
 use crate::scope::ScopeRef;
 use crate::session::{ Session, Error };
-use crate::analysis::hir::{ NodeID };
 
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct TypeAliasDef {
-    pub id: NodeID,
+    pub id: UniqueID,
     pub deftype: Type,
 }
 
@@ -18,19 +18,19 @@ pub type TypeAliasDefRef = Rc<TypeAliasDef>;
 
 
 impl TypeAliasDef {
-    pub fn new(defid: NodeID, deftype: Type) -> Self {
+    pub fn new(defid: UniqueID, deftype: Type) -> Self {
         Self {
             id: defid,
             deftype: deftype,
         }
     }
 
-    pub fn new_ref(defid: NodeID, deftype: Type) -> TypeAliasDefRef {
+    pub fn new_ref(defid: UniqueID, deftype: Type) -> TypeAliasDefRef {
         Rc::new(Self::new(defid, deftype))
     }
 
     #[must_use]
-    pub fn define(session: &Session, scope: ScopeRef, defid: NodeID, deftype: Type, aliastype: Type) -> Result<TypeAliasDefRef, Error> {
+    pub fn define(session: &Session, scope: ScopeRef, defid: UniqueID, deftype: Type, aliastype: Type) -> Result<TypeAliasDefRef, Error> {
         let name = deftype.get_name()?;
         scope.define_type(name, defid)?;
         let typealiasdef = Self::new_ref(defid, deftype);

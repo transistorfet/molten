@@ -3,17 +3,17 @@ use std::rc::Rc;
 use std::cell::RefCell;
 
 use crate::defs::Def;
+use crate::misc::UniqueID;
 use crate::scope::{ Scope, ScopeRef, Context };
 use crate::session::{ Session, Error };
 use crate::types::{ Type, Check, check_type };
-use crate::analysis::hir::{ NodeID };
 use crate::defs::classes::{ Vtable };
 use crate::defs::types::{ TypeAliasDef };
 
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct TraitDef {
-    pub id: NodeID,
+    pub id: UniqueID,
     pub vars: ScopeRef,
     pub deftype: Type,
     pub vtable: Vtable,
@@ -23,7 +23,7 @@ pub struct TraitDef {
 pub type TraitDefRef = Rc<TraitDef>;
 
 impl TraitDef {
-    pub fn new(defid: NodeID, vars: ScopeRef, deftype: Type, vtable: Vtable) -> Self {
+    pub fn new(defid: UniqueID, vars: ScopeRef, deftype: Type, vtable: Vtable) -> Self {
         Self {
             id: defid,
             vars: vars,
@@ -33,19 +33,19 @@ impl TraitDef {
         }
     }
 
-    pub fn new_ref(defid: NodeID, vars: ScopeRef, deftype: Type, vtable: Vtable) -> TraitDefRef {
+    pub fn new_ref(defid: UniqueID, vars: ScopeRef, deftype: Type, vtable: Vtable) -> TraitDefRef {
         Rc::new(Self::new(defid, vars, deftype, vtable))
     }
 
     #[must_use]
-    pub fn define(session: &Session, scope: ScopeRef, defid: NodeID, traitname: &str) -> Result<TraitDefRef, Error> {
+    pub fn define(session: &Session, scope: ScopeRef, defid: UniqueID, traitname: &str) -> Result<TraitDefRef, Error> {
         let tscope = session.map.get(defid).unwrap();
         tscope.define_type("Self", defid)?;
 
         let vars = Scope::new_ref(traitname, Context::TraitDef(defid), None);
 
         let deftype = Type::Universal(traitname.to_string(), defid);
-        let vtable = Vtable::create(session, NodeID::generate(), format!("{}_vtable", traitname))?;
+        let vtable = Vtable::create(session, UniqueID::generate(), format!("{}_vtable", traitname))?;
         let traitdef = Self::new_ref(defid, vars, deftype.clone(), vtable);
         scope.define_type(traitname, defid)?;
         session.set_def(defid, Def::TraitDef(traitdef.clone()));
@@ -71,8 +71,8 @@ impl TraitDef {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct TraitImpl {
-    pub id: NodeID,
-    pub trait_id: NodeID,
+    pub id: UniqueID,
+    pub trait_id: UniqueID,
     pub impltype: Type,
     pub vars: ScopeRef,
     pub vtable: Vtable,
@@ -81,7 +81,7 @@ pub struct TraitImpl {
 pub type TraitImplRef = Rc<TraitImpl>;
 
 impl TraitImpl {
-    pub fn new(id: NodeID, trait_id: NodeID, impltype: Type, vars: ScopeRef, vtable: Vtable) -> Self {
+    pub fn new(id: UniqueID, trait_id: UniqueID, impltype: Type, vars: ScopeRef, vtable: Vtable) -> Self {
 
         Self {
             id: id,
@@ -92,20 +92,20 @@ impl TraitImpl {
         }
     }
 
-    pub fn new_ref(id: NodeID, trait_id: NodeID, impltype: Type, vars: ScopeRef, vtable: Vtable) -> TraitImplRef {
+    pub fn new_ref(id: UniqueID, trait_id: UniqueID, impltype: Type, vars: ScopeRef, vtable: Vtable) -> TraitImplRef {
         Rc::new(Self::new(id, trait_id, impltype, vars, vtable))
     }
 
     #[must_use]
-    pub fn define(session: &Session, scope: ScopeRef, impl_id: NodeID, trait_id: NodeID, impltype: Type) -> Result<TraitImplRef, Error> {
+    pub fn define(session: &Session, scope: ScopeRef, impl_id: UniqueID, trait_id: UniqueID, impltype: Type) -> Result<TraitImplRef, Error> {
         let deftype = session.get_type(trait_id).unwrap();
         let name = format!("{}_{}", deftype.get_name()?, impltype.get_name()?);
         let tscope = session.map.get(impl_id).unwrap();
-        TypeAliasDef::define(session, tscope.clone(), NodeID::generate(), Type::Object("Self".to_string(), impl_id, vec!()), impltype.clone())?;
+        TypeAliasDef::define(session, tscope.clone(), UniqueID::generate(), Type::Object("Self".to_string(), impl_id, vec!()), impltype.clone())?;
 
         let vars = Scope::new_ref("", Context::TraitImpl(trait_id, impl_id), None);
 
-        let vtable = Vtable::create(session, NodeID::generate(), format!("{}_vtable", name.clone()))?;
+        let vtable = Vtable::create(session, UniqueID::generate(), format!("{}_vtable", name.clone()))?;
         let traitimpl = Self::new_ref(impl_id, trait_id, impltype.clone(), vars, vtable);
         scope.define_type(&name, impl_id)?;
         session.set_def(impl_id, Def::TraitImpl(traitimpl.clone()));

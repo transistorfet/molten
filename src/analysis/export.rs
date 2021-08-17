@@ -3,11 +3,12 @@ use std::fs::File;
 use std::io::prelude::*;
 
 use crate::types::Type;
+use crate::misc::UniqueID;
 use crate::config::Options;
 use crate::scope::{ ScopeRef };
 use crate::session::{ Session, Error };
 use crate::analysis::visitor::{ Visitor, ScopeStack };
-use crate::analysis::hir::{ NodeID, Visibility, Mutability, EnumVariant, WhereClause, Function, Expr, ExprKind };
+use crate::analysis::hir::{ Visibility, Mutability, EnumVariant, WhereClause, Function, Expr, ExprKind };
 
 
 pub fn write_exports(session: &Session, scope: ScopeRef, filename: &str, code: &Vec<Expr>) {
@@ -60,7 +61,7 @@ impl<'sess> Visitor for ExportsCollector<'sess> {
         Ok(())
     }
 
-    fn visit_module(&mut self, _refid: NodeID, name: &str, code: &Expr, _memo_id: NodeID) -> Result<Self::Return, Error> {
+    fn visit_module(&mut self, _refid: UniqueID, name: &str, code: &Expr, _memo_id: UniqueID) -> Result<Self::Return, Error> {
         self.declarations.push_str(&format!("module {}\n", name));
         match &code.kind {
             ExprKind::Function(func) => {
@@ -70,25 +71,25 @@ impl<'sess> Visitor for ExportsCollector<'sess> {
         }
     }
 
-    fn visit_import(&mut self, _refid: NodeID, _ident: &str, _decls: &Vec<Expr>) -> Result<Self::Return, Error> {
+    fn visit_import(&mut self, _refid: UniqueID, _ident: &str, _decls: &Vec<Expr>) -> Result<Self::Return, Error> {
         // Don't traverse imports
         Ok(())
     }
 
-    fn visit_declare(&mut self, refid: NodeID, vis: Visibility, name: &str, _ttype: &Type, whereclause: &WhereClause) -> Result<Self::Return, Error> {
+    fn visit_declare(&mut self, refid: UniqueID, vis: Visibility, name: &str, _ttype: &Type, whereclause: &WhereClause) -> Result<Self::Return, Error> {
         let defid = self.session.get_ref(refid)?;
         self.declarations.push_str(&emit_declaration(self.session, defid, vis, name, &whereclause.constraints));
         Ok(())
     }
 
-    fn visit_function(&mut self, refid: NodeID, func: &Function) -> Result<Self::Return, Error> {
+    fn visit_function(&mut self, refid: UniqueID, func: &Function) -> Result<Self::Return, Error> {
         let defid = self.session.get_ref(refid)?;
         self.declarations.push_str(&emit_declaration(self.session, defid, func.vis, &func.name, &func.whereclause.constraints));
         // TODO we would walk the body here to search everything that's publically visable, but currently only top level functions are exported
         Ok(())
     }
 
-    fn visit_class(&mut self, _refid: NodeID, classtype: &Type, parenttype: &Option<Type>, whereclause: &WhereClause, body: &Vec<Expr>) -> Result<Self::Return, Error> {
+    fn visit_class(&mut self, _refid: UniqueID, classtype: &Type, parenttype: &Option<Type>, whereclause: &WhereClause, body: &Vec<Expr>) -> Result<Self::Return, Error> {
         let mut namespec = unparse_type(self.session, classtype);
         if parenttype.is_some() {
             namespec = format!("{} extends {}", namespec, unparse_type(self.session, parenttype.as_ref().unwrap()))
@@ -123,7 +124,7 @@ impl<'sess> Visitor for ExportsCollector<'sess> {
     }
 
 
-    fn visit_methods(&mut self, _refid: NodeID, ttype: &Type, whereclause: &WhereClause, body: &Vec<Expr>) -> Result<Self::Return, Error> {
+    fn visit_methods(&mut self, _refid: UniqueID, ttype: &Type, whereclause: &WhereClause, body: &Vec<Expr>) -> Result<Self::Return, Error> {
         let mut namespec = unparse_type(self.session, ttype);
         if whereclause.constraints.len() > 0 {
             namespec += &emit_where_clause(&whereclause.constraints);
@@ -149,7 +150,7 @@ impl<'sess> Visitor for ExportsCollector<'sess> {
         Ok(())
     }
 
-    fn visit_enum(&mut self, _refid: NodeID, enumtype: &Type, whereclause: &WhereClause, variants: &Vec<EnumVariant>) -> Result<Self::Return, Error> {
+    fn visit_enum(&mut self, _refid: UniqueID, enumtype: &Type, whereclause: &WhereClause, variants: &Vec<EnumVariant>) -> Result<Self::Return, Error> {
         let mut namespec = unparse_type(self.session, &enumtype);
         if whereclause.constraints.len() > 0 {
             namespec += &emit_where_clause(&whereclause.constraints);
@@ -166,7 +167,7 @@ impl<'sess> Visitor for ExportsCollector<'sess> {
         Ok(())
     }
 
-    fn visit_trait_def(&mut self, _refid: NodeID, traitname: &str, body: &Vec<Expr>) -> Result<Self::Return, Error> {
+    fn visit_trait_def(&mut self, _refid: UniqueID, traitname: &str, body: &Vec<Expr>) -> Result<Self::Return, Error> {
         self.declarations.push_str(&format!("trait {} {{\n", traitname));
         for node in body {
             match &node.kind {
@@ -182,7 +183,7 @@ impl<'sess> Visitor for ExportsCollector<'sess> {
         Ok(())
     }
 
-    fn visit_trait_impl(&mut self, _refid: NodeID, traitname: &str, impltype: &Type, whereclause: &WhereClause, body: &Vec<Expr>) -> Result<Self::Return, Error> {
+    fn visit_trait_impl(&mut self, _refid: UniqueID, traitname: &str, impltype: &Type, whereclause: &WhereClause, body: &Vec<Expr>) -> Result<Self::Return, Error> {
         let mut namespec = unparse_type(self.session, &impltype);
         if whereclause.constraints.len() > 0 {
             namespec += &emit_where_clause(&whereclause.constraints);
@@ -204,7 +205,7 @@ impl<'sess> Visitor for ExportsCollector<'sess> {
     }
 }
 
-fn emit_declaration(session: &Session, defid: NodeID, vis: Visibility, name: &str, constraints: &Vec<(String, String)>) -> String {
+fn emit_declaration(session: &Session, defid: UniqueID, vis: Visibility, name: &str, constraints: &Vec<(String, String)>) -> String {
     if vis == Visibility::Public {
         //let name = get_mangled_name(session, &ident.name, *id);
         let ttype = session.get_type(defid).unwrap();
@@ -219,7 +220,7 @@ fn emit_declaration(session: &Session, defid: NodeID, vis: Visibility, name: &st
     }
 }
 
-fn emit_field(session: &Session, defid: NodeID, mutable: Mutability, name: &str) -> String {
+fn emit_field(session: &Session, defid: UniqueID, mutable: Mutability, name: &str) -> String {
     let ttype = session.get_type(defid).unwrap();
     let mutable_str = if let Mutability::Mutable = mutable { "mut " } else { "" };
     format!("val {}{}: {}\n", mutable_str, name, unparse_type(session, &ttype))

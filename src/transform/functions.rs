@@ -5,10 +5,11 @@ use crate::typecheck;
 use crate::abi::ABI;
 use crate::types::Type;
 use crate::defs::Def;
+use crate::misc::UniqueID;
 use crate::scope::ScopeMapRef;
 use crate::parsing::ast::{ Pos };
 use crate::analysis::visitor::{ Visitor };
-use crate::analysis::hir::{ NodeID, Visibility, Mutability, Argument, Function, Expr, ExprKind };
+use crate::analysis::hir::{ Visibility, Mutability, Argument, Function, Expr, ExprKind };
 
 use crate::misc::{ r };
 use crate::transform::transform::{ Transformer, CodeContext };
@@ -24,7 +25,7 @@ impl<'sess> Transformer<'sess> {
         }
     }
 
-    pub fn transform_func_name(&mut self, name: &str, id: NodeID) -> String {
+    pub fn transform_func_name(&mut self, name: &str, id: UniqueID) -> String {
         let scope = self.stack.get_scope();
         let ftype = self.session.get_type(id).unwrap();
         scope.get_full_name(ftype.get_abi().unwrap_or(ABI::Molten).mangle_name(name, ftype.get_argtypes().unwrap()))
@@ -46,7 +47,7 @@ impl<'sess> Transformer<'sess> {
         }
     }
 
-    pub fn transform_func_decl(&mut self, abi: ABI, refid: NodeID, vis: Visibility, name: &str, ttype: &Type) -> Vec<LLExpr> {
+    pub fn transform_func_decl(&mut self, abi: ABI, refid: UniqueID, vis: Visibility, name: &str, ttype: &Type) -> Vec<LLExpr> {
         let defid = self.session.get_ref(refid).unwrap();
         match abi {
             ABI::C => CFuncTransform::transform_decl(self, defid, vis, name, ttype),
@@ -55,7 +56,7 @@ impl<'sess> Transformer<'sess> {
         }
     }
 
-    pub fn transform_func_def(&mut self, refid: NodeID, func: &Function) -> Vec<LLExpr> {
+    pub fn transform_func_def(&mut self, refid: UniqueID, func: &Function) -> Vec<LLExpr> {
         let defid = self.session.get_ref(refid).unwrap();
         match func.abi {
             ABI::C => CFuncTransform::transform_def(self, defid, func.vis, &func.name, &func.args, &func.body),
@@ -64,7 +65,7 @@ impl<'sess> Transformer<'sess> {
         }
     }
 
-    pub fn transform_func_invoke(&mut self, abi: ABI, _id: NodeID, func: &Expr, args: &Vec<Expr>, ftype: &Type, rettype: &Type) -> Vec<LLExpr> {
+    pub fn transform_func_invoke(&mut self, abi: ABI, _id: UniqueID, func: &Expr, args: &Vec<Expr>, ftype: &Type, rettype: &Type) -> Vec<LLExpr> {
         let mut exprs = vec!();
 
         let argtypes = ftype.get_argtypes().unwrap().as_vec();
@@ -105,7 +106,7 @@ impl CFuncTransform {
         LLType::Function(argtypes, r(rettype))
     }
 
-    pub fn transform_decl(transform: &mut Transformer, defid: NodeID, _vis: Visibility, name: &str, _ttype: &Type) -> Vec<LLExpr> {
+    pub fn transform_decl(transform: &mut Transformer, defid: UniqueID, _vis: Visibility, name: &str, _ttype: &Type) -> Vec<LLExpr> {
         let fname = transform.transform_func_name(name, defid);
         let ftype = transform.session.get_type(defid).unwrap();
         let (argtypes, rettype, _) = ftype.get_function_types().unwrap();
@@ -114,11 +115,11 @@ impl CFuncTransform {
         vec!(LLExpr::GetValue(defid))
     }
 
-    pub fn transform_def_args(transform: &mut Transformer, args: &Vec<Argument>) -> Vec<(NodeID, String)> {
+    pub fn transform_def_args(transform: &mut Transformer, args: &Vec<Argument>) -> Vec<(UniqueID, String)> {
         args.iter().map(|arg| (transform.session.get_ref(arg.id).unwrap(), arg.name.clone())).collect()
     }
 
-    pub fn transform_def(transform: &mut Transformer, defid: NodeID, vis: Visibility, name: &str, args: &Vec<Argument>, body: &Vec<Expr>) -> Vec<LLExpr> {
+    pub fn transform_def(transform: &mut Transformer, defid: UniqueID, vis: Visibility, name: &str, args: &Vec<Argument>, body: &Vec<Expr>) -> Vec<LLExpr> {
         let fscope = transform.session.map.get(defid).unwrap();
         let fname = transform.transform_func_name(name, defid);
 
@@ -173,7 +174,7 @@ impl ClosureTransform {
         LLType::Struct(vec!(LLType::Ptr(r(ltype)), LLType::Ptr(r(LLType::I8))))
     }
 
-    pub fn transform_raw_func_data(transform: &mut Transformer, id: NodeID, fname: &str, cfid: NodeID) -> (String, LLType) {
+    pub fn transform_raw_func_data(transform: &mut Transformer, id: UniqueID, fname: &str, cfid: UniqueID) -> (String, LLType) {
         let ftype = transform.session.get_type(id).unwrap();
         let (argtypes, rettype, _) = ftype.get_function_types().unwrap();
         let cftype = ClosureTransform::transform_def_type(transform, &argtypes.as_vec(), rettype);
@@ -182,26 +183,26 @@ impl ClosureTransform {
         (cfname, cftype)
     }
 
-    pub fn transform_decl(transform: &mut Transformer, defid: NodeID, vis: Visibility, name: &str, ttype: &Type) -> Vec<LLExpr> {
+    pub fn transform_decl(transform: &mut Transformer, defid: UniqueID, vis: Visibility, name: &str, ttype: &Type) -> Vec<LLExpr> {
         let fname = transform.transform_func_name(name, defid);
         let ftype = transform.transform_value_type(ttype);
 
         ClosureTransform::make_definition(transform, defid, vis, fname, ftype, None)
     }
 
-    pub fn convert_def_args(context_arg_id: NodeID, exp_id: NodeID, fargs: &mut Vec<(NodeID, String)>) {
+    pub fn convert_def_args(context_arg_id: UniqueID, exp_id: UniqueID, fargs: &mut Vec<(UniqueID, String)>) {
         fargs.push((context_arg_id, String::from("__context__")));
         fargs.push((exp_id, String::from("__exception__")));
     }
 
-    pub fn transform_def(transform: &mut Transformer, defid: NodeID, vis: Visibility, name: &str, args: &Vec<Argument>, body: &Vec<Expr>) -> Vec<LLExpr> {
+    pub fn transform_def(transform: &mut Transformer, defid: UniqueID, vis: Visibility, name: &str, args: &Vec<Argument>, body: &Vec<Expr>) -> Vec<LLExpr> {
         let scope = transform.stack.get_scope();
         let fscope = transform.session.map.get(defid).unwrap();
         let fname = transform.transform_func_name(name, defid);
         let cl = transform.session.get_def(defid).unwrap().as_closure().unwrap();
 
         // Add context argument to transformed arguments list
-        let exp_id = NodeID::generate();
+        let exp_id = UniqueID::generate();
         let mut fargs = CFuncTransform::transform_def_args(transform, args);
         transform.with_scope(fscope.clone(), |_| {
             ClosureTransform::convert_def_args(cl.context_arg_id, exp_id, &mut fargs);
@@ -237,13 +238,13 @@ impl ClosureTransform {
 
         let mut fields = vec!();
         cl.context_struct.foreach_field(|defid, field, _| {
-            let rid = NodeID::generate();
+            let rid = UniqueID::generate();
             transform.session.set_ref(rid, defid);
             fields.push((field.to_string(), Expr::new_with_id(rid, Pos::empty(), ExprKind::Identifier(field.to_string()))));
         });
 
         let mut code = vec!();
-        let did_context = NodeID::generate();
+        let did_context = UniqueID::generate();
         let context_name = format!("{}_context", fname);
         // TODO if you could make this create and set the struct with the fptr and allocated context set before it then populates the context, then
         //      you wouldn't need the special recursive case in transform_reference.  It should be represented as an object, since the closure has a
@@ -257,7 +258,7 @@ impl ClosureTransform {
         let mut exprs = transform.visit_vec(&code).unwrap();
         let did_context_defid = transform.session.get_ref(did_context).unwrap();
 
-        let did = NodeID::generate();
+        let did = UniqueID::generate();
         exprs.push(ClosureTransform::make_closure_value(transform, did, cl.compiled_func_id, LLExpr::GetLocal(did_context_defid)));
 
         let lltype = ClosureTransform::convert_to_value_type(transform.get_type(cl.compiled_func_id).unwrap());
@@ -266,7 +267,7 @@ impl ClosureTransform {
         exprs
     }
 
-    fn make_definition(transform: &mut Transformer, id: NodeID, vis: Visibility, name: String, ltype: LLType, value: Option<LLExpr>) -> Vec<LLExpr> {
+    fn make_definition(transform: &mut Transformer, id: UniqueID, vis: Visibility, name: String, ltype: LLType, value: Option<LLExpr>) -> Vec<LLExpr> {
         let mut exprs = vec!();
 
         if let Some(CodeContext::Import) = transform.get_context() {
@@ -282,7 +283,7 @@ impl ClosureTransform {
         exprs
     }
 
-    pub fn make_closure_value(transform: &mut Transformer, id: NodeID, compiled_func_id: NodeID, context: LLExpr) -> LLExpr {
+    pub fn make_closure_value(transform: &mut Transformer, id: UniqueID, compiled_func_id: UniqueID, context: LLExpr) -> LLExpr {
         let lltype = ClosureTransform::convert_to_value_type(transform.get_type(compiled_func_id).unwrap());
         LLExpr::DefStruct(id, lltype, vec!(
             LLExpr::GetValue(compiled_func_id), LLExpr::Cast(LLType::Ptr(r(LLType::I8)), r(context))
@@ -299,7 +300,7 @@ impl ClosureTransform {
         };
 
         // Evaluate the function expression and save it, so that we don't execute it twice when indexing
-        let fobj_id = NodeID::generate();
+        let fobj_id = UniqueID::generate();
         exprs.push(LLExpr::SetValue(fobj_id, r(func)));
 
         // Add the extra context and exception arguments
@@ -311,7 +312,7 @@ impl ClosureTransform {
         exprs
     }
 
-    pub fn check_convert_closure_reference(transform: &mut Transformer, defid: NodeID, name: &str) -> Option<Vec<LLExpr>> {
+    pub fn check_convert_closure_reference(transform: &mut Transformer, defid: UniqueID, name: &str) -> Option<Vec<LLExpr>> {
         let scope = transform.stack.get_scope();
         if
             !scope.contains_context(name)
@@ -324,9 +325,9 @@ impl ClosureTransform {
                     let cl = transform.session.get_def(cid).unwrap().as_closure().unwrap();
                     if cid == defid {
                         //vec!(LLExpr::Cast(LLType::Alias(cl.context_type_id), r(LLExpr::GetValue(cl.context_arg_id))))
-                        Some(vec!(ClosureTransform::make_closure_value(transform, NodeID::generate(), cl.compiled_func_id, LLExpr::GetValue(cl.context_arg_id))))
+                        Some(vec!(ClosureTransform::make_closure_value(transform, UniqueID::generate(), cl.compiled_func_id, LLExpr::GetValue(cl.context_arg_id))))
                     } else {
-                        let field_id = NodeID::generate();
+                        let field_id = UniqueID::generate();
                         transform.session.set_ref(field_id, defid);
                         let index = cl.find_or_add_field(transform.session, field_id, name, &transform.session.get_type(defid).unwrap());
                         let context = LLExpr::Cast(LLType::Alias(cl.context_type_id), r(LLExpr::GetValue(cl.context_arg_id)));

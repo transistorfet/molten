@@ -6,14 +6,15 @@ use crate::misc::r;
 use crate::abi::ABI;
 use crate::defs::Def;
 use crate::types::Type;
+use crate::misc::UniqueID;
 use crate::scope::{ Scope, ScopeRef, Context };
 use crate::session::{ Session, Error };
-use crate::analysis::hir::{ NodeID, EnumVariant };
+use crate::analysis::hir::{ EnumVariant };
 
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct EnumDef {
-    pub id: NodeID,
+    pub id: UniqueID,
     pub vars: ScopeRef,
     pub deftype: Type,
     pub variants: RefCell<Vec<EnumVariant>>,
@@ -23,7 +24,7 @@ pub type EnumDefRef = Rc<EnumDef>;
 
 
 impl EnumDef {
-    pub fn new(defid: NodeID, vars: ScopeRef, deftype: Type) -> Self {
+    pub fn new(defid: UniqueID, vars: ScopeRef, deftype: Type) -> Self {
         Self {
             id: defid,
             vars: vars,
@@ -32,12 +33,12 @@ impl EnumDef {
         }
     }
 
-    pub fn new_ref(defid: NodeID, vars: ScopeRef, deftype: Type) -> EnumDefRef {
+    pub fn new_ref(defid: UniqueID, vars: ScopeRef, deftype: Type) -> EnumDefRef {
         Rc::new(Self::new(defid, vars, deftype))
     }
 
     #[must_use]
-    pub fn define(session: &Session, scope: ScopeRef, defid: NodeID, deftype: Type) -> Result<EnumDefRef, Error> {
+    pub fn define(session: &Session, scope: ScopeRef, defid: UniqueID, deftype: Type) -> Result<EnumDefRef, Error> {
         let name = deftype.get_name()?;
         let vars = Scope::new_ref(name, Context::Enum(defid), None);
 
@@ -64,11 +65,11 @@ impl EnumDef {
         Ok(())
     }
 
-    pub fn get_variant_by_id(&self, id: NodeID) -> Option<usize> {
+    pub fn get_variant_by_id(&self, id: UniqueID) -> Option<usize> {
         self.variants.borrow().iter().position(|variant| variant.id == id)
     }
 
-    pub fn get_variant_type_by_id(&self, id: NodeID) -> Option<Type> {
+    pub fn get_variant_type_by_id(&self, id: UniqueID) -> Option<Type> {
         let index = self.get_variant_by_id(id)?;
         self.variants.borrow()[index].ttype.clone()
     }

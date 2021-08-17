@@ -5,7 +5,6 @@ use std::collections::HashMap;
 
 use crate::defs::Def;
 use crate::misc::{ R, r, UniqueID };
-use crate::analysis::hir::{ NodeID };
 use crate::session::{ Session, Error };
 
 pub use crate::abi::ABI;
@@ -137,7 +136,7 @@ impl Type {
         }
     }
 
-    pub fn set_id(mut self, newid: NodeID) -> Result<Type, Error> {
+    pub fn set_id(mut self, newid: UniqueID) -> Result<Type, Error> {
         match &mut self {
             Type::Object(_, id, _) => {
                 *id = newid;
@@ -492,7 +491,7 @@ fn check_type_params(session: &Session, dtypes: &Vec<Type>, ctypes: &Vec<Type>, 
     }
 }
 
-fn check_trait_constraints(session: &Session, var_id: NodeID, ctype: &Type) -> bool {
+fn check_trait_constraints(session: &Session, var_id: UniqueID, ctype: &Type) -> bool {
     for trait_id in session.get_constraints(var_id) {
         if !check_trait_is_implemented(session, trait_id, ctype) {
             return false;
@@ -501,7 +500,7 @@ fn check_trait_constraints(session: &Session, var_id: NodeID, ctype: &Type) -> b
     return true;
 }
 
-fn check_trait_is_implemented(session: &Session, trait_id: NodeID, ctype: &Type) -> bool {
+fn check_trait_is_implemented(session: &Session, trait_id: UniqueID, ctype: &Type) -> bool {
     // If the class matching doesn't work, then try checking for trait matching, but this is a bad hack.  We should use universals with constraints instead of Type::Object
     match session.get_def(trait_id).and_then(|def| def.as_trait_def()) {
         Ok(traitdef) => {

@@ -4,10 +4,11 @@ use std::cell::RefCell;
 
 use crate::defs::Def;
 use crate::types::Type;
+use crate::misc::UniqueID;
 use crate::scope::{ Scope, ScopeRef, Context };
 use crate::session::{ Session, Error };
 use crate::types::{ check_type, Check };
-use crate::analysis::hir::{ NodeID, Mutability, Visibility, Expr, ExprKind };
+use crate::analysis::hir::{ Mutability, Visibility, Expr, ExprKind };
 
 use crate::defs::variables::FieldDef;
 
@@ -15,8 +16,8 @@ use crate::defs::variables::FieldDef;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct ClassDef {
-    pub id: NodeID,
-    pub initid: NodeID,
+    pub id: UniqueID,
+    pub initid: UniqueID,
     pub classname: String,
     pub classtype: Type,
     pub parenttype: Option<Type>,
@@ -28,10 +29,10 @@ pub type ClassDefRef = Rc<ClassDef>;
 
 
 impl ClassDef {
-    pub fn new(defid: NodeID, classname: String, classtype: Type, parenttype: Option<Type>, vars: ScopeRef, vtable: Vtable) -> Self {
+    pub fn new(defid: UniqueID, classname: String, classtype: Type, parenttype: Option<Type>, vars: ScopeRef, vtable: Vtable) -> Self {
         Self {
             id: defid,
-            initid: NodeID::generate(),
+            initid: UniqueID::generate(),
             classname: classname,
             classtype: classtype,
             parenttype: parenttype,
@@ -40,12 +41,12 @@ impl ClassDef {
         }
     }
 
-    pub fn new_ref(defid: NodeID, classname: String, classtype: Type, parenttype: Option<Type>, vars: ScopeRef, vtable: Vtable) -> ClassDefRef {
+    pub fn new_ref(defid: UniqueID, classname: String, classtype: Type, parenttype: Option<Type>, vars: ScopeRef, vtable: Vtable) -> ClassDefRef {
         Rc::new(Self::new(defid, classname, classtype, parenttype, vars, vtable))
     }
 
     #[must_use]
-    pub fn define(session: &Session, scope: ScopeRef, defid: NodeID, classtype: Type, parenttype: Option<Type>) -> Result<ClassDefRef, Error> {
+    pub fn define(session: &Session, scope: ScopeRef, defid: UniqueID, classtype: Type, parenttype: Option<Type>) -> Result<ClassDefRef, Error> {
         debug!("DEF CLASS: {:?}", classtype);
         let name = classtype.get_name()?;
         let tscope = session.map.get(defid).unwrap();
@@ -66,7 +67,7 @@ impl ClassDef {
         Ok(classdef)
     }
 
-    pub fn create_class(session: &Session, scope: ScopeRef, defid: NodeID, classtype: Type, parenttype: Option<Type>) -> Result<ClassDefRef, Error> {
+    pub fn create_class(session: &Session, scope: ScopeRef, defid: UniqueID, classtype: Type, parenttype: Option<Type>) -> Result<ClassDefRef, Error> {
         let name = classtype.get_name()?;
 
         // Find the parent class definitions, which the new class will inherit from
@@ -79,7 +80,7 @@ impl ClassDef {
         let vars = Scope::new_ref(name, Context::Class(defid), parentclass.map(|p| p.structdef.vars.clone()));
 
         session.set_type(defid, classtype.clone());
-        let vtable = Vtable::create(session, NodeID::generate(), format!("{}_vtable", name))?;
+        let vtable = Vtable::create(session, UniqueID::generate(), format!("{}_vtable", name))?;
         let classdef = ClassDef::new_ref(defid, name.to_string(), classtype, parenttype, vars, vtable);
         Ok(classdef)
     }
@@ -149,15 +150,15 @@ pub enum Define {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct StructDef {
-    pub id: NodeID,
+    pub id: UniqueID,
     pub vars: ScopeRef,
-    pub fields: RefCell<Vec<(NodeID, String, Type)>>,
+    pub fields: RefCell<Vec<(UniqueID, String, Type)>>,
 }
 
 pub type StructDefRef = Rc<StructDef>;
 
 impl StructDef {
-    pub fn new(id: NodeID, vars: ScopeRef) -> Self {
+    pub fn new(id: UniqueID, vars: ScopeRef) -> Self {
         Self {
             id: id,
             vars: vars,
@@ -165,7 +166,7 @@ impl StructDef {
         }
     }
 
-    pub fn new_ref(id: NodeID, vars: ScopeRef) -> StructDefRef {
+    pub fn new_ref(id: UniqueID, vars: ScopeRef) -> StructDefRef {
         Rc::new(Self::new(id, vars))
     }
 
@@ -173,7 +174,7 @@ impl StructDef {
         *self.fields.borrow_mut() = inherit.fields.borrow().clone();
     }
 
-    pub fn add_field(&self, session: &Session, id: NodeID, mutable: Mutability, name: &str, ttype: Type, define: Define) {
+    pub fn add_field(&self, session: &Session, id: UniqueID, mutable: Mutability, name: &str, ttype: Type, define: Define) {
         if define == Define::IfNotExists && self.vars.get_var_def(name).is_none() {
             FieldDef::define(session, self.vars.clone(), id, mutable, name, Some(ttype.clone())).unwrap();
         }
@@ -184,16 +185,16 @@ impl StructDef {
         self.fields.borrow().iter().position(|r| r.1 == field)
     }
 
-    pub fn find_field_by_id(&self, id: NodeID) -> Option<(usize, Type)> {
+    pub fn find_field_by_id(&self, id: UniqueID) -> Option<(usize, Type)> {
         let index = self.get_index_by_id(id)?;
         Some((index, self.fields.borrow()[index].2.clone()))
     }
 
-    pub fn get_index_by_id(&self, id: NodeID) -> Option<usize> {
+    pub fn get_index_by_id(&self, id: UniqueID) -> Option<usize> {
         self.fields.borrow().iter().position(|r| r.0 == id)
     }
 
-    pub fn foreach_field<F>(&self, mut f: F) where F: FnMut(NodeID, &str, &Type) -> () {
+    pub fn foreach_field<F>(&self, mut f: F) where F: FnMut(UniqueID, &str, &Type) -> () {
         for field in self.fields.borrow().iter() {
             f(field.0, &field.1, &field.2);
         }
@@ -205,19 +206,19 @@ impl StructDef {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Vtable {
-    pub id: NodeID,
-    pub table: RefCell<Vec<(NodeID, String, Type)>>,
+    pub id: UniqueID,
+    pub table: RefCell<Vec<(UniqueID, String, Type)>>,
 }
 
 impl Vtable {
-    pub fn new(id: NodeID) -> Self {
+    pub fn new(id: UniqueID) -> Self {
         Vtable {
             id: id,
             table: RefCell::new(vec!()),
         }
     }
 
-    pub fn create(session: &Session, id: NodeID, name: String) -> Result<Vtable, Error> {
+    pub fn create(session: &Session, id: UniqueID, name: String) -> Result<Vtable, Error> {
         let vtable = Vtable::new(id);
         session.set_type(id, Type::Object(name, id, vec!()));
         Ok(vtable)
@@ -251,7 +252,7 @@ impl Vtable {
         }
     }
 
-    pub fn add_entry(&self, session: &Session, id: NodeID, name: &str, ftype: Type) {
+    pub fn add_entry(&self, session: &Session, id: UniqueID, name: &str, ftype: Type) {
         debug!("ADDING VTABLE ENTRY: {} {:?} {:?}", id, name, ftype);
         if let Some(index) = self.get_index(session, name, &ftype) {
             self.table.borrow_mut()[index].0 = id;
@@ -266,7 +267,7 @@ impl Vtable {
         })
     }
 
-    pub fn get_index_by_id(&self, id: NodeID) -> Option<usize> {
+    pub fn get_index_by_id(&self, id: UniqueID) -> Option<usize> {
         self.table.borrow().iter().position(|r| r.0 == id)
     }
 
@@ -274,13 +275,13 @@ impl Vtable {
         self.table.borrow().len()
     }
 
-    pub fn foreach_entry<F>(&self, mut f: F) where F: FnMut(NodeID, &str, &Type) -> () {
+    pub fn foreach_entry<F>(&self, mut f: F) where F: FnMut(UniqueID, &str, &Type) -> () {
         for entry in self.table.borrow().iter() {
             f(entry.0, &entry.1, &entry.2);
         }
     }
 
-    pub fn foreach_enumerated<F>(&self, mut f: F) where F: FnMut(usize, NodeID, &str, &Type) -> () {
+    pub fn foreach_enumerated<F>(&self, mut f: F) where F: FnMut(usize, UniqueID, &str, &Type) -> () {
         for (i, entry) in self.table.borrow().iter().enumerate() {
             f(i, entry.0, &entry.1, &entry.2);
         }

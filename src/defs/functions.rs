@@ -4,10 +4,11 @@ use std::cell::RefCell;
 
 use crate::abi::ABI;
 use crate::defs::Def;
+use crate::misc::UniqueID;
 use crate::scope::{ Scope, ScopeRef, Context };
 use crate::session::{ Session, Error };
 use crate::types::{ Type, Check, check_type };
-use crate::analysis::hir::{ NodeID, Mutability, Visibility };
+use crate::analysis::hir::{ Mutability, Visibility };
 
 use crate::defs::classes::{ Define, StructDef, StructDefRef };
 
@@ -16,7 +17,7 @@ pub struct AnyFunc();
 
 impl AnyFunc {
     #[must_use]
-    pub fn define(session: &Session, scope: ScopeRef, defid: NodeID, vis: Visibility, name: &str, abi: ABI, ttype: Option<Type>) -> Result<Def, Error> {
+    pub fn define(session: &Session, scope: ScopeRef, defid: UniqueID, vis: Visibility, name: &str, abi: ABI, ttype: Option<Type>) -> Result<Def, Error> {
         match abi {
             ABI::C => {
                 match scope.get_context() {
@@ -41,7 +42,7 @@ impl AnyFunc {
     }
 
     #[must_use]
-    pub fn set_func_def(session: &Session, scope: ScopeRef, defid: NodeID, vis: Visibility, name: &str, def: Def, ttype: Option<Type>) -> Result<(), Error> {
+    pub fn set_func_def(session: &Session, scope: ScopeRef, defid: UniqueID, vis: Visibility, name: &str, def: Def, ttype: Option<Type>) -> Result<(), Error> {
         session.set_def(defid, def.clone());
 
         if let Some(ttype) = &ttype {
@@ -63,16 +64,16 @@ impl AnyFunc {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct OverloadDef {
-    pub id: NodeID,
-    pub parent: Option<NodeID>,
-    pub variants: RefCell<Vec<NodeID>>
+    pub id: UniqueID,
+    pub parent: Option<UniqueID>,
+    pub variants: RefCell<Vec<UniqueID>>
 }
 
 pub type OverloadDefRef = Rc<OverloadDef>;
 
 impl OverloadDef {
-    pub fn create(session: &Session, parent: Option<NodeID>, variants: Vec<NodeID>) -> NodeID {
-        let defid = NodeID::generate();
+    pub fn create(session: &Session, parent: Option<UniqueID>, variants: Vec<UniqueID>) -> UniqueID {
+        let defid = UniqueID::generate();
         let def = Rc::new(OverloadDef {
             id: defid,
             parent: parent,
@@ -86,7 +87,7 @@ impl OverloadDef {
     }
 
     #[must_use]
-    pub fn define(session: &Session, scope: ScopeRef, name: &str, variant_id: NodeID, previd: NodeID, _ttype: Option<Type>) -> Result<(), Error> {
+    pub fn define(session: &Session, scope: ScopeRef, name: &str, variant_id: UniqueID, previd: UniqueID, _ttype: Option<Type>) -> Result<(), Error> {
         let dscope = Scope::target(session, scope.clone());
 
         if dscope.contains_local(&name) {
@@ -109,19 +110,19 @@ impl OverloadDef {
         Ok(())
     }
 
-    pub fn add_variant(&self, session: &Session, id: NodeID) {
+    pub fn add_variant(&self, session: &Session, id: UniqueID) {
         session.set_ref(id, self.id);
         self.variants.borrow_mut().push(id);
     }
 
-    pub fn get_variants(&self, session: &Session) -> Vec<NodeID> {
+    pub fn get_variants(&self, session: &Session) -> Vec<UniqueID> {
         let mut variants = self.variants.borrow().clone();
         let prev = self.get_parent_variants(session);
         variants.extend(prev.iter());
         variants
     }
 
-    pub fn get_parent_variants(&self, session: &Session) -> Vec<NodeID> {
+    pub fn get_parent_variants(&self, session: &Session) -> Vec<UniqueID> {
         match self.parent {
             Some(id) => match session.get_def(id) {
                 Ok(Def::Overload(ol)) => ol.get_variants(session),
@@ -131,7 +132,7 @@ impl OverloadDef {
         }
     }
 
-    pub fn find_variant(&self, session: &Session, atypes: &Type) -> Result<(NodeID, Type), Error> {
+    pub fn find_variant(&self, session: &Session, atypes: &Type) -> Result<(UniqueID, Type), Error> {
         let (mut found, variant_types) = self.find_all_variants(session, atypes);
 
         match found.len() {
@@ -141,17 +142,17 @@ impl OverloadDef {
         }
     }
 
-    pub fn find_all_variants(&self, session: &Session, atypes: &Type) -> (Vec<(NodeID, Type)>, Vec<Type>) {
+    pub fn find_all_variants(&self, session: &Session, atypes: &Type) -> (Vec<(UniqueID, Type)>, Vec<Type>) {
         let variants = self.get_variants(session);
         self.find_variants_of(variants, session, atypes)
     }
 
-    pub fn find_local_variants(&self, session: &Session, atypes: &Type) -> (Vec<(NodeID, Type)>, Vec<Type>) {
+    pub fn find_local_variants(&self, session: &Session, atypes: &Type) -> (Vec<(UniqueID, Type)>, Vec<Type>) {
         let variants = self.variants.borrow().clone();
         self.find_variants_of(variants, session, atypes)
     }
 
-    pub fn find_variants_of(&self, variants: Vec<NodeID>, session: &Session, atypes: &Type) -> (Vec<(NodeID, Type)>, Vec<Type>) {
+    pub fn find_variants_of(&self, variants: Vec<UniqueID>, session: &Session, atypes: &Type) -> (Vec<(UniqueID, Type)>, Vec<Type>) {
         let mut found = vec!();
         let mut variant_types = vec!();
         for id in variants {
@@ -183,29 +184,29 @@ impl OverloadDef {
 #[derive(Clone, Debug, PartialEq)]
 pub struct ClosureDef {
     pub vis: Visibility,
-    pub compiled_func_id: NodeID,
-    pub context_arg_id: NodeID,
-    pub context_type_id: NodeID,
+    pub compiled_func_id: UniqueID,
+    pub context_arg_id: UniqueID,
+    pub context_type_id: UniqueID,
     pub context_struct: StructDefRef,
-    pub context_init_id: NodeID,
+    pub context_init_id: UniqueID,
     //pub context_builder: RefCell<Vec<Expr>>,
 }
 
 pub type ClosureDefRef = Rc<ClosureDef>;
 
 impl ClosureDef {
-    pub fn create(session: &Session, defid: NodeID, vis: Visibility) -> Result<Def, Error> {
-        let context_type_id = NodeID::generate();
+    pub fn create(session: &Session, defid: UniqueID, vis: Visibility) -> Result<Def, Error> {
+        let context_type_id = UniqueID::generate();
         // TODO the context and name are incorrect here
         let structdef = StructDef::new_ref(context_type_id, Scope::new_ref("", Context::Block, None));
 
         let def = Def::Closure(Rc::new(ClosureDef {
             vis,
-            compiled_func_id: NodeID::generate(),
-            context_arg_id: NodeID::generate(),
+            compiled_func_id: UniqueID::generate(),
+            context_arg_id: UniqueID::generate(),
             context_type_id,
             context_struct: structdef.clone(),
-            context_init_id: NodeID::generate(),
+            context_init_id: UniqueID::generate(),
             //context_builder: RefCell::new(vec![]),
         }));
 
@@ -218,17 +219,17 @@ impl ClosureDef {
     }
 
     #[must_use]
-    pub fn define(session: &Session, scope: ScopeRef, defid: NodeID, vis: Visibility, name: &str, ttype: Option<Type>) -> Result<Def, Error> {
+    pub fn define(session: &Session, scope: ScopeRef, defid: UniqueID, vis: Visibility, name: &str, ttype: Option<Type>) -> Result<Def, Error> {
         let def = ClosureDef::create(session, defid, vis)?;
         AnyFunc::set_func_def(session, scope, defid, vis, name, def.clone(), ttype)?;
         Ok(def)
     }
 
-    pub fn add_field(&self, session: &Session, id: NodeID, name: &str, ttype: Type, define: Define) {
+    pub fn add_field(&self, session: &Session, id: UniqueID, name: &str, ttype: Type, define: Define) {
         self.context_struct.add_field(session, id, Mutability::Mutable, name, ttype, define);
     }
 
-    pub fn find_or_add_field(&self, session: &Session, id: NodeID, name: &str, ttype: &Type) -> usize {
+    pub fn find_or_add_field(&self, session: &Session, id: UniqueID, name: &str, ttype: &Type) -> usize {
         // TODO you should probably modify this to use the IDs
         match self.context_struct.find_field_by_id(id) {
             Some((index, _)) => index,
@@ -244,14 +245,14 @@ impl ClosureDef {
 #[derive(Clone, Debug, PartialEq)]
 pub struct MethodDef {
     pub closure: ClosureDefRef,
-    pub id: NodeID,
+    pub id: UniqueID,
 }
 
 pub type MethodDefRef = Rc<MethodDef>;
 
 impl MethodDef {
     #[must_use]
-    pub fn define(session: &Session, scope: ScopeRef, defid: NodeID, vis: Visibility, name: &str, ttype: Option<Type>) -> Result<Def, Error> {
+    pub fn define(session: &Session, scope: ScopeRef, defid: UniqueID, vis: Visibility, name: &str, ttype: Option<Type>) -> Result<Def, Error> {
         let closure = match ClosureDef::create(session, defid, vis) {
             Ok(Def::Closure(cl)) => cl,
             result @ _ => return result,
@@ -271,17 +272,17 @@ impl MethodDef {
 #[derive(Clone, Debug, PartialEq)]
 pub struct TraitFuncDef {
     pub closure: ClosureDefRef,
-    pub trait_id: NodeID,
-    pub impl_id: NodeID,
-    pub impl_func_id: NodeID,
-    pub def_func_id: RefCell<Option<NodeID>>,
+    pub trait_id: UniqueID,
+    pub impl_id: UniqueID,
+    pub impl_func_id: UniqueID,
+    pub def_func_id: RefCell<Option<UniqueID>>,
 }
 
 pub type TraitFuncDefRef = Rc<TraitFuncDef>;
 
 impl TraitFuncDef {
     #[must_use]
-    pub fn define(session: &Session, scope: ScopeRef, impl_func_id: NodeID, vis: Visibility, name: &str, ttype: Option<Type>) -> Result<Def, Error> {
+    pub fn define(session: &Session, scope: ScopeRef, impl_func_id: UniqueID, vis: Visibility, name: &str, ttype: Option<Type>) -> Result<Def, Error> {
         let closure = match ClosureDef::create(session, impl_func_id, vis) {
             Ok(Def::Closure(cl)) => cl,
             result => return result,
@@ -304,7 +305,7 @@ impl TraitFuncDef {
         Ok(def)
     }
 
-    pub fn set_def_func_id(&self, id: NodeID) {
+    pub fn set_def_func_id(&self, id: UniqueID) {
         *self.def_func_id.borrow_mut() = Some(id);
     }
 }
@@ -312,7 +313,7 @@ impl TraitFuncDef {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct CFuncDef {
-    pub id: NodeID,
+    pub id: UniqueID,
     pub vis: Visibility,
     //pub ftype: Type,
 }
@@ -321,7 +322,7 @@ pub type CFuncDefRef = Rc<CFuncDef>;
 
 impl CFuncDef {
     #[must_use]
-    pub fn define(session: &Session, scope: ScopeRef, defid: NodeID, vis: Visibility, name: &str, ttype: Option<Type>) -> Result<Def, Error> {
+    pub fn define(session: &Session, scope: ScopeRef, defid: UniqueID, vis: Visibility, name: &str, ttype: Option<Type>) -> Result<Def, Error> {
         if vis == Visibility::Anonymous {
             return Err(Error::new(format!("NameError: C ABI function declared without a name")));
         }

@@ -2,10 +2,11 @@
 use std::collections::HashMap;
 
 use crate::defs::Def;
+use crate::misc::UniqueID;
 use crate::types::{ Type, Check, check_type };
 use crate::session::{ Session, Error };
 use crate::scope::{ ScopeRef };
-use crate::analysis::hir::{ NodeID, Function, WhereClause, Expr, ExprKind };
+use crate::analysis::hir::{ Function, WhereClause, Expr, ExprKind };
 use crate::analysis::visitor::{ self, Visitor, ScopeStack };
 
 
@@ -64,7 +65,7 @@ impl<'sess> Visitor for Validator<'sess> {
         visitor::walk_vec(self, code)
     }
 
-    fn visit_function(&mut self, refid: NodeID, func: &Function) -> Result<Self::Return, Error> {
+    fn visit_function(&mut self, refid: UniqueID, func: &Function) -> Result<Self::Return, Error> {
         visitor::walk_function(self, refid, func)?;
 
         // Check that each overloaded variant of a function have distinct types from each other
@@ -80,7 +81,7 @@ impl<'sess> Visitor for Validator<'sess> {
         Ok(())
     }
 
-    fn visit_class(&mut self, refid: NodeID, _classtype: &Type, _parenttype: &Option<Type>, _whereclause: &WhereClause, body: &Vec<Expr>) -> Result<Self::Return, Error> {
+    fn visit_class(&mut self, refid: UniqueID, _classtype: &Type, _parenttype: &Option<Type>, _whereclause: &WhereClause, body: &Vec<Expr>) -> Result<Self::Return, Error> {
         let classdef = self.session.get_def_from_ref(refid)?.as_class()?;
 
         visitor::walk_class(self, refid, body)?;
@@ -143,7 +144,7 @@ impl<'sess> Visitor for Validator<'sess> {
         Ok(())
     }
 
-    fn visit_trait_impl(&mut self, refid: NodeID, _traitname: &str, _impltype: &Type, _whereclause: &WhereClause, body: &Vec<Expr>) -> Result<Self::Return, Error> {
+    fn visit_trait_impl(&mut self, refid: UniqueID, _traitname: &str, _impltype: &Type, _whereclause: &WhereClause, body: &Vec<Expr>) -> Result<Self::Return, Error> {
         let impl_id = self.session.get_ref(refid)?;
 
         visitor::walk_trait_impl(self, refid, body)?;
@@ -179,7 +180,7 @@ impl<'sess> Visitor for Validator<'sess> {
         Ok(())
     }
 
-    fn visit_import(&mut self, _id: NodeID, _ident: &str, _decls: &Vec<Expr>) -> Result<Self::Return, Error> {
+    fn visit_import(&mut self, _id: UniqueID, _ident: &str, _decls: &Vec<Expr>) -> Result<Self::Return, Error> {
         // Skip checking imports
         Ok(())
     }

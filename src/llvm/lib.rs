@@ -13,7 +13,7 @@ use crate::types::Type;
 use crate::session::Session;
 use crate::scope::{ Scope, ScopeRef, ScopeMapRef, Context };
 use crate::parsing::parser::{ parse_type };
-use crate::analysis::hir::{ NodeID, Mutability, Visibility };
+use crate::analysis::hir::{ Mutability, Visibility };
 use crate::analysis::binding::{ bind_type_names };
 use crate::config::Options;
 use crate::misc::{ r, UniqueID };
@@ -41,8 +41,8 @@ pub enum FuncKind {
 
 #[derive(Clone)]
 pub enum BuiltinDef<'sess> {
-    Func(NodeID, &'sess str, &'sess str, FuncKind),
-    Class(NodeID, &'sess str, Vec<Type>, Vec<(String, Type)>, Vec<BuiltinDef<'sess>>),
+    Func(UniqueID, &'sess str, &'sess str, FuncKind),
+    Class(UniqueID, &'sess str, Vec<Type>, Vec<(String, Type)>, Vec<BuiltinDef<'sess>>),
 }
 
 
@@ -116,7 +116,7 @@ pub unsafe fn define_builtins_node<'sess>(llvm: &LLVM<'sess>, transformer: &mut 
                 },
                 FuncKind::Function(func) => {
                     if abi == ABI::Molten {
-                        let func_id = NodeID::generate();
+                        let func_id = UniqueID::generate();
                         let function = build_lib_function(llvm, &format!("{}_func", name), &ltype, func);
                         llvm.set_value(func_id, function);
 
@@ -139,7 +139,7 @@ pub unsafe fn define_builtins_node<'sess>(llvm: &LLVM<'sess>, transformer: &mut 
 
             let lltype = if !structdef.is_empty() {
                 for (field, ttype) in structdef {
-                    classdef.structdef.add_field(llvm.session, NodeID::generate(), Mutability::Mutable, field, ttype.clone(), Define::IfNotExists);
+                    classdef.structdef.add_field(llvm.session, UniqueID::generate(), Mutability::Mutable, field, ttype.clone(), Define::IfNotExists);
                 }
                 //build_class_type(llvm, scope.clone(), *id, &cname, classdef.clone())
 
@@ -269,8 +269,8 @@ unsafe fn build_lib_method(llvm: &LLVM, name: &str, objtype: LLVMTypeRef, ltype:
 }
 
 
-fn id() -> NodeID {
-    NodeID::generate()
+fn id() -> UniqueID {
+    UniqueID::generate()
 }
 
 pub fn get_builtins<'sess>() -> Vec<BuiltinDef<'sess>> {
