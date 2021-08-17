@@ -13,7 +13,8 @@ a high level language with a full object system that facilitates both functional
 and object-oriented programming.  Some syntax elements have been changed from
 typical ML languages to follow conventions found in more common languages, such
 as C++, Rust, and Python (eg. parenthesis-delimited blocks, conventional class
-definitions, generics/type parameters with angle brackets, etc)
+definitions, generics/type parameters with angle brackets, etc).  For more info
+on the internals, see [An Overview Of Molten Internals](https://transistorfet.github.io/articles/molten_overview.html)
 
 
 Installing
@@ -75,7 +76,7 @@ Int
 Real
 String
 (Int, Int) -> Int   // function type
-'a                  // type variable
+'a                  // universal type variable
 Array<Int>          // array of integers
 (Int, Real)         // tuple type
 { a: Int, b: Real } // record type
