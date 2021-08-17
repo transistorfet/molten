@@ -5,7 +5,7 @@ use crate::abi::ABI;
 use crate::types::Type;
 use crate::misc::{ r, UniqueID };
 use crate::session::{ Session, Error };
-use crate::defs::modules::{ ModuleDef };
+use crate::defs::modules::ModuleDef;
 use crate::parsing::ast::{ Pos, ASTPattern, AST };
 use crate::analysis::hir::{ NodeID, Visibility, Mutability, AssignType, Literal, Argument, MatchCase, EnumVariant, Function, WhereClause, Pattern, Expr, ExprKind };
 
@@ -26,7 +26,7 @@ pub struct Refinery<'sess> {
 impl<'sess> Refinery<'sess> {
     pub fn refine(session: &'sess Session, code: Vec<AST>) -> Vec<Expr> {
         let refinery = Refinery {
-            session: session,
+            session,
             context: RefCell::new(vec!()),
         };
 
@@ -104,13 +104,10 @@ impl<'sess> Refinery<'sess> {
                 Expr::make_decl(pos, vis, ident, ttype, whereclause)
             },
 
-            AST::Function(pos, _vis, name, args, ret, body, abi, whereclause) => {
-                // TODO visibility is forced here so I don't have to add 'pub' keywords yet
-                let vis = if self.top_level() {
-                    Visibility::Public
-                } else {
-                    Visibility::Private
-                };
+            AST::Function(pos, vis, name, args, ret, body, abi, whereclause) => {
+                if vis == Visibility::Public && !self.top_level() {
+                    return Err(Error::new("SyntaxError: only a top level function can be public".to_string()));
+                }
 
                 let args = args.into_iter().map(|arg| Argument::new(arg.pos, arg.name, arg.ttype)).collect();
 

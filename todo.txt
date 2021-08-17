@@ -1,10 +1,6 @@
 
-* reorganize stage-specific files in src/ into parser/analysis directories
-
 * you can't import files that contain a dash in the filename
 * using a decl for a function defined in later, in the same module, causes an overload error rather than linking the definition and declaration
-* remove the forced visibility in refinery, when you decide on pub/priv semantics, and change the export code to traverse recursively (issue with scope names)
-  perhaps only ever allowing top level things to be exported is a sufficient compromise
 
 * I don't like how I have to explicitly set the type params when they should be inferrable
 * the try block's pattern matching is not useful because subtyping wont let us match different parents, only inheritence chains, so we really need an exception enum to be

@@ -8,7 +8,7 @@ extern crate nom;
 #[macro_use(position)]
 extern crate nom_locate;
 
-use regex::{ Regex };
+use regex::Regex;
 use clap::{ App, Arg, ArgMatches };
 
 #[macro_use]

@@ -7,11 +7,11 @@
 //!dec }
 
 class Test {
-    fn test(self, x) {
+    pub fn test(self, x) {
         self.test2(x)
     }
 
-    fn test2(self, x) {
+    pub fn test2(self, x) {
         x + 4
     }
 }
