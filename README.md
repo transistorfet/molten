@@ -22,8 +22,8 @@ Installing
 You will need `rustc` and `cargo` installed.  It's recommended that you use
 `rustup` to install these.  I've most recently tested it with rustc version 1.52.
 You will also need LLVM 11 installed, as well as libgc (Boehm-Demers-Weiser's
-Garbage Collector), and clang, although clang can be replace with gcc by editing
-the `molten` python script.
+Garbage Collector), and clang to linking, although clang can be replace with gcc
+by editing the `molten` python script.
 
 On Debian/Ubuntu, run:
 `sudo apt-get install llvm-11 llvm-11-runtime llvm-11-dev clang libgc-dev`
@@ -107,29 +107,6 @@ simpler and more predictable.
 foo(1, 2)
 ```
 
-### Classes
-```
-class Foo {
-    val mut name: String
-
-    fn new(self, name) {
-        self.name = name
-    }
-
-    fn get(self) => self.name
-
-    fn static(x) => x * 2
-}
-
-class Bar extends Foo {
-    fn get(self, title) => self.name + " " + title
-}
-
-let bar = new Bar("Mischief")
-bar.get("The Cat")              // returns "Mischief The Cat"
-Foo::static(5)
-```
-
 ### Blocks
 A block is a collection of expressions which return the result of the last
 expression in the block.  They can be used in place of a single expression.
@@ -148,20 +125,24 @@ let is_zero = if self.x <= 0 then {
 ```
 
 ### Flow Control
-The return value of an if statement is the result of the expression of the
-clause that is evaluated.  The types of both clauses must match.  The `else`
-clause can be left out as long as the true clause evaluates to Nil.
+The return value of an if expression is the result of evaluating either the
+`then` clause or `else` clause.  The types of both clauses must match.  The
+`else` clause can be left out as long as the true clause evaluates to Nil.
 ```
 if x == 5 then
     "It's five"
 else
     "It's not five"
+```
 
-match x {
-    1 => "It's one"
-    5 => "It's five"
-    _ => "It's not one or five"
-}
+A match expression allows pattern matching, which can unpack refs, tuples,
+records, and enums.  It can bind values to named variables in the pattern
+and creates a new scope for each arm of the match expression.
+```
+match x with
+| 1 => "It's one"
+| 5 => "It's five"
+| int => "It's not one or five, it's " + str(int)
 ```
 
 ### And / Or
@@ -181,26 +162,6 @@ to continue the line.
    % 5          // equals 3
 ```
 
-### Loops
-```
-while is_true
-    println("looping")
-
-for i in iter([ 1, 2, 3 ])
-    println("counting " + i)
-```
-
-### Arrays
-```
-let array1 = [ 1, 3, 6 ]
-for x in array1
-    println(str(x))
-
-let array2 = new Array<String>();
-array2.insert(0, "Hello")
-println(array2[0])
-```
-
 ### Tuples
 ```
 let tup = (1, "String", 4.5)
@@ -218,6 +179,32 @@ println(rec.s)
 let rec: { i: Int, s: String, r: Real }
 ```
 
+### Arrays
+```
+let array1 = [ 1, 3, 6 ]
+for x in array1
+    println(str(x))
+
+let array2 = new Array<String>();
+array2.insert(0, "Hello")
+println(array2[0])
+```
+The Array type is defined in libcore, which must be imported if arrays are used.
+
+### Loops
+```
+while is_true
+    println("looping")
+
+for i in iter([ 1, 2, 3 ])
+    println("counting " + i)
+```
+For loops take an instance of `Iterator<'item>` and calls the `.next()` method
+on it, running the body for each `Option::Some('item)` returned.  The `iter`
+function is defined for different types to convert them into an appropriate
+iterator.  In the case of arrays, it will return the result of
+`new ArrayInterator<'item>(input_array)`
+
 ### Refs
 A ref is an indirect reference to some data.  It can be passed around as a
 value, and dereferenced to get or set the data inside of it.  The internal value
@@ -234,24 +221,63 @@ let r = ref { a = 42, b = "The Answer" }
 println(*r.b)                   // prints "The Answer"
 ```
 
+### Classes
+```
+class Foo {
+    // A field with type String
+    val mut name: String
+
+    fn new(self, name) {
+        self.name = name
+    }
+
+    fn get(self) => self.name
+
+    fn static(x) => x * 2
+}
+
+class Bar extends Foo {
+    fn get(self, title) => self.name + " " + title
+}
+
+let bar = new Bar("Mischief")
+bar.get("The Cat")              // returns "Mischief The Cat"
+Foo::static(5)
+```
+All methods are both closures, and virtual methods, so they can access
+variables in their parents' scopes and also be overridden by a child class's
+implementation of the same method, accessible with a reference to the parent
+class type.
+
+Fields can have an optional type, but not an initializer.  If a class has at
+least one field, it must have at least one "new" constructor, which must assign
+to each field an initial value.  The type can be inferred from this assignment
+if the optional type is not supplied.  If a field is declared as mutable, it
+can be reassigned to, but if the `mut` keyword is absent, the field can only be
+assigned to within the constructor, and will be immutable after the constructor
+has returned.  Every constructor must also call the `Super::new` method of its
+parent class, if it has a parent that has a constructor.
+
 ### Enums (Tagged Unions)
 An enum can either have no arguments, or a tuple of arguments.  Constructing an
 enum variant requires using the Resolve (::) notation.  Pattern matching is
-currently the only way to get values out of a variant.  The current implementation
-needs work and does not currently support nested variant types
+currently the only way to get values out of a variant.  Unlike with classes,
+which allocate memory for a new instance, enums are immediate data types like
+tuples and records.  In order to store it in a memory location, a `ref` must
+be used.  A ref is required in order to make a recursive enum.
 ```
 enum Value =
 | None
 | Integer(Int)
 | String(String)
 | Pair(String, String)
+| Reference(ref Value)          // A recursive reference
 
 let val = Value::String("Hey")
 
-match val {
-    Value::String(s) => println(s)
-    _ => ()
-}
+match val with
+| Value::String(s) => println(s)
+| _ => ()
 ```
 
 Methods can be added to enums using a `methods` body.  Currently it can only be
@@ -260,10 +286,9 @@ used with enums.
 ```
 methods Value {
     fn is_some(val: Value) {
-        match val {
-            None => false
-            _ => true
-        }
+        match val with
+        | Value::None => false
+        | _ => true
     }
 }
 
@@ -320,18 +345,16 @@ The above example will output:
 ```
 
 ### Exceptions
-Exceptions aren't quite settled yet.
+All exceptions must be an instance of the `Exception` class defined in libcore.
 ```
-try open("file.txt") {
-    e => println("Exception Occurred: " + e)
-}
+try open("file.txt")
+with e => println("Exception Occurred: " + e.msg)
 
 try {
     //...
     raise "Problem"
-} catch {
+} with
     e => println(e)
-}
 ```
 
 ### Annotations

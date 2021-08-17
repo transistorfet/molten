@@ -19,17 +19,15 @@ enum Option<'item> =
 
 methods Option<'item> {
     pub fn unwrap(self) -> 'item {
-        match self {
-            Option::None => raise new Exception("Panic: unwrap on none")
-            Option::Some(item) => item
-        }
+        match self with
+        | Option::None => raise new Exception("Panic: unwrap on none")
+        | Option::Some(item) => item
     }
 
     pub fn unwrap_or(self, item: 'item) -> 'item {
-        match self {
-            Option::None => item
-            Option::Some(item) => item
-        }
+        match self with
+        | Option::None => item
+        | Option::Some(item) => item
     }
 }
 

@@ -34,10 +34,9 @@ class Option2<'item> {
     }
 
     fn unwrap_or(self, item: 'item) {
-        match self.item {
-            Nullable::Null => item
-            Nullable::Some(a) => a
-        }
+        match self.item with
+        | Nullable::Null => item
+        | Nullable::Some(a) => a
     }
 }
 

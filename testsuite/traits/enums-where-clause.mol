@@ -17,10 +17,9 @@ enum Nummy<'thing> where thing: Display =
 
 
 fn print_test(v: Nummy<'a>) where a: Display {
-    match v {
-        Nummy::Very(x) => println(x.format())
-        Nummy::NotQuite => println("Hmm...")
-    }
+    match v with
+    | Nummy::Very(x) => println(x.format())
+    | Nummy::NotQuite => println("Hmm...")
 }
 
 

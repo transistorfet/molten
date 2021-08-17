@@ -62,11 +62,10 @@ println(str(*x.b))
 
 
 
-let result = match 12 {
-    1 => "Totally One"
-    2 => "Two Poo"
-    _ => "Some number"
-}
+let result = match 12 with
+    | 1 => "Totally One"
+    | 2 => "Two Poo"
+    | _ => "Some number"
 println(result)
 
 
@@ -134,11 +133,10 @@ pub fn runloop() {
 runloop()
 
 
-try {
+try 
     raise new Exception("Test")
-} catch {
+with
     e => println("EXCEPTION! " + e.msg)
-}
 
 //let mem = __ua_alloc(10)
 //__ua_set(mem, 0, thing)
@@ -225,14 +223,13 @@ fn ctest() / C {
 
 fn test4() {
     let clo = "from test4 scope"
-    match "thing" {
+    match "thing" with
         e => {
             let a = "from match arm scope"
             println("e was " + e)
             println(a)
             println(clo)
         }
-    }
 }
 test4()
 
@@ -275,20 +272,18 @@ enum Value =
 
 let val = Value::String("Hey")
 
-match val {
-    Value::String(s) => println(s)
-    _ => ()
-}
+match val with
+| Value::String(s) => println(s)
+| _ => ()
 
 fn print_node(node) {
-    match node {
-        Value::String(s) => println("So " + s)
-        Value::Tree(t) => {
+    match node with
+        | Value::String(s) => println("So " + s)
+        | Value::Tree(t) => {
             println("Tree")
             print_node(*t)
         }
-        _ => println("Nothing")
-    }
+        | _ => println("Nothing")
 }
 
 let val2 = Value::Tree(ref Value::Tree(ref Value::Tree(ref Value::Tree(ref Value::String("Hey\n")))))
@@ -337,10 +332,9 @@ enum BrokenTest<'a> =
 
 let broken = BrokenTest::Variant2(5)
 
-match broken {
-    BrokenTest::Variant2(x) => println("stuff")
-    _ => ()
-}
+match broken with
+| BrokenTest::Variant2(x) => println("stuff")
+| _ => ()
 
 
 // Test that you can pass different universals between functions, since the invoke will be mapped
@@ -352,7 +346,7 @@ fn moo2(t: 'b) {
     moo1(t)
 }
 
-
+/*
 
 let opt3 = Option::Some(10)
 match opt3 {
@@ -431,3 +425,32 @@ for item in iter(["one", "two", "three"]) {
     println(item)
 }
 
+
+/*
+// TODO this causes an overload error instead of a forward definition
+decl export() -> String
+
+pub fn export() {
+    "works"
+}
+*/
+
+class TestException extends Exception {
+    fn new(self) {
+        Super::new(self, "something")
+    }
+}
+
+class TestException2 extends Exception {
+    fn new(self) {
+        Super::new(self, "something")
+    }
+}
+
+try {
+    raise new TestException2()
+} catch {
+    e : TestException => println("hey")
+    e : TestException2 => println("ho")
+}
+*/

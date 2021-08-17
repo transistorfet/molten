@@ -6,13 +6,12 @@ let text = "Global Scope"
 
 fn test() {
     let text = "Function Scope"
-    match 1 {
+    match 1 with
         1 => {
             let a = "This Is Block Scope"
             println(a)
             println(text)
         }
-    }
 }
 test()
 

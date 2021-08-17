@@ -7,12 +7,12 @@ import lib.libcore
 
 let c = "String"
 
-match c {
-    "String" => { println("Here") }
-    _ => { println("Not Here") }
-}
+match c with
+| "String" => { println("Here") }
+| _ => { println("Not Here") }
 
-match c + "and" {
-    "String" => { println("Here") }
-    _ => { println("Not Here") }
-}
+
+match c + "and" with
+| "String" => { println("Here") }
+| _ => { println("Not Here") }
+

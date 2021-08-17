@@ -407,15 +407,10 @@ named!(trywith(Span) -> AST,
         pos: get_position!() >>
         wscom!(tag_word!("try")) >>
         c: expression >>
-        line_or_space_or_comment >>
-        opt!(wscom!(tag_word!("catch"))) >>
         return_error!(ErrorKind::Tag, //ErrorKind::Custom(ERR_IN_TRY),
-            tag!("{")
+             wscom!(tag_word!("with"))
         ) >>
         l: caselist >>
-        return_error!(ErrorKind::Tag, //ErrorKind::Custom(ERR_IN_TRY),
-            tag!("}")
-        ) >>
         (AST::Try(pos, r(c), l))
     )
 );
@@ -434,29 +429,23 @@ named!(matchcase(Span) -> AST,
         pos: get_position!() >>
         wscom!(tag_word!("match")) >>
         c: expression >>
-        line_or_space_or_comment >>
-        //wscom!(tag_word!("with")) >>
         return_error!(ErrorKind::Tag, //ErrorKind::Custom(ERR_IN_MATCH),
-            tag!("{")
+            wscom!(tag_word!("with"))
         ) >>
         l: caselist >>
-        return_error!(ErrorKind::Tag, //ErrorKind::Custom(ERR_IN_MATCH),
-            tag!("}")
-        ) >>
         (AST::Match(pos, r(c), l))
     )
 );
 
 named!(caselist(Span) -> Vec<(ASTPattern, AST)>,
-    //separated_list0!(wscom!(tag!("|")), do_parse!(
-    many1!(wscom!(do_parse!(
-        //wscom!(tag!("|")) >>
-        c: pattern >>
-        wscom!(tag!("=>")) >>
-        e: expression >>
-        //wscom!(tag!(",")) >>
-        ((c, e))
-    )))
+    preceded!(opt!(wscom!(complete!(tag!("|")))),
+        separated_list0!(wscom!(complete!(tag!("|"))), do_parse!(
+            c: pattern >>
+            wscom!(tag!("=>")) >>
+            e: expression >>
+            ((c, e))
+        ))
+    )
 );
 
 named!(forloop(Span) -> AST,

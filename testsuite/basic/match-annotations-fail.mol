@@ -7,8 +7,8 @@ import lib.libcore
 
 let a = 1
 
-match a {
-    e : String => { println(str(e)) }
-    _ => { println("Not One") }
-}
+match a with
+| e : String => { println(str(e)) }
+| _ => { println("Not One") }
+
 

@@ -17,10 +17,10 @@ enum Colours =
 
 let col = Colours::Red
 
-match col {
-    Colours::Red => println("Red")
-    _ => println("Not Red")
-}
+match col with
+| Colours::Red => println("Red")
+| _ => println("Not Red")
+
 
 
 // Test enums with mixed arguments
@@ -30,12 +30,11 @@ enum TestThing =
 | Variant3(String, String)
 
 fn print_thing(e) {
-    match e {
-        TestThing::Variant1 => println("It's Variant 1")
-        TestThing::Variant2(n) => println("It's soo Variant 2 with " + str(n))
-        TestThing::Variant3(s1, s2) => println("It's totally Variant 3 with " + s1 + " and " + s2)
-        _ => println("I don't know")
-    }
+    match e with
+    | TestThing::Variant1 => println("It's Variant 1")
+    | TestThing::Variant2(n) => println("It's soo Variant 2 with " + str(n))
+    | TestThing::Variant3(s1, s2) => println("It's totally Variant 3 with " + s1 + " and " + s2)
+    | _ => println("I don't know")
 }
 
 let t1 = TestThing::Variant1
@@ -52,13 +51,12 @@ enum Expr =
 | Binary(ref Expr, ref Expr)
 
 fn print_expr(e) {
-    match e {
-        Expr::Integer(n) => print(str(n))
-        Expr::Binary(e1, e2) => {
-            print_expr(*e1)
-            print(" + ")
-            print_expr(*e2)
-        }
+    match e with
+    | Expr::Integer(n) => print(str(n))
+    | Expr::Binary(e1, e2) => {
+        print_expr(*e1)
+        print(" + ")
+        print_expr(*e2)
     }
 }
 
@@ -74,14 +72,12 @@ enum OptionTest<'a> =
 
 let a = OptionTest::Some(21)
 
-match a {
-    OptionTest::None => println("None")
-    OptionTest::Some(x) => println(str(x))
-}
+match a with
+| OptionTest::None => println("None")
+| OptionTest::Some(x) => println(str(x))
 
-match a {
-    OptionTest::None => println("None")
-    OptionTest::Some(21) => println("look we both know it's 21")
-    OptionTest::Some(x) => println(str(x))
-}
+match a with
+| OptionTest::None => println("None")
+| OptionTest::Some(21) => println("look we both know it's 21")
+| OptionTest::Some(x) => println(str(x))
 

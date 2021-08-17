@@ -6,9 +6,8 @@
 import lib.libcore
 
 
-try println(str(123)) {
-    _ => println("Error")
-}
+try println(str(123))
+with _ => println("Error")
 
 
 fn test() {
@@ -16,15 +15,13 @@ fn test() {
 }
 
 
-try test() {
-    _ => println("Error")
-}
+try test()
+with _ => println("Error")
 
 
 try {
     raise new Exception("Test")
-} catch {
+} with
     e => println("EXCEPTION! " + e.msg)
-}
 
 

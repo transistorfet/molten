@@ -27,17 +27,16 @@ enum BinaryTree<'item> where item: LessThan =
 // when decending.  When it reaches an empty spot, it will modify the ref containing the empty
 // node and replace it with a new node holding the inserted value
 fn insert_node(tree: ref BinaryTree<'item>, item: 'item) where item: LessThan {
-    match *tree {
+    match *tree with
         BinaryTree::Empty => {
             *tree = BinaryTree::Node(item, ref BinaryTree::Empty, ref BinaryTree::Empty)
         }
-        BinaryTree::Node(stored, left, right) => {
+        | BinaryTree::Node(stored, left, right) => {
             if item.less_than(stored) then
                 insert_node(left, item)
             else
                 insert_node(right, item)
         }
-    }
 }
 
 // Print out the contents of the tree
@@ -46,14 +45,13 @@ fn insert_node(tree: ref BinaryTree<'item>, item: 'item) where item: LessThan {
 // to only one trait constraint per universal, and since our list already uses the LessThan
 // trait, we can't add any additional constraints here
 fn print_tree(tree) {
-    match *tree {
-        BinaryTree::Empty => ()
-        BinaryTree::Node(stored, left, right) => {
+    match *tree with
+        | BinaryTree::Empty => ()
+        | BinaryTree::Node(stored, left, right) => {
             print_tree(left)
             println(str(stored))
             print_tree(right)
         }
-    }
 }
 
 // Our input data stored in an Array<Int>
@@ -63,7 +61,7 @@ let numbers = [ 1, 3, 50, 98, 17, 2, 350, 9, 18, 2, 37, 50, 9, 12, 73, 50, 97, 3
 let tree = ref BinaryTree::Empty
 
 // For each number in our input list, insert it into our tree in place
-for v in numbers {
+for v in iter(numbers) {
     insert_node(tree, v)
 }
 
