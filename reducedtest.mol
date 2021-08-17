@@ -433,3 +433,14 @@ try
 with
     e : TestException => println("hey")
 
+let is_cat = true
+is_cat and println("It's a cat") == ()
+
+match (11, "Ten") with
+| (10, name) => println(name)
+| (10, _) => println("Something else named ")
+
+match { num = 11, name = "Ten" } with
+| { num = 10, name = name } => println(name)
+| { num = _, name = name } => println("Something else named " + name)
+

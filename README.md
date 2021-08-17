@@ -5,8 +5,8 @@ Molten
 ###### *Started November 06, 2017*
 
 Molten is a programming language which borrows from the ML family of languages,
-as well as from Rust and Python.  The compiler is written in Rust and uses
-LLVM to generate IR which can be compiled to machine code.
+as well as from Rust and Python.  The compiler is written in Rust and uses LLVM
+to generate IR which can be compiled to machine code.
 
 I originally started this project in order to learn Rust.  It is intended to be
 a high level language with a full object system that facilitates both functional
@@ -14,17 +14,18 @@ and object-oriented programming.  Some syntax elements have been changed from
 typical ML languages to follow conventions found in more common languages, such
 as C++, Rust, and Python (eg. parenthesis-delimited blocks, conventional class
 definitions, generics/type parameters with angle brackets, etc).  For more info
-on the internals, see [An Overview Of Molten Internals](https://transistorfet.github.io/articles/molten_overview.html)
+on the internals, see [An Overview Of Molten
+Internals](https://transistorfet.github.io/articles/molten_overview.html)
 
 
 Installing
 ----------
 
 You will need `rustc` and `cargo` installed.  It's recommended that you use
-`rustup` to install these.  I've most recently tested it with rustc version 1.52.
-You will also need LLVM 11 installed, as well as libgc (Boehm-Demers-Weiser's
-Garbage Collector), and clang to linking, although clang can be replace with gcc
-by editing the `molten` python script.
+`rustup` to install these.  I've most recently tested it with rustc version
+1.52.  You will also need LLVM 11 installed, as well as libgc
+(Boehm-Demers-Weiser's Garbage Collector), and clang to linking, although clang
+can be replace with gcc by editing the `molten` python script.
 
 On Debian/Ubuntu, run:
 `sudo apt-get install llvm-11 llvm-11-runtime llvm-11-dev clang libgc-dev`
@@ -45,10 +46,10 @@ The `molten` script helps with compiling and linking IR files.  To run an exampl
 ```
 
 This will run cargo to build the compiler if needed, then compile the fac.mol
-file, as well as all of its dependencies (in this case, the libcore.mol library),
-link them together using clang, along with libgc, and then run the binary.  It
-can also compile to LLVM IR, and run LLVM bitcode by using the `-S` flag.  The
-resulting .bc file can be run using `lli-11`.
+file, as well as all of its dependencies (in this case, the libcore.mol
+library), link them together using clang, along with libgc, and then run the
+binary.  It can also compile to LLVM IR, and run LLVM bitcode by using the `-S`
+flag.  The resulting .bc file can be run using `lli-11`.
 
 
 Example
@@ -112,10 +113,10 @@ foo(1, 2)
 A block is a collection of expressions which return the result of the last
 expression in the block.  They can be used in place of a single expression.
 They do not create their own local scope, at least at the moment, so variables
-defined inside blocks will appear in the parent scope (usually the function
-the block is in).  Each expression in the block must end in a newline or
-semi-colon character (or be the last expression in the block).  This applies
-to the top level.
+defined inside blocks will appear in the parent scope (usually the function the
+block is in).  Each expression in the block must end in a newline or semi-colon
+character (or be the last expression in the block).  This applies to the top
+level.
 ```
 let is_zero = if self.x <= 0 then {
     self.x = 0
@@ -125,43 +126,30 @@ let is_zero = if self.x <= 0 then {
 }
 ```
 
-### Flow Control
-The return value of an if expression is the result of evaluating either the
-`then` clause or `else` clause.  The types of both clauses must match.  The
-`else` clause can be left out as long as the true clause evaluates to Nil.
-```
-if x == 5 then
-    "It's five"
-else
-    "It's not five"
-```
-
-A match expression allows pattern matching, which can unpack refs, tuples,
-records, and enums.  It can bind values to named variables in the pattern
-and creates a new scope for each arm of the match expression.
-```
-match x with
-| 1 => "It's one"
-| 5 => "It's five"
-| int => "It's not one or five, it's " + str(int)
-```
-
-### And / Or
-The keyword operators `and` and `or` have side-effects and will not execute
-the second expression if the result can be determined from the first
-expression.  The resulting value is the last expression that was executed.
-Operands are not limited to Bool values, although that may change in future.
-
 ### Math
-Infix operators are evaluated using order of operations.  Both sides of an
-infix operation must be on the same line, or else a `\` character can be used
-to continue the line.
+Infix operators are evaluated using order of operations.  Both sides of an infix
+operation must be on the same line, or a `\` character can be used to
+continue the line.
 ```
 5 + 12 * 2      // equals 29
 
 42 * 4 \
    % 5          // equals 3
 ```
+
+### And / Or
+The keyword operators `and` and `or` have side-effects and will not execute the
+second expression if the result can be determined from the first expression.
+The expressions must have the same type, and the returned value is the first
+expression that returns a non-zero value.
+```
+let is_cat = true
+let result = is_cat and println("It's a cat") == ()
+```
+Since is_cat is Bool, both sides of the `and` must be Bool.  Since the
+`println()` function returns Unit, we compare it with itself which will always
+be true.  The `println()` will only execute if `is_cat` is true, and `result`
+will be true if `is_cat` is true, or false if `is_cat` is false.
 
 ### Tuples
 ```
@@ -170,14 +158,24 @@ println(tup.1)                  // prints "String"
 ```
 
 ### Records
-Records are like tuples but with named fields.  Record literals use the
-equals sign ("=") to assign a value to a field.  Specifying a record type
-uses a colon (":") to separate the field name from the type.
+Records are like tuples but with named fields.  Record literals use the equals
+sign ("=") to assign a value to a field.  Specifying a record type uses a colon
+(":") to separate the field name from the type.
 ```
 let rec = { i = 1, s = "String", r = 4.5 }
-println(rec.s)
+println(rec.s)                  // prints "String"
 
 let rec: { i: Int, s: String, r: Real }
+```
+
+Records can be updated, which will copy all fields of the record into a new
+record, but with some of the fields modified.
+```
+let rec = { i = 1, s = "String", r = 4.5 }
+
+let newrec = { rec with s = "Updated" }
+println("New Value: " + newrec.s)       // prints "Updated"
+println("Old Value: " + rec.s)          // prints "String"
 ```
 
 ### Arrays
@@ -192,9 +190,30 @@ println(array2[0])
 ```
 The Array type is defined in libcore, which must be imported if arrays are used.
 
+### Flow Control
+The return value of an if expression is the result of evaluating either the
+`then` clause or `else` clause.  The types of both clauses must match.  The
+`else` clause can be left out as long as the true clause evaluates to Nil.
+```
+if x == 5 then
+    "It's five"
+else
+    "It's not five"
+```
+
+A match expression allows pattern matching, which can unpack refs, tuples,
+records, and enums.  It can bind values to named variables in the pattern and
+creates a new scope for each arm of the match expression.
+```
+match x with
+| 1 => "It's one"
+| 5 => "It's five"
+| num => "It's not one or five, it's " + str(num)
+```
+
 ### Loops
 ```
-while is_true
+while true
     println("looping")
 
 for i in iter([ 1, 2, 3 ])
@@ -203,8 +222,8 @@ for i in iter([ 1, 2, 3 ])
 For loops take an instance of `Iterator<'item>` and calls the `.next()` method
 on it, running the body for each `Option::Some('item)` returned.  The `iter`
 function is defined for different types to convert them into an appropriate
-iterator.  In the case of arrays, it will return the result of
-`new ArrayInterator<'item>(input_array)`
+iterator.  In the case of arrays, it will return the result of `new
+ArrayInterator<'item>(input_array)`
 
 ### Refs
 A ref is an indirect reference to some data.  It can be passed around as a
@@ -245,16 +264,16 @@ let bar = new Bar("Mischief")
 bar.get("The Cat")              // returns "Mischief The Cat"
 Foo::static(5)
 ```
-All methods are both closures, and virtual methods, so they can access
-variables in their parents' scopes and also be overridden by a child class's
+All methods are both closures, and virtual methods, so they can access variables
+in their parents' scopes and also be overridden by a child class's
 implementation of the same method, accessible with a reference to the parent
 class type.
 
 Fields can have an optional type, but not an initializer.  If a class has at
 least one field, it must have at least one "new" constructor, which must assign
 to each field an initial value.  The type can be inferred from this assignment
-if the optional type is not supplied.  If a field is declared as mutable, it
-can be reassigned to, but if the `mut` keyword is absent, the field can only be
+if the optional type is not supplied.  If a field is declared as mutable, it can
+be reassigned to, but if the `mut` keyword is absent, the field can only be
 assigned to within the constructor, and will be immutable after the constructor
 has returned.  Every constructor must also call the `Super::new` method of its
 parent class, if it has a parent that has a constructor.
@@ -264,8 +283,8 @@ An enum can either have no arguments, or a tuple of arguments.  Constructing an
 enum variant requires using the Resolve (::) notation.  Pattern matching is
 currently the only way to get values out of a variant.  Unlike with classes,
 which allocate memory for a new instance, enums are immediate data types like
-tuples and records.  In order to store it in a memory location, a `ref` must
-be used.  A ref is required in order to make a recursive enum.
+tuples and records.  In order to store it in a memory location, a `ref` must be
+used.  A ref is required in order to make a recursive enum.
 ```
 enum Value =
 | None
@@ -298,8 +317,7 @@ val.is_some()
 
 ### Traits and Trait Objects
 A trait can be defined with method declarations in the body, with the predefined
-type alias "Self" used to refer to the current trait object
-```
+type alias "Self" used to refer to the current trait object ```
 trait Add {
     decl add(Self, Self) -> Self
 }
@@ -307,9 +325,9 @@ trait Add {
 
 A trait can then be implemented for a given type.  An impl block can only have
 function definitions that match the trait declarations.  Inside the impl block
-the "Self" type alias will refer to the implementation type.  Trait objects
-that are passed to arguments with type "Self" will automatically be unpacked
-into their impl type, and if the return type has type "Self", the result will
+the "Self" type alias will refer to the implementation type.  Trait objects that
+are passed to arguments with type "Self" will automatically be unpacked into
+their impl type, and if the return type has type "Self", the result will
 automatically be packed back into a trait object.
 ```
 impl Add for Int {
@@ -372,10 +390,9 @@ import libcore
 ```
 
 ### External Functions
-A function can be declared without being implemented, and functions can
-also be defined with an ABI specifier so that they are accessible to
-other languages.  Only C support is currently implemented. A C function
-cannot be a closure.
+A function can be declared without being implemented, and functions can also be
+defined with an ABI specifier so that they are accessible to other languages.
+Only C support is currently implemented. A C function cannot be a closure.
 ```
 decl foo(Int) -> Int         // external molten function
 decl bar(Int) -> Int / C     // external C function
@@ -386,8 +403,8 @@ fn baz(i: Int) / C {
 ```
 
 ### Linking to C
-An example of writing a C file, and linking it to a molten program is shown
-in `lib/libccore.c`.  When imported into a molten file and compiled with the
+An example of writing a C file, and linking it to a molten program is shown in
+`lib/libccore.c`.  When imported into a molten file and compiled with the
 `molten` script, the library will be compiling using clang and the
 `libccore.cdec` (manually maintained) will be copied to `libccore.dec`.  The
 importing molten program will be able to use declarations from libccore.cdec.

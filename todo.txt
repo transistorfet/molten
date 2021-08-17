@@ -1,4 +1,6 @@
 
+* matching tuples and records is broken because of the way it's done.  Only one field will actually be compared and the other instructions will do nothing.  This is
+  due to the strange way that patterns are being transformed
 * you can't import files that contain a dash in the filename
 * using a decl for a function defined in later, in the same module, causes an overload error rather than linking the definition and declaration
 * seems to be problems implementing Display on Option<'item>, caused by check_trait_constraints() which causes a recursive loop checking Option<'item> with 'item
