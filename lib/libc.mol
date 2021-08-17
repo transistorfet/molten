@@ -1,0 +1,30 @@
+
+//type chars = String
+
+//println("LIBC")
+
+////// stdlib.h //////
+
+pub decl malloc(Int) -> 'ptr / C
+pub decl realloc('ptr, Int) -> 'ptr / C
+pub decl free('ptr) -> () / C
+
+pub decl rand() -> Int / C
+pub decl srand(Int) -> () / C
+
+
+////// string.h //////
+
+pub decl memcpy('ptr, 'ptr, Int) -> 'ptr / C
+pub decl strcmp(String, String) -> Int / C
+pub decl strlen(String) -> Int / C
+
+
+////// stdio.h //////
+
+pub decl puts(String) -> () / C
+pub decl gets(String) -> String / C
+pub decl getchar() -> Int / C
+
+//pub decl printf(String, ...)
+
