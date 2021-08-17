@@ -370,7 +370,8 @@ pub fn bind_type_names(session: &Session, scope: ScopeRef, ttype: Option<&mut Ty
             },
             &mut Type::Variable(ref mut id) => {
                 if *id == UniqueID(0) {
-                    panic!("InternalError: Type::Variable with id 0");
+                    let new_id = session.new_typevar().get_id()?;
+                    *id = new_id;
                 }
                 session.set_type(*id, Type::Variable(*id));
             },

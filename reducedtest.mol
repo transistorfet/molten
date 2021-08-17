@@ -8,15 +8,6 @@ if true == true then {
 }
 
 
-/*
-// TODO this is only here because we were sometimes unable to import libcore
-fn str(num: Int) -> String {
-    let buffer: String = malloc(22)
-    sprintf(buffer, "%ld", num, ())
-    buffer
-}
-*/
-
 let boo = false
 
 println(str(true))
@@ -51,9 +42,9 @@ if foo() == 24 and foo() == 24 then println("True") else println("False")
 if y < 10 or y > 13 or y == 12 then println("True") else println("False")
 
 
-// TODO this causes a parse error
-//let x = ref { a = 2, b = 5 }
-//(!x).a
+// this previously caused a parse error
+let x2 = ref { a = 2, b = 5 }
+(*x2).a
 
 let x = ref { a = 2, b = 5 }
 println(str(*x.a))
@@ -76,11 +67,9 @@ println(str(4))
 let s = { a = 2, b = 5 }
 println(str(s.a))
 
-// TODO this doesn't work because the arg is pushed into the invoke
-// but the constructor doesn't even work, even though it probably should
-// store { i64 (i8*)*, i64, { i8* (i64, i8*)* }* }* %12, { i64 (i8*)* }** %37
-//let s2 = { a = 2, b = foo }
-//s2.b()
+// Test that you can call a non-method from an access by surronding the access in brackets
+let s2 = { a = 2, b = foo }
+(s2.b)()
 
 //fn test2() {
 let clo = "It Closure Worked"
@@ -193,22 +182,20 @@ println(str(opt.unwrap_or(1)))
 let opt2 = Option2::none()
 println(str(opt2.unwrap_or(2)))
 
+// This intentionally causes an assignment error
 //let mut test = 4
 //test = 5
 //println(str(test))
 
-/*
-// TODO this doesn't work yet
+// Test that you can write a recursive C function
 fn rectestc(x) / C {
     if x <= 1 then
         1
     else
         rectestc(x - 1)
 }
+println(str(rectestc(4)))
 
-//println(str(rectestc(4)))
-rectestc(4)
-*/
 
 fn pctest(i) {
     str(5 : Int)
@@ -218,6 +205,7 @@ let pc = (pctest(5) : String)
 
 
 fn ctest() / C {
+    // this is explicitly disallowed in a C function
     //raise "Error"
 }
 
@@ -253,15 +241,13 @@ enum TestThing =
 //let tt = TestThing::Variant2(987)
 let tt = TestThing::Variant3("Hey", "Ho")
 
-/*
-// TODO this causes the optimizer to hang when compiling this code
-match tt {
-    TestThing::Variant1 => println("It's Variant 1")
-    TestThing::Variant2(n) => println("It's soo Variant 2 with " + str(n))
-    TestThing::Variant3(s1, s2) => println("It's totally Variant 3 with " + s1 + " and " + s2)
-    _ => println("I don't know")
-}
-*/
+// TODO this was causing the optimizer to hang when compiling this code
+match tt with
+| TestThing::Variant1 => println("It's Variant 1")
+| TestThing::Variant2(n) => println("It's soo Variant 2 with " + str(n))
+| TestThing::Variant3(s1, s2) => println("It's totally Variant 3 with " + s1 + " and " + s2)
+| _ => println("I don't know")
+
 
 enum Value =
 | None
@@ -346,13 +332,11 @@ fn moo2(t: 'b) {
     moo1(t)
 }
 
-/*
 
 let opt3 = Option::Some(10)
-match opt3 {
-    Option::Some(x) => println(str(x))
-    Option::None => println("None")
-}
+match opt3 with
+| Option::Some(x) => println(str(x))
+| Option::None => println("None")
 
 let opt4 = Option::Some("hey")
 println(opt4.unwrap())
@@ -366,10 +350,9 @@ trait Display {
 /*
 impl Display for Option<'pants> where pants: Display {
     fn str(self) {
-        match self {
-            Option::None => "None"
-            Option::Some(item) => "Some(" + item.str() + ")"
-        }
+        match self with
+        | Option::None => "None"
+        | Option::Some(item) => "Some(" + item.str() + ")"
     }
 }
 */
@@ -388,19 +371,18 @@ fn disy(data: 'a) where a: Display {
 disy(true)
 
 
-let itr = new ArrayIterator<Int>([1, 2, 3, 4])
+let itr = new ArrayIterator<_>([1, 2, 3, 4])
 //println(str(iter.next().unwrap()))
 //println(str(iter.next().unwrap()))
 
 // TODO this type annotation is needed to satisfy the type checker
 fn print_next(itr: ArrayIterator<Int>) {
-    match itr.next() {
+    match itr.next() with
         Option::Some(item) => {
             println(str(item))
             true
         }
-        _ => false
-    }
+        | _ => false
 }
 
 // TODO while loops are kind of useless at the moment because we can't assign a value each iteration, nor break, nor mutate a flag
@@ -409,14 +391,13 @@ while print_next(itr) { }
 itr.reset()
 
 while {
-    match itr.next() {
+    match itr.next() with
         Option::Some(i) => {
             let item = i
             println(str(item))
             true
         }
-        _ => false
-    }
+        | _ => false
 } {
 }
 
@@ -447,10 +428,8 @@ class TestException2 extends Exception {
     }
 }
 
-try {
+try
     raise new TestException2()
-} catch {
+with
     e : TestException => println("hey")
-    e : TestException2 => println("ho")
-}
-*/
+

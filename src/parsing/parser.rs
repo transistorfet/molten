@@ -821,6 +821,7 @@ named!(complete_type_description(Span) -> Type,
 
 named!(type_description(Span) -> Type,
     alt!(
+        type_underscore |
         type_function |
         type_unit |
         type_ref |
@@ -829,6 +830,10 @@ named!(type_description(Span) -> Type,
         type_variable |
         type_object
     )
+);
+
+named!(type_underscore(Span) -> Type,
+    map!(tag!("_"), |_| Type::Variable(UniqueID(0)))
 );
 
 named!(type_ref(Span) -> Type,
