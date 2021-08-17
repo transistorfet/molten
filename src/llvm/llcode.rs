@@ -1,5 +1,5 @@
 
-use crate::hir::NodeID;
+use crate::analysis::hir::NodeID;
 use crate::misc::{ R };
 
 

@@ -1,9 +1,9 @@
 
 use crate::misc::r;
 use crate::types::Type;
-use crate::hir::{ NodeID, Expr };
 use crate::defs::traits::{ TraitDefRef };
-use crate::visitor::{ Visitor };
+use crate::analysis::hir::{ NodeID, Expr };
+use crate::analysis::visitor::{ Visitor };
 
 use crate::transform::transform::{ CodeContext, Transformer };
 use crate::transform::classes::{ VtableTransform };

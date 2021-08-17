@@ -1,11 +1,14 @@
 
-* try to remove some of the complete!()s in parser
 * reorganize stage-specific files in src/ into parser/analysis directories
-* should you go back to the match/with try/with syntax?  I think now that 'raise' is fixed it might not be a clunky
-* you can't import files that contain a dash in the filename
 
+* you can't import files that contain a dash in the filename
 * using a decl for a function defined in later, in the same module, causes an overload error rather than linking the definition and declaration
 * remove the forced visibility in refinery, when you decide on pub/priv semantics, and change the export code to traverse recursively (issue with scope names)
+  perhaps only ever allowing top level things to be exported is a sufficient compromise
+
+* I don't like how I have to explicitly set the type params when they should be inferrable
+* the try block's pattern matching is not useful because subtyping wont let us match different parents, only inheritence chains, so we really need an exception enum to be
+  usable, which could mean using the `exception` keyword like in ML or make a way of extending enums
 * seems to be problems implementing Display on Option<'item>, caused by check_trait_constraints() which causes a recursive loop checking Option<'item> with 'item
 * you currently can't call a method on a type that implements a trait.  You can only call the trait methods on a universal, but that shouldn't be necessary
 * fix the issue where passing a function `() -> String` into another function as `() -> 'a`, with a universal, will unpack the String value without packing it from within
@@ -13,23 +16,19 @@
 
 * write overview
 
-* I don't like how I have to explicitly set the type params when they should be inferrable
 
 * implement trait dependence
 * add some way of creating a traitobj using a def or annotation (issues with universals vs variables and mapping typevars; using check_type(..., false) works but might not be correct)
+* need a way to import/compile directory of many files (libcore as many files)
 
 * can you remove access to getindex?
 * ByteString or ByteArray or ImmutableString?
 * rename String type to ByteString, ByteArray, or CString, or ZString, or NullString, or NullByteArray, or ZByteArray, RawString;  I'm leaning ZByteArray or ByteString
 * rename SuperString type to String, will require a bunch of libcore changes
+* you could also maybe add a native array type (like a slice, with a pointer and size value in a pair), to replace UniversalArray
 
 * I'd really like to change the way method calls are done.  It's annoying having all these definitions and blocks for every call
   but this might not be possible because you need to bind references during type checking, and you can't do that without all the variants
-
-* should you make it so that only functions/classes/enumdefs/etc can create a universal, and other places like new/definition/etc will raise an error if they are undefined, is this useful?
-* you could also maybe add a native array type (like a slice, with a pointer and size value in a pair), to replace UniversalArray
-
-* need a way to import/compile directory of many files (libcore as many files)
 
 
 DISCUSSION:
@@ -129,6 +128,7 @@ Changes:
 
 
 * should you make it possible to call a trait method via a resolve; eg. Add::add(x, y).  The issue is that vtable is in the objects
+* should you make it so that only functions/classes/enumdefs/etc can create a universal, and other places like new/definition/etc will raise an error if they are undefined, is this useful?
 * should you fix scope resolution to also work on objects, so that you can have static methods from the object without explicitly referencing its type
 * should exports also list all the modules that the file imports, so that class definitions in other imports can be found, if needed for arguments
 * should you add break/continue statements for loops

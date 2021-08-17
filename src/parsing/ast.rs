@@ -4,9 +4,9 @@ use std::str;
 
 use crate::abi::ABI;
 use crate::types::Type;
-use crate::parser::Span;
 use crate::misc::{ R };
-use crate::hir::{ Visibility, Mutability, AssignType, Literal, WhereClause };
+use crate::parsing::parser::Span;
+use crate::analysis::hir::{ Visibility, Mutability, AssignType, Literal, WhereClause };
 
 
 #[derive(Copy, Clone, PartialEq)]

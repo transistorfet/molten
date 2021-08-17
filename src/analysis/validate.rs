@@ -5,8 +5,8 @@ use crate::defs::Def;
 use crate::types::{ Type, Check, check_type };
 use crate::session::{ Session, Error };
 use crate::scope::{ ScopeRef };
-use crate::hir::{ NodeID, Function, WhereClause, Expr, ExprKind };
-use crate::visitor::{ self, Visitor, ScopeStack };
+use crate::analysis::hir::{ NodeID, Function, WhereClause, Expr, ExprKind };
+use crate::analysis::visitor::{ self, Visitor, ScopeStack };
 
 
 #[derive(Clone, Debug, PartialEq)]

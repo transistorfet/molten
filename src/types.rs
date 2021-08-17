@@ -5,7 +5,7 @@ use std::collections::HashMap;
 
 use crate::defs::Def;
 use crate::misc::{ R, r, UniqueID };
-use crate::hir::{ NodeID };
+use crate::analysis::hir::{ NodeID };
 use crate::session::{ Session, Error };
 
 pub use crate::abi::ABI;

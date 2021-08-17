@@ -19,9 +19,9 @@ use self::llvm_sys::target_machine::*;
 use self::llvm_sys::transforms::pass_manager_builder::*;
 
 
-use crate::hir::NodeID;
 use crate::config::Options;
 use crate::misc::{ UniqueID };
+use crate::analysis::hir::NodeID;
 use crate::session::{ Session, Error };
 
 use crate::llvm::llcode::{ LLType, LLLit, LLRef, LLCmpType, LLLink, LLCC, LLExpr, LLGlobal, LLBlock };

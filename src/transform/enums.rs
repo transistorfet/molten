@@ -1,7 +1,7 @@
 
 use crate::misc::r;
 use crate::types::Type;
-use crate::hir::{ NodeID };
+use crate::analysis::hir::{ NodeID };
 
 use crate::defs::enums::EnumDefRef;
 

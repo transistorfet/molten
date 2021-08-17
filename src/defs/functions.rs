@@ -7,7 +7,7 @@ use crate::defs::Def;
 use crate::scope::{ Scope, ScopeRef, Context };
 use crate::session::{ Session, Error };
 use crate::types::{ Type, Check, check_type };
-use crate::hir::{ NodeID, Mutability, Visibility };
+use crate::analysis::hir::{ NodeID, Mutability, Visibility };
 
 use crate::defs::classes::{ Define, StructDef, StructDefRef };
 

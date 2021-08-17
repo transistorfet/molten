@@ -9,13 +9,13 @@ use std::io::prelude::*;
 use std::collections::HashMap;
 
 use crate::types;
-use crate::parser;
+use crate::parsing::parser;
 use crate::defs::{ Def };
 use crate::config::Options;
-use crate::hir::{ NodeID };
-use crate::ast::{ Pos, AST };
-use crate::scope::{ ScopeMapRef };
 use crate::types::{ Type };
+use crate::scope::{ ScopeMapRef };
+use crate::analysis::hir::{ NodeID };
+use crate::parsing::ast::{ Pos, AST };
 
 
 #[derive(Clone, Debug, PartialEq)]

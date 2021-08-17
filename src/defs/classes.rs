@@ -7,7 +7,7 @@ use crate::types::Type;
 use crate::scope::{ Scope, ScopeRef, Context };
 use crate::session::{ Session, Error };
 use crate::types::{ check_type, Check };
-use crate::hir::{ NodeID, Mutability, Visibility, Expr, ExprKind };
+use crate::analysis::hir::{ NodeID, Mutability, Visibility, Expr, ExprKind };
 
 use crate::defs::variables::FieldDef;
 

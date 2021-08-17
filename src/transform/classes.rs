@@ -1,6 +1,6 @@
 
-use crate::hir::{ NodeID, Expr };
-use crate::visitor::{ Visitor };
+use crate::analysis::hir::{ NodeID, Expr };
+use crate::analysis::visitor::{ Visitor };
 
 use crate::defs::classes::{ ClassDefRef, StructDef, StructDefRef, Vtable };
 

@@ -3,7 +3,6 @@ use crate::abi::ABI;
 use crate::session::{ Session, Error };
 use crate::scope::{ ScopeRef, Context };
 use crate::types::{ Type, resolve_type };
-use crate::hir::{ NodeID, Visibility, Mutability, MatchCase, EnumVariant, WhereClause, Function, Pattern, Expr, ExprKind };
 use crate::misc::{ UniqueID, r };
 
 use crate::defs::Def;
@@ -15,7 +14,8 @@ use crate::defs::variables::{ AnyVar, VarDef, ArgDef };
 use crate::defs::traits::{ TraitDef, TraitImpl };
 use crate::defs::modules::{ ModuleDef };
 
-use crate::visitor::{ self, Visitor, ScopeStack };
+use crate::analysis::hir::{ NodeID, Visibility, Mutability, MatchCase, EnumVariant, WhereClause, Function, Pattern, Expr, ExprKind };
+use crate::analysis::visitor::{ self, Visitor, ScopeStack };
 
 
 #[derive(Clone, Debug, PartialEq)]

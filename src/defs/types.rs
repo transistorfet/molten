@@ -5,7 +5,7 @@ use crate::defs::Def;
 use crate::types::Type;
 use crate::scope::ScopeRef;
 use crate::session::{ Session, Error };
-use crate::hir::{ NodeID };
+use crate::analysis::hir::{ NodeID };
 
 
 #[derive(Clone, Debug, PartialEq)]

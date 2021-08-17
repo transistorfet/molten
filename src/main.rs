@@ -8,33 +8,28 @@ extern crate nom;
 #[macro_use(position)]
 extern crate nom_locate;
 
+use regex::{ Regex };
+use clap::{ App, Arg, ArgMatches };
+
 #[macro_use]
 mod debug;
-
-#[macro_use]
-mod parser;
-
 mod abi;
-mod ast;
-mod hir;
 mod misc;
-mod visitor;
-mod mutvisitor;
 mod scope;
 mod types;
 mod config;
 mod session;
-mod refinery;
-mod binding;
-mod typecheck;
-mod validate;
 mod defs;
-mod export;
+mod parsing;
+mod analysis;
 mod transform;
 mod llvm;
 
-use regex::{ Regex };
-use clap::{ App, Arg, ArgMatches };
+use crate::parsing::refinery;
+use crate::analysis::binding;
+use crate::analysis::typecheck;
+use crate::analysis::validate;
+use crate::analysis::export;
 use crate::config::{ Options, EmitAs };
 
 fn main() {

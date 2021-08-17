@@ -11,10 +11,10 @@ use self::llvm::core::*;
 use crate::abi::ABI;
 use crate::types::Type;
 use crate::session::Session;
-use crate::parser::{ parse_type };
-use crate::hir::{ NodeID, Mutability, Visibility };
 use crate::scope::{ Scope, ScopeRef, ScopeMapRef, Context };
-use crate::binding::{ bind_type_names };
+use crate::parsing::parser::{ parse_type };
+use crate::analysis::hir::{ NodeID, Mutability, Visibility };
+use crate::analysis::binding::{ bind_type_names };
 use crate::config::Options;
 use crate::misc::{ r, UniqueID };
 

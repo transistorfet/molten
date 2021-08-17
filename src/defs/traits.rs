@@ -6,7 +6,7 @@ use crate::defs::Def;
 use crate::scope::{ Scope, ScopeRef, Context };
 use crate::session::{ Session, Error };
 use crate::types::{ Type, Check, check_type };
-use crate::hir::{ NodeID };
+use crate::analysis::hir::{ NodeID };
 use crate::defs::classes::{ Vtable };
 use crate::defs::types::{ TypeAliasDef };
 

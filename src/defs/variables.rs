@@ -3,9 +3,9 @@ use std::rc::Rc;
 
 use crate::defs::Def;
 use crate::types::Type;
-use crate::hir::{ NodeID, Mutability };
 use crate::scope::{ Scope, ScopeRef, Context };
 use crate::session::{ Session, Error };
+use crate::analysis::hir::{ NodeID, Mutability };
 
 
 pub struct AnyVar();

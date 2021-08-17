@@ -7,15 +7,15 @@ use crate::types::Type;
 use crate::config::Options;
 use crate::scope::{ ScopeRef };
 use crate::session::{ Session, Error };
-use crate::ast::{ Pos };
-use crate::hir::{ NodeID, Visibility, Mutability, AssignType, Literal, MatchCase, EnumVariant, WhereClause, Function, Pattern, PatKind, Expr, ExprKind };
+use crate::parsing::ast::{ Pos };
+use crate::analysis::hir::{ NodeID, Visibility, Mutability, AssignType, Literal, MatchCase, EnumVariant, WhereClause, Function, Pattern, PatKind, Expr, ExprKind };
 use crate::defs::modules::ModuleDef;
 
 use crate::misc::{ r };
 use crate::transform::functions::{ ClosureTransform };
 use crate::llvm::llcode::{ LLType, LLLit, LLRef, LLCmpType, LLLink, LLCC, LLExpr, LLGlobal };
 
-use crate::visitor::{ Visitor, ScopeStack };
+use crate::analysis::visitor::{ Visitor, ScopeStack };
 
 
 #[derive(Copy, Clone, Debug, PartialEq)]

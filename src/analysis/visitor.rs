@@ -5,7 +5,7 @@ use crate::abi::ABI;
 use crate::types::Type;
 use crate::scope::ScopeRef;
 use crate::session::{ Session, Error };
-use crate::hir::{ NodeID, Visibility, Mutability, AssignType, Literal, MatchCase, EnumVariant, WhereClause, Function, Pattern, PatKind, Expr, ExprKind };
+use crate::analysis::hir::{ NodeID, Visibility, Mutability, AssignType, Literal, MatchCase, EnumVariant, WhereClause, Function, Pattern, PatKind, Expr, ExprKind };
 
 /*
 #[derive(Copy, Clone, Debug, PartialEq)]

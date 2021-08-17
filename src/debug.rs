@@ -1,7 +1,7 @@
 
 use crate::session::Session;
 use crate::scope::{ ScopeRef };
-use crate::hir::{ Expr, ExprKind };
+use crate::analysis::hir::{ Expr, ExprKind };
 
 macro_rules! debug {
     //($fmt:expr, $($arg:expr),*) => {

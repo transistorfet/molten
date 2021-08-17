@@ -8,7 +8,7 @@ use crate::defs::Def;
 use crate::types::Type;
 use crate::scope::{ Scope, ScopeRef, Context };
 use crate::session::{ Session, Error };
-use crate::hir::{ NodeID, EnumVariant };
+use crate::analysis::hir::{ NodeID, EnumVariant };
 
 
 #[derive(Clone, Debug, PartialEq)]

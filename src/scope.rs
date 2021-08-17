@@ -6,10 +6,10 @@ use std::collections::HashMap;
 
 use crate::abi::ABI;
 use crate::types::Type;
-use crate::hir::{ NodeID };
-use crate::session::{ Session, Error };
 use crate::misc::{ UniqueID };
+use crate::session::{ Session, Error };
 use crate::defs::Def;
+use crate::analysis::hir::{ NodeID };
 
 const NAMES: usize = 0;
 const TYPES: usize = 1;

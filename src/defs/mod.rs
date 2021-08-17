@@ -1,6 +1,6 @@
 
 use crate::scope::ScopeRef;
-use crate::hir::Mutability;
+use crate::analysis::hir::Mutability;
 use crate::session::{ Error };
 
 pub mod enums;

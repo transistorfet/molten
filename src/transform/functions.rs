@@ -4,11 +4,11 @@ use crate::typecheck;
 
 use crate::abi::ABI;
 use crate::types::Type;
-use crate::ast::{ Pos };
-use crate::hir::{ NodeID, Visibility, Mutability, Argument, Function, Expr, ExprKind };
 use crate::defs::Def;
 use crate::scope::ScopeMapRef;
-use crate::visitor::{ Visitor };
+use crate::parsing::ast::{ Pos };
+use crate::analysis::visitor::{ Visitor };
+use crate::analysis::hir::{ NodeID, Visibility, Mutability, Argument, Function, Expr, ExprKind };
 
 use crate::misc::{ r };
 use crate::transform::transform::{ Transformer, CodeContext };

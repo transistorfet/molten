@@ -2,8 +2,8 @@
 use crate::session::Error;
 use crate::scope::ScopeRef;
 use crate::session::Session;
-use crate::hir::{ NodeID, Pattern, PatKind, Expr, ExprKind };
-use crate::visitor::{ ScopeStack };
+use crate::analysis::hir::{ NodeID, Pattern, PatKind, Expr, ExprKind };
+use crate::analysis::visitor::{ ScopeStack };
 
 pub trait MutVisitor: Sized {
     fn get_scope_stack<'a>(&'a self) -> &'a ScopeStack;

@@ -1,7 +1,7 @@
 
-use crate::hir::{ NodeID, MatchCase, Expr };
 use crate::types::{ Type };
-use crate::visitor::{ Visitor };
+use crate::analysis::hir::{ NodeID, MatchCase, Expr };
+use crate::analysis::visitor::{ Visitor };
 
 use crate::misc::{ r };
 use crate::transform::transform::{ Transformer };

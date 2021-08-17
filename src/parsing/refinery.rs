@@ -3,11 +3,11 @@ use std::cell::RefCell;
 
 use crate::abi::ABI;
 use crate::types::Type;
-use crate::ast::{ Pos, ASTPattern, AST };
 use crate::misc::{ r, UniqueID };
 use crate::session::{ Session, Error };
 use crate::defs::modules::{ ModuleDef };
-use crate::hir::{ NodeID, Visibility, Mutability, AssignType, Literal, Argument, MatchCase, EnumVariant, Function, WhereClause, Pattern, Expr, ExprKind };
+use crate::parsing::ast::{ Pos, ASTPattern, AST };
+use crate::analysis::hir::{ NodeID, Visibility, Mutability, AssignType, Literal, Argument, MatchCase, EnumVariant, Function, WhereClause, Pattern, Expr, ExprKind };
 
 
 #[derive(Copy, Clone, Debug, PartialEq)]

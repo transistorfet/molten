@@ -3,10 +3,11 @@
 use crate::defs::Def;
 use crate::session::{ Session, Error };
 use crate::scope::{ ScopeRef };
-use crate::hir::{ NodeID, Visibility, Mutability, AssignType, Literal, MatchCase, EnumVariant, WhereClause, Function, Pattern, Expr, ExprKind };
 use crate::types::{ Type, Check, ABI, expect_type, resolve_type };
 use crate::misc::{ r };
-use crate::visitor::{ self, TypeVisitor, Visitor, ScopeStack };
+
+use crate::analysis::hir::{ NodeID, Visibility, Mutability, AssignType, Literal, MatchCase, EnumVariant, WhereClause, Function, Pattern, Expr, ExprKind };
+use crate::analysis::visitor::{ self, TypeVisitor, Visitor, ScopeStack };
 
 
 #[derive(Clone, Debug, PartialEq)]

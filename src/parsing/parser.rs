@@ -35,8 +35,8 @@ use std::str::FromStr;
 use crate::abi::ABI;
 use crate::types::Type;
 use crate::misc::{ r, UniqueID };
-use crate::ast::{ Pos, RawArgument, ASTPattern, AST };
-use crate::hir::{ Mutability, Visibility, AssignType, Literal, WhereClause };
+use crate::parsing::ast::{ Pos, RawArgument, ASTPattern, AST };
+use crate::analysis::hir::{ Mutability, Visibility, AssignType, Literal, WhereClause };
 
 
 ///// Parsing Macros /////

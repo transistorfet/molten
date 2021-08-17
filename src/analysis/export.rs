@@ -6,8 +6,8 @@ use crate::types::Type;
 use crate::config::Options;
 use crate::scope::{ ScopeRef };
 use crate::session::{ Session, Error };
-use crate::visitor::{ Visitor, ScopeStack };
-use crate::hir::{ NodeID, Visibility, Mutability, EnumVariant, WhereClause, Function, Expr, ExprKind };
+use crate::analysis::visitor::{ Visitor, ScopeStack };
+use crate::analysis::hir::{ NodeID, Visibility, Mutability, EnumVariant, WhereClause, Function, Expr, ExprKind };
 
 
 pub fn write_exports(session: &Session, scope: ScopeRef, filename: &str, code: &Vec<Expr>) {
