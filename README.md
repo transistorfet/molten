@@ -24,7 +24,7 @@ Installing
 You will need `rustc` and `cargo` installed.  It's recommended that you use
 `rustup` to install these.  I've most recently tested it with rustc version
 1.52.  You will also need LLVM 11 installed, as well as libgc
-(Boehm-Demers-Weiser's Garbage Collector), and clang to linking, although clang
+(Boehm-Demers-Weiser's Garbage Collector), and clang for linking, although clang
 can be replace with gcc by editing the `molten` python script.
 
 On Debian/Ubuntu, run:
