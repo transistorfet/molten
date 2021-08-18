@@ -2,7 +2,7 @@
 use crate::abi::ABI;
 use crate::session::{ Session, Error };
 use crate::scope::{ ScopeRef, Context };
-use crate::types::{ Type, resolve_type };
+use crate::types::{ Type, resolve_type, CheckRecursiveType };
 use crate::misc::{ UniqueID, r };
 
 use crate::defs::Def;
@@ -224,7 +224,7 @@ impl<'sess> Visitor for NameBinder<'sess> {
         for variant in variants.iter() {
             let mut variant = variant.clone();
             variant.ttype = self.bind_type_option(tscope.clone(), variant.ttype)?;
-            check_recursive_type(variant.ttype.as_ref(), defid)?;
+            CheckRecursiveType::check(variant.ttype.as_ref(), defid)?;
             enumdef.add_variant(self.session, variant)?;
         }
         Ok(())
@@ -410,42 +410,6 @@ fn bind_where_constraints(session: &Session, scope: ScopeRef, whereclause: &Wher
             panic!("We're only allowing 1 trait constraint per universal at the moment");
         }
         session.set_constraints(var_id, constraints);
-    }
-    Ok(())
-}
-
-pub fn check_recursive_type(ttype: Option<&Type>, forbidden_id: UniqueID) -> Result<(), Error> {
-    match ttype {
-        Some(ttype) => match ttype {
-            Type::Object(name, id, types) => {
-                if *id == forbidden_id {
-                    return Err(Error::new(format!("TypeError: an enum cannot contain itself in {:?}", name)));
-                }
-
-                for ttype in types.iter() {
-                    check_recursive_type(Some(ttype), forbidden_id)?;
-                }
-            },
-            Type::Tuple(types) => {
-                for ttype in types.iter() {
-                    check_recursive_type(Some(ttype), forbidden_id)?;
-                }
-            },
-            Type::Record(types) => {
-                for (_, ttype) in types.iter() {
-                    check_recursive_type(Some(ttype), forbidden_id)?;
-                }
-            },
-            Type::Universal(_, _id) |
-            Type::Variable(_id) => {
-                // TODO this might be an error?
-            },
-            Type::Ref(_) |
-            Type::Function(_, _, _) => {
-                // Any reference or function containing the type is ok
-            },
-        },
-        None => { },
     }
     Ok(())
 }

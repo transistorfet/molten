@@ -492,6 +492,10 @@ fn check_type_params(session: &Session, dtypes: &Vec<Type>, ctypes: &Vec<Type>, 
 }
 
 fn check_trait_constraints(session: &Session, var_id: UniqueID, ctype: &Type) -> bool {
+    if CheckRecursiveType::check(Some(ctype), var_id).is_err() {
+        return false;
+    }
+
     for trait_id in session.get_constraints(var_id) {
         if !check_trait_is_implemented(session, trait_id, ctype) {
             return false;
@@ -513,5 +517,51 @@ fn check_trait_is_implemented(session: &Session, trait_id: UniqueID, ctype: &Typ
         _ => panic!("InternalError: trait is not defined, but should be by this point {:?}", trait_id),
     }
     return false;
+}
+
+pub struct CheckRecursiveType {
+    forbidden_id: UniqueID
+}
+
+impl CheckRecursiveType {
+    pub fn check(ttype: Option<&Type>, forbidden_id: UniqueID) -> Result<(), Error> {
+        let mut checker = CheckRecursiveType { forbidden_id };
+        ttype.map(|ttype| checker.visit_type(ttype)).unwrap_or(Ok(()))
+    }
+
+    fn visit_type_vec<'a, I>(&mut self, items: I) -> Result<(), Error> where I: Iterator<Item = &'a Type> {
+        for item in items {
+            self.visit_type(item)?;
+        }
+        Ok(())
+    }
+
+    fn visit_type(&mut self, ttype: &Type) -> Result<(), Error> {
+        match ttype {
+            Type::Universal(_, id) |
+            Type::Variable(id) |
+            Type::Object(_, id, _) if *id == self.forbidden_id => {
+                return Err(Error::new("TypeError: type cannot contain itself".to_string()));
+            },
+            _ => { },
+        }
+
+        match ttype {
+            Type::Object(_, _, types) |
+            Type::Tuple(types) => {
+                self.visit_type_vec(types.iter())?;
+            },
+            Type::Record(types) => {
+                self.visit_type_vec(types.iter().map(|(_, ttype)| ttype))?;
+            },
+            Type::Universal(_, _) |
+            Type::Variable(_) |
+            Type::Ref(_) |
+            Type::Function(_, _, _) => {
+                // Any reference or function containing the type is ok
+            },
+        }
+        Ok(())
+    }
 }
 

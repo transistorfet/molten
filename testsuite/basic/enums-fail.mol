@@ -1,6 +1,6 @@
 
 //!should_fail
-//!err .*TypeError: an enum cannot contain itself in "TestThing"
+//!err .*TypeError: type cannot contain itself
 //!err .*
 
 
