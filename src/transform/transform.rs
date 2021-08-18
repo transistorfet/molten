@@ -681,6 +681,16 @@ impl<'sess> Transformer<'sess> {
         exprs
     }
 
+    pub fn transform_pattern_conjunction(&mut self, exprs: &mut Vec<LLExpr>, prev: Option<LLExpr>, pat: &Pattern, value_id: UniqueID) -> LLExpr {
+        let mut newexprs = self.transform_pattern(pat, value_id);
+        let result = newexprs.pop().unwrap();
+        exprs.extend(newexprs);
+        match prev {
+            Some(expr) => LLExpr::Cmp(LLCmpType::Equal, r(expr), r(result)),
+            None => result
+        }
+    }
+
     // TODO this can't be moved into the visitor yet because of the value_id (which represents the value to compare against)
     pub fn transform_pattern(&mut self, pat: &Pattern, value_id: UniqueID) -> Vec<LLExpr> {
         let mut exprs = vec!();
@@ -713,20 +723,26 @@ impl<'sess> Transformer<'sess> {
             },
 
             PatKind::Tuple(items) => {
+                let mut prev = None;
+
                 for (i, item) in items.iter().enumerate() {
                     let value = LLExpr::GetItem(r(LLExpr::GetValue(value_id)), i);
                     exprs.push(LLExpr::SetValue(item.id, r(value)));
-                    exprs.extend(self.transform_pattern(&item, item.id));
+                    prev = Some(self.transform_pattern_conjunction(&mut exprs, prev, &item, item.id));
                 }
+                exprs.push(prev.unwrap());
             },
 
             PatKind::Record(items) => {
+                let mut prev = None;
+
                 for (i, (_, item)) in items.iter().enumerate() {
                     //let index = items.iter().position(|(name, _)| name == field).unwrap();
                     let value = LLExpr::GetItem(r(LLExpr::GetValue(value_id)), i);
                     exprs.push(LLExpr::SetValue(item.id, r(value)));
-                    exprs.extend(self.transform_pattern(&item, item.id));
+                    prev = Some(self.transform_pattern_conjunction(&mut exprs, prev, &item, item.id));
                 }
+                exprs.push(prev.unwrap());
             },
 
             PatKind::EnumVariant(_, args, eid) => {
@@ -753,15 +769,21 @@ impl<'sess> Transformer<'sess> {
                         ))
                     )));
 
+                    let mut prev = None;
                     let argtypes = self.session.get_type(*eid).unwrap().as_vec();
                     for ((i, arg), packed_type) in args.iter().enumerate().zip(argtypes.iter()) {
                         let unpacked_type = self.session.get_type(arg.id).unwrap();
                         let value = self.check_convert_to_trait(&mut exprs, &unpacked_type, packed_type, LLExpr::GetItem(r(LLExpr::GetValue(item_id)), i));
                         exprs.push(LLExpr::SetValue(arg.id, r(value)));
-                        exprs.extend(self.transform_pattern(&arg, arg.id));
+                        prev = Some(self.transform_pattern_conjunction(&mut exprs, prev, &arg, arg.id));
                     }
+                    exprs.push(prev.unwrap());
+                } else {
+                    exprs.push(LLExpr::Literal(LLLit::I1(true)));
                 }
-                exprs.push(LLExpr::Cmp(LLCmpType::Equal, r(LLExpr::GetItem(r(LLExpr::GetValue(value_id)), 0)), r(LLExpr::Literal(LLLit::I8(variant as i8)))));
+
+                let variant_result = LLExpr::Cmp(LLCmpType::Equal, r(LLExpr::GetItem(r(LLExpr::Cast(LLType::Alias(enumdef.id), r(LLExpr::GetValue(value_id)))), 0)), r(LLExpr::Literal(LLLit::I8(variant as i8))));
+                exprs = vec!(LLExpr::Phi(vec!(vec!(variant_result)), vec!(exprs)));
             },
         }
         exprs

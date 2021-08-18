@@ -211,6 +211,17 @@ match x with
 | num => "It's not one or five, it's " + str(num)
 ```
 
+Values can be unpacked with match as well, including records, tuples, refs, and
+enum variants.  A underscore `_` will match any value, and an identifier (eg.
+`value`) will match anything and bind that value to the name in the process, so
+that it can be referenced inside the match arm.  Here's an example using a
+record:
+```
+match { num = 10, name = "Ten" } with
+| { num = 10, name = value } => println(value)
+| { num = _, name = value } => println("Something else named " + value)
+```
+
 ### Loops
 ```
 while true

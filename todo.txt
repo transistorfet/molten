@@ -1,20 +1,14 @@
 
 * seems to be problems implementing Display on Option<'item>, caused by check_trait_constraints() which causes a recursive loop checking Option<'item> with 'item
 * the issue is with accessing the item inside the option, which causes a segfault, probably because of that issue with packing/unpacking
-
-* matching tuples and records is broken because of the way it's done.  Only one field will actually be compared and the other instructions will do nothing.  This is
-  due to the strange way that patterns are being transformed
-
-* you can't import files that contain a dash in the filename
-* using a decl for a function defined in later, in the same module, causes an overload error rather than linking the definition and declaration
-
-* the try block's pattern matching is not useful because subtyping wont let us match different parents, only inheritence chains, so we really need an exception enum to be
-  usable, which could mean using the `exception` keyword like in ML or make a way of extending enums
-* you currently can't call a method on a type that implements a trait.  You can only call the trait methods on a universal, but that shouldn't be necessary
 * fix the issue where passing a function `() -> String` into another function as `() -> 'a`, with a universal, will unpack the String value without packing it from within
   the non-universal function, causing a segfault.  Should we just disallow anything but a bare universal?
 
-* write overview
+* you can't import files that contain a dash in the filename
+* using a decl for a function defined in later, in the same module, causes an overload error rather than linking the definition and declaration
+* the try block's pattern matching is not useful because subtyping wont let us match different parents, only inheritence chains, so we really need an exception enum to be
+  usable, which could mean using the `exception` keyword like in ML or make a way of extending enums
+* you currently can't call a method on a type that implements a trait.  You can only call the trait methods on a universal, but that shouldn't be necessary
 
 
 * implement trait dependence

@@ -264,6 +264,7 @@ match val with
 
 fn print_node(node) {
     match node with
+        | Value::String("Hey\n") => println("Quite")
         | Value::String(s) => println("So " + s)
         | Value::Tree(t) => {
             println("Tree")
@@ -438,9 +439,9 @@ is_cat and println("It's a cat") == ()
 
 match (11, "Ten") with
 | (10, name) => println(name)
-| (10, _) => println("Something else named ")
+| (_, name) => println("Something else named " + name)
 
-match { num = 11, name = "Ten" } with
+match { num = 10, name = "Ten" } with
 | { num = 10, name = name } => println(name)
 | { num = _, name = name } => println("Something else named " + name)
 
