@@ -264,6 +264,7 @@ match val with
 
 fn print_node(node) {
     match node with
+        | Value::String("Something Else") => println("Hmmm...")
         | Value::String("Hey\n") => println("Quite")
         | Value::String(s) => println("So " + s)
         | Value::Tree(t) => {

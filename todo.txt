@@ -8,7 +8,11 @@
 * using a decl for a function defined in later, in the same module, causes an overload error rather than linking the definition and declaration
 * the try block's pattern matching is not useful because subtyping wont let us match different parents, only inheritence chains, so we really need an exception enum to be
   usable, which could mean using the `exception` keyword like in ML or make a way of extending enums
+
 * you currently can't call a method on a type that implements a trait.  You can only call the trait methods on a universal, but that shouldn't be necessary
+* you could have a scope in session which is for *all* traits, and all trait methods get defined in that table, and if method lookup fails through normal means, you can
+  lookup on the common traits table to find the trait_id, and then make an access to the method in the static vtable if it exists, but you'd have to maybe do more work
+  in transform to find these places and properly convert them
 
 
 * implement trait dependence

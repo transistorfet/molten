@@ -328,7 +328,8 @@ val.is_some()
 
 ### Traits and Trait Objects
 A trait can be defined with method declarations in the body, with the predefined
-type alias "Self" used to refer to the current trait object ```
+type alias "Self" used to refer to the current trait object
+```
 trait Add {
     decl add(Self, Self) -> Self
 }
@@ -368,6 +369,7 @@ fn do_some_adding(x: 'a) -> 'a where a: Add {
 println(str(do_some_adding(400)))
 println(str(do_some_adding(1.5)))
 ```
+
 The above example will output:
 ```
 800
