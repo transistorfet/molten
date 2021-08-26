@@ -465,6 +465,6 @@ impl Display for { a: Int, b: String } {
 }
 */
 
-let value_added = true
-println(value_added.str())
+//let value_added = true
+//println(value_added.str())
 

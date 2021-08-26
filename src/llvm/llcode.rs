@@ -100,6 +100,7 @@ pub enum LLExpr {
     LoadRef(R<LLExpr>),
     StoreRef(R<LLExpr>, R<LLExpr>),
 
+    And(R<LLExpr>, R<LLExpr>),
     Cmp(LLCmpType, R<LLExpr>, R<LLExpr>),
     Phi(Vec<LLBlock>, Vec<LLBlock>),
     Loop(LLBlock, LLBlock),

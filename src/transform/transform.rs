@@ -686,7 +686,8 @@ impl<'sess> Transformer<'sess> {
         let result = newexprs.pop().unwrap();
         exprs.extend(newexprs);
         match prev {
-            Some(expr) => LLExpr::Cmp(LLCmpType::Equal, r(expr), r(result)),
+            //Some(expr) => LLExpr::Cmp(LLCmpType::Equal, r(expr), r(result)),
+            Some(expr) => LLExpr::And(r(LLExpr::Cmp(LLCmpType::Equal, r(expr), r(LLExpr::Literal(LLLit::I1(true))))), r(LLExpr::Cmp(LLCmpType::Equal, r(result), r(LLExpr::Literal(LLLit::I1(true)))))),
             None => result
         }
     }

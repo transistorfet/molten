@@ -724,6 +724,12 @@ impl<'sess> LLVM<'sess> {
                 self.build_store(pointer, value)
             },
 
+            LLExpr::And(expr1, expr2) => {
+                let val1 = self.build_expr(expr1);
+                let val2 = self.build_expr(expr2);
+                LLVMBuildAnd(self.builder, val1, val2, cstr(""))
+            },
+
             LLExpr::Cmp(cmp, expr1, expr2) => {
                 let val1 = self.build_expr(expr1);
                 let val2 = self.build_expr(expr2);

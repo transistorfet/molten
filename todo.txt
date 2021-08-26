@@ -1,6 +1,4 @@
 
-* yet more problems with pattern matching.  match-types.mol fails now because it's matching patterns it shouldn't (possibly due to how you're doing conjunction)
-
 * you currently can't call a method on a type that implements a trait.  You can only call the trait methods on a universal, but that shouldn't be necessary
 * you could have a scope in session which is for *all* traits, and all trait methods get defined in that table, and if method lookup fails through normal means, you can
   lookup on the common traits table to find the trait_id, and then make an access to the method in the static vtable if it exists, but you'd have to maybe do more work
