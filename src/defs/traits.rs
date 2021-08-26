@@ -47,7 +47,7 @@ impl TraitDef {
         let deftype = Type::Universal(traitname.to_string(), defid);
         let vtable = Vtable::create(session, UniqueID::generate(), format!("{}_vtable", traitname))?;
         let traitdef = Self::new_ref(defid, vars, deftype.clone(), vtable);
-        scope.define_type(traitname, defid)?;
+        scope.define_trait(traitname, defid)?;
         session.set_def(defid, Def::TraitDef(traitdef.clone()));
         session.set_type(defid, deftype);
         session.set_constraints(defid, vec!(defid));
@@ -97,17 +97,15 @@ impl TraitImpl {
     }
 
     #[must_use]
-    pub fn define(session: &Session, scope: ScopeRef, impl_id: UniqueID, trait_id: UniqueID, impltype: Type) -> Result<TraitImplRef, Error> {
+    pub fn define(session: &Session, impl_id: UniqueID, trait_id: UniqueID, impltype: Type) -> Result<TraitImplRef, Error> {
         let deftype = session.get_type(trait_id).unwrap();
-        let name = format!("{}_{}", deftype.get_name()?, impltype.get_name()?);
         let tscope = session.map.get(impl_id).unwrap();
         TypeAliasDef::define(session, tscope.clone(), UniqueID::generate(), Type::Object("Self".to_string(), impl_id, vec!()), impltype.clone())?;
 
         let vars = Scope::new_ref("", Context::TraitImpl(trait_id, impl_id), None);
 
-        let vtable = Vtable::create(session, UniqueID::generate(), format!("{}_vtable", name.clone()))?;
+        let vtable = Vtable::create(session, UniqueID::generate(), format!("{}_{}_vtable", deftype.get_name()?, impltype.get_name()?))?;
         let traitimpl = Self::new_ref(impl_id, trait_id, impltype.clone(), vars, vtable);
-        scope.define_type(&name, impl_id)?;
         session.set_def(impl_id, Def::TraitImpl(traitimpl.clone()));
         session.set_ref(impl_id, trait_id);
         session.set_type(impl_id, impltype);

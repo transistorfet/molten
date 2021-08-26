@@ -245,12 +245,12 @@ impl<'sess> Visitor for NameBinder<'sess> {
     fn visit_trait_impl(&mut self, refid: UniqueID, traitname: &str, impltype: &Type, whereclause: &WhereClause, body: &Vec<Expr>) -> Result<Self::Return, Error> {
         let scope = self.stack.get_scope();
         let impl_id = self.session.new_def_id(refid);
-        let trait_id = scope.get_type_def(traitname).ok_or_else(|| Error::new(format!("NameError: undefined type {:?}", traitname)))?;
+        let trait_id = scope.get_trait_def(traitname).ok_or_else(|| Error::new(format!("NameError: undefined type {:?}", traitname)))?;
         let tscope = self.session.map.get_or_add(impl_id, traitname, Context::TraitImpl(trait_id, impl_id), Some(scope.clone()));
 
         let impltype = self.bind_type(tscope.clone(), impltype.clone())?;
         bind_where_constraints(self.session, tscope.clone(), whereclause)?;
-        TraitImpl::define(self.session, scope.clone(), impl_id, trait_id, impltype)?;
+        TraitImpl::define(self.session, impl_id, trait_id, impltype)?;
 
         self.with_scope(tscope, |visitor| {
             visitor.visit_vec(body)
@@ -401,7 +401,7 @@ pub fn bind_type_names(session: &Session, scope: ScopeRef, ttype: Option<&mut Ty
 fn bind_where_constraints(session: &Session, scope: ScopeRef, whereclause: &WhereClause) -> Result<(), Error> {
     for (varname, traitname) in &whereclause.constraints {
         let var_id = scope.get_type_def(&varname).ok_or_else(|| Error::new(format!("TypeError: definition not set for {:?}", varname)))?;
-        let trait_id = scope.get_type_def(&traitname).ok_or_else(|| Error::new(format!("TypeError: definition not set for {:?}", traitname)))?;
+        let trait_id = scope.get_trait_def(&traitname).ok_or_else(|| Error::new(format!("TypeError: definition not set for {:?}", traitname)))?;
         let mut constraints = session.get_constraints(var_id);
         if !constraints.contains(&trait_id) {
             constraints.push(trait_id);

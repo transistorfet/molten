@@ -1,18 +1,24 @@
 
-* seems to be problems implementing Display on Option<'item>, caused by check_trait_constraints() which causes a recursive loop checking Option<'item> with 'item
-* the issue is with accessing the item inside the option, which causes a segfault, probably because of that issue with packing/unpacking
-* fix the issue where passing a function `() -> String` into another function as `() -> 'a`, with a universal, will unpack the String value without packing it from within
-  the non-universal function, causing a segfault.  Should we just disallow anything but a bare universal?
-
-* you can't import files that contain a dash in the filename
-* using a decl for a function defined in later, in the same module, causes an overload error rather than linking the definition and declaration
-* the try block's pattern matching is not useful because subtyping wont let us match different parents, only inheritence chains, so we really need an exception enum to be
-  usable, which could mean using the `exception` keyword like in ML or make a way of extending enums
+* yet more problems with pattern matching.  match-types.mol fails now because it's matching patterns it shouldn't (possibly due to how you're doing conjunction)
 
 * you currently can't call a method on a type that implements a trait.  You can only call the trait methods on a universal, but that shouldn't be necessary
 * you could have a scope in session which is for *all* traits, and all trait methods get defined in that table, and if method lookup fails through normal means, you can
   lookup on the common traits table to find the trait_id, and then make an access to the method in the static vtable if it exists, but you'd have to maybe do more work
   in transform to find these places and properly convert them
+
+---
+* it's now possible in example/binary tree to declare print_tree() as generic, but then it prints garbled data because of the issue encoding type variables embedded in another type
+  (eg. ref BinaryTree<'item>)
+* seems to be problems implementing Display on Option<'item>, caused by check_trait_constraints() which causes a recursive loop checking Option<'item> with 'item
+* the issue is with accessing the item inside the option, which causes a segfault, probably because of that issue with packing/unpacking
+* fix the issue where passing a function `() -> String` into another function as `() -> 'a`, with a universal, will unpack the String value without packing it from within
+  the non-universal function, causing a segfault.  Should we just disallow anything but a bare universal?
+---
+
+* you can't import files that contain a dash in the filename
+* using a decl for a function defined in later, in the same module, causes an overload error rather than linking the definition and declaration
+* the try block's pattern matching is not useful because subtyping wont let us match different parents, only inheritence chains, so we really need an exception enum to be
+  usable, which could mean using the `exception` keyword like in ML or make a way of extending enums
 
 
 * implement trait dependence

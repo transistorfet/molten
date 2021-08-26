@@ -14,7 +14,9 @@ match (1, 2) with
 | _ => println("not quite")
 
 
+// The record pattern fields are in a different order
 match { a = 1, b = 2 } with
+| { b = 1, a = 2 } => println(str(2))
 | { b = 2, a = 1 } => println(str(1))
 | _ => println("fail")
 

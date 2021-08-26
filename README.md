@@ -384,9 +384,9 @@ with e => println("Exception Occurred: " + e.msg)
 
 try {
     //...
-    raise "Problem"
+    raise new Exception("Problem")
 } with
-    e => println(e)
+    e => println(e.msg)
 ```
 
 ### Annotations

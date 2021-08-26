@@ -446,3 +446,25 @@ match { num = 10, name = "Ten" } with
 | { num = 10, name = name } => println(name)
 | { num = _, name = name } => println("Something else named " + name)
 
+
+/*
+class Name {
+// Using a trait def as an object type improperly
+val t: Display
+
+}
+*/
+
+//Display::str(true)
+
+/*
+impl Display for { a: Int, b: String } {
+    fn str(self) {
+        self.b
+    }
+}
+*/
+
+let value_added = true
+println(value_added.str())
+

@@ -294,7 +294,7 @@ impl TraitFuncDef {
         };
 
         let def = Def::TraitFunc(Rc::new(TraitFuncDef {
-            closure: closure,
+            closure,
             trait_id,
             impl_id,
             impl_func_id,

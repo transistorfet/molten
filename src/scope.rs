@@ -12,6 +12,7 @@ use crate::defs::Def;
 
 const NAMES: usize = 0;
 const TYPES: usize = 1;
+const TRAITS: usize = 2;
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum Context {
@@ -28,7 +29,7 @@ pub enum Context {
 pub struct Scope {
     pub context: Cell<Context>,
     pub basename: RefCell<String>,
-    pub namespaces: [RefCell<HashMap<String, UniqueID>>; 2],
+    pub namespaces: [RefCell<HashMap<String, UniqueID>>; 3],
     pub parent: Option<ScopeRef>,
 }
 
@@ -39,7 +40,7 @@ impl Scope {
         Scope {
             context: Cell::new(context),
             basename: RefCell::new(String::from(name)),
-            namespaces: [ RefCell::new(HashMap::new()), RefCell::new(HashMap::new()) ],
+            namespaces: [ RefCell::new(HashMap::new()), RefCell::new(HashMap::new()), RefCell::new(HashMap::new()) ],
             parent: parent,
         }
     }
@@ -155,6 +156,24 @@ impl Scope {
             f(&name, *id)
         }
     }
+
+    ///// Trait Functions /////
+
+    pub fn define_trait(&self, name: &str, defid: UniqueID) -> Result<(), Error> {
+        let mut traits = self.namespaces[TRAITS].borrow_mut();
+        match traits.contains_key(name) {
+            true => Err(Error::new(format!("NameError: trait is already defined; {:?}", name))),
+            false => {
+                traits.insert(name.to_string(), defid);
+                Ok(())
+            },
+        }
+    }
+
+    pub fn get_trait_def(&self, name: &str) -> Option<UniqueID> {
+        self._search(TRAITS, name, |id| Some(id), None)
+    }
+
 
     ///// Name Functions /////
 
