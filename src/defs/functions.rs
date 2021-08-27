@@ -76,7 +76,7 @@ impl OverloadDef {
         let defid = UniqueID::generate();
         let def = Rc::new(OverloadDef {
             id: defid,
-            parent: parent,
+            parent,
             variants: RefCell::new(vec!())
         });
         for variant in variants {
@@ -259,7 +259,7 @@ impl MethodDef {
         };
 
         let def = Def::Method(Rc::new(MethodDef {
-            closure: closure,
+            closure,
             id: defid,
         }));
 
@@ -329,7 +329,7 @@ impl CFuncDef {
 
         let def = Def::CFunc(Rc::new(CFuncDef {
             id: defid,
-            vis: vis,
+            vis,
         }));
 
         scope.define(name, defid)?;

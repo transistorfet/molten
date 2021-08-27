@@ -8,11 +8,11 @@ use crate::misc::{ UniqueID, r };
 use crate::defs::Def;
 use crate::defs::enums::EnumDef;
 use crate::defs::classes::ClassDef;
-use crate::defs::functions::{ AnyFunc };
+use crate::defs::functions::AnyFunc;
+use crate::defs::modules::ModuleDef;
 use crate::defs::types::TypeAliasDef;
 use crate::defs::variables::{ AnyVar, VarDef, ArgDef };
 use crate::defs::traits::{ TraitDef, TraitImpl };
-use crate::defs::modules::{ ModuleDef };
 
 use crate::analysis::hir::{ Visibility, Mutability, MatchCase, EnumVariant, WhereClause, Function, Pattern, Expr, ExprKind };
 use crate::analysis::visitor::{ self, Visitor, ScopeStack };
@@ -28,7 +28,7 @@ pub struct NameBinder<'sess> {
 impl<'sess> NameBinder<'sess> {
     pub fn bind_names(session: &'sess Session, scope: ScopeRef, code: &Vec<Expr>) {
         let mut namebinder = NameBinder {
-            session: session,
+            session,
             stack: ScopeStack::new(),
         };
 
@@ -48,11 +48,11 @@ impl<'sess> Visitor for NameBinder<'sess> {
         ()
     }
 
-    fn get_scope_stack<'a>(&'a self) -> &'a ScopeStack {
+    fn get_scope_stack(&self) -> &ScopeStack {
         &self.stack
     }
 
-    fn get_session<'b>(&'b self) -> &'b Session {
+    fn get_session(&self) -> &Session {
         self.session
     }
 

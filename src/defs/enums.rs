@@ -9,7 +9,7 @@ use crate::types::Type;
 use crate::misc::UniqueID;
 use crate::scope::{ Scope, ScopeRef, Context };
 use crate::session::{ Session, Error };
-use crate::analysis::hir::{ EnumVariant };
+use crate::analysis::hir::EnumVariant;
 
 
 #[derive(Clone, Debug, PartialEq)]
@@ -27,8 +27,8 @@ impl EnumDef {
     pub fn new(defid: UniqueID, vars: ScopeRef, deftype: Type) -> Self {
         Self {
             id: defid,
-            vars: vars,
-            deftype: deftype,
+            vars,
+            deftype,
             variants: RefCell::new(vec!()),
         }
     }

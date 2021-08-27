@@ -7,13 +7,13 @@ use crate::types::Type;
 use crate::defs::Def;
 use crate::misc::UniqueID;
 use crate::scope::ScopeMapRef;
-use crate::parsing::ast::{ Pos };
-use crate::analysis::visitor::{ Visitor };
+use crate::parsing::ast::Pos;
+use crate::analysis::visitor::Visitor;
 use crate::analysis::hir::{ Visibility, Mutability, Argument, Function, Expr, ExprKind };
 
 use crate::misc::{ r };
+use crate::transform::classes::StructTransform;
 use crate::transform::transform::{ Transformer, CodeContext };
-use crate::transform::classes::{ StructTransform };
 use crate::llvm::llcode::{ LLType, LLLink, LLRef, LLCC, LLExpr, LLGlobal };
 
 
@@ -74,7 +74,7 @@ impl<'sess> Transformer<'sess> {
         let funcresult = self.transform_as_result(&mut exprs, func);
         exprs.extend(self.create_func_invoke(abi, funcresult, fargs));
         let last = exprs.pop().unwrap();
-        let result = self.check_convert_to_trait(&mut exprs, &rettype, src_type, last);
+        let result = self.check_convert_to_trait(&mut exprs, rettype, src_type, last);
         exprs.push(result);
         exprs
     }
@@ -230,10 +230,10 @@ impl ClosureTransform {
         transform.insert_global(index, LLGlobal::DefType(cl.compiled_func_id, fname.clone(), compiled_func_type.clone()));
 
         let llvis = transform.transform_vis(vis);
-        transform.insert_global(index, LLGlobal::DefCFunc(cl.compiled_func_id, llvis, compiled_func_name.clone(), compiled_func_type.clone(), fargs, body, LLCC::FastCC));
+        transform.insert_global(index, LLGlobal::DefCFunc(cl.compiled_func_id, llvis, compiled_func_name, compiled_func_type, fargs, body, LLCC::FastCC));
 
         let structtype = LLType::Ptr(r(StructTransform::get_type(transform, &cl.context_struct)));
-        transform.insert_global(index, LLGlobal::DefType(cl.context_type_id, format!("__context_{}__", cl.context_type_id), structtype.clone()));
+        transform.insert_global(index, LLGlobal::DefType(cl.context_type_id, format!("__context_{}__", cl.context_type_id), structtype));
 
 
         let mut fields = vec!();
@@ -249,12 +249,12 @@ impl ClosureTransform {
         // TODO if you could make this create and set the struct with the fptr and allocated context set before it then populates the context, then
         //      you wouldn't need the special recursive case in transform_reference.  It should be represented as an object, since the closure has a
         //      struct already, but it will take some refactoring first
-        code.push(Expr::new_with_id(did_context, Pos::empty(), ExprKind::Definition(Mutability::Mutable, context_name.clone(), None, r(
+        code.push(Expr::new_with_id(did_context, Pos::empty(), ExprKind::Definition(Mutability::Mutable, context_name, None, r(
             Expr::make_ref(Pos::empty(), Expr::make_record(Pos::empty(), fields))
         ))));
 
         binding::NameBinder::bind_names(transform.session, scope.clone(), &code);
-        typecheck::TypeChecker::check(transform.session, scope.clone(), &code);
+        typecheck::TypeChecker::check(transform.session, scope, &code);
         let mut exprs = transform.visit_vec(&code).unwrap();
         let did_context_defid = transform.session.get_ref(did_context).unwrap();
 

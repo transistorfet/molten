@@ -9,12 +9,12 @@ use std::io::prelude::*;
 use std::collections::HashMap;
 
 use crate::types;
+use crate::defs::Def;
+use crate::types::Type;
 use crate::misc::UniqueID;
 use crate::parsing::parser;
-use crate::defs::{ Def };
 use crate::config::Options;
-use crate::types::{ Type };
-use crate::scope::{ ScopeMapRef };
+use crate::scope::ScopeMapRef;
 use crate::parsing::ast::{ Pos, AST };
 
 
@@ -230,11 +230,11 @@ pub struct Error {
 
 impl Error {
     pub fn new(msg: String) -> Error {
-        Error { pos: None, msg: msg }
+        Error { pos: None, msg }
     }
 
     pub fn new_pos(pos: Pos, msg: String) -> Error {
-        Error { pos: Some(pos), msg: msg }
+        Error { pos: Some(pos), msg }
     }
 
     pub fn add_pos(mut self, pos: Pos) -> Error {

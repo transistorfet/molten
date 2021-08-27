@@ -6,14 +6,14 @@ use crate::defs::Def;
 use crate::types::Type;
 use crate::misc::UniqueID;
 use crate::config::Options;
-use crate::scope::{ ScopeRef };
+use crate::scope::ScopeRef;
 use crate::session::{ Session, Error };
-use crate::parsing::ast::{ Pos };
+use crate::parsing::ast::Pos;
 use crate::analysis::hir::{ Visibility, Mutability, AssignType, Literal, MatchCase, EnumVariant, WhereClause, Function, Pattern, PatKind, Expr, ExprKind };
 use crate::defs::modules::ModuleDef;
 
 use crate::misc::{ r };
-use crate::transform::functions::{ ClosureTransform };
+use crate::transform::functions::ClosureTransform;
 use crate::llvm::llcode::{ LLType, LLLit, LLRef, LLCmpType, LLLink, LLCC, LLExpr, LLGlobal };
 
 use crate::analysis::visitor::{ Visitor, ScopeStack };
@@ -38,7 +38,7 @@ pub struct Transformer<'sess> {
 impl<'sess> Transformer<'sess> {
     pub fn new(session: &'sess Session) -> Self {
         Transformer {
-            session: session,
+            session,
             stack: ScopeStack::new(),
             context: vec!(),
             globals: vec!(),
@@ -105,7 +105,7 @@ impl<'sess> Transformer<'sess> {
     }
 
     pub fn transform_code(&mut self, scope: ScopeRef, code: &Vec<Expr>) {
-        self.stack.push_scope(scope.clone());
+        self.stack.push_scope(scope);
 
         let exp_id = UniqueID::generate();
         self.declare_global_exception_point(exp_id);
@@ -127,11 +127,11 @@ impl<'sess> Visitor for Transformer<'sess> {
         vec!()
     }
 
-    fn get_scope_stack<'a>(&'a self) -> &'a ScopeStack {
+    fn get_scope_stack(&self) -> &ScopeStack {
         &self.stack
     }
 
-    fn get_session<'b>(&'b self) -> &'b Session {
+    fn get_session(&self) -> &Session {
         self.session
     }
 
@@ -173,7 +173,7 @@ impl<'sess> Visitor for Transformer<'sess> {
     }
 
     fn visit_tuple(&mut self, refid: UniqueID, items: &Vec<Expr>) -> Result<Self::Return, Error> {
-        Ok(self.transform_tuple_lit(refid, &items))
+        Ok(self.transform_tuple_lit(refid, items))
     }
 
     fn visit_record(&mut self, refid: UniqueID, items: &Vec<(String, Expr)>) -> Result<Self::Return, Error> {
@@ -185,7 +185,7 @@ impl<'sess> Visitor for Transformer<'sess> {
     }
 
     fn visit_record_update(&mut self, refid: UniqueID, record: &Expr, items: &Vec<(String, Expr)>) -> Result<Self::Return, Error> {
-        Ok(self.transform_record_update(refid, &record, &items))
+        Ok(self.transform_record_update(refid, record, items))
     }
 
     fn visit_identifier(&mut self, refid: UniqueID, name: &str) -> Result<Self::Return, Error> {
@@ -410,7 +410,7 @@ impl<'sess> Transformer<'sess> {
         match &ttype {
             Type::Object(_, id, _) => self.get_type(*id).unwrap(),
             Type::Ref(ttype) => LLType::Ptr(r(self.transform_value_type(ttype))),
-            Type::Tuple(items) => LLType::Struct(items.iter().map(|item| self.transform_value_type(&item)).collect()),
+            Type::Tuple(items) => LLType::Struct(items.iter().map(|item| self.transform_value_type(item)).collect()),
             Type::Record(items) => LLType::Struct(items.iter().map(|item| self.transform_value_type(&item.1)).collect()),
             Type::Variable(id) => panic!("Unexpected placeholder type variable during transform: {}", id),
             // TODO how will you do generics
@@ -486,7 +486,7 @@ impl<'sess> Transformer<'sess> {
         let defid = UniqueID::generate();
         let compiled_func_id = UniqueID::generate();
         let scope = self.stack.get_scope();
-        let ttype = Type::Function(r(Type::Tuple(vec!())), r(scope.find_type(self.session, "Bool").unwrap().clone()), ABI::Molten);
+        let ttype = Type::Function(r(Type::Tuple(vec!())), r(scope.find_type(self.session, "Bool").unwrap()), ABI::Molten);
         let lltype = ClosureTransform::convert_to_def_type(LLType::Function(vec!(), r(LLType::I1)));
         self.session.set_type(defid, ttype.clone());
         self.set_type(compiled_func_id, lltype.clone());
@@ -729,7 +729,7 @@ impl<'sess> Transformer<'sess> {
                 for (i, item) in items.iter().enumerate() {
                     let value = LLExpr::GetItem(r(LLExpr::GetValue(value_id)), i);
                     exprs.push(LLExpr::SetValue(item.id, r(value)));
-                    prev = Some(self.transform_pattern_conjunction(&mut exprs, prev, &item, item.id));
+                    prev = Some(self.transform_pattern_conjunction(&mut exprs, prev, item, item.id));
                 }
                 exprs.push(prev.unwrap());
             },
@@ -741,7 +741,7 @@ impl<'sess> Transformer<'sess> {
                     //let index = items.iter().position(|(name, _)| name == field).unwrap();
                     let value = LLExpr::GetItem(r(LLExpr::GetValue(value_id)), i);
                     exprs.push(LLExpr::SetValue(item.id, r(value)));
-                    prev = Some(self.transform_pattern_conjunction(&mut exprs, prev, &item, item.id));
+                    prev = Some(self.transform_pattern_conjunction(&mut exprs, prev, item, item.id));
                 }
                 exprs.push(prev.unwrap());
             },
@@ -776,7 +776,7 @@ impl<'sess> Transformer<'sess> {
                         let unpacked_type = self.session.get_type(arg.id).unwrap();
                         let value = self.check_convert_to_trait(&mut exprs, &unpacked_type, packed_type, LLExpr::GetItem(r(LLExpr::GetValue(item_id)), i));
                         exprs.push(LLExpr::SetValue(arg.id, r(value)));
-                        prev = Some(self.transform_pattern_conjunction(&mut exprs, prev, &arg, arg.id));
+                        prev = Some(self.transform_pattern_conjunction(&mut exprs, prev, arg, arg.id));
                     }
                     exprs.push(prev.unwrap());
                 } else {

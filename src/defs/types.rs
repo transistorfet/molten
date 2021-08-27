@@ -21,7 +21,7 @@ impl TypeAliasDef {
     pub fn new(defid: UniqueID, deftype: Type) -> Self {
         Self {
             id: defid,
-            deftype: deftype,
+            deftype,
         }
     }
 

@@ -3,9 +3,9 @@ use std::collections::HashMap;
 
 use crate::defs::Def;
 use crate::misc::UniqueID;
+use crate::scope::ScopeRef;
 use crate::types::{ Type, Check, check_type };
 use crate::session::{ Session, Error };
-use crate::scope::{ ScopeRef };
 use crate::analysis::hir::{ Function, WhereClause, Expr, ExprKind };
 use crate::analysis::visitor::{ self, Visitor, ScopeStack };
 
@@ -20,7 +20,7 @@ pub struct Validator<'sess> {
 impl<'sess> Validator<'sess> {
     pub fn validate(session: &'sess Session, scope: ScopeRef, code: &Vec<Expr>) -> () {
         let mut validator = Validator {
-            session: session,
+            session,
             stack: ScopeStack::new(),
         };
 
@@ -39,11 +39,11 @@ impl<'sess> Visitor for Validator<'sess> {
         ()
     }
 
-    fn get_scope_stack<'a>(&'a self) -> &'a ScopeStack {
+    fn get_scope_stack(&self) -> &ScopeStack {
         &self.stack
     }
 
-    fn get_session<'b>(&'b self) -> &'b Session {
+    fn get_session(&self) -> &Session {
         self.session
     }
 

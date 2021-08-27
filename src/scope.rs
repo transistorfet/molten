@@ -6,7 +6,7 @@ use std::collections::HashMap;
 
 use crate::abi::ABI;
 use crate::types::Type;
-use crate::misc::{ UniqueID };
+use crate::misc::UniqueID;
 use crate::session::{ Session, Error };
 use crate::defs::Def;
 
@@ -41,7 +41,7 @@ impl Scope {
             context: Cell::new(context),
             basename: RefCell::new(String::from(name)),
             namespaces: [ RefCell::new(HashMap::new()), RefCell::new(HashMap::new()), RefCell::new(HashMap::new()) ],
-            parent: parent,
+            parent,
         }
     }
 

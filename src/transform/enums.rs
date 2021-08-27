@@ -5,8 +5,8 @@ use crate::misc::UniqueID;
 
 use crate::defs::enums::EnumDefRef;
 
-use crate::transform::transform::{ Transformer };
-use crate::transform::functions::{ CFuncTransform };
+use crate::transform::transform::Transformer;
+use crate::transform::functions::CFuncTransform;
 use crate::llvm::llcode::{ LLType, LLLit, LLCC, LLLink, LLExpr, LLGlobal };
 
 
@@ -61,9 +61,8 @@ impl<'sess> Transformer<'sess> {
 
     pub fn create_enum_struct(&mut self, id: UniqueID, name: String, selector: LLType, ltype: Option<LLType>) {
         let mut body = vec!(selector);
-        match ltype {
-            Some(ltype) => body.push(ltype),
-            None => { },
+        if let Some(ltype) = ltype {
+            body.push(ltype);
         }
 
         self.add_global(LLGlobal::DefNamedStruct(id, name, false));

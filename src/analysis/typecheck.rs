@@ -2,7 +2,7 @@
 
 use crate::defs::Def;
 use crate::session::{ Session, Error };
-use crate::scope::{ ScopeRef };
+use crate::scope::ScopeRef;
 use crate::types::{ Type, Check, ABI, expect_type, resolve_type };
 use crate::misc::{ r, UniqueID };
 
@@ -20,7 +20,7 @@ pub struct TypeChecker<'sess> {
 impl<'sess> TypeChecker<'sess> {
     pub fn check(session: &'sess Session, scope: ScopeRef, code: &Vec<Expr>) -> Type {
         let mut typechecker = TypeChecker {
-            session: session,
+            session,
             stack: ScopeStack::new(),
         };
 
@@ -46,11 +46,11 @@ impl<'sess> Visitor for TypeChecker<'sess> {
         self.session.new_typevar()
     }
 
-    fn get_scope_stack<'a>(&'a self) -> &'a ScopeStack {
+    fn get_scope_stack(&self) -> &ScopeStack {
         &self.stack
     }
 
-    fn get_session<'b>(&'b self) -> &'b Session {
+    fn get_session(&self) -> &Session {
         self.session
     }
 

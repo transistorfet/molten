@@ -92,7 +92,7 @@ impl Pos {
             offset: span.location_offset(),
             column: span.get_utf8_column(),
             line: span.location_line(),
-            fileno: fileno,
+            fileno,
         }
     }
 

@@ -4,11 +4,11 @@ use std::cell::RefCell;
 
 use crate::defs::Def;
 use crate::misc::UniqueID;
-use crate::scope::{ Scope, ScopeRef, Context };
+use crate::defs::classes::Vtable;
+use crate::defs::types::TypeAliasDef;
 use crate::session::{ Session, Error };
+use crate::scope::{ Scope, ScopeRef, Context };
 use crate::types::{ Type, Check, check_type };
-use crate::defs::classes::{ Vtable };
-use crate::defs::types::{ TypeAliasDef };
 
 
 #[derive(Clone, Debug, PartialEq)]
@@ -26,9 +26,9 @@ impl TraitDef {
     pub fn new(defid: UniqueID, vars: ScopeRef, deftype: Type, vtable: Vtable) -> Self {
         Self {
             id: defid,
-            vars: vars,
-            deftype: deftype,
-            vtable: vtable,
+            vars,
+            deftype,
+            vtable,
             impls: RefCell::new(vec!()),
         }
     }
@@ -84,11 +84,11 @@ impl TraitImpl {
     pub fn new(id: UniqueID, trait_id: UniqueID, impltype: Type, vars: ScopeRef, vtable: Vtable) -> Self {
 
         Self {
-            id: id,
-            trait_id: trait_id,
-            impltype: impltype,
-            vars: vars,
-            vtable: vtable,
+            id,
+            trait_id,
+            impltype,
+            vars,
+            vtable,
         }
     }
 

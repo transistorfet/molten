@@ -2,12 +2,12 @@
 use crate::misc::r;
 use crate::types::Type;
 use crate::misc::UniqueID;
-use crate::defs::traits::{ TraitDefRef };
-use crate::analysis::hir::{ Expr };
-use crate::analysis::visitor::{ Visitor };
+use crate::defs::traits::TraitDefRef;
+use crate::analysis::hir::Expr;
+use crate::analysis::visitor::Visitor;
 
 use crate::transform::transform::{ CodeContext, Transformer };
-use crate::transform::classes::{ VtableTransform };
+use crate::transform::classes::VtableTransform;
 use crate::llvm::llcode::{ LLType, LLLit, LLRef, LLExpr };
 
 
@@ -62,7 +62,7 @@ impl<'sess> Transformer<'sess> {
         let (lltype, vtable) = match traitdef {
             Some(traitdef) => {
                 let lltype = self.transform_trait_def_type(traitdef.clone());
-                let traitimpl = traitdef.find_impl(self.session, &src_type).unwrap();
+                let traitimpl = traitdef.find_impl(self.session, src_type).unwrap();
                 let vtable = LLExpr::GetLocal(traitimpl.vtable.id);
                 (lltype, vtable)
             },
@@ -101,18 +101,18 @@ impl<'sess> Transformer<'sess> {
             (Type::Universal(_, _), Type::Universal(_, _)) => { },
             (Type::Universal(_, id), _) => {
                 let constraints = self.session.get_constraints(*id);
-                let opt_traitdef = match constraints.len() > 0 {
+                let opt_traitdef = match !constraints.is_empty() {
                     true => Some(self.session.get_def(constraints[0]).unwrap().as_trait_def().unwrap()),
                     false => None,
                 };
-                return self.convert_pack_trait_obj(exprs, opt_traitdef, &src_type, value)
+                return self.convert_pack_trait_obj(exprs, opt_traitdef, src_type, value)
             },
             (_, Type::Universal(_, _)) => {
                 return LLExpr::Cast(self.transform_value_type(dest_type), r(self.convert_unpack_trait_obj(value)));
             },
             _ => { },
         }
-        return value;
+        value
     }
 
     pub fn convert_impl_func_args(&mut self, func_id: UniqueID, fargs: &mut Vec<(UniqueID, String)>, body: &mut Vec<LLExpr>) {

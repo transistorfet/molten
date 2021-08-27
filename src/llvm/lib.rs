@@ -12,14 +12,14 @@ use crate::abi::ABI;
 use crate::types::Type;
 use crate::session::Session;
 use crate::scope::{ Scope, ScopeRef, ScopeMapRef, Context };
-use crate::parsing::parser::{ parse_type };
+use crate::parsing::parser::parse_type;
 use crate::analysis::hir::{ Mutability, Visibility };
-use crate::analysis::binding::{ bind_type_names };
+use crate::analysis::binding::bind_type_names;
 use crate::config::Options;
 use crate::misc::{ r, UniqueID };
 
+use crate::defs::functions::AnyFunc;
 use crate::defs::classes::{ ClassDef, Define };
-use crate::defs::functions::{ AnyFunc };
 
 use crate::transform::transform::Transformer;
 
@@ -64,7 +64,7 @@ pub fn declare_builtins_node<'sess>(session: &Session, scope: ScopeRef, node: &B
             let tscope = Scope::new_ref("", Context::Block, Some(scope.clone()));
 
             let mut ftype = parse_type(ftype);
-            bind_type_names(session, tscope.clone(), ftype.as_mut()).unwrap();
+            bind_type_names(session, tscope, ftype.as_mut()).unwrap();
             debug!("BUILTIN TYPE: {:?}", ftype);
 
             let abi = ftype.as_ref().map(|t| t.get_abi().unwrap()).unwrap_or(ABI::Molten);
@@ -229,7 +229,7 @@ unsafe fn declare_irregular_functions(llvm: &LLVM) {
 }
 
 unsafe fn build_lib_function(llvm: &LLVM, name: &str, ltype: &LLType, func: PlainFunction) -> LLVMValueRef {
-    let function = LLVMAddFunction(llvm.module, cstr(name), llvm.build_type(&ltype));
+    let function = LLVMAddFunction(llvm.module, cstr(name), llvm.build_type(ltype));
     LLVMSetLinkage(function, llvm::LLVMLinkage::LLVMLinkOnceODRLinkage);
 
     //let name = "alwaysinline";
@@ -249,7 +249,7 @@ unsafe fn build_lib_function(llvm: &LLVM, name: &str, ltype: &LLType, func: Plai
 }
 
 unsafe fn build_lib_method(llvm: &LLVM, name: &str, objtype: LLVMTypeRef, ltype: &LLType, func: ObjectFunction) -> LLVMValueRef {
-    let function = LLVMAddFunction(llvm.module, cstr(name), llvm.build_type(&ltype));
+    let function = LLVMAddFunction(llvm.module, cstr(name), llvm.build_type(ltype));
     LLVMSetLinkage(function, llvm::LLVMLinkage::LLVMLinkOnceODRLinkage);
 
     //let name = "alwaysinline";

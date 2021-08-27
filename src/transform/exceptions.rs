@@ -2,10 +2,10 @@
 use crate::types::Type;
 use crate::misc::UniqueID;
 use crate::analysis::hir::{ MatchCase, Expr };
-use crate::analysis::visitor::{ Visitor };
+use crate::analysis::visitor::Visitor;
 
 use crate::misc::{ r };
-use crate::transform::transform::{ Transformer };
+use crate::transform::transform::Transformer;
 use crate::llvm::llcode::{ LLType, LLLit, LLRef, LLCC, LLCmpType, LLLink, LLExpr, LLGlobal };
 
 

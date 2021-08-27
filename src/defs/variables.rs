@@ -6,7 +6,7 @@ use crate::types::Type;
 use crate::misc::UniqueID;
 use crate::scope::{ Scope, ScopeRef, Context };
 use crate::session::{ Session, Error };
-use crate::analysis::hir::{ Mutability };
+use crate::analysis::hir::Mutability;
 
 
 pub struct AnyVar();
@@ -37,7 +37,7 @@ impl VarDef {
     pub fn define(session: &Session, scope: ScopeRef, id: UniqueID, mutable: Mutability, name: &str, ttype: Option<Type>) -> Result<Def, Error> {
 
         let def = Def::Var(Rc::new(VarDef {
-            mutable: mutable,
+            mutable,
 
         }));
 
@@ -70,7 +70,7 @@ impl ArgDef {
     #[must_use]
     pub fn define(session: &Session, scope: ScopeRef, id: UniqueID, mutable: Mutability, name: &str, ttype: Option<Type>) -> Result<Def, Error> {
         let def = Def::Arg(Rc::new(ArgDef {
-            mutable: mutable,
+            mutable,
 
         }));
 
@@ -93,7 +93,7 @@ impl FieldDef {
     pub fn define(session: &Session, scope: ScopeRef, id: UniqueID, mutable: Mutability, name: &str, ttype: Option<Type>) -> Result<Def, Error> {
 
         let def = Def::Field(Rc::new(FieldDef {
-            mutable: mutable,
+            mutable,
 
         }));
 

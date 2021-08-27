@@ -1,7 +1,7 @@
 
+use crate::session::Error;
 use crate::scope::ScopeRef;
 use crate::analysis::hir::Mutability;
-use crate::session::{ Error };
 
 pub mod enums;
 pub mod types;
@@ -11,8 +11,8 @@ pub mod functions;
 pub mod traits;
 pub mod modules;
 
-use crate::defs::enums::{ EnumDefRef };
-use crate::defs::types::{ TypeAliasDefRef };
+use crate::defs::enums::EnumDefRef;
+use crate::defs::types::TypeAliasDefRef;
 use crate::defs::traits::{ TraitDefRef, TraitImplRef };
 use crate::defs::classes::{ ClassDefRef, StructDefRef };
 use crate::defs::variables::{ VarDefRef, ArgDefRef, FieldDefRef };

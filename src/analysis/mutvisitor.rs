@@ -4,7 +4,7 @@ use crate::misc::UniqueID;
 use crate::scope::ScopeRef;
 use crate::session::Session;
 use crate::analysis::hir::{ Pattern, PatKind, Expr, ExprKind };
-use crate::analysis::visitor::{ ScopeStack };
+use crate::analysis::visitor::ScopeStack;
 
 pub trait MutVisitor: Sized {
     fn get_scope_stack<'a>(&'a self) -> &'a ScopeStack;

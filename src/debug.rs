@@ -1,6 +1,6 @@
 
 use crate::session::Session;
-use crate::scope::{ ScopeRef };
+use crate::scope::ScopeRef;
 use crate::analysis::hir::{ Expr, ExprKind };
 
 macro_rules! debug {

@@ -5,7 +5,7 @@ use std::io::prelude::*;
 use crate::types::Type;
 use crate::misc::UniqueID;
 use crate::config::Options;
-use crate::scope::{ ScopeRef };
+use crate::scope::ScopeRef;
 use crate::session::{ Session, Error };
 use crate::analysis::visitor::{ Visitor, ScopeStack };
 use crate::analysis::hir::{ Visibility, Mutability, EnumVariant, WhereClause, Function, Expr, ExprKind };
@@ -31,7 +31,7 @@ pub struct ExportsCollector<'sess> {
 impl<'sess> ExportsCollector<'sess> {
     pub fn new(session: &'sess Session, scope: ScopeRef) -> Self {
         let collector = ExportsCollector {
-            session: session,
+            session,
             stack: ScopeStack::new(),
             declarations: String::new(),
         };
@@ -48,11 +48,11 @@ impl<'sess> Visitor for ExportsCollector<'sess> {
         ()
     }
 
-    fn get_scope_stack<'a>(&'a self) -> &'a ScopeStack {
+    fn get_scope_stack(&self) -> &ScopeStack {
         &self.stack
     }
 
-    fn get_session<'b>(&'b self) -> &'b Session {
+    fn get_session(&self) -> &Session {
         self.session
     }
 
@@ -151,7 +151,7 @@ impl<'sess> Visitor for ExportsCollector<'sess> {
     }
 
     fn visit_enum(&mut self, _refid: UniqueID, enumtype: &Type, whereclause: &WhereClause, variants: &Vec<EnumVariant>) -> Result<Self::Return, Error> {
-        let mut namespec = unparse_type(self.session, &enumtype);
+        let mut namespec = unparse_type(self.session, enumtype);
         if whereclause.constraints.len() > 0 {
             namespec += &emit_where_clause(&whereclause.constraints);
         }
@@ -159,7 +159,7 @@ impl<'sess> Visitor for ExportsCollector<'sess> {
         self.declarations.push_str(&format!("enum {} =\n", namespec));
         for variant in variants {
             let typename = match &variant.ttype {
-                Some(t) => format!("({})", t.as_vec().iter().map(|t| unparse_type(self.session, &t)).collect::<Vec<String>>().join(",")),
+                Some(t) => format!("({})", t.as_vec().iter().map(|t| unparse_type(self.session, t)).collect::<Vec<String>>().join(",")),
                 None => "".to_string(),
             };
             self.declarations.push_str(&format!("| {}{}\n", variant.name, typename));
@@ -184,7 +184,7 @@ impl<'sess> Visitor for ExportsCollector<'sess> {
     }
 
     fn visit_trait_impl(&mut self, _refid: UniqueID, traitname: &str, impltype: &Type, whereclause: &WhereClause, body: &Vec<Expr>) -> Result<Self::Return, Error> {
-        let mut namespec = unparse_type(self.session, &impltype);
+        let mut namespec = unparse_type(self.session, impltype);
         if whereclause.constraints.len() > 0 {
             namespec += &emit_where_clause(&whereclause.constraints);
         }

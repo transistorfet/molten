@@ -150,10 +150,10 @@ impl Argument {
     pub fn new(pos: Pos, name: String, ttype: Option<Type>) -> Self {
         Argument {
             id: UniqueID::generate(),
-            pos: pos,
-            name: name,
-            ttype: ttype,
-            //default: default,
+            pos,
+            name,
+            ttype,
+            //default,
         }
     }
 }
@@ -162,8 +162,8 @@ impl MatchCase {
     pub fn new(pat: Pattern, body: Expr) -> Self {
         Self {
             id: UniqueID::generate(),
-            pat: pat,
-            body: body,
+            pat,
+            body,
         }
     }
 }
@@ -173,9 +173,9 @@ impl EnumVariant {
     pub fn new(pos: Pos, name: String, ttype: Option<Type>) -> Self {
         Self {
             id: UniqueID::generate(),
-            pos: pos,
-            name: name,
-            ttype: ttype,
+            pos,
+            name,
+            ttype,
         }
     }
 }
@@ -183,8 +183,8 @@ impl EnumVariant {
 impl WhereClause {
     pub fn new(pos: Pos, constraints: Vec<(String, String)>) -> Self {
         WhereClause {
-            pos: pos,
-            constraints: constraints,
+            pos,
+            constraints,
         }
     }
 
@@ -215,8 +215,8 @@ impl Pattern {
     pub fn new(pos: Pos, kind: PatKind) -> Self {
         Self {
             id: UniqueID::generate(),
-            pos: pos,
-            kind: kind,
+            pos,
+            kind,
         }
     }
 
@@ -227,37 +227,37 @@ impl Pattern {
 
     #[allow(dead_code)]
     pub fn make_lit(pos: Pos, literal: Literal) -> Pattern {
-        Pattern { id: UniqueID::generate(), pos: pos, kind: PatKind::Literal(literal, UniqueID::generate()) }
+        Pattern { id: UniqueID::generate(), pos, kind: PatKind::Literal(literal, UniqueID::generate()) }
     }
 
     #[allow(dead_code)]
     pub fn make_binding(pos: Pos, name: String) -> Pattern {
-        Pattern { id: UniqueID::generate(), pos: pos, kind: PatKind::Binding(name) }
+        Pattern { id: UniqueID::generate(), pos, kind: PatKind::Binding(name) }
     }
 
     #[allow(dead_code)]
     pub fn make_annotation(pos: Pos, ttype: Type, pat: Pattern) -> Pattern {
-        Pattern { id: UniqueID::generate(), pos: pos, kind: PatKind::Annotation(ttype, r(pat)) }
+        Pattern { id: UniqueID::generate(), pos, kind: PatKind::Annotation(ttype, r(pat)) }
     }
 
     #[allow(dead_code)]
     pub fn make_enum_variant(pos: Pos, path: Vec<String>, args: Vec<Pattern>) -> Pattern {
-        Pattern { id: UniqueID::generate(), pos: pos, kind: PatKind::EnumVariant(path, args, UniqueID::generate()) }
+        Pattern { id: UniqueID::generate(), pos, kind: PatKind::EnumVariant(path, args, UniqueID::generate()) }
     }
 
     #[allow(dead_code)]
     pub fn make_ref(pos: Pos, subpat: Pattern) -> Pattern {
-        Pattern { id: UniqueID::generate(), pos: pos, kind: PatKind::Ref(r(subpat)) }
+        Pattern { id: UniqueID::generate(), pos, kind: PatKind::Ref(r(subpat)) }
     }
 
     #[allow(dead_code)]
     pub fn make_tuple(pos: Pos, items: Vec<Pattern>) -> Pattern {
-        Pattern { id: UniqueID::generate(), pos: pos, kind: PatKind::Tuple(items) }
+        Pattern { id: UniqueID::generate(), pos, kind: PatKind::Tuple(items) }
     }
 
     #[allow(dead_code)]
     pub fn make_record(pos: Pos, items: Vec<(String, Pattern)>) -> Pattern {
-        Pattern { id: UniqueID::generate(), pos: pos, kind: PatKind::Record(items) }
+        Pattern { id: UniqueID::generate(), pos, kind: PatKind::Record(items) }
     }
 }
 
@@ -266,17 +266,17 @@ impl Expr {
     pub fn new(pos: Pos, kind: ExprKind) -> Expr {
         Expr {
             id: UniqueID::generate(),
-            pos: pos,
-            kind: kind,
+            pos,
+            kind,
         }
     }
 
     #[allow(dead_code)]
     pub fn new_with_id(id: UniqueID, pos: Pos, kind: ExprKind) -> Expr {
         Expr {
-            id: id,
-            pos: pos,
-            kind: kind,
+            id,
+            pos,
+            kind,
         }
     }
 
@@ -298,12 +298,12 @@ impl Expr {
 
     #[allow(dead_code)]
     pub fn make_ref(pos: Pos, expr: Expr) -> Expr {
-        Expr { id: UniqueID::generate(), pos: pos, kind: ExprKind::Ref(r(expr)) }
+        Expr { id: UniqueID::generate(), pos, kind: ExprKind::Ref(r(expr)) }
     }
 
     #[allow(dead_code)]
     pub fn make_deref(pos: Pos, expr: Expr) -> Expr {
-        Expr { id: UniqueID::generate(), pos: pos, kind: ExprKind::Deref(r(expr)) }
+        Expr { id: UniqueID::generate(), pos, kind: ExprKind::Deref(r(expr)) }
     }
 
     #[allow(dead_code)]
@@ -313,142 +313,142 @@ impl Expr {
 
     #[allow(dead_code)]
     pub fn make_tuple(pos: Pos, items: Vec<Expr>) -> Expr {
-        Expr { id: UniqueID::generate(), pos: pos, kind: ExprKind::Tuple(items) }
+        Expr { id: UniqueID::generate(), pos, kind: ExprKind::Tuple(items) }
     }
 
     #[allow(dead_code)]
     pub fn make_record(pos: Pos, items: Vec<(String, Expr)>) -> Expr {
-        Expr { id: UniqueID::generate(), pos: pos, kind: ExprKind::Record(items) }
+        Expr { id: UniqueID::generate(), pos, kind: ExprKind::Record(items) }
     }
 
     #[allow(dead_code)]
     pub fn make_record_update(pos: Pos, record: Expr, items: Vec<(String, Expr)>) -> Expr {
-        Expr { id: UniqueID::generate(), pos: pos, kind: ExprKind::RecordUpdate(r(record), items) }
+        Expr { id: UniqueID::generate(), pos, kind: ExprKind::RecordUpdate(r(record), items) }
     }
 
     #[allow(dead_code)]
     pub fn make_ident(pos: Pos, ident: String) -> Expr {
-        Expr { id: UniqueID::generate(), pos: pos, kind: ExprKind::Identifier(ident) }
+        Expr { id: UniqueID::generate(), pos, kind: ExprKind::Identifier(ident) }
     }
 
     #[allow(dead_code)]
     pub fn make_ident_from_str(pos: Pos, name: &str) -> Expr {
-        Expr { id: UniqueID::generate(), pos: pos, kind: ExprKind::Identifier(name.to_string()) }
+        Expr { id: UniqueID::generate(), pos, kind: ExprKind::Identifier(name.to_string()) }
     }
 
     #[allow(dead_code)]
     pub fn make_resolve(pos: Pos, object: Expr, ident: String) -> Expr {
-        Expr { id: UniqueID::generate(), pos: pos, kind: ExprKind::Resolver(r(object), ident, UniqueID::generate()) }
+        Expr { id: UniqueID::generate(), pos, kind: ExprKind::Resolver(r(object), ident, UniqueID::generate()) }
     }
 
     #[allow(dead_code)]
     pub fn make_access(pos: Pos, object: Expr, ident: String) -> Expr {
-        Expr { id: UniqueID::generate(), pos: pos, kind: ExprKind::Accessor(r(object), ident, UniqueID::generate()) }
+        Expr { id: UniqueID::generate(), pos, kind: ExprKind::Accessor(r(object), ident, UniqueID::generate()) }
     }
 
     #[allow(dead_code)]
     pub fn make_invoke(pos: Pos, fexpr: Expr, args: Vec<Expr>) -> Expr {
-        Expr { id: UniqueID::generate(), pos: pos, kind: ExprKind::Invoke(r(fexpr), args, UniqueID::generate()) }
+        Expr { id: UniqueID::generate(), pos, kind: ExprKind::Invoke(r(fexpr), args, UniqueID::generate()) }
     }
 
     #[allow(dead_code)]
     pub fn make_side_effect(pos: Pos, ident: String, args: Vec<Expr>) -> Expr {
-        Expr { id: UniqueID::generate(), pos: pos, kind: ExprKind::SideEffect(ident, args) }
+        Expr { id: UniqueID::generate(), pos, kind: ExprKind::SideEffect(ident, args) }
     }
 
     #[allow(dead_code)]
     pub fn make_block(pos: Pos, body: Vec<Expr>) -> Expr {
-        Expr { id: UniqueID::generate(), pos: pos, kind: ExprKind::Block(body) }
+        Expr { id: UniqueID::generate(), pos, kind: ExprKind::Block(body) }
     }
 
     #[allow(dead_code)]
     pub fn make_if(pos: Pos, cond: Expr, texpr: Expr, fexpr: Expr) -> Expr {
-        Expr { id: UniqueID::generate(), pos: pos, kind: ExprKind::If(r(cond), r(texpr), r(fexpr)) }
+        Expr { id: UniqueID::generate(), pos, kind: ExprKind::If(r(cond), r(texpr), r(fexpr)) }
     }
 
     #[allow(dead_code)]
     pub fn make_raise(pos: Pos, expr: Expr) -> Expr {
-        Expr { id: UniqueID::generate(), pos: pos, kind: ExprKind::Raise(r(expr)) }
+        Expr { id: UniqueID::generate(), pos, kind: ExprKind::Raise(r(expr)) }
     }
 
     #[allow(dead_code)]
     pub fn make_try(pos: Pos, cond: Expr, cases: Vec<MatchCase>) -> Expr {
-        Expr { id: UniqueID::generate(), pos: pos, kind: ExprKind::Try(r(cond), cases) }
+        Expr { id: UniqueID::generate(), pos, kind: ExprKind::Try(r(cond), cases) }
     }
 
     #[allow(dead_code)]
     pub fn make_match(pos: Pos, cond: Expr, cases: Vec<MatchCase>) -> Expr {
-        Expr { id: UniqueID::generate(), pos: pos, kind: ExprKind::Match(r(cond), cases) }
+        Expr { id: UniqueID::generate(), pos, kind: ExprKind::Match(r(cond), cases) }
     }
 
     #[allow(dead_code)]
     pub fn make_decl(pos: Pos, vis: Visibility, ident: String, ttype: Type, whereclause: WhereClause) -> Expr {
-        Expr { id: UniqueID::generate(), pos: pos, kind: ExprKind::Declare(vis, ident, ttype, whereclause) }
+        Expr { id: UniqueID::generate(), pos, kind: ExprKind::Declare(vis, ident, ttype, whereclause) }
     }
 
     #[allow(dead_code)]
     pub fn make_func(pos: Pos, func: Function) -> Expr {
-        Expr { id: UniqueID::generate(), pos: pos, kind: ExprKind::Function(func) }
+        Expr { id: UniqueID::generate(), pos, kind: ExprKind::Function(func) }
     }
 
     #[allow(dead_code)]
     pub fn make_alloc_object(pos: Pos, ttype: Type) -> Expr {
-        Expr { id: UniqueID::generate(), pos: pos, kind: ExprKind::AllocObject(ttype) }
+        Expr { id: UniqueID::generate(), pos, kind: ExprKind::AllocObject(ttype) }
     }
 
     #[allow(dead_code)]
     pub fn make_class(pos: Pos, classtype: Type, parenttype: Option<Type>, whereclause: WhereClause, body: Vec<Expr>) -> Expr {
-        Expr { id: UniqueID::generate(), pos: pos, kind: ExprKind::Class(classtype, parenttype, whereclause, body) }
+        Expr { id: UniqueID::generate(), pos, kind: ExprKind::Class(classtype, parenttype, whereclause, body) }
     }
 
     #[allow(dead_code)]
     pub fn make_methods(pos: Pos, ttype: Type, whereclause: WhereClause, body: Vec<Expr>) -> Expr {
-        Expr { id: UniqueID::generate(), pos: pos, kind: ExprKind::Methods(ttype, whereclause, body) }
+        Expr { id: UniqueID::generate(), pos, kind: ExprKind::Methods(ttype, whereclause, body) }
     }
 
     #[allow(dead_code)]
     pub fn make_import(pos: Pos, ident: String, decls: Vec<Expr>) -> Expr {
-        Expr { id: UniqueID::generate(), pos: pos, kind: ExprKind::Import(ident, decls) }
+        Expr { id: UniqueID::generate(), pos, kind: ExprKind::Import(ident, decls) }
     }
 
     #[allow(dead_code)]
     pub fn make_def(pos: Pos, mutable: Mutability, ident: String, ttype: Option<Type>, value: Expr) -> Expr {
-        Expr { id: UniqueID::generate(), pos: pos, kind: ExprKind::Definition(mutable, ident, ttype, r(value)) }
+        Expr { id: UniqueID::generate(), pos, kind: ExprKind::Definition(mutable, ident, ttype, r(value)) }
     }
 
     #[allow(dead_code)]
     pub fn make_field(pos: Pos, mutable: Mutability, ident: String, ttype: Option<Type>) -> Expr {
-        Expr { id: UniqueID::generate(), pos: pos, kind: ExprKind::Field(mutable, ident, ttype) }
+        Expr { id: UniqueID::generate(), pos, kind: ExprKind::Field(mutable, ident, ttype) }
     }
 
     #[allow(dead_code)]
     pub fn make_assign(pos: Pos, left: Expr, right: Expr, ty: AssignType) -> Expr {
-        Expr { id: UniqueID::generate(), pos: pos, kind: ExprKind::Assignment(r(left), r(right), ty) }
+        Expr { id: UniqueID::generate(), pos, kind: ExprKind::Assignment(r(left), r(right), ty) }
     }
 
     #[allow(dead_code)]
     pub fn make_while(pos: Pos, cond: Expr, body: Expr) -> Expr {
-        Expr { id: UniqueID::generate(), pos: pos, kind: ExprKind::While(r(cond), r(body)) }
+        Expr { id: UniqueID::generate(), pos, kind: ExprKind::While(r(cond), r(body)) }
     }
 
     #[allow(dead_code)]
     pub fn make_type_alias(pos: Pos, deftype: Type, ttype: Type) -> Expr {
-        Expr { id: UniqueID::generate(), pos: pos, kind: ExprKind::TypeAlias(deftype, ttype) }
+        Expr { id: UniqueID::generate(), pos, kind: ExprKind::TypeAlias(deftype, ttype) }
     }
 
     #[allow(dead_code)]
     pub fn make_enum(pos: Pos, enumtype: Type, whereclause: WhereClause, variants: Vec<EnumVariant>) -> Expr {
-        Expr { id: UniqueID::generate(), pos: pos, kind: ExprKind::Enum(enumtype, whereclause, variants) }
+        Expr { id: UniqueID::generate(), pos, kind: ExprKind::Enum(enumtype, whereclause, variants) }
     }
 
     #[allow(dead_code)]
     pub fn make_trait_def(pos: Pos, traitname: String, body: Vec<Expr>) -> Expr {
-        Expr { id: UniqueID::generate(), pos: pos, kind: ExprKind::TraitDef(traitname, body) }
+        Expr { id: UniqueID::generate(), pos, kind: ExprKind::TraitDef(traitname, body) }
     }
 
     #[allow(dead_code)]
     pub fn make_trait_impl(pos: Pos, traitname: String, impltype: Type, whereclause: WhereClause, body: Vec<Expr>) -> Expr {
-        Expr { id: UniqueID::generate(), pos: pos, kind: ExprKind::TraitImpl(traitname, impltype, whereclause, body) }
+        Expr { id: UniqueID::generate(), pos, kind: ExprKind::TraitImpl(traitname, impltype, whereclause, body) }
     }
 
     #[allow(dead_code)]
@@ -458,7 +458,7 @@ impl Expr {
 
     #[allow(dead_code)]
     pub fn make_module_decl(pos: Pos, name: String) -> Expr {
-        Expr { id: UniqueID::generate(), pos: pos, kind: ExprKind::ModuleDecl(name) }
+        Expr { id: UniqueID::generate(), pos, kind: ExprKind::ModuleDecl(name) }
     }
 
 

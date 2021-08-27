@@ -19,8 +19,8 @@ use self::llvm_sys::target_machine::*;
 use self::llvm_sys::transforms::pass_manager_builder::*;
 
 
+use crate::misc::UniqueID;
 use crate::config::Options;
-use crate::misc::{ UniqueID };
 use crate::session::{ Session, Error };
 
 use crate::llvm::llcode::{ LLType, LLLit, LLRef, LLCmpType, LLLink, LLCC, LLExpr, LLGlobal, LLBlock };
@@ -72,10 +72,10 @@ impl<'sess> LLVM<'sess> {
             let builder = LLVMCreateBuilderInContext(context);
 
             LLVM {
-                session: session,
-                context: context,
-                module: module,
-                builder: builder,
+                session,
+                context,
+                module,
+                builder,
                 target: RefCell::new(ptr::null_mut()),
                 target_machine: RefCell::new(ptr::null_mut()),
                 target_data: RefCell::new(ptr::null_mut()),
@@ -198,7 +198,7 @@ impl<'sess> LLVM<'sess> {
 
     pub fn get_value(&self, id: UniqueID) -> Result<LLVMValueRef, Error> {
         debug!("<<<<<<<<< GET VALUE: {:?} = {:?}", id, self.values.borrow().get(&id).cloned());
-        self.values.borrow().get(&id).cloned().ok_or(Error::new(format!("Codegen Value Unset: {:?}", id)))
+        self.values.borrow().get(&id).cloned().ok_or_else(|| Error::new(format!("Codegen Value Unset: {:?}", id)))
     }
 
     pub fn set_type(&self, id: UniqueID, value: LLVMTypeRef) {
@@ -206,7 +206,7 @@ impl<'sess> LLVM<'sess> {
     }
 
     pub fn get_type(&self, id: UniqueID) -> Result<LLVMTypeRef, Error> {
-        self.types.borrow().get(&id).cloned().ok_or(Error::new(format!("Codegen Type Unset: {:?}", id)))
+        self.types.borrow().get(&id).cloned().ok_or_else(|| Error::new(format!("Codegen Type Unset: {:?}", id)))
     }
 
 
@@ -263,7 +263,7 @@ impl<'sess> LLVM<'sess> {
     pub unsafe fn cfunc_type(&self, args: &Vec<LLType>, ret: &LLType) -> LLVMTypeRef {
         let mut argtypes = vec!();
         for ltype in args {
-            argtypes.push(self.build_type(&ltype));
+            argtypes.push(self.build_type(ltype));
         }
         let rettype = self.build_type(ret);
         LLVMFunctionType(rettype, argtypes.as_mut_ptr(), argtypes.len() as u32, false as i32)
@@ -430,7 +430,7 @@ impl<'sess> LLVM<'sess> {
             LLLit::I64(num) => self.i64_const(*num),
             LLLit::F64(num) => self.f64_const(*num),
             LLLit::Null(ltype) => self.null_const(self.build_type(ltype)),
-            LLLit::ConstStr(string) => self.str_const(&string),
+            LLLit::ConstStr(string) => self.str_const(string),
         }
     }
 
@@ -478,7 +478,7 @@ impl<'sess> LLVM<'sess> {
     }
 
     pub unsafe fn build_def_global(&self, name: &str, link: LLLink, rtype: LLVMTypeRef, initval: Option<LLVMValueRef>) -> LLVMValueRef {
-        let global = LLVMAddGlobal(self.module, rtype, cstr(&name));
+        let global = LLVMAddGlobal(self.module, rtype, cstr(name));
         self.build_linkage(global, link);
         if let Some(initval) = initval {
             LLVMSetInitializer(global, initval);
@@ -763,16 +763,16 @@ impl<'sess> LLVM<'sess> {
                 LLGlobal::DefGlobal(id, link, name, ltype, should_init) => {
                     let rtype = self.build_type(ltype);
                     let initializer = if *should_init { Some(self.null_const(rtype)) } else { None };
-                    let global = self.build_def_global(&name, *link, rtype, initializer);
+                    let global = self.build_def_global(name, *link, rtype, initializer);
                     self.set_value(*id, global);
                 },
 
                 LLGlobal::DeclCFunc(id, name, ltype, cc) |
                 LLGlobal::DefCFunc(id, _, name, ltype, _, _, cc) => {
                     let ftype = self.build_type(ltype);
-                    let mut function = LLVMGetNamedFunction(self.module, cstr(&name));
+                    let mut function = LLVMGetNamedFunction(self.module, cstr(name));
                     if function.is_null() {
-                        function = LLVMAddFunction(self.module, cstr(&name), ftype);
+                        function = LLVMAddFunction(self.module, cstr(name), ftype);
                     }
                     LLVMSetFunctionCallConv(function, self.get_callconv(*cc) as c_uint);
                     self.set_value(*id, function);
@@ -780,7 +780,7 @@ impl<'sess> LLVM<'sess> {
 
 
                 LLGlobal::DefNamedStruct(id, name, use_ptr) => {
-                    let s = LLVMStructCreateNamed(self.context, cstr(&name));
+                    let s = LLVMStructCreateNamed(self.context, cstr(name));
                     self.set_type(*id, if *use_ptr { LLVMPointerType(s, 0) } else { s });
                 },
 
@@ -799,7 +799,7 @@ impl<'sess> LLVM<'sess> {
         LLVMPositionBuilderAtEnd(self.builder, bb);
         *self.curfunc.borrow_mut() = function;
 
-        for (i, ref arg) in args.iter().enumerate() {
+        for (i, arg) in args.iter().enumerate() {
             let llarg = LLVMGetParam(function, i as u32);
             LLVMSetValueName2(llarg, cstr(&arg.1), arg.1.len());
             self.set_value(arg.0, llarg);

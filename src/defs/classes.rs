@@ -33,11 +33,11 @@ impl ClassDef {
         Self {
             id: defid,
             initid: UniqueID::generate(),
-            classname: classname,
-            classtype: classtype,
-            parenttype: parenttype,
+            classname,
+            classtype,
+            parenttype,
             structdef: StructDef::new_ref(defid, vars),
-            vtable: vtable,
+            vtable,
         }
     }
 
@@ -160,8 +160,8 @@ pub type StructDefRef = Rc<StructDef>;
 impl StructDef {
     pub fn new(id: UniqueID, vars: ScopeRef) -> Self {
         Self {
-            id: id,
-            vars: vars,
+            id,
+            vars,
             fields: RefCell::new(vec!()),
         }
     }
@@ -213,7 +213,7 @@ pub struct Vtable {
 impl Vtable {
     pub fn new(id: UniqueID) -> Self {
         Vtable {
-            id: id,
+            id,
             table: RefCell::new(vec!()),
         }
     }

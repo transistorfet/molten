@@ -1,6 +1,6 @@
 
-use crate::analysis::hir::{ Expr };
-use crate::analysis::visitor::{ Visitor };
+use crate::analysis::hir::Expr;
+use crate::analysis::visitor::Visitor;
 
 use crate::defs::classes::{ ClassDefRef, StructDef, StructDefRef, Vtable };
 
