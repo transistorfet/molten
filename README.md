@@ -15,7 +15,7 @@ typical ML languages to follow conventions found in more common languages, such
 as C++, Rust, and Python (eg. parenthesis-delimited blocks, conventional class
 definitions, generics/type parameters with angle brackets, etc).  For more info
 on the internals, see [An Overview Of Molten
-Internals](https://transistorfet.github.io/posts/molten_overview.html)
+Internals](https://jabberwocky.ca/posts/2021-08-molten_overview.html)
 
 
 Installing
