@@ -2,7 +2,7 @@
 An Overview Of Molten Internals
 ===============================
 
-###### *Written August 2021*
+###### *Written August 2021 by transistor_fet*
 
 Molten is both a language, and a compiler that's written in Rust which uses LLVM for its final code
 generation and linking of native binaries.  I started it as a larger project to learn more about
