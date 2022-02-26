@@ -14,7 +14,7 @@ use crate::analysis::hir::{ Visibility, Mutability, Argument, Function, Expr, Ex
 use crate::misc::{ r };
 use crate::transform::classes::StructTransform;
 use crate::transform::transform::{ Transformer, CodeContext };
-use crate::llvm::llcode::{ LLType, LLLink, LLRef, LLCC, LLExpr, LLGlobal };
+use crate::llvm::llcode::{ LLLit, LLType, LLLink, LLRef, LLCC, LLExpr, LLGlobal };
 
 
 impl<'sess> Transformer<'sess> {
@@ -236,30 +236,38 @@ impl ClosureTransform {
         transform.insert_global(index, LLGlobal::DefType(cl.context_type_id, format!("__context_{}__", cl.context_type_id), structtype));
 
 
-        let mut fields = vec!();
-        cl.context_struct.foreach_field(|defid, field, _| {
-            let rid = UniqueID::generate();
-            transform.session.set_ref(rid, defid);
-            fields.push((field.to_string(), Expr::new_with_id(rid, Pos::empty(), ExprKind::Identifier(field.to_string()))));
-        });
+        let mut exprs = vec![];
+        let context = if cl.context_struct.fields.borrow().len() != 0 {
+            let mut fields = vec!();
+            cl.context_struct.foreach_field(|defid, field, _| {
+                let rid = UniqueID::generate();
+                transform.session.set_ref(rid, defid);
+                fields.push((field.to_string(), Expr::new_with_id(rid, Pos::empty(), ExprKind::Identifier(field.to_string()))));
+            });
 
-        let mut code = vec!();
-        let did_context = UniqueID::generate();
-        let context_name = format!("{}_context", fname);
-        // TODO if you could make this create and set the struct with the fptr and allocated context set before it then populates the context, then
-        //      you wouldn't need the special recursive case in transform_reference.  It should be represented as an object, since the closure has a
-        //      struct already, but it will take some refactoring first
-        code.push(Expr::new_with_id(did_context, Pos::empty(), ExprKind::Definition(Mutability::Mutable, context_name, None, r(
-            Expr::make_ref(Pos::empty(), Expr::make_record(Pos::empty(), fields))
-        ))));
+            let mut code = vec!();
+            let did_context = UniqueID::generate();
+            let context_name = format!("{}_context", fname);
+            // TODO if you could make this create and set the struct with the fptr and allocated context set before it then populates the context, then
+            //      you wouldn't need the special recursive case in transform_reference.  It should be represented as an object, since the closure has a
+            //      struct already, but it will take some refactoring first
+            code.push(Expr::new_with_id(did_context, Pos::empty(), ExprKind::Definition(Mutability::Mutable, context_name, None, r(
+                Expr::make_ref(Pos::empty(), Expr::make_record(Pos::empty(), fields))
+            ))));
 
-        binding::NameBinder::bind_names(transform.session, scope.clone(), &code);
-        typecheck::TypeChecker::check(transform.session, scope, &code);
-        let mut exprs = transform.visit_vec(&code).unwrap();
-        let did_context_defid = transform.session.get_ref(did_context).unwrap();
+            binding::NameBinder::bind_names(transform.session, scope.clone(), &code);
+            typecheck::TypeChecker::check(transform.session, scope, &code);
+            exprs.extend(transform.visit_vec(&code).unwrap());
+            let did_context_defid = transform.session.get_ref(did_context).unwrap();
+
+            LLExpr::GetLocal(did_context_defid)
+        } else {
+            // If the context contains no fields, then use NULL instead
+            LLExpr::Literal(LLLit::Null(LLType::Alias(cl.context_type_id)))
+        };
 
         let did = UniqueID::generate();
-        exprs.push(ClosureTransform::make_closure_value(transform, did, cl.compiled_func_id, LLExpr::GetLocal(did_context_defid)));
+        exprs.push(ClosureTransform::make_closure_value(transform, did, cl.compiled_func_id, context));
 
         let lltype = ClosureTransform::convert_to_value_type(transform.get_type(cl.compiled_func_id).unwrap());
         exprs.extend(ClosureTransform::make_definition(transform, defid, vis, fname, lltype, Some(LLExpr::GetValue(did))));
