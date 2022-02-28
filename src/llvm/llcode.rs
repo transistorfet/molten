@@ -78,7 +78,10 @@ pub enum LLExpr {
     GetValue(UniqueID),
     SetValue(UniqueID, R<LLExpr>),
     GetNamed(String),
+
     Cast(LLType, R<LLExpr>),
+    PackUniversal(LLType, R<LLExpr>),
+    UnpackUniversal(LLType, R<LLExpr>),
 
     CallC(R<LLExpr>, Vec<LLExpr>, LLCC),
 

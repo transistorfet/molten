@@ -134,8 +134,16 @@ pub trait Visitor: Sized {
         Ok(self.default_return())
     }
 
-    fn visit_annotation(&mut self, _id: UniqueID, _ttype: &Type, code: &Expr) -> Result<Self::Return, Error> {
-        self.visit_node(code)
+    fn visit_annotation(&mut self, _id: UniqueID, _ttype: &Type, expr: &Expr) -> Result<Self::Return, Error> {
+        self.visit_node(expr)
+    }
+
+    fn visit_pack_universal(&mut self, _id: UniqueID, _ttype: &Type, expr: &Expr) -> Result<Self::Return, Error> {
+        self.visit_node(expr)
+    }
+
+    fn visit_unpack_universal(&mut self, _id: UniqueID, _ttype: &Type, expr: &Expr) -> Result<Self::Return, Error> {
+        self.visit_node(expr)
     }
 
     fn visit_ref(&mut self, _id: UniqueID, expr: &Expr) -> Result<Self::Return, Error> {
@@ -281,6 +289,14 @@ pub trait Visitor: Sized {
     }
 
     fn visit_pattern_annotation(&mut self, _id: UniqueID, _ttype: &Type, subpat: &Pattern) -> Result<Self::Return, Error> {
+        self.visit_pattern(subpat)
+    }
+
+    fn visit_pattern_pack_universal(&mut self, _id: UniqueID, _ttype: &Type, subpat: &Pattern) -> Result<Self::Return, Error> {
+        self.visit_pattern(subpat)
+    }
+
+    fn visit_pattern_unpack_universal(&mut self, _id: UniqueID, _ttype: &Type, subpat: &Pattern) -> Result<Self::Return, Error> {
         self.visit_pattern(subpat)
     }
 
@@ -458,8 +474,16 @@ pub fn walk_node<R, V: Visitor<Return = R>>(visitor: &mut V, node: &Expr) -> Res
             visitor.visit_literal(node.id, lit)
         },
 
-        ExprKind::Annotation(ttype, code) => {
-            visitor.visit_annotation(node.id, ttype, code)
+        ExprKind::Annotation(ttype, expr) => {
+            visitor.visit_annotation(node.id, ttype, expr)
+        },
+
+        ExprKind::PackUniversal(ttype, expr) => {
+            visitor.visit_pack_universal(node.id, ttype, expr)
+        },
+
+        ExprKind::UnpackUniversal(ttype, expr) => {
+            visitor.visit_unpack_universal(node.id, ttype, expr)
         },
 
         ExprKind::Ref(expr) => {
@@ -609,6 +633,14 @@ pub fn walk_pattern<R, V: Visitor<Return = R>>(visitor: &mut V, pat: &Pattern) -
 
         PatKind::Annotation(ttype, subpat) => {
             visitor.visit_pattern_annotation(pat.id, ttype, subpat)
+        },
+
+        PatKind::PackUniversal(ttype, subpat) => {
+            visitor.visit_pattern_pack_universal(pat.id, ttype, subpat)
+        },
+
+        PatKind::UnpackUniversal(ttype, subpat) => {
+            visitor.visit_pattern_unpack_universal(pat.id, ttype, subpat)
         },
 
         PatKind::Ref(subpat) => {

@@ -3,8 +3,10 @@ use crate::session::Error;
 use crate::misc::UniqueID;
 use crate::scope::ScopeRef;
 use crate::session::Session;
+use crate::parsing::ast::Pos;
 use crate::analysis::hir::{ Pattern, PatKind, Expr, ExprKind };
 use crate::analysis::visitor::ScopeStack;
+
 
 pub trait MutVisitor: Sized {
     fn get_scope_stack<'a>(&'a self) -> &'a ScopeStack;
@@ -57,6 +59,8 @@ pub fn walk_mut_node<V: MutVisitor>(visitor: &mut V, node: &mut Expr) {
         ExprKind::Field(_, _, _) => { },
 
         ExprKind::Annotation(_, expr) |
+        ExprKind::PackUniversal(_, expr) |
+        ExprKind::UnpackUniversal(_, expr) |
         ExprKind::Ref(expr) |
         ExprKind::Deref(expr) |
         ExprKind::Resolver(expr, _, _) |
@@ -116,6 +120,7 @@ pub fn walk_mut_node<V: MutVisitor>(visitor: &mut V, node: &mut Expr) {
             for case in cases {
                 let lscope = visitor.get_scope_by_id(case.id);
                 visitor.with_scope(lscope, |visitor| {
+                    visitor.visit_pattern(&mut case.pat);
                     visitor.visit_node(&mut case.body);
                 });
             }
@@ -156,7 +161,9 @@ pub fn walk_mut_pattern<V: MutVisitor>(visitor: &mut V, pat: &mut Pattern) {
         PatKind::Binding(_) => { },
 
         PatKind::Ref(subpat) |
-        PatKind::Annotation(_, subpat) => {
+        PatKind::Annotation(_, subpat) |
+        PatKind::PackUniversal(_, subpat) |
+        PatKind::UnpackUniversal(_, subpat) => {
             visitor.visit_pattern(subpat);
         },
 
@@ -176,4 +183,17 @@ pub fn walk_mut_pattern<V: MutVisitor>(visitor: &mut V, pat: &mut Pattern) {
     }
 }
 
+pub fn swap_node_value<F>(existing: &mut Expr, f: F) where F: FnOnce(Expr) -> Expr {
+    let mut owned_expr = Expr::make_block(Pos::empty(), vec![]);
+    std::mem::swap(existing, &mut owned_expr);
+    let new_expr = f(owned_expr);
+    let _ = std::mem::replace(existing, new_expr);
+}
+
+pub fn swap_pattern_value<F>(existing: &mut Pattern, f: F) where F: FnOnce(Pattern) -> Pattern {
+    let mut owned_pat = Pattern::make_wild();
+    std::mem::swap(existing, &mut owned_pat);
+    let new_pat = f(owned_pat);
+    let _ = std::mem::replace(existing, new_pat);
+}
 

@@ -115,7 +115,7 @@ fn compile_file(input: &str, output: Option<&str>) {
     llvm::lib::make_global(&session, &builtins);
 
     let code = session.parse_file(input, false);
-    let code = refinery::Refinery::refine(&session, code);
+    let mut code = refinery::Refinery::refine(&session, code);
     session.write_link_file();
     if Options::as_ref().linkfile_only {
         return;
@@ -137,6 +137,7 @@ fn compile_file(input: &str, output: Option<&str>) {
     export::write_exports(&session, session.map.get_global(), &format!("{}.dec", session.target), &code);
 
     //closures::ClosureConversion::visit(&session, session.map.get_global(), &mut code);
+    crate::transform::autopack::AutoPack::visit(&session, session.map.get_global(), &mut code);
 
     let mut transformer = transform::transform::Transformer::new(&session);
     transformer.initialize();

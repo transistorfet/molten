@@ -88,6 +88,8 @@ pub enum PatKind {
     Literal(Literal, UniqueID),
     Binding(String),
     Annotation(Type, R<Pattern>),
+    PackUniversal(Type, R<Pattern>),
+    UnpackUniversal(Type, R<Pattern>),
     EnumVariant(Vec<String>, Vec<Pattern>, UniqueID),
     Ref(R<Pattern>),
     Tuple(Vec<Pattern>),
@@ -108,6 +110,8 @@ pub enum ExprKind {
     Ref(R<Expr>),
     Deref(R<Expr>),
     Annotation(Type, R<Expr>),
+    PackUniversal(Type, R<Expr>),
+    UnpackUniversal(Type, R<Expr>),
 
     Tuple(Vec<Expr>),
     Record(Vec<(String, Expr)>),
@@ -241,6 +245,16 @@ impl Pattern {
     }
 
     #[allow(dead_code)]
+    pub fn make_pack_universal(pos: Pos, ttype: Type, pat: Pattern) -> Pattern {
+        Pattern { id: UniqueID::generate(), pos, kind: PatKind::PackUniversal(ttype, r(pat)) }
+    }
+
+    #[allow(dead_code)]
+    pub fn make_unpack_universal(pos: Pos, ttype: Type, pat: Pattern) -> Pattern {
+        Pattern { id: UniqueID::generate(), pos, kind: PatKind::UnpackUniversal(ttype, r(pat)) }
+    }
+
+    #[allow(dead_code)]
     pub fn make_enum_variant(pos: Pos, path: Vec<String>, args: Vec<Pattern>) -> Pattern {
         Pattern { id: UniqueID::generate(), pos, kind: PatKind::EnumVariant(path, args, UniqueID::generate()) }
     }
@@ -293,7 +307,17 @@ impl Expr {
 
     #[allow(dead_code)]
     pub fn make_annotation(ttype: Type, expr: Expr) -> Expr {
-        Expr { id: UniqueID::generate(), pos: Pos::empty(), kind: ExprKind::Annotation(ttype, r(expr)) }
+        Expr { id: UniqueID::generate(), pos: expr.pos.clone(), kind: ExprKind::Annotation(ttype, r(expr)) }
+    }
+
+    #[allow(dead_code)]
+    pub fn make_pack_universal(utype: Type, expr: Expr) -> Expr {
+        Expr { id: UniqueID::generate(), pos: expr.pos.clone(), kind: ExprKind::PackUniversal(utype, r(expr)) }
+    }
+
+    #[allow(dead_code)]
+    pub fn make_unpack_universal(utype: Type, expr: Expr) -> Expr {
+        Expr { id: UniqueID::generate(), pos: expr.pos.clone(), kind: ExprKind::UnpackUniversal(utype, r(expr)) }
     }
 
     #[allow(dead_code)]

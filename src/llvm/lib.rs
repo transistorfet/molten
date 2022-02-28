@@ -243,7 +243,7 @@ unsafe fn build_lib_function(llvm: &LLVM, name: &str, ltype: &LLType, func: Plai
 
     let args = (0..ltype.argcount()).map(|i| LLVMGetParam(function, i as u32)).collect();
     let ret = func(llvm, args);
-    LLVMBuildRet(llvm.builder, llvm.cast_typevars(LLVMGetReturnType(LLVMGetElementType(LLVMTypeOf(function))), ret));
+    LLVMBuildRet(llvm.builder, ret);
 
     function
 }
@@ -263,7 +263,7 @@ unsafe fn build_lib_method(llvm: &LLVM, name: &str, objtype: LLVMTypeRef, ltype:
 
     let args = (0..ltype.argcount()).map(|i| LLVMGetParam(function, i as u32)).collect();
     let ret = func(llvm, objtype, args);
-    LLVMBuildRet(llvm.builder, llvm.cast_typevars(LLVMGetReturnType(LLVMGetElementType(LLVMTypeOf(function))), ret));
+    LLVMBuildRet(llvm.builder, ret);
 
     function
 }

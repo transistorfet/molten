@@ -69,7 +69,7 @@ impl<'sess> Transformer<'sess> {
         let exp_id = self.get_exception().unwrap();
         let value = self.transform_as_result(&mut exprs, valexpr);
 
-        exprs.push(LLExpr::StoreRef(r(LLExpr::AccessRef(r(LLExpr::GetValue(exp_id)), vec!(LLRef::Field(1)))), r(LLExpr::Cast(LLType::Var, r(value)))));
+        exprs.push(LLExpr::StoreRef(r(LLExpr::AccessRef(r(LLExpr::GetValue(exp_id)), vec!(LLRef::Field(1)))), r(LLExpr::Cast(LLType::Ptr(r(LLType::I8)), r(value)))));
         exprs.push(LLExpr::CallC(r(LLExpr::GetNamed("longjmp".to_string())), vec!(LLExpr::Cast(LLType::Ptr(r(LLType::I8)), r(LLExpr::GetValue(exp_id))), LLExpr::Literal(LLLit::I32(1))), LLCC::CCC));
 
         let ltype = self.transform_value_type(&self.session.get_type(id).unwrap());

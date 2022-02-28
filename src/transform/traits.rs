@@ -74,12 +74,13 @@ impl<'sess> Transformer<'sess> {
 
         let id = UniqueID::generate();
         LLExpr::DefStruct(id, lltype, vec!(
-            vtable, LLExpr::Cast(LLType::Ptr(r(LLType::I8)), r(value))
+            vtable,
+            LLExpr::Cast(LLType::Ptr(r(LLType::I8)), r(LLExpr::PackUniversal(LLType::Ptr(r(LLType::I8)), r(value))))
         ))
     }
 
-    pub fn convert_unpack_trait_obj(&mut self, value: LLExpr) -> LLExpr {
-        LLExpr::GetItem(r(value), 1)
+    pub fn convert_unpack_trait_obj(&mut self, dest_type: &Type, value: LLExpr) -> LLExpr {
+        LLExpr::UnpackUniversal(self.transform_value_type(dest_type), r(LLExpr::GetItem(r(value), 1)))
     }
 
     pub fn transform_trait_access_method(&mut self, traitdef: TraitDefRef, objval: LLExpr, field_id: UniqueID) -> Vec<LLExpr> {
@@ -89,30 +90,19 @@ impl<'sess> Transformer<'sess> {
         vec!(LLExpr::LoadRef(r(LLExpr::AccessRef(r(vtable), vec!(LLRef::Field(index))))))
     }
 
-    pub fn check_transform_to_trait(&mut self, exprs: &mut Vec<LLExpr>, dest_type: &Type, src: &Expr) -> LLExpr {
-        let src_type = self.session.get_type(src.id).unwrap();
-        let value = self.transform_as_result(exprs, src);
-        self.check_convert_to_trait(exprs, dest_type, &src_type, value)
+    pub fn convert_to_trait_universal(&mut self, exprs: &mut Vec<LLExpr>, dest_type: &Type, src_type: &Type, value: LLExpr) -> LLExpr {
+        let id = dest_type.get_id().unwrap();
+        let constraints = self.session.get_constraints(id);
+        let opt_traitdef = match !constraints.is_empty() {
+            true => Some(self.session.get_def(constraints[0]).unwrap().as_trait_def().unwrap()),
+            false => None,
+        };
+
+        self.convert_pack_trait_obj(exprs, opt_traitdef, src_type, value)
     }
 
-    pub fn check_convert_to_trait(&mut self, exprs: &mut Vec<LLExpr>, dest_type: &Type, src_type: &Type, value: LLExpr) -> LLExpr {
-        match (&dest_type, &src_type) {
-            // If the source of data is also a universal, then don't convert
-            (Type::Universal(_, _), Type::Universal(_, _)) => { },
-            (Type::Universal(_, id), _) => {
-                let constraints = self.session.get_constraints(*id);
-                let opt_traitdef = match !constraints.is_empty() {
-                    true => Some(self.session.get_def(constraints[0]).unwrap().as_trait_def().unwrap()),
-                    false => None,
-                };
-                return self.convert_pack_trait_obj(exprs, opt_traitdef, src_type, value)
-            },
-            (_, Type::Universal(_, _)) => {
-                return LLExpr::Cast(self.transform_value_type(dest_type), r(self.convert_unpack_trait_obj(value)));
-            },
-            _ => { },
-        }
-        value
+    pub fn convert_from_trait_universal(&mut self, _exprs: &mut Vec<LLExpr>, dest_type: &Type, value: LLExpr) -> LLExpr {
+        self.convert_unpack_trait_obj(dest_type, value)
     }
 
     pub fn convert_impl_func_args(&mut self, func_id: UniqueID, fargs: &mut Vec<(UniqueID, String)>, body: &mut Vec<LLExpr>) {
@@ -124,7 +114,8 @@ impl<'sess> Transformer<'sess> {
             if argtype.get_id() == Ok(trait_id) {
                 let converted_id = arg.0;
                 arg.0 = UniqueID::generate();
-                body.insert(0, LLExpr::SetValue(converted_id, r(self.convert_unpack_trait_obj(LLExpr::GetValue(arg.0)))));
+                let dest_type = self.session.get_type(converted_id).unwrap();
+                body.insert(0, LLExpr::SetValue(converted_id, r(self.convert_unpack_trait_obj(&dest_type, LLExpr::GetValue(arg.0)))));
             }
         }
 

@@ -51,7 +51,7 @@ macro_rules! wscom {
     });
 
     ($i:expr, $f:expr) => (
-        wscom!($i, call!($f));
+        wscom!($i, call!($f))
     );
 }
 
@@ -62,7 +62,7 @@ macro_rules! wscoml {
     });
 
     ($i:expr, $f:expr) => (
-        wscoml!($i, call!($f));
+        wscoml!($i, call!($f))
     );
 }
 

@@ -102,7 +102,8 @@ impl<'sess> LLVM<'sess> {
             let jmpbuf = LLVMStructCreateNamed(self.context, cstr("JmpBuf"));
             let mut body = vec!(
                 LLVMArrayType(self.i64_type(), 10),
-                self.get_type(TYPEVAR_ID).unwrap()          // value returned from exception
+                //self.get_type(TYPEVAR_ID).unwrap()          // value returned from exception
+                self.str_type()
             );
             LLVMStructSetBody(jmpbuf, body.as_mut_ptr(), body.len() as u32, 0);
 
@@ -325,14 +326,14 @@ impl<'sess> LLVM<'sess> {
                 //(_, LLVMTypeKind::LLVMPointerTypeKind) =>
                 //    LLVMBuildIntToPtr(self.builder, value, rtype, cstr("ptr")),
 
-                (LLVMTypeKind::LLVMPointerTypeKind, _) => {
-                    let reference = LLVMBuildPointerCast(self.builder, value, LLVMPointerType(rtype, 0), cstr(""));
-                    LLVMBuildLoad(self.builder, reference, cstr(""))
-                },
-                (_, LLVMTypeKind::LLVMPointerTypeKind) => {
-                    let boxed = self.build_boxed(LLVMPointerType(LLVMTypeOf(value), 0), value);
-                    LLVMBuildPointerCast(self.builder, boxed, rtype, cstr(""))
-                },
+                //(LLVMTypeKind::LLVMPointerTypeKind, _) => {
+                //    let reference = LLVMBuildPointerCast(self.builder, value, LLVMPointerType(rtype, 0), cstr(""));
+                //    LLVMBuildLoad(self.builder, reference, cstr(""))
+                //},
+                //(_, LLVMTypeKind::LLVMPointerTypeKind) => {
+                //    let boxed = self.build_boxed(LLVMPointerType(LLVMTypeOf(value), 0), value);
+                //    LLVMBuildPointerCast(self.builder, boxed, rtype, cstr(""))
+                //},
 
                 (LLVMTypeKind::LLVMStructTypeKind, LLVMTypeKind::LLVMStructTypeKind) => {
                     let pointer = LLVMBuildAlloca(self.builder, LLVMTypeOf(value), cstr(""));
@@ -354,17 +355,6 @@ impl<'sess> LLVM<'sess> {
                 _ =>
                     panic!("I HAVEN'T DONE THIS"),
             }
-        } else {
-            value
-        }
-    }
-
-    pub unsafe fn cast_typevars(&self, rtype: LLVMTypeRef, value: LLVMValueRef) -> LLVMValueRef {
-        let vtype = LLVMTypeOf(value);
-        let typevar = self.get_type(TYPEVAR_ID).unwrap();
-
-        if rtype != vtype && (rtype == typevar || vtype == typevar) {
-            self.build_cast(rtype, value)
         } else {
             value
         }
@@ -491,7 +481,7 @@ impl<'sess> LLVM<'sess> {
     }
 
     pub unsafe fn build_store(&self, pointer: LLVMValueRef, value: LLVMValueRef) -> LLVMValueRef {
-        LLVMBuildStore(self.builder, self.cast_typevars(LLVMGetElementType(LLVMTypeOf(pointer)), value), pointer);
+        LLVMBuildStore(self.builder, value, pointer);
         value
     }
 
@@ -634,10 +624,38 @@ impl<'sess> LLVM<'sess> {
                 LLVMGetNamedFunction(self.module, cstr(name))
             },
 
+
             LLExpr::Cast(ltype, expr) => {
                 let value = self.build_expr(expr);
                 let rtype = self.build_type(ltype);
                 self.build_cast(rtype, value)
+            },
+
+            LLExpr::PackUniversal(ltype, expr) => {
+                let value = self.build_expr(expr);
+                let rtype = self.build_type(ltype);
+
+                let sourcekind = LLVMGetTypeKind(LLVMTypeOf(value));
+                let result = if sourcekind != LLVMTypeKind::LLVMPointerTypeKind {
+                    self.build_boxed(LLVMPointerType(LLVMTypeOf(value), 0), value)
+                } else {
+                    value
+                };
+
+                LLVMBuildPointerCast(self.builder, result, rtype, cstr(""))
+            },
+
+            LLExpr::UnpackUniversal(ltype, expr) => {
+                let value = self.build_expr(expr);
+                let rtype = self.build_type(ltype);
+
+                let destkind = LLVMGetTypeKind(rtype);
+                if destkind != LLVMTypeKind::LLVMPointerTypeKind {
+                    let reference = LLVMBuildPointerCast(self.builder, value, LLVMPointerType(rtype, 0), cstr(""));
+                    LLVMBuildLoad(self.builder, reference, cstr(""))
+                } else {
+                    LLVMBuildPointerCast(self.builder, value, rtype, cstr(""))
+                }
             },
 
 

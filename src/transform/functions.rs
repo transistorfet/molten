@@ -65,17 +65,12 @@ impl<'sess> Transformer<'sess> {
         }
     }
 
-    pub fn transform_func_invoke(&mut self, abi: ABI, _id: UniqueID, func: &Expr, args: &Vec<Expr>, ftype: &Type, rettype: &Type) -> Vec<LLExpr> {
+    pub fn transform_func_invoke(&mut self, abi: ABI, _id: UniqueID, func: &Expr, args: &Vec<Expr>) -> Vec<LLExpr> {
         let mut exprs = vec!();
 
-        let argtypes = ftype.get_argtypes().unwrap().as_vec();
-        let src_type = ftype.get_rettype().unwrap();
-        let fargs = self.transform_as_typed_args(&mut exprs, argtypes, args);
+        let fargs = self.transform_as_args(&mut exprs, args);
         let funcresult = self.transform_as_result(&mut exprs, func);
         exprs.extend(self.create_func_invoke(abi, funcresult, fargs));
-        let last = exprs.pop().unwrap();
-        let result = self.check_convert_to_trait(&mut exprs, rettype, src_type, last);
-        exprs.push(result);
         exprs
     }
 

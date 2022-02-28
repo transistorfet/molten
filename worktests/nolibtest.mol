@@ -1,0 +1,130 @@
+
+//// Basic Literals + Math ////
+
+0123
+0x234
+Inf
+//Info  // checks that Inf parses correctly, and that Info doesn't
+-Inf
+NaN
+true
+false
+()
+
+2 * (10 + -3) + 5
+2 + 4 * 7 - 1 / 20  * 10 - 50 * 12
+(2 * 3) + (4 - 5)
+2 + 4 * 7 - 1 / 20  == 10 - 50 * 12
+123 + ~124 * 25
+123 + (124 * 25)
+(1, 2)
+
+
+
+//// Functions ////
+
+let y = 12
+
+fn foo() {
+    fn bar() {
+        45 + y
+    }
+    println(str(bar()))
+
+    y + 12
+}
+
+foo()
+
+let bar = foo
+bar()
+
+
+
+//// Match ////
+
+let result = match 12 with
+    | 1 => "Totally One"
+    | 2 => "Two Poo"
+    | _ => "Some number"
+println(result)
+
+
+
+//// Classes ////
+
+class Stuff {
+    val what: Int
+
+    fn new(self) {
+        self.what = 8
+    }
+
+    fn tell() {
+        println("Let me tell you!")
+    }
+}
+
+let s = new Stuff()
+Stuff::tell()
+println(str(s.what))
+
+
+//// Universal Type Variables ////
+
+fn universal(a: 'a) -> 'a {
+    a
+}
+
+println(str(universal(5)))
+println(universal("Test"))
+
+
+//// Enums ////
+
+enum TestThing =
+| Variant1
+| Variant2(Int)
+| Variant3(String, String)
+
+//let tt = TestThing::Variant1
+//let tt = TestThing::Variant2(987)
+let tt = TestThing::Variant3("Hey", "Ho")
+
+match tt with
+| TestThing::Variant1 => println("It's Variant 1")
+| TestThing::Variant2(n) => println("It's soo Variant 2 with " + str(n))
+| TestThing::Variant3(s1, s2) => println("It's totally Variant 3 with " + s1 + " and " + s2)
+| _ => println("I don't know")
+
+
+
+//// Traits ////
+
+trait TraitTest {
+    decl thing(Self) -> Bool
+}
+
+impl TraitTest for String {
+    fn thing(self) {
+        println(self)
+        true
+    }
+}
+
+impl TraitTest for Int {
+    fn thing(self) {
+        println(str(self))
+        false
+    }
+}
+
+
+fn test_trait(t: 'a) where a: TraitTest {
+    println(str(t.thing()))
+    // TODO this doesn't work.  You can't build the method resolver in transform without access to the object...
+    //println(str(TraitTest::thing(t)))
+}
+
+test_trait("Hey")
+

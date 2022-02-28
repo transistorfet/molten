@@ -468,3 +468,34 @@ impl Display for { a: Int, b: String } {
 //let value_added = true
 //println(value_added.str())
 
+impl Display for String {
+    fn str(self) {
+        self
+    }
+}
+
+//fn convert_str(s: String) -> Option<'a> where a: Display {
+//    Option::Some(s)
+//}
+
+
+fn printopt(opt: Option<'a>) where a: Display {
+    match opt with
+    | Option::Some(data) => println(data.str())
+    | Option::None => println("None")
+}
+
+//printopt(convert_str("Hey"))
+printopt("Hey")
+
+
+// TODO this compiles but doesn't work because it improperly treats the ref
+//      (it's a ref Int, not a ref <universal>)
+fn test(a: ref 'a, b: 'a) {
+    *a = b
+}
+let r3 = ref 5
+test(r3, 6)
+println(str(*r3))
+
+

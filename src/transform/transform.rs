@@ -164,6 +164,23 @@ impl<'sess> Visitor for Transformer<'sess> {
         Ok(exprs)
     }
 
+    fn visit_pack_universal(&mut self, _refid: UniqueID, ttype: &Type, code: &Expr) -> Result<Self::Return, Error> {
+        let mut exprs = vec!();
+        let src_type = self.session.get_type(code.id).unwrap();
+        let result = self.transform_as_result(&mut exprs, code);
+        let result = self.convert_to_trait_universal(&mut exprs, &ttype, &src_type, result);
+        exprs.push(result);
+        Ok(exprs)
+    }
+
+    fn visit_unpack_universal(&mut self, _refid: UniqueID, ttype: &Type, code: &Expr) -> Result<Self::Return, Error> {
+        let mut exprs = vec!();
+        let result = self.transform_as_result(&mut exprs, code);
+        let result = self.convert_from_trait_universal(&mut exprs, &ttype, result);
+        exprs.push(result);
+        Ok(exprs)
+    }
+
     fn visit_ref(&mut self, refid: UniqueID, expr: &Expr) -> Result<Self::Return, Error> {
         Ok(self.transform_alloc_ref(refid, expr))
     }
@@ -204,10 +221,9 @@ impl<'sess> Visitor for Transformer<'sess> {
 
 
     fn visit_invoke(&mut self, refid: UniqueID, func: &Expr, args: &Vec<Expr>, fid: UniqueID) -> Result<Self::Return, Error> {
-        let rettype = self.session.get_type(refid).unwrap();
         let deftype = self.session.get_type(fid).unwrap();
         let abi = deftype.get_abi().unwrap();
-        Ok(self.transform_func_invoke(abi, refid, func, args, &deftype, &rettype))
+        Ok(self.transform_func_invoke(abi, refid, func, args))
     }
 
 
@@ -398,10 +414,10 @@ impl<'sess> Transformer<'sess> {
         last
     }
 
-    pub fn transform_as_typed_args(&mut self, exprs: &mut Vec<LLExpr>, argtypes: Vec<Type>, args: &Vec<Expr>) -> Vec<LLExpr> {
+    pub fn transform_as_args(&mut self, exprs: &mut Vec<LLExpr>, args: &Vec<Expr>) -> Vec<LLExpr> {
         let mut fargs = vec!();
-        for (atype, arg) in argtypes.iter().zip(args.iter()) {
-            fargs.push(self.check_transform_to_trait(exprs, atype, arg));
+        for arg in args.iter() {
+            fargs.push(self.transform_as_result(exprs, arg));
         }
         fargs
     }
@@ -681,10 +697,15 @@ impl<'sess> Transformer<'sess> {
         exprs
     }
 
-    pub fn transform_pattern_conjunction(&mut self, exprs: &mut Vec<LLExpr>, prev: Option<LLExpr>, pat: &Pattern, value_id: UniqueID) -> LLExpr {
+    pub fn transform_pattern_as_result(&mut self, exprs: &mut Vec<LLExpr>, pat: &Pattern, value_id: UniqueID) -> LLExpr {
         let mut newexprs = self.transform_pattern(pat, value_id);
-        let result = newexprs.pop().unwrap();
+        let last = newexprs.pop().unwrap();
         exprs.extend(newexprs);
+        last
+    }
+
+    pub fn transform_pattern_conjunction(&mut self, exprs: &mut Vec<LLExpr>, prev: Option<LLExpr>, pat: &Pattern, value_id: UniqueID) -> LLExpr {
+        let result = self.transform_pattern_as_result(exprs, pat, value_id);
         match prev {
             //Some(expr) => LLExpr::Cmp(LLCmpType::Equal, r(expr), r(result)),
             Some(expr) => LLExpr::And(r(LLExpr::Cmp(LLCmpType::Equal, r(expr), r(LLExpr::Literal(LLLit::I1(true))))), r(LLExpr::Cmp(LLCmpType::Equal, r(result), r(LLExpr::Literal(LLLit::I1(true)))))),
@@ -715,6 +736,19 @@ impl<'sess> Transformer<'sess> {
             PatKind::Annotation(_, subpat) => {
                 let ttype = self.session.get_type(pat.id).unwrap();
                 exprs.push(LLExpr::SetValue(pat.id, r(LLExpr::Cast(self.transform_value_type(&ttype), r(LLExpr::GetValue(value_id))))));
+                exprs.extend(self.transform_pattern(subpat, pat.id));
+            },
+
+            PatKind::PackUniversal(ttype, subpat) => {
+                let unpacked_type = self.session.get_type(pat.id).unwrap();
+                let value = self.convert_to_trait_universal(&mut exprs, &unpacked_type, ttype, LLExpr::GetValue(value_id));
+                exprs.push(LLExpr::SetValue(pat.id, r(value)));
+                exprs.extend(self.transform_pattern(subpat, pat.id));
+            },
+
+            PatKind::UnpackUniversal(ttype, subpat) => {
+                let value = self.convert_from_trait_universal(&mut exprs, ttype, LLExpr::GetValue(value_id));
+                exprs.push(LLExpr::SetValue(pat.id, r(value)));
                 exprs.extend(self.transform_pattern(subpat, pat.id));
             },
 
@@ -761,6 +795,7 @@ impl<'sess> Transformer<'sess> {
                     let variant_type = self.get_type(variant_id).unwrap();
                     exprs.push(LLExpr::DefLocal(value_ref_id, value_ref_id.to_string(), variant_type.clone(), r(LLExpr::Cast(variant_type.clone(), r(LLExpr::GetValue(value_id))))));
 
+                    // Extract the data struct out of the tagged struct
                     let item_id = UniqueID::generate();
                     exprs.push(LLExpr::SetValue(item_id, r(
                         LLExpr::LoadRef(r(
@@ -770,12 +805,10 @@ impl<'sess> Transformer<'sess> {
                         ))
                     )));
 
+                    // For each argument, get the corresponding value from the enum data struct and match it against the associated pattern
                     let mut prev = None;
-                    let argtypes = self.session.get_type(*eid).unwrap().as_vec();
-                    for ((i, arg), packed_type) in args.iter().enumerate().zip(argtypes.iter()) {
-                        let unpacked_type = self.session.get_type(arg.id).unwrap();
-                        let value = self.check_convert_to_trait(&mut exprs, &unpacked_type, packed_type, LLExpr::GetItem(r(LLExpr::GetValue(item_id)), i));
-                        exprs.push(LLExpr::SetValue(arg.id, r(value)));
+                    for (i, arg) in args.iter().enumerate() {
+                        exprs.push(LLExpr::SetValue(arg.id, r(LLExpr::GetItem(r(LLExpr::GetValue(item_id)), i))));
                         prev = Some(self.transform_pattern_conjunction(&mut exprs, prev, arg, arg.id));
                     }
                     exprs.push(prev.unwrap());

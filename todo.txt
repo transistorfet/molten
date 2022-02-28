@@ -1,4 +1,13 @@
 
+* you could have multiple trait constraints per argument, such that you also pass in a vtable for each argument (or repack a pair struct) that is assembled by
+  the calling function on the stack, and which can be reduced in the number of trait vtables for that type's vtable list when recreating the vtable list to call
+  another function.  You just can't have additional constraints if the type isn't already defined with that many.  It might end up being a lot of vtable overhead
+  if they can't be predetermined.  Can they be shrunk another way?  You also wouldn't be able to store these values since the vtable would disappear after the call...
+
+* I hate to say it, but I should maybe remove exceptions because they aren't a good way of returning *shrug*  I think Haskell recommends not using them
+
+* add functional functions like map, filter, foldl, foldr
+
 * you currently can't call a method on a type that implements a trait.  You can only call the trait methods on a universal, but that shouldn't be necessary
 * you could have a scope in session which is for *all* traits, and all trait methods get defined in that table, and if method lookup fails through normal means, you can
   lookup on the common traits table to find the trait_id, and then make an access to the method in the static vtable if it exists, but you'd have to maybe do more work
